@@ -8,6 +8,7 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   const router = useRouter()
 
+
   useEffect(() => {
     if (!loading && !user) {
       router.replace('/') // or your login route
