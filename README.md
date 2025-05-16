@@ -17,3 +17,20 @@ npx prisma db seed
 
 
 
+
+
+
+
+PROCESS:
+
+user can create location details folder
+under location details user can create clients details folder
+under clients details folder user can create projects details folder
+under project details folder user can create equipments and vehicle
+
+
+users:
+superadmin   permission: ALL
+admin        permission: ALL
+client       permission: view
+
