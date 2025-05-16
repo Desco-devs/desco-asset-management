@@ -1,13 +1,15 @@
   'use client'
 
+import Client from "./client"
 
-  export default function Equipments() {
+
+  export default function Proejects() {
 
 
     return (
 
         <div>
-            Hadsasdasdasd
+           <Client/>
         </div>
     )
   }

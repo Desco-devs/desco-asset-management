@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ClientProviders from "./AuthProviderClient";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Desco",
@@ -18,6 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+         <Toaster richColors />
         <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
