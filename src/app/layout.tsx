@@ -21,6 +21,7 @@ export default function RootLayout({
       <body>
          <Toaster richColors />
         <ClientProviders>{children}</ClientProviders>
+        <Toaster />
       </body>
     </html>
   );
