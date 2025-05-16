@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 import { Input } from "@/components/ui/input";
@@ -18,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { toast } from "sonner";
 
 interface SigninProps {
   onToggle: () => void;
@@ -73,9 +73,8 @@ const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen w-full p-4 bg-gray-50">
-      <ToastContainer />
-      <Card className="w-full max-w-md shadow-lg relative bg-white">
+    <div className="flex items-center justify-center min-h-screen w-full p-4">
+      <Card className="w-full max-w-md shadow-lg relative">
         <CardHeader className="space-y-1 flex flex-col items-center">
           <div className="flex flex-col items-center">
             <img className="h-16 mb-2" src="/images/logo.png" alt="logo" />
@@ -127,7 +126,7 @@ const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-black text-white hover:bg-gray-800 duration-300 ease-in-out transition-all mt-2"
+              className="w-full bg-chart-1 hover:bg-chart-2 text-white duration-300 ease-in-out transition-all mt-2"
             >
               {loading ? "Logging in..." : "LOGIN"}
             </Button>

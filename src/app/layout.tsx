@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ClientProviders from "./AuthProviderClient";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "Desco",
@@ -19,6 +20,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <ClientProviders>{children}</ClientProviders>
+        <Toaster />
       </body>
     </html>
   );
