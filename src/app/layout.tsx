@@ -1,7 +1,6 @@
 // src/app/layout.tsx  (server component)
 
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ClientProviders from "./AuthProviderClient";
 import { Toaster } from "sonner";
