@@ -28,8 +28,6 @@ model User {
   phone       String?
   permissions Json      @default("[]") // stores an array of Permission strings
 
-  projects    Project[]
-
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
@@ -61,9 +59,6 @@ model Project {
   uid         String      @id @default(uuid())
   name        String
 
-  userId      String
-  user        User        @relation(fields: [userId], references: [uid])
-
   clientId    String
   client      Client      @relation(fields: [clientId], references: [uid])
 
@@ -83,7 +78,7 @@ model Equipment {
   status          Status
   remarks         String?
   owner           String
-  image_url       String?   // <-- Added image_url field, optional
+  image_url       String?   // optional
 
   projectId       String
   project         Project  @relation(fields: [projectId], references: [uid])
@@ -104,7 +99,7 @@ model Vehicle {
   status          Status
   remarks         String?
   owner           String
-  image_url       String?   // <-- Added image_url field, optional
+  image_url       String?   // optional
 
   projectId       String
   project         Project  @relation(fields: [projectId], references: [uid])

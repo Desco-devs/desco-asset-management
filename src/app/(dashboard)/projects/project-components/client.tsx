@@ -1,20 +1,14 @@
 "use client";
 
-interface Location {
-  uid: string;
-  address: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 import {
   fetchLocations,
   addLocation,
   updateLocation,
   deleteLocation,
 } from "@/app/service/client/clients";
-import { useRouter } from "next/navigation";
 
 import {
   Table,
@@ -73,12 +67,24 @@ import {
   SlidersHorizontal,
   RefreshCcw,
 } from "lucide-react";
+
 import { toast } from "sonner";
+
 import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
+
 import AddClient from "../modal/addClient";
+import ViewClientsModal from "../modal/viewClient";
+
+interface Location {
+  uid: string;
+  address: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export default function LocationManager() {
   const router = useRouter();
+
   const [locations, setLocations] = useState<Location[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -87,32 +93,33 @@ export default function LocationManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Sorting state
+  // Sorting
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Location | null;
     direction: "asc" | "desc" | null;
-  }>({
-    key: "createdAt", // Default sort by creation date
-    direction: "desc", // Default newest first
-  });
+  }>({ key: "createdAt", direction: "desc" });
 
-  // Pagination state
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
-  // For alert modal
+  // Delete confirmation modal
   const [alertOpen, setAlertOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Load locations function
+  // View clients modal
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewLocationId, setViewLocationId] = useState<string | null>(null);
+ const [viewLocationAddress, setViewLocationAddress] = useState<string | null>(null);
+
+  // Fetch & sort
   const loadLocations = async () => {
     setIsLoading(true);
     try {
       const data = await fetchLocations();
-      // Ensure locations are sorted by createdAt in descending order
-      const sortedData = sortLocationsByDate(data);
-      setLocations(sortedData);
-      setFilteredLocations(sortedData);
+      const sorted = sortLocationsByDate(data);
+      setLocations(sorted);
+      setFilteredLocations(sorted);
     } catch (e) {
       console.error(e);
       toast.error("Failed to load locations");
@@ -121,15 +128,12 @@ export default function LocationManager() {
     }
   };
 
-  // Helper function to sort locations by date
-  const sortLocationsByDate = (data: Location[]) => {
-    return [...data].sort(
+  const sortLocationsByDate = (data: Location[]) =>
+    [...data].sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-  };
 
-  // Apply sorting to locations
   const applySorting = (data: Location[]) => {
     if (sortConfig.key && sortConfig.direction) {
       return [...data].sort((a, b) => {
@@ -145,7 +149,7 @@ export default function LocationManager() {
     return data;
   };
 
-  // Manual refresh function
+  // Manual refresh
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     router.refresh();
@@ -154,48 +158,36 @@ export default function LocationManager() {
     toast.success("Data refreshed");
   };
 
-  // Initial load - only once when component mounts
   useEffect(() => {
     loadLocations();
   }, []);
 
-  // Filter locations based on search term
+  // Filtering & sorting
   useEffect(() => {
     const filtered = locations.filter(
-      (location) =>
-        location.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        location.uid.toLowerCase().includes(searchTerm.toLowerCase())
+      (loc) =>
+        loc.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        loc.uid.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    const sortedFiltered = applySorting(filtered);
-    setFilteredLocations(sortedFiltered);
-    setCurrentPage(1); // Reset to first page when filtering
+    setFilteredLocations(applySorting(filtered));
+    setCurrentPage(1);
   }, [searchTerm, locations, sortConfig]);
 
-  // Request sort
   const requestSort = (key: keyof Location) => {
     let direction: "asc" | "desc" | null = "asc";
-
     if (sortConfig.key === key) {
-      if (sortConfig.direction === "asc") {
-        direction = "desc";
-      } else if (sortConfig.direction === "desc") {
-        direction = null;
-      }
+      if (sortConfig.direction === "asc") direction = "desc";
+      else if (sortConfig.direction === "desc") direction = null;
     }
-
-    setSortConfig({ key, direction });
-
-    if (direction === null) {
-      // Reset to default sort (newest first)
-      setSortConfig({ key: "createdAt", direction: "desc" });
-    }
+    setSortConfig(
+      direction
+        ? { key, direction }
+        : { key: "createdAt", direction: "desc" }
+    );
   };
 
-  // Get sorted icon
   const getSortIcon = (key: keyof Location) => {
-    if (sortConfig.key !== key) {
-      return null;
-    }
+    if (sortConfig.key !== key) return null;
     return sortConfig.direction === "asc" ? (
       <ChevronUp className="ml-1 h-4 w-4" />
     ) : (
@@ -203,15 +195,13 @@ export default function LocationManager() {
     );
   };
 
+  // CRUD handlers
   async function handleAddLocation(address: string) {
     try {
-      const newLocation = await addLocation(address);
-      toast.success("Location added successfully");
-
-      // Reload data to ensure we have the latest from the server
+      await addLocation(address);
+      toast.success("Location added");
       await loadLocations();
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast.error("Failed to add location");
     }
   }
@@ -221,33 +211,25 @@ export default function LocationManager() {
       await updateLocation(id, editAddress);
       setEditingId(null);
       setEditAddress("");
-      toast.success("Location updated successfully");
-
-      // Reload data to ensure we have the latest from the server
+      toast.success("Location updated");
       await loadLocations();
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast.error("Failed to update location");
     }
   }
 
-  // Open alert modal for delete confirmation
   function openDeleteModal(id: string) {
     setDeleteId(id);
     setAlertOpen(true);
   }
 
-  // Confirm delete handler
   async function confirmDelete() {
     if (!deleteId) return;
     try {
       await deleteLocation(deleteId);
-      toast.success("Location deleted successfully");
-
-      // Reload data to ensure we have the latest from the server
+      toast.success("Location deleted");
       await loadLocations();
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast.error("Failed to delete location");
     } finally {
       setAlertOpen(false);
@@ -256,25 +238,14 @@ export default function LocationManager() {
   }
 
   // Pagination logic
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredLocations.slice(
-    indexOfFirstItem,
-    indexOfLastItem
-  );
+  const indexOfLast = currentPage * itemsPerPage;
+  const indexOfFirst = indexOfLast - itemsPerPage;
+  const currentItems = filteredLocations.slice(indexOfFirst, indexOfLast);
   const totalPages = Math.ceil(filteredLocations.length / itemsPerPage);
+  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
-  // Generate page numbers
-  const pageNumbers = [];
-  for (let i = 1; i <= totalPages; i++) {
-    pageNumbers.push(i);
-  }
-
-  // Handle page navigation
-  const handlePageChange = (pageNumber: number) => {
-    if (pageNumber > 0 && pageNumber <= totalPages) {
-      setCurrentPage(pageNumber);
-    }
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
   return (
@@ -287,14 +258,13 @@ export default function LocationManager() {
             </CardTitle>
             <CardDescription>
               Manage all client locations
-              {isRefreshing && (
-                <span className="text-xs ml-2">(refreshing...)</span>
-              )}
+              {isRefreshing && <span className="text-xs ml-2">(refreshing...)</span>}
             </CardDescription>
           </div>
           <AddClient onAdd={handleAddLocation} />
         </div>
       </CardHeader>
+
       <CardContent>
         <div className="flex justify-between items-center mb-4">
           <div className="relative w-64">
@@ -313,16 +283,17 @@ export default function LocationManager() {
             </Badge>
             <Select
               value={itemsPerPage.toString()}
-              onValueChange={(value) => setItemsPerPage(parseInt(value))}
+              onValueChange={(v) => setItemsPerPage(parseInt(v))}
             >
               <SelectTrigger className="w-32">
                 <SelectValue placeholder="Items per page" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="5">5 per page</SelectItem>
-                <SelectItem value="10">10 per page</SelectItem>
-                <SelectItem value="20">20 per page</SelectItem>
-                <SelectItem value="50">50 per page</SelectItem>
+                {[5, 10, 20, 50].map((n) => (
+                  <SelectItem key={n} value={n.toString()}>
+                    {n} per page
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button
@@ -332,9 +303,7 @@ export default function LocationManager() {
               onClick={handleManualRefresh}
               disabled={isRefreshing}
             >
-              <RefreshCcw
-                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
+              <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
               <span className="sr-only">Refresh</span>
             </Button>
           </div>
@@ -344,61 +313,29 @@ export default function LocationManager() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-20">
-                  <div
-                    className="flex items-center cursor-pointer"
-                    onClick={() => requestSort("uid")}
-                  >
-                    UID {getSortIcon("uid")}
-                  </div>
-                </TableHead>
-                <TableHead>
-                  <div
-                    className="flex items-center cursor-pointer"
-                    onClick={() => requestSort("address")}
-                  >
-                    Address {getSortIcon("address")}
-                  </div>
-                </TableHead>
-                <TableHead>
-                  <div
-                    className="flex items-center cursor-pointer"
-                    onClick={() => requestSort("createdAt")}
-                  >
-                    Created At {getSortIcon("createdAt")}
-                  </div>
-                </TableHead>
-                <TableHead>
-                  <div
-                    className="flex items-center cursor-pointer"
-                    onClick={() => requestSort("updatedAt")}
-                  >
-                    Updated At {getSortIcon("updatedAt")}
-                  </div>
-                </TableHead>
+                {["uid", "address", "createdAt", "updatedAt"].map((col) => (
+                  <TableHead key={col}>
+                    <div
+                      className="flex items-center cursor-pointer"
+                      onClick={() => requestSort(col as keyof Location)}
+                    >
+                      {col.charAt(0).toUpperCase() + col.slice(1)}{" "}
+                      {getSortIcon(col as keyof Location)}
+                    </div>
+                  </TableHead>
+                ))}
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                // Loading state
-                Array.from({ length: 3 }).map((_, index) => (
-                  <TableRow key={`loading-${index}`}>
-                    <TableCell>
-                      <div className="h-4 bg-muted animate-pulse rounded"></div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 bg-muted animate-pulse rounded w-full"></div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 bg-muted animate-pulse rounded w-24"></div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 bg-muted animate-pulse rounded w-24"></div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="h-4 bg-muted animate-pulse rounded w-16 ml-auto"></div>
-                    </TableCell>
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 5 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <div className="h-4 bg-muted animate-pulse rounded w-full" />
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))
               ) : currentItems.length === 0 ? (
@@ -410,14 +347,10 @@ export default function LocationManager() {
               ) : (
                 currentItems.map((loc) => (
                   <TableRow key={loc.uid}>
-                    <TableCell className="font-mono text-xs">
-                      {loc.uid}
-                    </TableCell>
-
+                    <TableCell className="font-mono text-xs">{loc.uid}</TableCell>
                     <TableCell>
                       {editingId === loc.uid ? (
                         <Input
-                          type="text"
                           value={editAddress}
                           onChange={(e) => setEditAddress(e.target.value)}
                           className="w-full"
@@ -426,14 +359,12 @@ export default function LocationManager() {
                         loc.address
                       )}
                     </TableCell>
-
                     <TableCell>
                       {new Date(loc.createdAt).toLocaleString()}
                     </TableCell>
                     <TableCell>
                       {new Date(loc.updatedAt).toLocaleString()}
                     </TableCell>
-
                     <TableCell className="text-right">
                       {editingId === loc.uid ? (
                         <div className="flex justify-end gap-2">
@@ -474,6 +405,15 @@ export default function LocationManager() {
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
+                              onClick={() => {
+                                setViewLocationId(loc.uid);
+                                setViewLocationAddress(loc.address);
+                                setViewOpen(true);
+                              }}
+                            >
+                              View Clients
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               className="text-red-600"
                               onClick={() => openDeleteModal(loc.uid)}
                             >
@@ -490,59 +430,54 @@ export default function LocationManager() {
           </Table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex justify-end items-center mt-4">
-            <div className="mt-4 w-fit ">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handlePageChange(currentPage - 1);
+                    }}
+                    className={
+                      currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                    }
+                  />
+                </PaginationItem>
+
+                {pageNumbers.map((num) => (
+                  <PaginationItem key={num}>
+                    <PaginationLink
                       href="#"
+                      isActive={currentPage === num}
                       onClick={(e) => {
                         e.preventDefault();
-                        handlePageChange(currentPage - 1);
+                        handlePageChange(num);
                       }}
-                      className={
-                        currentPage === 1
-                          ? "pointer-events-none opacity-50"
-                          : ""
-                      }
-                    />
+                    >
+                      {num}
+                    </PaginationLink>
                   </PaginationItem>
+                ))}
 
-                  {pageNumbers.map((number) => (
-                    <PaginationItem key={number}>
-                      <PaginationLink
-                        href="#"
-                        isActive={currentPage === number}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handlePageChange(number);
-                        }}
-                      >
-                        {number}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
-
-                  <PaginationItem>
-                    <PaginationNext
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handlePageChange(currentPage + 1);
-                      }}
-                      className={
-                        currentPage === totalPages
-                          ? "pointer-events-none opacity-50"
-                          : ""
-                      }
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handlePageChange(currentPage + 1);
+                    }}
+                    className={
+                      currentPage === totalPages
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </div>
         )}
       </CardContent>
@@ -555,6 +490,16 @@ export default function LocationManager() {
         onConfirm={confirmDelete}
         confirmText="Delete"
         cancelText="Cancel"
+      />
+
+      <ViewClientsModal
+        isOpen={viewOpen}
+        onOpenChange={(open) => {
+          setViewOpen(open);
+          if (!open) setViewLocationId(null);
+        }}
+         locationId={viewLocationId}
+        locationAddress={viewLocationAddress}
       />
     </Card>
   );
