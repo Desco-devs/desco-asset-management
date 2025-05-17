@@ -1,5 +1,3 @@
-
-
 const VehiclePage = () => {
   return (
     <div>

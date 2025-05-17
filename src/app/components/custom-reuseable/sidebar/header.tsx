@@ -108,7 +108,7 @@ const Header = () => {
         <Separator orientation="vertical" className="mr-2 h-4" />
         <div className="w-full flex items-center justify-between">
           {/* Routes */}
-          <div className="flex flex-row items-center gap-12">
+          <div className="flex flex-row items-center gap-12 w-fit">
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
@@ -133,19 +133,19 @@ const Header = () => {
               </BreadcrumbList>
             </Breadcrumb>
             {/* Date and Time Cards */}
-            <div className="hidden md:flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-3 w-fit">
               <Card className="bg-card/50 rounded-sm backdrop-blur-sm flex items-center px-3 py-1.5 text-xs border shadow-sm">
                 <span>{currentDate}</span>
               </Card>
 
-              <Card className="w-fit rounded-sm  flex-row text-xs bg-card/50 backdrop-blur-sm flex items-center gap-1.5 px-3 py-1.5 border shadow-sm">
+              <Card className="rounded-sm  flex-row text-xs bg-card/50 backdrop-blur-sm flex items-center gap-1.5 px-3 py-1.5 border shadow-sm">
                 <Clock className="h-3.5 w-3.5" />
                 <span>{currentTime}</span>
               </Card>
             </div>
           </div>
 
-          <div className="flex flex-row items-center gap-2">
+          <div className="w-fit flex flex-row items-center gap-2">
             {/* Theme Toggle */}
             <ModeToggle />
             {/* User Profile */}

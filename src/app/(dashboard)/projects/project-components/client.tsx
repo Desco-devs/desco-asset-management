@@ -1,13 +1,20 @@
 "use client";
 
+interface Location {
+  uid: string;
+  address: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 import React, { useState, useEffect } from "react";
-import type { Location } from "@/app/service/client/clients";
 import {
   fetchLocations,
   addLocation,
   updateLocation,
   deleteLocation,
 } from "@/app/service/client/clients";
+import { useRouter } from "next/navigation";
 
 import {
   Table,
@@ -64,25 +71,29 @@ import {
   PlusCircle,
   Search,
   SlidersHorizontal,
+  RefreshCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
 import AddClient from "../modal/addClient";
 
 export default function LocationManager() {
+  const router = useRouter();
   const [locations, setLocations] = useState<Location[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editAddress, setEditAddress] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Sorting state
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Location | null;
     direction: "asc" | "desc" | null;
   }>({
-    key: null,
-    direction: null,
+    key: "createdAt", // Default sort by creation date
+    direction: "desc", // Default newest first
   });
 
   // Pagination state
@@ -93,17 +104,58 @@ export default function LocationManager() {
   const [alertOpen, setAlertOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadLocations() {
-      try {
-        const data = await fetchLocations();
-        setLocations(data);
-        setFilteredLocations(data);
-      } catch (e) {
-        console.error(e);
-        toast.error("Failed to load locations");
-      }
+  // Load locations function
+  const loadLocations = async () => {
+    setIsLoading(true);
+    try {
+      const data = await fetchLocations();
+      // Ensure locations are sorted by createdAt in descending order
+      const sortedData = sortLocationsByDate(data);
+      setLocations(sortedData);
+      setFilteredLocations(sortedData);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to load locations");
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Helper function to sort locations by date
+  const sortLocationsByDate = (data: Location[]) => {
+    return [...data].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  };
+
+  // Apply sorting to locations
+  const applySorting = (data: Location[]) => {
+    if (sortConfig.key && sortConfig.direction) {
+      return [...data].sort((a, b) => {
+        if (a[sortConfig.key!] < b[sortConfig.key!]) {
+          return sortConfig.direction === "asc" ? -1 : 1;
+        }
+        if (a[sortConfig.key!] > b[sortConfig.key!]) {
+          return sortConfig.direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return data;
+  };
+
+  // Manual refresh function
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    router.refresh();
+    await loadLocations();
+    setIsRefreshing(false);
+    toast.success("Data refreshed");
+  };
+
+  // Initial load - only once when component mounts
+  useEffect(() => {
     loadLocations();
   }, []);
 
@@ -114,25 +166,10 @@ export default function LocationManager() {
         location.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
         location.uid.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    setFilteredLocations(filtered);
+    const sortedFiltered = applySorting(filtered);
+    setFilteredLocations(sortedFiltered);
     setCurrentPage(1); // Reset to first page when filtering
-  }, [searchTerm, locations]);
-
-  // Sort locations when sort config changes
-  useEffect(() => {
-    if (sortConfig.key && sortConfig.direction) {
-      const sortedLocations = [...filteredLocations].sort((a, b) => {
-        if (a[sortConfig.key!] < b[sortConfig.key!]) {
-          return sortConfig.direction === "asc" ? -1 : 1;
-        }
-        if (a[sortConfig.key!] > b[sortConfig.key!]) {
-          return sortConfig.direction === "asc" ? 1 : -1;
-        }
-        return 0;
-      });
-      setFilteredLocations(sortedLocations);
-    }
-  }, [sortConfig]);
+  }, [searchTerm, locations, sortConfig]);
 
   // Request sort
   const requestSort = (key: keyof Location) => {
@@ -149,13 +186,8 @@ export default function LocationManager() {
     setSortConfig({ key, direction });
 
     if (direction === null) {
-      // Reset to original order
-      const filtered = locations.filter(
-        (location) =>
-          location.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          location.uid.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredLocations(filtered);
+      // Reset to default sort (newest first)
+      setSortConfig({ key: "createdAt", direction: "desc" });
     }
   };
 
@@ -174,8 +206,10 @@ export default function LocationManager() {
   async function handleAddLocation(address: string) {
     try {
       const newLocation = await addLocation(address);
-      setLocations((prev) => [...prev, newLocation]);
       toast.success("Location added successfully");
+
+      // Reload data to ensure we have the latest from the server
+      await loadLocations();
     } catch (e) {
       console.error(e);
       toast.error("Failed to add location");
@@ -184,13 +218,13 @@ export default function LocationManager() {
 
   async function handleUpdateLocation(id: string) {
     try {
-      const updated = await updateLocation(id, editAddress);
-      setLocations((prev) =>
-        prev.map((loc) => (loc.uid === id ? updated : loc))
-      );
+      await updateLocation(id, editAddress);
       setEditingId(null);
       setEditAddress("");
       toast.success("Location updated successfully");
+
+      // Reload data to ensure we have the latest from the server
+      await loadLocations();
     } catch (e) {
       console.error(e);
       toast.error("Failed to update location");
@@ -208,8 +242,10 @@ export default function LocationManager() {
     if (!deleteId) return;
     try {
       await deleteLocation(deleteId);
-      setLocations((prev) => prev.filter((loc) => loc.uid !== deleteId));
       toast.success("Location deleted successfully");
+
+      // Reload data to ensure we have the latest from the server
+      await loadLocations();
     } catch (e) {
       console.error(e);
       toast.error("Failed to delete location");
@@ -246,8 +282,15 @@ export default function LocationManager() {
       <CardHeader>
         <div className="flex justify-between items-center">
           <div>
-            <CardTitle>Location Management</CardTitle>
-            <CardDescription>Manage all client locations</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              Location Management
+            </CardTitle>
+            <CardDescription>
+              Manage all client locations
+              {isRefreshing && (
+                <span className="text-xs ml-2">(refreshing...)</span>
+              )}
+            </CardDescription>
           </div>
           <AddClient onAdd={handleAddLocation} />
         </div>
@@ -282,6 +325,18 @@ export default function LocationManager() {
                 <SelectItem value="50">50 per page</SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-0 h-8 w-8"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCcw
+                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+              />
+              <span className="sr-only">Refresh</span>
+            </Button>
           </div>
         </div>
 
@@ -325,7 +380,28 @@ export default function LocationManager() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {currentItems.length === 0 ? (
+              {isLoading ? (
+                // Loading state
+                Array.from({ length: 3 }).map((_, index) => (
+                  <TableRow key={`loading-${index}`}>
+                    <TableCell>
+                      <div className="h-4 bg-muted animate-pulse rounded"></div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 bg-muted animate-pulse rounded w-full"></div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 bg-muted animate-pulse rounded w-24"></div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 bg-muted animate-pulse rounded w-24"></div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="h-4 bg-muted animate-pulse rounded w-16 ml-auto"></div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : currentItems.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center h-24">
                     No locations found.

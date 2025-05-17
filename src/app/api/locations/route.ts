@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { revalidatePath } from 'next/cache'
 
 const prisma = new PrismaClient()
 
@@ -11,6 +12,9 @@ function isPrismaError(err: unknown): err is { code?: string } {
     typeof (err as any).code === 'string'
   )
 }
+
+// Define a common path to revalidate whenever data changes
+const REVALIDATE_PATH = '/projects'
 
 export async function GET() {
   try {
@@ -36,6 +40,10 @@ export async function POST(request: Request) {
         address: address.trim(),
       },
     })
+
+    // Revalidate the locations path to update clients in real-time
+    revalidatePath(REVALIDATE_PATH)
+
     return NextResponse.json(newLocation, { status: 201 })
   } catch (error) {
     console.error(error)
@@ -57,6 +65,9 @@ export async function PUT(request: Request) {
       where: { uid: id },
       data: { address: address.trim() },
     })
+
+    // Revalidate the locations path to update clients in real-time
+    revalidatePath(REVALIDATE_PATH)
 
     return NextResponse.json(updatedLocation)
   } catch (error: unknown) {
@@ -80,6 +91,9 @@ export async function DELETE(request: Request) {
     await prisma.location.delete({
       where: { uid: id },
     })
+
+    // Revalidate the locations path to update clients in real-time
+    revalidatePath(REVALIDATE_PATH)
 
     return NextResponse.json({ message: 'Location deleted successfully' })
   } catch (error: unknown) {
