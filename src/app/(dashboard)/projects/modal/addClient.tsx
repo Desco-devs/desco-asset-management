@@ -45,7 +45,9 @@ export default function AddClient({ onAdd }: AddClientProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="w-fit text-sm">New Location</Button>
+        <Button className="w-fit text-sm bg-chart-1 dark:text-accent-foreground hover:bg-chart-3">
+          New Location
+        </Button>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-[425px]">

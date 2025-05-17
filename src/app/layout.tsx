@@ -1,9 +1,9 @@
-// src/app/layout.tsx  (server component)
+// src/app/layout.tsx (server component)
 
 import type { Metadata } from "next";
 import "./globals.css";
-import ClientProviders from "./AuthProviderClient";
 import { Toaster } from "sonner";
+import ClientProviders from "./AuthProviderClient";
 
 export const metadata: Metadata = {
   title: "Desco",
@@ -16,11 +16,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-         <Toaster richColors />
-        <ClientProviders>{children}</ClientProviders>
-        <Toaster />
+        <ClientProviders>
+          {children}
+          <Toaster richColors />
+        </ClientProviders>
       </body>
     </html>
   );
