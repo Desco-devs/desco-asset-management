@@ -11,14 +11,21 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import { Calendar, RefreshCw, Trash2 } from "lucide-react"
+import { Calendar, RefreshCw, Trash2, Edit2 } from "lucide-react"
 
 import { Equipment } from "@/app/service/types"
 
 import AddEquipmentModal from "./modal/addEquipment"
+import EditEquipmentModal from "./modal/editEquipment"
 import { deleteEquipment } from "@/app/service/equipments/equipment"
 import AlertModal from "@/app/components/custom-reuseable/modal/alertModal"
 
+// ShadCN Tooltip imports
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip"
 
 interface EquipmentModalProps {
   isOpen: boolean
@@ -39,10 +46,13 @@ export default function EquipmentModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
-
-  // AlertModal state
+  const [editOpen, setEditOpen] = useState(false)
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
   const [alertOpen, setAlertOpen] = useState(false)
   const [toDeleteUid, setToDeleteUid] = useState<string | null>(null)
+
+  const today = new Date()
+  const msPerDay = 1000 * 60 * 60 * 24
 
   const loadEquipments = () => {
     setLoading(true)
@@ -94,48 +104,126 @@ export default function EquipmentModal({
 
           {loading && <p>Loading…</p>}
           {error && <p className="text-red-500">{error}</p>}
-          {!loading && !error && equipments.length === 0 && <p>No equipments found.</p>}
+          {!loading && !error && equipments.length === 0 && (
+            <p>No equipments found.</p>
+          )}
 
           {!loading && !error && equipments.length > 0 && (
             <ul className="space-y-2">
-              {equipments.map(e => (
-                <li
-                  key={e.uid}
-                  className="border p-2 rounded flex items-center justify-between"
-                >
-                  <div>
-                    <div className="font-medium">
-                      {e.brand} {e.model}
-                    </div>
-                    <div className="flex text-xs text-gray-500 space-x-4 mt-1">
-                      <div className="flex items-start space-x-1">
-                        <Calendar className="w-3 h-3 mt-[2px]" />
-                        <div>
-                          {new Date(e.expirationDate).toLocaleDateString(undefined, {
-                            month: "short",
-                            day:   "numeric",
-                            year:  "numeric",
-                          })}
+              {equipments.map(e => {
+                const expDate = new Date(e.expirationDate)
+                const daysToExpiry = Math.ceil(
+                  (expDate.getTime() - today.getTime()) / msPerDay
+                )
+                let expLabel: string
+                let expClass: string
+                if (daysToExpiry < 0) {
+                  expLabel = `Expired ${Math.abs(daysToExpiry)}d ago`
+                  expClass = "text-red-500"
+                } else if (daysToExpiry <= 10) {
+                  expLabel = `${daysToExpiry}d left`
+                  expClass = "text-yellow-500"
+                } else {
+                  expLabel = `${daysToExpiry}d left`
+                  expClass = "text-gray-500"
+                }
+
+                const hasInspection = !!e.inspectionDate
+                const inspDate = hasInspection
+                  ? new Date(e.inspectionDate!)
+                  : null
+                let inspLabel = ""
+                let inspClass = "text-gray-500"
+                if (hasInspection && inspDate) {
+                  const daysToInspect = Math.ceil(
+                    (inspDate.getTime() - today.getTime()) / msPerDay
+                  )
+                  if (daysToInspect < 0) {
+                    inspLabel = `Overdue ${Math.abs(daysToInspect)}d`
+                    inspClass = "text-red-500"
+                  } else {
+                    inspLabel = `${daysToInspect}d to inspect`
+                  }
+                }
+
+                return (
+                  <li
+                    key={e.uid}
+                    className="border p-2 rounded flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="font-medium">
+                        {e.brand} {e.model}
+                      </div>
+                      <div className="flex text-xs space-x-4 mt-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center space-x-1 cursor-pointer hover:font-bold">
+                              <span className="font-semibold">Expiration:</span>
+                              <Calendar className="w-3 h-3" />
+                              <span className={expClass}>{expLabel}</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {expDate.toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </TooltipContent>
+                        </Tooltip>
+
+                        {hasInspection && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center space-x-1 cursor-pointer hover:font-bold">
+                                <span className="font-semibold">Inspection:</span>
+                                <Calendar className="w-3 h-3" />
+                                <span className={inspClass}>{inspLabel}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {inspDate!.toLocaleDateString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+
+                        <div className="flex items-center space-x-1">
+                          <RefreshCw className="w-3 h-3" />
+                          <span>{e.status}</span>
                         </div>
                       </div>
-                      <div className="flex items-start space-x-1">
-                        <RefreshCw className="w-3 h-3 mt-[2px]" />
-                        <span>{e.status}</span>
-                      </div>
                     </div>
-                  </div>
-                  <Button
-                    size="icon"
-                    variant="destructive"
-                    onClick={() => {
-                      setToDeleteUid(e.uid)
-                      setAlertOpen(true)
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </li>
-              ))}
+
+                    <div className="flex space-x-2">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingEquipment(e)
+                          setEditOpen(true)
+                        }}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        onClick={() => {
+                          setToDeleteUid(e.uid)
+                          setAlertOpen(true)
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           )}
 
@@ -150,6 +238,19 @@ export default function EquipmentModal({
         onOpenChange={setAddOpen}
         projectId={projectId}
         onCreated={() => {
+          loadEquipments()
+          onEquipmentsChange?.()
+        }}
+      />
+
+      <EditEquipmentModal
+        isOpen={editOpen}
+        onOpenChange={open => {
+          setEditOpen(open)
+          if (!open) setEditingEquipment(null)
+        }}
+        equipment={editingEquipment!}
+        onUpdated={() => {
           loadEquipments()
           onEquipmentsChange?.()
         }}

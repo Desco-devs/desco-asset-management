@@ -1,7 +1,7 @@
 // File: app/components/AddEquipmentModal.tsx
 "use client"
 
-import React, { useState, ChangeEvent } from "react"
+import React, { useState, useRef, ChangeEvent } from "react"
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,11 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip"
 import { toast } from "sonner"
 import { createEquipment } from "@/app/service/equipments/equipment"
 import ImagePreviewModal from "@/app/components/custom-reuseable/modal/previewImage"
@@ -65,46 +70,66 @@ export default function AddEquipmentModal({
   onCreated,
 }: AddEquipmentModalProps) {
   const [input, setInput] = useState<EquipmentInput>(initialState)
+  const [errors, setErrors] = useState<Partial<Record<keyof EquipmentInput, string>>>({})
   const [loading, setLoading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const todayStr = new Date().toISOString().split("T")[0]
 
-  const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setInput(prev => ({ ...prev, [name]: value }))
+    setErrors(prev => ({ ...prev, [name]: undefined }))
   }
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null
     const url = file ? URL.createObjectURL(file) : null
     setInput(prev => ({ ...prev, image: file, previewUrl: url }))
+    setErrors(prev => ({ ...prev, image: undefined }))
   }
 
   const resetForm = () => {
     if (input.previewUrl) URL.revokeObjectURL(input.previewUrl)
     setInput(initialState)
+    setErrors({})
     setPreviewOpen(false)
   }
 
-  const handleSubmit = async () => {
-    if (!input.image) {
-      toast.error("Please select an image")
-      return
+  function validate() {
+    const errs: typeof errors = {}
+    if (!input.brand.trim()) errs.brand = "Brand is required"
+    if (!input.model.trim()) errs.model = "Model is required"
+    if (!input.type.trim()) errs.type = "Type is required"
+    if (!input.expirationDate) {
+      errs.expirationDate = "Expiration date is required"
+    } else if (input.expirationDate < todayStr) {
+      errs.expirationDate = "Expiration cannot be in the past"
     }
+    if (!input.owner.trim()) errs.owner = "Owner is required"
+    if (input.inspectionDate && input.inspectionDate < todayStr) {
+      errs.inspectionDate = "Inspection cannot be in the past"
+    }
+    if (!input.image) errs.image = "Image is required"
+    setErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  const handleSubmit = async () => {
+    if (!validate()) return
     setLoading(true)
     try {
       await createEquipment({
-        brand: input.brand,
-        model: input.model,
-        type: input.type,
+        brand: input.brand.trim(),
+        model: input.model.trim(),
+        type: input.type.trim(),
         expirationDate: input.expirationDate,
         status: input.status,
-        remarks: input.remarks || null,
-        owner: input.owner,
+        remarks: input.remarks.trim() || null,
+        owner: input.owner.trim(),
         projectId,
         inspectionDate: input.inspectionDate,
-        image: input.image,
+        image: input.image!,
       })
       toast.success("Equipment added")
       onCreated()
@@ -118,18 +143,20 @@ export default function AddEquipmentModal({
     }
   }
 
+  const hasImage = Boolean(input.previewUrl)
+  const buttonLabel = hasImage ? "Change Image" : "Add Image"
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md sm:max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Equipment</DialogTitle>
-            <DialogDescription>
-              Enter details for new equipment
-            </DialogDescription>
+            <DialogDescription>Enter details for new equipment</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Brand */}
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="brand">Brand</Label>
               <Input
@@ -138,9 +165,12 @@ export default function AddEquipmentModal({
                 value={input.brand}
                 onChange={handleChange}
                 placeholder="e.g. Canon"
+                className={errors.brand ? "border-red-500" : ""}
               />
+              {errors.brand && <p className="text-red-500 text-xs">{errors.brand}</p>}
             </div>
 
+            {/* Model */}
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="model">Model</Label>
               <Input
@@ -149,9 +179,12 @@ export default function AddEquipmentModal({
                 value={input.model}
                 onChange={handleChange}
                 placeholder="e.g. EOS R5"
+                className={errors.model ? "border-red-500" : ""}
               />
+              {errors.model && <p className="text-red-500 text-xs">{errors.model}</p>}
             </div>
 
+            {/* Type */}
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="type">Type</Label>
               <Input
@@ -160,20 +193,29 @@ export default function AddEquipmentModal({
                 value={input.type}
                 onChange={handleChange}
                 placeholder="e.g. Camera"
+                className={errors.type ? "border-red-500" : ""}
               />
+              {errors.type && <p className="text-red-500 text-xs">{errors.type}</p>}
             </div>
 
+            {/* Expiration Date */}
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="expirationDate">Expiration Date</Label>
               <Input
                 id="expirationDate"
                 type="date"
                 name="expirationDate"
+                min={todayStr}
                 value={input.expirationDate}
                 onChange={handleChange}
+                className={errors.expirationDate ? "border-red-500" : ""}
               />
+              {errors.expirationDate && (
+                <p className="text-red-500 text-xs">{errors.expirationDate}</p>
+              )}
             </div>
 
+            {/* Status */}
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="status">Status</Label>
               <Select
@@ -187,13 +229,12 @@ export default function AddEquipmentModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="OPERATIONAL">Operational</SelectItem>
-                  <SelectItem value="NON_OPERATIONAL">
-                    Non-operational
-                  </SelectItem>
+                  <SelectItem value="NON_OPERATIONAL">Non-operational</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Remarks */}
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="remarks">Remarks</Label>
               <Textarea
@@ -206,6 +247,7 @@ export default function AddEquipmentModal({
               />
             </div>
 
+            {/* Owner */}
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="owner">Owner</Label>
               <Input
@@ -214,40 +256,66 @@ export default function AddEquipmentModal({
                 value={input.owner}
                 onChange={handleChange}
                 placeholder="Person responsible"
+                className={errors.owner ? "border-red-500" : ""}
               />
+              {errors.owner && <p className="text-red-500 text-xs">{errors.owner}</p>}
             </div>
 
+            {/* Inspection Date */}
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="inspectionDate">Inspection Date</Label>
               <Input
                 id="inspectionDate"
                 type="date"
                 name="inspectionDate"
+                min={todayStr}
                 value={input.inspectionDate || ""}
                 onChange={handleChange}
+                className={errors.inspectionDate ? "border-red-500" : ""}
               />
+              {errors.inspectionDate && (
+                <p className="text-red-500 text-xs">{errors.inspectionDate}</p>
+              )}
             </div>
 
+            {/* Image */}
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="image">Image</Label>
               <input
                 id="image"
                 type="file"
                 accept="image/*"
+                ref={fileInputRef}
                 onChange={handleFileChange}
-                className="block"
+                className="hidden"
               />
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={errors.image ? "border-red-500" : ""}
+                  >
+                    {buttonLabel}
+                  </Button>
+                </TooltipTrigger>
+                {hasImage && (
+                  <TooltipContent side="top" className="p-0">
+                    <img
+                      src={input.previewUrl!}
+                      alt="Preview"
+                      className="w-32 h-32 object-cover rounded"
+                    />
+                  </TooltipContent>
+                )}
+              </Tooltip>
+              {input.image && (
+                <p className="text-sm text-gray-600">{input.image.name}</p>
+              )}
+              {errors.image && (
+                <p className="text-red-500 text-xs">{errors.image}</p>
+              )}
             </div>
-
-            {input.previewUrl && (
-              <img
-                src={input.previewUrl}
-                alt="Thumbnail"
-                className="w-20 h-20 object-cover rounded cursor-pointer"
-                onMouseEnter={() => setPreviewOpen(true)}
-                onClick={() => setPreviewOpen(true)}
-              />
-            )}
           </div>
 
           <DialogFooter className="mt-6 flex justify-end space-x-2">
