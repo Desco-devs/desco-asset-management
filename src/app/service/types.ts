@@ -1,4 +1,4 @@
-// app/service/types.ts
+// File: app/service/types.ts
 
 /**
  * Permission flags for User
@@ -34,6 +34,19 @@ export interface Location {
 }
 
 /**
+ * Client model returned from API
+ */
+export interface Client {
+  uid: string;
+  name: string;
+  locationId: string;
+  createdAt: string;
+  updatedAt: string;
+  location: Location;
+  projects: Project[];
+}
+
+/**
  * Project model returned from API
  */
 export interface Project {
@@ -48,19 +61,6 @@ export interface Project {
 }
 
 /**
- * Client model returned from API
- */
-export interface Client {
-  uid: string;
-  name: string;
-  locationId: string;
-  createdAt: string;
-  updatedAt: string;
-  location: Location;
-  projects: Project[];
-}
-
-/**
  * Equipment model
  */
 export interface Equipment {
@@ -68,11 +68,12 @@ export interface Equipment {
   brand: string;
   model: string;
   type: string;
-  expirationDate: string;
+  expirationDate: string;        // ISO date string
   status: Status;
-  remarks?: string;
+  remarks?: string | null;
   owner: string;
-  image_url?: string;
+  image_url?: string | null;
+  inspectionDate?: string | null; // ISO date string or null
   projectId: string;
   createdAt: string;
   updatedAt: string;
@@ -87,13 +88,16 @@ export interface Vehicle {
   model: string;
   type: string;
   plateNumber: string;
-  inspectionDate: string;
-  before: number;
-  expiryDate: string;
+  inspectionDate: string;        // ISO date string
+  before: number;                // in months
+  expiryDate: string;            // ISO date string
   status: Status;
-  remarks?: string;
+  remarks?: string | null;
   owner: string;
-  image_url?: string;
+  frontImgUrl?: string | null;
+  backImgUrl?: string | null;
+  side1ImgUrl?: string | null;
+  side2ImgUrl?: string | null;
   projectId: string;
   createdAt: string;
   updatedAt: string;

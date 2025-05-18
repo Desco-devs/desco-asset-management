@@ -1,3 +1,4 @@
+// app/components/ProjectsModal.tsx
 "use client"
 
 import React, { useEffect, useState } from "react"
@@ -50,32 +51,37 @@ export default function ProjectsModal({
   const [newName, setNewName] = useState("")
   const [creating, setCreating] = useState(false)
 
-  // ── update state ──
+  // edit/update/delete state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
-  const [updatingId, setUpdatingId] = useState<string | null>(null) // ← per-row loader
-
-  // ── delete state ──
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [toDelete, setToDelete] = useState<Project | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  // ── equipment/vehicle modal state ──
+  // equipment/vehicle modal state
   const [equipmentOpen, setEquipmentOpen] = useState(false)
   const [vehiclesOpen, setVehiclesOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
 
-  useEffect(() => {
-    if (!isOpen) return
+  // 1) reloadProjects function
+  async function reloadProjects() {
     setLoading(true)
     setError(null)
-    fetchProjectsByClient(clientId)
-      .then(setProjects)
-      .catch(err => {
-        setError(err.message)
-        toast.error(err.message || "Failed to load projects")
-      })
-      .finally(() => setLoading(false))
+    try {
+      const data = await fetchProjectsByClient(clientId)
+      setProjects(data)
+    } catch (err: any) {
+      setError(err.message)
+      toast.error(err.message || "Failed to load projects")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!isOpen) return
+    reloadProjects()
   }, [isOpen, clientId])
 
   async function handleCreate() {
@@ -112,7 +118,6 @@ export default function ProjectsModal({
       return
     }
     setUpdatingId(uid)
-    // capture old arrays so we can reattach them
     const old = projects.find(p => p.uid === uid)
     try {
       const updated = await updateProject(uid, { name: editingName.trim() })
@@ -233,7 +238,6 @@ export default function ProjectsModal({
                     </div>
                   ) : (
                     <div className="flex justify-between items-start">
-                      {/* name + timestamps */}
                       <div className="flex-1 flex flex-col">
                         <span className="font-medium">{p.name}</span>
                         <div className="flex text-xs text-gray-500 space-x-4 mt-1">
@@ -276,7 +280,6 @@ export default function ProjectsModal({
                         </div>
                       </div>
 
-                      {/* actions */}
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => startEditing(p)}>
                           Edit
@@ -327,7 +330,9 @@ export default function ProjectsModal({
         onOpenChange={setEquipmentOpen}
         projectId={selectedProject?.uid ?? ""}
         projectName={selectedProject?.name ?? ""}
+        onEquipmentsChange={reloadProjects}
       />
+
       <VehiclesModal
         isOpen={vehiclesOpen}
         onOpenChange={setVehiclesOpen}

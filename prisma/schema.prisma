@@ -78,11 +78,10 @@ model Equipment {
   status          Status
   remarks         String?
   owner           String
-  image_url       String?   // optional
-
+  image_url       String?
+  inspectionDate  DateTime?
   projectId       String
   project         Project  @relation(fields: [projectId], references: [uid])
-
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -99,7 +98,10 @@ model Vehicle {
   status          Status
   remarks         String?
   owner           String
-  image_url       String?   // optional
+  frontImgUrl   String?  
+  backImgUrl   String?  
+  side1ImgUrl   String?  
+  side2ImgUrl   String?   
 
   projectId       String
   project         Project  @relation(fields: [projectId], references: [uid])
