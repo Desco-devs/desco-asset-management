@@ -4,16 +4,13 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { getEquipmentsByProject } from "@/app/service/client/dynamicClients"
-import { deleteEquipment } from "@/app/service/equipments/equipment"
 
 import AlertModal from "@/app/components/custom-reuseable/modal/alertModal"
-import AddEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/addEquipment"
-import EditEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/editEquipment"
-
+import AddVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/addVehicle"
+import EditVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/editVehicle"
 
 import DataTable, { Column } from "@/app/components/custom-reuseable/table/ReusableTable"
-import type { Equipment } from "@/app/service/types"
+import type { Vehicle } from "@/app/service/types"
 
 import {
   DropdownMenu,
@@ -25,8 +22,15 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal } from "lucide-react"
 
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import ViewDetailsModal from "@/app/(dashboard)/projects/modal/tools/modal/viewEquipment"
+import ViewVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/viewVehicle"
+import { deleteVehicle, getVehiclesByProject } from "@/app/service/vehicles/vehicles"
+
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip"
 
 function formatCountdown(ms: number) {
   if (ms <= 0) return "0d 0h 0m 0s"
@@ -44,123 +48,142 @@ function getColorByDaysLeft(daysLeft: number, warningThreshold = 5) {
   return "text-gray-700"
 }
 
-export default function EquipmentsPage() {
+export default function VehiclesPage() {
   const { projectId: rawProjectId } = useParams()
   const projectId = Array.isArray(rawProjectId) ? rawProjectId[0] : rawProjectId ?? ""
 
-  const [equipments, setEquipments] = useState<Equipment[]>([])
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
 
   const [addOpen, setAddOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
 
   const [alertOpen, setAlertOpen] = useState(false)
   const [toDeleteUid, setToDeleteUid] = useState<string | null>(null)
 
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false)
-  const [viewingEquipment, setViewingEquipment] = useState<Equipment | null>(null)
+  const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null)
 
   const [now, setNow] = useState(new Date())
 
-
-
-  // Update "now" every second for countdown timers
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(interval)
   }, [])
 
-  async function loadEquipments() {
+  async function loadVehicles() {
     setLoading(true)
     try {
       if (!projectId) return
-      const data = await getEquipmentsByProject(projectId)
-      setEquipments(data)
+      const data = await getVehiclesByProject(projectId)
+      setVehicles(data)
     } catch {
-      toast.error("Failed to fetch equipments.")
+      toast.error("Failed to fetch vehicles.")
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadEquipments()
+    loadVehicles()
   }, [projectId])
 
   async function handleDelete() {
     if (!toDeleteUid) return
     try {
-      await deleteEquipment(toDeleteUid)
-      toast.success("Equipment deleted")
+      await deleteVehicle(toDeleteUid)
+      toast.success("Vehicle deleted")
       setToDeleteUid(null)
       setAlertOpen(false)
-      loadEquipments()
+      loadVehicles()
     } catch (error: any) {
-      toast.error(error.message || "Failed to delete equipment")
+      toast.error(error.message || "Failed to delete vehicle")
     }
   }
 
-  const columns: Column<Equipment>[] = [
+  const columns: Column<Vehicle>[] = [
     {
       key: "brand",
       title: "Brand",
-      render: (_value, equipment) => <span>{equipment.brand}</span>,
+      render: (_value, vehicle) => <span>{vehicle.brand}</span>,
     },
     {
       key: "model",
       title: "Model",
-      render: (_value, equipment) => (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-pointer underline">{equipment.model}</span>
-          </TooltipTrigger>
-          {equipment.image_url ? (
-            <TooltipContent className="p-0">
-              <img
-                src={equipment.image_url}
-                alt={`${equipment.model} image`}
-                className="max-w-xs max-h-48 rounded-md"
-                draggable={false}
-              />
-            </TooltipContent>
-          ) : (
-            <TooltipContent>No image available</TooltipContent>
-          )}
-        </Tooltip>
-      ),
+      render: (_value, vehicle) => <span>{vehicle.model}</span>,
     },
     {
       key: "type",
       title: "Type",
-      render: (_value, equipment) => <span>{equipment.type}</span>,
+      render: (_value, vehicle) => <span>{vehicle.type}</span>,
     },
     {
-      key: "expirationDate",
-      title: "Expiration",
-      render: (_value, equipment) => {
-        if (!equipment.expirationDate) return "-"
-        const expDate = new Date(equipment.expirationDate)
+      key: "plateNumber",
+      title: "Plate Number",
+    },
+    {
+      key: "inspectionDate",
+      title: "Inspection Date",
+      render: (_value, vehicle) => {
+        if (!vehicle.inspectionDate) return "-"
+        const inspDate = new Date(vehicle.inspectionDate)
+        const diffMs = inspDate.getTime() - now.getTime()
+        const daysLeft = diffMs / (1000 * 60 * 60 * 24)
+        const colorClass = getColorByDaysLeft(daysLeft, 5)
+        const formattedDate = inspDate.toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={`${colorClass} font-semibold cursor-default`}>
+                  {diffMs <= 0
+                    ? `Overdue ${Math.abs(Math.floor(daysLeft))}d`
+                    : formatCountdown(diffMs)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <span>{formattedDate}</span>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      },
+      sortable: true,
+    },
+    {
+      key: "expiryDate",
+      title: "Expiry Date",
+      render: (_value, vehicle) => {
+        if (!vehicle.expiryDate) return "-"
+        const expDate = new Date(vehicle.expiryDate)
         const diffMs = expDate.getTime() - now.getTime()
         const daysLeft = diffMs / (1000 * 60 * 60 * 24)
         const colorClass = getColorByDaysLeft(daysLeft, 5)
+        const formattedDate = expDate.toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
         return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className={`${colorClass} font-semibold cursor-default`}>
-                {diffMs <= 0
-                  ? `Expired ${Math.abs(Math.floor(daysLeft))}d ago`
-                  : formatCountdown(diffMs)}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {expDate.toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
-            </TooltipContent>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={`${colorClass} font-semibold cursor-default`}>
+                  {diffMs <= 0
+                    ? `Expired ${Math.abs(Math.floor(daysLeft))}d ago`
+                    : formatCountdown(diffMs)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <span>{formattedDate}</span>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )
       },
       sortable: true,
@@ -174,35 +197,6 @@ export default function EquipmentsPage() {
       title: "Owner",
     },
     {
-      key: "inspectionDate",
-      title: "Inspection Date",
-      render: (_value, equipment) => {
-        if (!equipment.inspectionDate) return "-"
-        const inspDate = new Date(equipment.inspectionDate)
-        const diffMs = inspDate.getTime() - now.getTime()
-        const daysLeft = diffMs / (1000 * 60 * 60 * 24)
-        const colorClass = getColorByDaysLeft(daysLeft, 5)
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className={`${colorClass} font-semibold cursor-default`}>
-                {diffMs <= 0
-                  ? `Overdue ${Math.abs(Math.floor(daysLeft))}d`
-                  : formatCountdown(diffMs)}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {inspDate.toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
-            </TooltipContent>
-          </Tooltip>
-        )
-      },
-    },
-    {
       key: "remarks",
       title: "Remarks",
       render: (value) => value ?? "-",
@@ -211,7 +205,7 @@ export default function EquipmentsPage() {
       key: "actions",
       title: "Actions",
       className: "text-center",
-      render: (_value, equipment) => (
+      render: (_value, vehicle) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -225,7 +219,7 @@ export default function EquipmentsPage() {
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={() => {
-                setViewingEquipment(equipment)
+                setViewingVehicle(vehicle)
                 setViewDetailsOpen(true)
               }}
             >
@@ -234,7 +228,7 @@ export default function EquipmentsPage() {
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={() => {
-                setEditingEquipment(equipment)
+                setEditingVehicle(vehicle)
                 setEditOpen(true)
               }}
             >
@@ -243,7 +237,7 @@ export default function EquipmentsPage() {
             <DropdownMenuItem
               className="text-destructive cursor-pointer"
               onClick={() => {
-                setToDeleteUid(equipment.uid)
+                setToDeleteUid(vehicle.uid)
                 setAlertOpen(true)
               }}
             >
@@ -257,54 +251,53 @@ export default function EquipmentsPage() {
 
   return (
     <div className="py-4">
-      <DataTable<Equipment>
-        data={equipments}
+      <DataTable<Vehicle>
+        data={vehicles}
         columns={columns}
         loading={loading}
         pagination
         searchable
         sortable
-        onRefresh={loadEquipments}
-        actions={<Button onClick={() => setAddOpen(true)}>Add Equipment</Button>}
+        onRefresh={loadVehicles}
+        actions={<Button onClick={() => setAddOpen(true)}>Add Vehicle</Button>}
       />
 
-      <AddEquipmentModal
+      <AddVehicleModal
         isOpen={addOpen}
         onOpenChange={setAddOpen}
         projectId={projectId}
         onCreated={() => {
-          loadEquipments()
+          loadVehicles()
           setAddOpen(false)
         }}
       />
 
-      {editingEquipment && (
-        <EditEquipmentModal
+      {editingVehicle && (
+        <EditVehicleModal
           isOpen={editOpen}
           onOpenChange={(open) => {
             setEditOpen(open)
-            if (!open) setEditingEquipment(null)
+            if (!open) setEditingVehicle(null)
           }}
-          equipment={editingEquipment}
+          vehicle={editingVehicle}
           onUpdated={() => {
-            loadEquipments()
+            loadVehicles()
             setEditOpen(false)
           }}
         />
       )}
 
-      <ViewDetailsModal
+      <ViewVehicleModal
         isOpen={viewDetailsOpen}
         onOpenChange={setViewDetailsOpen}
-        equipment={viewingEquipment}
+        vehicle={viewingVehicle}
       />
-
 
       <AlertModal
         isOpen={alertOpen}
         onOpenChange={setAlertOpen}
-        title="Delete Equipment"
-        description="Are you sure you want to delete this equipment? This action cannot be undone."
+        title="Delete Vehicle"
+        description="Are you sure you want to delete this vehicle? This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
         onConfirm={handleDelete}

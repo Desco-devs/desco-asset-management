@@ -1,3 +1,4 @@
+// File: app/(dashboard)/locations/[locationId]/clients/[clientId]/projects/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -6,11 +7,10 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { deleteProject, updateProject } from "@/app/service/client/project";
 import { getProjectsByClient } from "@/app/service/client/dynamicClients";
-import DataTable, {
-  Column,
-} from "@/app/components/custom-reuseable/table/ReusableTable";
+import DataTable, { Column } from "@/app/components/custom-reuseable/table/ReusableTable";
 import CreateProjectModal from "@/app/(dashboard)/projects/modal/addProjects";
 import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
+import { Project } from "@/app/service/types";
 
 import {
   DropdownMenu,
@@ -21,13 +21,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
-
-interface Project {
-  uid: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -64,7 +57,10 @@ export default function ProjectsPage() {
   }, [clientId]);
 
   async function handleUpdate(uid: string) {
-    if (!editingName.trim()) return toast.error("Project name required");
+    if (!editingName.trim()) {
+      toast.error("Project name required");
+      return;
+    }
     setUpdatingId(uid);
     try {
       const updated = await updateProject(uid, { name: editingName.trim() });
@@ -73,6 +69,7 @@ export default function ProjectsPage() {
       );
       toast.success("Updated successfully");
       setEditingId(null);
+      setEditingName("");
     } catch {
       toast.error("Failed to update");
     } finally {
@@ -173,16 +170,16 @@ export default function ProjectsPage() {
                   )
                 }
               >
-                Equipments
+                Equipments {project.equipments?.length ?? "0"}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() =>
                   router.push(
-                    `/locations/${locationId}/clients/${clientId}/projects/vehicles/${project.uid}/vehicles`
+                    `/locations/${locationId}/clients/${clientId}/projects/vehicles/${project.uid}`
                   )
                 }
               >
-                Vehicles
+                Vehicles {project.vehicles?.length ?? "0"}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
@@ -223,13 +220,11 @@ export default function ProjectsPage() {
         columns={columns}
         loading={loading}
         pagination
-        searchable={true}
-        sortable={true}
+        searchable
+        sortable
         onRefresh={loadProjects}
         refreshing={false}
-        actions={
-          <Button onClick={() => setCreateModalOpen(true)}>New Project</Button>
-        }
+        actions={<Button onClick={() => setCreateModalOpen(true)}>New Project</Button>}
       />
 
       <CreateProjectModal

@@ -115,7 +115,6 @@ export default function AddEquipmentModal({
     if (input.inspectionDate && input.inspectionDate < todayStr) {
       errs.inspectionDate = "Inspection cannot be in the past";
     }
-    if (!input.image) errs.image = "Image is required";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
