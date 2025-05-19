@@ -40,7 +40,9 @@ export function NavMain({
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => {
-          const isMainActive = pathname === item.url || item.items?.some((subItem) => subItem.url === pathname);
+          const isMainActive =
+            pathname === item.url ||
+            item.items?.some((subItem) => subItem.url === pathname);
           return (
             <Collapsible
               key={item.title}
@@ -52,7 +54,11 @@ export function NavMain({
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton
                     tooltip={item.title}
-                    className={`hover:bg-foreground/15 ${pathname === item.url ? "bg-foreground/14 text-accent-foreground" : ""}`}
+                    className={`hover:bg-foreground/15 ${
+                      pathname === item.url
+                        ? "bg-foreground/14 text-accent-foreground"
+                        : ""
+                    }`}
                   >
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
@@ -66,7 +72,11 @@ export function NavMain({
                         <SidebarMenuSubButton asChild>
                           <a
                             href={subItem.url}
-                            className={`hover:bg-foreground/15 ${pathname === subItem.url ? "bg-foreground/14 text-accent-foreground" : ""}`}
+                            className={`hover:bg-foreground/15 ${
+                              pathname === subItem.url
+                                ? "bg-foreground/14 text-accent-foreground"
+                                : ""
+                            }`}
                           >
                             <span>{subItem.title}</span>
                           </a>

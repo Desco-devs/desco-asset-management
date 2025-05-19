@@ -1,12 +1,6 @@
-// app/components/modal/editEquipment.tsx
-"use client"
+"use client";
 
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  ChangeEvent,
-} from "react"
+import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,33 +8,34 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
-} from "@/components/ui/tooltip"
-import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
-import { Equipment, Status } from "@/app/service/types"
-import { updateEquipment } from "@/app/service/equipments/equipment"
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import { toast } from "sonner";
+import { Loader2, ImageIcon } from "lucide-react";
+import { Equipment, Status } from "@/app/service/types";
+import { updateEquipment } from "@/app/service/equipments/equipment";
 
 interface EditEquipmentModalProps {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  equipment?: Equipment | null
-  onUpdated: () => void
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  equipment?: Equipment | null;
+  onUpdated: () => void;
 }
 
 export default function EditEquipmentModal({
@@ -49,56 +44,54 @@ export default function EditEquipmentModal({
   equipment,
   onUpdated,
 }: EditEquipmentModalProps) {
-  if (!equipment) return null
+  if (!equipment) return null;
 
-  const [brand, setBrand] = useState(equipment.brand)
-  const [model, setModel] = useState(equipment.model)
-  const [type, setType] = useState(equipment.type)
+  const [brand, setBrand] = useState(equipment.brand);
+  const [model, setModel] = useState(equipment.model);
+  const [type, setType] = useState(equipment.type);
   const [expirationDate, setExpirationDate] = useState(
     equipment.expirationDate.slice(0, 10)
-  )
-  const [status, setStatus] = useState<Status>(equipment.status)
+  );
+  const [status, setStatus] = useState<Status>(equipment.status);
   const [remarks, setRemarks] = useState<string | null>(
     equipment.remarks ?? ""
-  )
-  const [owner, setOwner] = useState(equipment.owner)
+  );
+  const [owner, setOwner] = useState(equipment.owner);
   const [inspectionDate, setInspectionDate] = useState(
     equipment.inspectionDate?.slice(0, 10) ?? ""
-  )
-  const [image, setImage] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  );
+  const [image, setImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return
-    setBrand(equipment.brand)
-    setModel(equipment.model)
-    setType(equipment.type)
-    setExpirationDate(equipment.expirationDate.slice(0, 10))
-    setStatus(equipment.status)
-    setRemarks(equipment.remarks ?? "")
-    setOwner(equipment.owner)
-    setInspectionDate(
-      equipment.inspectionDate?.slice(0, 10) ?? ""
-    )
-    setImage(null)
-    setPreviewUrl(null)
-  }, [isOpen, equipment])
+    if (!isOpen) return;
+    setBrand(equipment.brand);
+    setModel(equipment.model);
+    setType(equipment.type);
+    setExpirationDate(equipment.expirationDate.slice(0, 10));
+    setStatus(equipment.status);
+    setRemarks(equipment.remarks ?? "");
+    setOwner(equipment.owner);
+    setInspectionDate(equipment.inspectionDate?.slice(0, 10) ?? "");
+    setImage(null);
+    setPreviewUrl(null);
+  }, [isOpen, equipment]);
 
   const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) {
-      const file = e.target.files[0]
-      setImage(file)
-      const url = URL.createObjectURL(file)
-      setPreviewUrl(url)
+      const file = e.target.files[0];
+      setImage(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
     }
-  }
+  };
 
   const handleSubmit = async () => {
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     try {
       await updateEquipment(equipment.uid, {
         brand,
@@ -110,57 +103,79 @@ export default function EditEquipmentModal({
         owner,
         inspectionDate: inspectionDate || undefined,
         image: image || undefined,
-      })
-      toast.success("Updated successfully")
-      onOpenChange(false)
-      onUpdated()
+      });
+      toast.success("Updated successfully");
+      onOpenChange(false);
+      onUpdated();
     } catch (err: any) {
-      console.error(err)
-      toast.error(err.message || "Failed to update equipment")
+      console.error(err);
+      toast.error(err.message || "Failed to update equipment");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
-  const hasImage = Boolean(previewUrl || equipment.image_url)
-  const buttonLabel = equipment.image_url || previewUrl ? "Change Image" : "Upload Image"
+  const hasImage = Boolean(previewUrl || equipment.image_url);
+  const buttonLabel =
+    equipment.image_url || previewUrl ? "Change Image" : "Upload Image";
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
           <DialogTitle>Edit Equipment</DialogTitle>
-          <DialogDescription>Update equipment details</DialogDescription>
+          <DialogDescription>
+            Update the details of the equipment here. Click save when you're
+            done.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4">
-          <div>
-            <Label>Brand</Label>
-            <Input value={brand} onChange={e => setBrand(e.target.value)} />
-          </div>
-          <div>
-            <Label>Model</Label>
-            <Input value={model} onChange={e => setModel(e.target.value)} />
-          </div>
-          <div>
-            <Label>Type</Label>
-            <Input value={type} onChange={e => setType(e.target.value)} />
-          </div>
-          <div>
-            <Label>Expiration Date</Label>
+        <div className="grid grid-cols-2 gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="brand" className="text-right">
+              Brand
+            </Label>
             <Input
-              type="date"
-              value={expirationDate}
-              onChange={e => setExpirationDate(e.target.value)}
+              id="brand"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              className="col-span-3"
             />
           </div>
-          <div>
-            <Label>Status</Label>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="model" className="text-right">
+              Model
+            </Label>
+            <Input
+              id="model"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="type" className="text-right">
+              Type
+            </Label>
+            <Input
+              id="type"
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="status" className="text-right">
+              Status
+            </Label>
             <Select
               value={status}
-              onValueChange={value => setStatus(value as Status)}
+              onValueChange={(value) => setStatus(value as Status)}
             >
-              <SelectTrigger>
+              <SelectTrigger className="col-span-3">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
@@ -169,67 +184,109 @@ export default function EditEquipmentModal({
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label>Owner</Label>
-            <Input value={owner} onChange={e => setOwner(e.target.value)} />
-          </div>
-          <div>
-            <Label>Remarks</Label>
-            <Textarea
-              value={remarks || ""}
-              onChange={e => setRemarks(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label>Inspection Date</Label>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="owner" className="text-right">
+              Owner
+            </Label>
             <Input
-              type="date"
-              value={inspectionDate}
-              onChange={e => setInspectionDate(e.target.value)}
+              id="owner"
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+              className="col-span-3"
             />
           </div>
 
-          <div>
-            <Label>Image</Label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFile}
-              className="hidden"
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="remarks" className="text-right">
+              Remarks
+            </Label>
+            <Textarea
+              id="remarks"
+              value={remarks || ""}
+              onChange={(e) => setRemarks(e.target.value)}
+              className="col-span-3"
             />
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {buttonLabel}
-                </Button>
-              </TooltipTrigger>
-              {hasImage && (
-                <TooltipContent side="top" className="p-0">
-                  <img
-                    src={previewUrl || equipment.image_url!}
-                    alt="Preview"
-                    className="w-32 h-32 object-cover rounded"
-                  />
-                </TooltipContent>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="expirationDate" className="text-right">
+              Expiration Date
+            </Label>
+            <Input
+              id="expirationDate"
+              type="date"
+              value={expirationDate}
+              onChange={(e) => setExpirationDate(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="inspectionDate" className="text-right">
+              Inspection Date
+            </Label>
+            <Input
+              id="inspectionDate"
+              type="date"
+              value={inspectionDate}
+              onChange={(e) => setInspectionDate(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">Image</Label>
+            <div className="col-span-3 flex items-center space-x-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFile}
+                className="hidden"
+              />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <ImageIcon className="mr-2 h-4 w-4" />
+                      {buttonLabel}
+                    </Button>
+                  </TooltipTrigger>
+                  {hasImage && (
+                    <TooltipContent>
+                      <img
+                        src={previewUrl || equipment.image_url!}
+                        alt="Preview"
+                        className="max-w-[200px] max-h-[200px] object-cover rounded"
+                      />
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+              {image && (
+                <span className="text-sm text-muted-foreground">
+                  {image.name}
+                </span>
               )}
-            </Tooltip>
-            {image && (
-              <p className="mt-1 text-sm text-gray-600">
-                Selected: {image.name}
-              </p>
-            )}
+            </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
-          <Button disabled={isSubmitting} onClick={handleSubmit}>
+          <Button type="submit" disabled={isSubmitting} onClick={handleSubmit}>
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -242,5 +299,5 @@ export default function EditEquipmentModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -6,6 +6,6 @@ export default function Proejects() {
   return (
     <div>
       <Client />
-    </div>
+    </div> 
   );
 }

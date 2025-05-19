@@ -73,7 +73,8 @@ import { toast } from "sonner";
 import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
 
 import AddClient from "../modal/addClient";
-import ViewClientsModal from "../modal/viewClient";
+// Remove the ViewClientsModal import since we're not using it anymore
+// import ViewClientsModal from "../modal/viewClient";
 
 interface Location {
   uid: string;
@@ -107,10 +108,10 @@ export default function LocationManager() {
   const [alertOpen, setAlertOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // View clients modal
-  const [viewOpen, setViewOpen] = useState(false);
-  const [viewLocationId, setViewLocationId] = useState<string | null>(null);
- const [viewLocationAddress, setViewLocationAddress] = useState<string | null>(null);
+  // Remove view modal related state variables since we're not using them anymore
+  // const [viewOpen, setViewOpen] = useState(false);
+  // const [viewLocationId, setViewLocationId] = useState<string | null>(null);
+  // const [viewLocationAddress, setViewLocationAddress] = useState<string | null>(null);
 
   // Fetch & sort
   const loadLocations = async () => {
@@ -180,9 +181,7 @@ export default function LocationManager() {
       else if (sortConfig.direction === "desc") direction = null;
     }
     setSortConfig(
-      direction
-        ? { key, direction }
-        : { key: "createdAt", direction: "desc" }
+      direction ? { key, direction } : { key: "createdAt", direction: "desc" }
     );
   };
 
@@ -237,6 +236,11 @@ export default function LocationManager() {
     }
   }
 
+  // Navigation handler for viewing clients
+  const handleViewClients = (locationId: string) => {
+    router.push(`/locations/${locationId}/clients`);
+  };
+
   // Pagination logic
   const indexOfLast = currentPage * itemsPerPage;
   const indexOfFirst = indexOfLast - itemsPerPage;
@@ -258,7 +262,9 @@ export default function LocationManager() {
             </CardTitle>
             <CardDescription>
               Manage all client locations
-              {isRefreshing && <span className="text-xs ml-2">(refreshing...)</span>}
+              {isRefreshing && (
+                <span className="text-xs ml-2">(refreshing...)</span>
+              )}
             </CardDescription>
           </div>
           <AddClient onAdd={handleAddLocation} />
@@ -303,7 +309,9 @@ export default function LocationManager() {
               onClick={handleManualRefresh}
               disabled={isRefreshing}
             >
-              <RefreshCcw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              <RefreshCcw
+                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+              />
               <span className="sr-only">Refresh</span>
             </Button>
           </div>
@@ -347,7 +355,9 @@ export default function LocationManager() {
               ) : (
                 currentItems.map((loc) => (
                   <TableRow key={loc.uid}>
-                    <TableCell className="font-mono text-xs">{loc.uid}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {loc.uid}
+                    </TableCell>
                     <TableCell>
                       {editingId === loc.uid ? (
                         <Input
@@ -405,11 +415,7 @@ export default function LocationManager() {
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => {
-                                setViewLocationId(loc.uid);
-                                setViewLocationAddress(loc.address);
-                                setViewOpen(true);
-                              }}
+                              onClick={() => handleViewClients(loc.uid)}
                             >
                               View Clients
                             </DropdownMenuItem>
@@ -432,52 +438,56 @@ export default function LocationManager() {
 
         {totalPages > 1 && (
           <div className="flex justify-end items-center mt-4">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handlePageChange(currentPage - 1);
-                    }}
-                    className={
-                      currentPage === 1 ? "pointer-events-none opacity-50" : ""
-                    }
-                  />
-                </PaginationItem>
-
-                {pageNumbers.map((num) => (
-                  <PaginationItem key={num}>
-                    <PaginationLink
+            <div className="w-fit">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
                       href="#"
-                      isActive={currentPage === num}
                       onClick={(e) => {
                         e.preventDefault();
-                        handlePageChange(num);
+                        handlePageChange(currentPage - 1);
                       }}
-                    >
-                      {num}
-                    </PaginationLink>
+                      className={
+                        currentPage === 1
+                          ? "pointer-events-none opacity-50"
+                          : ""
+                      }
+                    />
                   </PaginationItem>
-                ))}
 
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handlePageChange(currentPage + 1);
-                    }}
-                    className={
-                      currentPage === totalPages
-                        ? "pointer-events-none opacity-50"
-                        : ""
-                    }
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+                  {pageNumbers.map((num) => (
+                    <PaginationItem key={num}>
+                      <PaginationLink
+                        href="#"
+                        isActive={currentPage === num}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handlePageChange(num);
+                        }}
+                      >
+                        {num}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(currentPage + 1);
+                      }}
+                      className={
+                        currentPage === totalPages
+                          ? "pointer-events-none opacity-50"
+                          : ""
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </div>
         )}
       </CardContent>
@@ -492,15 +502,7 @@ export default function LocationManager() {
         cancelText="Cancel"
       />
 
-      <ViewClientsModal
-        isOpen={viewOpen}
-        onOpenChange={(open) => {
-          setViewOpen(open);
-          if (!open) setViewLocationId(null);
-        }}
-         locationId={viewLocationId}
-        locationAddress={viewLocationAddress}
-      />
+      {/* Remove the ViewClientsModal since we're not using it anymore */}
     </Card>
   );
 }

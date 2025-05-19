@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -13,7 +13,6 @@ import {
 import {
   Pagination,
   PaginationContent,
-  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -31,243 +30,288 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
 import {
   ChevronDown,
   ChevronUp,
+  RefreshCcw,
   Search,
   SlidersHorizontal,
-  RefreshCcw,
-  Bell,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
-export type TableColumn<T> = {
-  key: keyof T;
-  header: React.ReactNode;
-  cell?: (item: T) => React.ReactNode;
+export interface Column<T = any> {
+  key: string;
+  title: string;
   sortable?: boolean;
+  render?: (value: any, record: T, index: number) => React.ReactNode;
+  className?: string;
   width?: string;
-};
+}
 
-export type SortConfig<T> = {
-  key: keyof T | null;
-  direction: "asc" | "desc" | null;
-};
-
-export type TableProps<T> = {
+export interface DataTableProps<T = any> {
   data: T[];
-  columns: TableColumn<T>[];
-  title?: string;
-  description?: string;
-  isLoading?: boolean;
-  isRefreshing?: boolean;
-  hasNewData?: boolean;
-  sortConfig?: SortConfig<T>;
-  onSort?: (key: keyof T) => void;
-  searchPlaceholder?: string;
+  columns: Column<T>[];
+
+  loading?: boolean;
+  refreshing?: boolean;
+
+  searchable?: boolean;
   searchTerm?: string;
-  onSearchChange?: (value: string) => void;
-  renderActions?: () => React.ReactNode;
-  renderCustomHeader?: () => React.ReactNode;
-  renderRowActions?: (item: T) => React.ReactNode;
-  lastUpdated?: Date;
-  onRefresh?: () => void;
-  onNewDataClick?: () => void;
-  pageSize?: number;
-  onPageSizeChange?: (size: number) => void;
+  onSearchTermChange?: (value: string) => void;
+  searchPlaceholder?: string;
+
+  sortable?: boolean;
+
+  pagination?: boolean;
   currentPage?: number;
-  totalPages?: number;
+  itemsPerPage?: number;
   onPageChange?: (page: number) => void;
-  pageSizeOptions?: number[];
-  loadingRowCount?: number;
-  emptyMessage?: string;
-};
+  onItemsPerPageChange?: (size: number) => void;
+  itemsPerPageOptions?: number[];
+
+  onRefresh?: () => void;
+  actions?: React.ReactNode;
+  badgeText?: string;
+
+  renderRowActions?: (record: T, index: number) => React.ReactNode;
+
+  rowKey?: string | ((record: T) => string);
+
+  emptyText?: string;
+  className?: string;
+}
 
 export default function DataTable<T>({
   data,
   columns,
-  title = "Data Table",
-  description = "Manage your data",
-  isLoading = false,
-  isRefreshing = false,
-  hasNewData = false,
-  sortConfig = { key: null, direction: null },
-  onSort,
+  loading = false,
+  refreshing = false,
+  searchable = true,
+  searchTerm: externalSearchTerm,
+  onSearchTermChange,
   searchPlaceholder = "Search...",
-  searchTerm = "",
-  onSearchChange,
-  renderActions,
-  renderCustomHeader,
-  renderRowActions,
-  lastUpdated,
-  onRefresh,
-  onNewDataClick,
-  pageSize = 5,
-  onPageSizeChange,
-  currentPage = 1,
-  totalPages = 1,
+  sortable = true,
+  pagination = true,
+  currentPage: externalCurrentPage,
+  itemsPerPage = 5,
   onPageChange,
-  pageSizeOptions = [5, 10, 20, 50],
-  loadingRowCount = 3,
-  emptyMessage = "No data found.",
-}: TableProps<T>) {
-  // Format the last update time
-  const formatLastUpdate = () => {
-    return lastUpdated ? lastUpdated.toLocaleTimeString() : "";
-  };
+  onItemsPerPageChange,
+  itemsPerPageOptions = [5, 10, 20, 50],
+  onRefresh,
+  actions,
+  badgeText,
+  renderRowActions,
+  rowKey = "id",
+  emptyText = "No data found",
+  className = "",
+}: DataTableProps<T>) {
+  const [internalSearchTerm, setInternalSearchTerm] = useState("");
+  const [internalPage, setInternalPage] = useState(1);
 
-  // Get sorted icon
-  const getSortIcon = (key: keyof T) => {
-    if (sortConfig.key !== key) {
-      return null;
+  const searchValue = externalSearchTerm ?? internalSearchTerm;
+  const setSearchValue = onSearchTermChange ?? setInternalSearchTerm;
+
+  const page = externalCurrentPage ?? internalPage;
+  const setPage = onPageChange ?? setInternalPage;
+
+  const [sortConfig, setSortConfig] = useState<{
+    key: string;
+    direction: "asc" | "desc" | null;
+  }>({
+    key: columns[0]?.key ?? "",
+    direction: "desc",
+  });
+
+  const filteredData = useMemo(() => {
+    let filtered = [...data];
+    if (searchable && searchValue.trim()) {
+      filtered = filtered.filter((record) =>
+        columns.some((col) => {
+          const val = (record as any)[col.key];
+          return val
+            ?.toString()
+            .toLowerCase()
+            .includes(searchValue.toLowerCase());
+        })
+      );
     }
+    if (sortable && sortConfig.key && sortConfig.direction) {
+      filtered.sort((a, b) => {
+        const aVal = (a as any)[sortConfig.key];
+        const bVal = (b as any)[sortConfig.key];
+        if (aVal === bVal) return 0;
+        const comp = aVal < bVal ? -1 : 1;
+        return sortConfig.direction === "asc" ? comp : -comp;
+      });
+    }
+    return filtered;
+  }, [data, searchValue, columns, sortable, sortConfig]);
+
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+
+  const paginatedData = useMemo(() => {
+    if (!pagination) return filteredData;
+    const start = (page - 1) * itemsPerPage;
+    return filteredData.slice(start, start + itemsPerPage);
+  }, [filteredData, page, itemsPerPage, pagination]);
+
+  function requestSort(key: string) {
+    setSortConfig((prev) => {
+      if (prev.key !== key) return { key, direction: "asc" };
+      if (prev.direction === "asc") return { key, direction: "desc" };
+      return { key: "", direction: null };
+    });
+    setPage(1);
+  }
+
+  function getSortIcon(key: string) {
+    if (sortConfig.key !== key) return null;
     return sortConfig.direction === "asc" ? (
       <ChevronUp className="ml-1 h-4 w-4" />
     ) : (
       <ChevronDown className="ml-1 h-4 w-4" />
     );
-  };
-
-  // Handle column header click for sorting
-  const handleHeaderClick = (key: keyof T, sortable?: boolean) => {
-    if (sortable && onSort) {
-      onSort(key);
-    }
-  };
-
-  // Generate page numbers
-  const pageNumbers = [];
-  for (let i = 1; i <= totalPages; i++) {
-    pageNumbers.push(i);
   }
 
+  function getRowKey(record: T, idx: number) {
+    if (typeof rowKey === "function") return rowKey(record);
+    return (record as any)[rowKey] ?? idx.toString();
+  }
+
+  function handlePageChange(newPage: number) {
+    if (newPage < 1 || newPage > totalPages) return;
+    setPage(newPage);
+  }
+
+  function handleItemsPerPageChange(value: string) {
+    const size = Number(value);
+    if (!isNaN(size)) {
+      onItemsPerPageChange?.(size);
+    }
+  }
+
+  const LoadingSkeleton = () => (
+    <>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <TableRow key={`loading-row-${i}`}>
+          {Array.from({
+            length: columns.length + (renderRowActions ? 1 : 0),
+          }).map((_, j) => (
+            <TableCell key={`loading-col-${j}`}>
+              <div className="h-4 bg-muted animate-pulse rounded w-full" />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  );
+
   return (
-    <Card className="w-full">
+    <Card className={className}>
       <CardHeader>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              {title}
-              {(onRefresh || onNewDataClick) && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`p-0 h-8 w-8 relative ${
-                      hasNewData ? "text-primary" : ""
-                    }`}
-                    onClick={
-                      hasNewData && onNewDataClick ? onNewDataClick : onRefresh
-                    }
-                    disabled={isRefreshing}
-                  >
-                    {hasNewData ? (
-                      <>
-                        <Bell className="h-4 w-4" />
-                        <span className="absolute top-0 right-0 h-2 w-2 bg-primary rounded-full"></span>
-                      </>
-                    ) : (
-                      <RefreshCcw
-                        className={`h-4 w-4 ${
-                          isRefreshing ? "animate-spin" : ""
-                        }`}
-                      />
-                    )}
-                    <span className="sr-only">
-                      {hasNewData ? "New data available" : "Refresh"}
-                    </span>
-                  </Button>
-                </div>
-              )}
-            </CardTitle>
-            <CardDescription className="flex items-center justify-between">
-              <span>{description}</span>
-              {lastUpdated && (
-                <span className="text-xs text-muted-foreground">
-                  {isRefreshing ? (
-                    "Refreshing..."
-                  ) : hasNewData && onNewDataClick ? (
-                    <span
-                      className="text-primary font-medium cursor-pointer"
-                      onClick={onNewDataClick}
-                    >
-                      New data available! Click to update
-                    </span>
-                  ) : (
-                    `Last updated: ${formatLastUpdate()}`
-                  )}
-                </span>
-              )}
-            </CardDescription>
+        <div className="flex flex-col justify-between items-center gap-4">
+          <div className="flex items-center justify-between w-full">
+            <CardTitle>{badgeText ?? "Data Table"}</CardTitle>
+            {badgeText && (
+              <CardDescription>
+                Manage all {badgeText}{" "}
+                {refreshing && (
+                  <span className="text-xs ml-2">(refreshing...)</span>
+                )}
+              </CardDescription>
+            )}
+
+            {actions}
           </div>
-          {renderActions && renderActions()}
-        </div>
-        {renderCustomHeader && renderCustomHeader()}
-      </CardHeader>
-      <CardContent>
-        <div className="flex justify-between items-center mb-4">
-          {onSearchChange && (
-            <div className="relative w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder={searchPlaceholder}
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => onSearchChange(e.target.value)}
-              />
-            </div>
-          )}
-          {onPageSizeChange && (
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="flex gap-1 items-center">
-                <SlidersHorizontal className="h-3 w-3" />
-                {data.length} items
-              </Badge>
+
+          <div className="flex items-center justify-baseline w-full">
+            {searchable && (
+              <div className="relative w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                <Input
+                  placeholder={searchPlaceholder}
+                  className="pl-8"
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 ml-auto">
+              {badgeText && (
+                <Badge variant="outline" className="flex gap-1 items-center">
+                  <SlidersHorizontal className="h-3 w-3" />
+                  {filteredData.length} {badgeText.toLowerCase()}
+                </Badge>
+              )}
+
               <Select
-                value={pageSize.toString()}
-                onValueChange={(value) => onPageSizeChange(parseInt(value))}
+                value={itemsPerPage.toString()}
+                onValueChange={handleItemsPerPageChange}
               >
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="Items per page" />
+                <SelectTrigger>
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {pageSizeOptions.map((size) => (
-                    <SelectItem key={size} value={size.toString()}>
-                      {size} per page
+                  {itemsPerPageOptions.map((n) => (
+                    <SelectItem key={n} value={n.toString()}>
+                      {n} per page
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-          )}
-        </div>
 
+              {onRefresh && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="p-0 h-8 w-8"
+                  onClick={onRefresh}
+                  disabled={refreshing}
+                  aria-label="Refresh"
+                >
+                  <RefreshCcw
+                    className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+                  />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent>
         <div className="overflow-x-auto rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
-                {columns.map((column, index) => (
+                {columns.map((col) => (
                   <TableHead
-                    key={index}
-                    className={column.width ? column.width : undefined}
+                    key={col.key}
+                    className={col.className}
+                    style={{
+                      cursor:
+                        col.sortable !== false && sortable
+                          ? "pointer"
+                          : "default",
+                    }}
+                    onClick={() =>
+                      col.sortable !== false && sortable && requestSort(col.key)
+                    }
                   >
-                    <div
-                      className={`flex items-center ${
-                        column.sortable ? "cursor-pointer" : ""
-                      }`}
-                      onClick={() =>
-                        handleHeaderClick(column.key, column.sortable)
-                      }
-                    >
-                      {column.header}
-                      {column.sortable && getSortIcon(column.key)}
+                    <div className="flex items-center">
+                      {col.title}{" "}
+                      {col.sortable !== false &&
+                        sortable &&
+                        getSortIcon(col.key)}
                     </div>
                   </TableHead>
                 ))}
@@ -276,47 +320,38 @@ export default function DataTable<T>({
                 )}
               </TableRow>
             </TableHeader>
+
             <TableBody>
-              {isLoading ? (
-                // Loading state
-                Array.from({ length: loadingRowCount }).map((_, index) => (
-                  <TableRow key={`loading-${index}`}>
-                    {columns.map((_, colIndex) => (
-                      <TableCell key={colIndex}>
-                        <div className="h-4 bg-muted animate-pulse rounded w-full"></div>
-                      </TableCell>
-                    ))}
-                    {renderRowActions && (
-                      <TableCell>
-                        <div className="h-4 bg-muted animate-pulse rounded w-16 ml-auto"></div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))
-              ) : data.length === 0 ? (
+              {loading ? (
+                <LoadingSkeleton />
+              ) : paginatedData.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={
-                      renderRowActions ? columns.length + 1 : columns.length
-                    }
+                    colSpan={columns.length + (renderRowActions ? 1 : 0)}
                     className="text-center h-24"
                   >
-                    {emptyMessage}
+                    {emptyText}
                   </TableCell>
                 </TableRow>
               ) : (
-                data.map((item, rowIndex) => (
-                  <TableRow key={rowIndex}>
-                    {columns.map((column, colIndex) => (
-                      <TableCell key={colIndex}>
-                        {column.cell
-                          ? column.cell(item)
-                          : String(item[column.key] || "")}
+                paginatedData.map((record, index) => (
+                  <TableRow
+                    key={getRowKey(record, index)}
+                    className="hover:bg-muted/50 cursor-pointer"
+                  >
+                    {columns.map((col) => (
+                      <TableCell key={col.key} className={col.className}>
+                        {col.render
+                          ? col.render((record as any)[col.key], record, index)
+                          : (record as any)[col.key]}
                       </TableCell>
                     ))}
                     {renderRowActions && (
-                      <TableCell className="text-right">
-                        {renderRowActions(item)}
+                      <TableCell
+                        className="text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {renderRowActions(record, index)}
                       </TableCell>
                     )}
                   </TableRow>
@@ -326,10 +361,9 @@ export default function DataTable<T>({
           </Table>
         </div>
 
-        {/* Pagination */}
-        {onPageChange && totalPages > 1 && (
-          <div className="flex justify-end items-center mt-4">
-            <div className="mt-4 w-fit">
+        {pagination && totalPages > 1 && (
+          <div className="flex justify-end items-center">
+            <div className="flex w-fit mt-4">
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
@@ -337,40 +371,40 @@ export default function DataTable<T>({
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        onPageChange(currentPage - 1);
+                        handlePageChange(page - 1);
                       }}
                       className={
-                        currentPage === 1
-                          ? "pointer-events-none opacity-50"
-                          : ""
+                        page === 1 ? "pointer-events-none opacity-50" : ""
                       }
                     />
                   </PaginationItem>
 
-                  {pageNumbers.map((number) => (
-                    <PaginationItem key={number}>
-                      <PaginationLink
-                        href="#"
-                        isActive={currentPage === number}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          onPageChange(number);
-                        }}
-                      >
-                        {number}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (num) => (
+                      <PaginationItem key={num}>
+                        <PaginationLink
+                          href="#"
+                          isActive={page === num}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handlePageChange(num);
+                          }}
+                        >
+                          {num}
+                        </PaginationLink>
+                      </PaginationItem>
+                    )
+                  )}
 
                   <PaginationItem>
                     <PaginationNext
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        onPageChange(currentPage + 1);
+                        handlePageChange(page + 1);
                       }}
                       className={
-                        currentPage === totalPages
+                        page === totalPages
                           ? "pointer-events-none opacity-50"
                           : ""
                       }

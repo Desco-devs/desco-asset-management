@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
@@ -58,46 +59,72 @@ const Header = () => {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Convert path to breadcrumb segments
-  const getPathSegments = () => {
-    // Remove leading slash and split by remaining slashes
+  // Smart breadcrumb logic - only show relevant segments
+  const getSmartBreadcrumbs = () => {
     const segments = pathname.split("/").filter(Boolean);
 
-    // Format segments for display (capitalize first letter, replace hyphens with spaces)
-    return segments.map((segment) =>
-      segment
-        .split("-")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ")
-    );
-  };
+    // If we're at root, just return empty
+    if (segments.length === 0) return { paths: [], currentPage: "Dashboard" };
 
-  const pathSegments = getPathSegments();
-  const currentPage =
-    pathSegments.length > 0
-      ? pathSegments[pathSegments.length - 1]
-      : "Dashboard";
+    // Configuration for different breadcrumb strategies
+    const MAX_BREADCRUMB_SEGMENTS = 2; // Maximum segments to show before current page
 
-  // Create paths for each breadcrumb segment
-  const getBreadcrumbPaths = () => {
-    const paths = [];
-    const segments = pathname.split("/").filter(Boolean);
+    // Strategy 1: Show only first and last segments if path is too long
+    let breadcrumbSegments = [];
 
-    for (let i = 0; i < segments.length - 1; i++) {
-      const path = "/" + segments.slice(0, i + 1).join("/");
-      paths.push({
-        name: segments[i]
+    if (segments.length <= MAX_BREADCRUMB_SEGMENTS + 1) {
+      // Short path: show all segments except the last one
+      breadcrumbSegments = segments.slice(0, -1);
+    } else {
+      // Long path: show first segment and parent segment
+      breadcrumbSegments = [
+        segments[0], // First segment (e.g., "locations")
+        segments[segments.length - 2], // Parent of current page
+      ];
+    }
+
+    // Create breadcrumb paths
+    const paths = breadcrumbSegments.map((segment, index) => {
+      // For strategy with gaps, construct proper path
+      let path;
+      if (segments.length > MAX_BREADCRUMB_SEGMENTS + 1 && index === 1) {
+        // This is the parent segment, construct full path
+        path = "/" + segments.slice(0, -1).join("/");
+      } else {
+        // Normal path construction
+        const originalIndex = segments.indexOf(segment);
+        path = "/" + segments.slice(0, originalIndex + 1).join("/");
+      }
+
+      return {
+        name: segment
           .split("-")
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
           .join(" "),
         path,
+        isEllipsis: false,
+      };
+    });
+
+    // Add ellipsis indicator if we skipped segments
+    if (segments.length > MAX_BREADCRUMB_SEGMENTS + 1 && paths.length > 1) {
+      paths.splice(1, 0, {
+        name: "...",
+        path: "#",
+        isEllipsis: true,
       });
     }
 
-    return paths;
+    // Get current page name
+    const currentPage = segments[segments.length - 1]
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+
+    return { paths, currentPage };
   };
 
-  const breadcrumbPaths = getBreadcrumbPaths();
+  const { paths: breadcrumbPaths, currentPage } = getSmartBreadcrumbs();
 
   return (
     <header className="w-full flex sticky top-0 bg-background h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 border-b z-50">
@@ -114,16 +141,26 @@ const Header = () => {
                 <BreadcrumbItem className="hidden md:block">
                   <BreadcrumbLink href="/">DESCO</BreadcrumbLink>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
+                {breadcrumbPaths.length > 0 && (
+                  <BreadcrumbSeparator className="hidden md:block" />
+                )}
 
-                {/* Dynamic breadcrumb segments */}
+                {/* Smart breadcrumb segments */}
                 {breadcrumbPaths.map((item, index) => (
-                  <BreadcrumbItem key={index} className="hidden md:block">
-                    <BreadcrumbLink href={item.path}>
-                      {item.name}
-                    </BreadcrumbLink>
-                    <BreadcrumbSeparator />
-                  </BreadcrumbItem>
+                  <React.Fragment key={`breadcrumb-${index}`}>
+                    <BreadcrumbItem className="hidden md:block">
+                      {item.isEllipsis ? (
+                        <span className="text-muted-foreground">
+                          {item.name}
+                        </span>
+                      ) : (
+                        <BreadcrumbLink href={item.path}>
+                          {item.name}
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator className="hidden md:block" />
+                  </React.Fragment>
                 ))}
 
                 {/* Current page */}
