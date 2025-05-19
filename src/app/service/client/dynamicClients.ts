@@ -1,6 +1,6 @@
 // Get clients by locationId
 export async function getClientsByLocation(locationId: string) {
-    const res = await fetch(`/api/locations/${locationId}/clients`, {
+    const res = await fetch(`/api/locations/${locationId}`, {
         method: "GET",
         cache: "no-store",
         next: { revalidate: 0 },
@@ -15,7 +15,7 @@ export async function getClientsByLocation(locationId: string) {
 
 // Get projects by clientId
 export async function getProjectsByClient(clientId: string) {
-    const res = await fetch(`/api/clients/${clientId}/projects`, {
+    const res = await fetch(`/api/clients/${clientId}`, {
         method: "GET",
         cache: "no-store",
         next: { revalidate: 0 },
@@ -42,21 +42,4 @@ export async function getEquipmentsByProject(projectId: string) {
 
     const project = await res.json()
     return project.equipments ?? []
-}
-
-
-// Get vehicles by projectId
-export async function getVehiclesByProject(projectId: string) {
-    const res = await fetch(`/api/projects/${projectId}`, {
-        method: "GET",
-        cache: "no-store",
-        next: { revalidate: 0 },
-    })
-
-    if (!res.ok) {
-        throw new Error(`Failed to fetch vehicles for project ${projectId}`)
-    }
-
-    const project = await res.json()
-    return project.vehicles ?? []
 }
