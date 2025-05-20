@@ -16,7 +16,7 @@ async function main() {
     {
       username:    'admin',
       fullname:    'Administrator',
-      permissions: [ Permission.VIEW, Permission.CREATE, Permission.UPDATE ],
+      permissions: [ Permission.VIEW, Permission.CREATE, Permission.UPDATE, Permission.UPDATE ],
     },
     {
       username:    'client',

@@ -23,7 +23,7 @@ import {
 import { MoreHorizontal } from "lucide-react"
 
 import ViewVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/viewVehicle"
-import { deleteVehicle, getVehiclesByProject } from "@/app/service/vehicles/vehicles"
+import { useAuth } from "@/app/context/AuthContext"
 
 import {
   Tooltip,
@@ -31,6 +31,7 @@ import {
   TooltipContent,
   TooltipProvider,
 } from "@/components/ui/tooltip"
+import { deleteVehicle, getVehiclesByProject } from "@/app/service/vehicles/vehicles"
 
 function formatCountdown(ms: number) {
   if (ms <= 0) return "0d 0h 0m 0s"
@@ -51,6 +52,12 @@ function getColorByDaysLeft(daysLeft: number, warningThreshold = 5) {
 export default function VehiclesPage() {
   const { projectId: rawProjectId } = useParams()
   const projectId = Array.isArray(rawProjectId) ? rawProjectId[0] : rawProjectId ?? ""
+
+  const { user } = useAuth()
+  const canCreate = user?.permissions.includes("CREATE") ?? false
+  const canUpdate = user?.permissions.includes("UPDATE") ?? false
+  const canDelete = user?.permissions.includes("DELETE") ?? false
+  const canView = user?.permissions.includes("VIEW") ?? false
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
@@ -216,33 +223,42 @@ export default function VehiclesPage() {
           <DropdownMenuContent align="end" className="w-36">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => {
-                setViewingVehicle(vehicle)
-                setViewDetailsOpen(true)
-              }}
-            >
-              View details
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => {
-                setEditingVehicle(vehicle)
-                setEditOpen(true)
-              }}
-            >
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-destructive cursor-pointer"
-              onClick={() => {
-                setToDeleteUid(vehicle.uid)
-                setAlertOpen(true)
-              }}
-            >
-              Delete
-            </DropdownMenuItem>
+
+            {canView && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => {
+                  setViewingVehicle(vehicle)
+                  setViewDetailsOpen(true)
+                }}
+              >
+                View details
+              </DropdownMenuItem>
+            )}
+
+            {canUpdate && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => {
+                  setEditingVehicle(vehicle)
+                  setEditOpen(true)
+                }}
+              >
+                Edit
+              </DropdownMenuItem>
+            )}
+
+            {canDelete && (
+              <DropdownMenuItem
+                className="text-destructive cursor-pointer"
+                onClick={() => {
+                  setToDeleteUid(vehicle.uid)
+                  setAlertOpen(true)
+                }}
+              >
+                Delete
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -259,20 +275,22 @@ export default function VehiclesPage() {
         searchable
         sortable
         onRefresh={loadVehicles}
-        actions={<Button onClick={() => setAddOpen(true)}>Add Vehicle</Button>}
+        actions={canCreate ? <Button onClick={() => setAddOpen(true)}>Add Vehicle</Button> : null}
       />
 
-      <AddVehicleModal
-        isOpen={addOpen}
-        onOpenChange={setAddOpen}
-        projectId={projectId}
-        onCreated={() => {
-          loadVehicles()
-          setAddOpen(false)
-        }}
-      />
+      {canCreate && (
+        <AddVehicleModal
+          isOpen={addOpen}
+          onOpenChange={setAddOpen}
+          projectId={projectId}
+          onCreated={() => {
+            loadVehicles()
+            setAddOpen(false)
+          }}
+        />
+      )}
 
-      {editingVehicle && (
+      {editingVehicle && canUpdate && (
         <EditVehicleModal
           isOpen={editOpen}
           onOpenChange={(open) => {
@@ -288,7 +306,7 @@ export default function VehiclesPage() {
       )}
 
       <ViewVehicleModal
-        isOpen={viewDetailsOpen}
+        isOpen={viewDetailsOpen && canView}
         onOpenChange={setViewDetailsOpen}
         vehicle={viewingVehicle}
       />

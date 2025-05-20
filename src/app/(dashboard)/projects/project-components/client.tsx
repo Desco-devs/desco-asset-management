@@ -62,7 +62,6 @@ import {
   ChevronDown,
   ChevronUp,
   MoreHorizontal,
-  PlusCircle,
   Search,
   SlidersHorizontal,
   RefreshCcw,
@@ -73,8 +72,8 @@ import { toast } from "sonner";
 import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
 
 import AddClient from "../modal/addClient";
-// Remove the ViewClientsModal import since we're not using it anymore
-// import ViewClientsModal from "../modal/viewClient";
+
+import { useAuth } from "@/app/context/AuthContext";
 
 interface Location {
   uid: string;
@@ -85,6 +84,13 @@ interface Location {
 
 export default function LocationManager() {
   const router = useRouter();
+
+  const { user } = useAuth();
+
+  const canCreate = user?.permissions.includes("CREATE") ?? false;
+  const canUpdate = user?.permissions.includes("UPDATE") ?? false;
+  const canDelete = user?.permissions.includes("DELETE") ?? false;
+  const canView = user?.permissions.includes("VIEW") ?? false;
 
   const [locations, setLocations] = useState<Location[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
@@ -107,11 +113,6 @@ export default function LocationManager() {
   // Delete confirmation modal
   const [alertOpen, setAlertOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-
-  // Remove view modal related state variables since we're not using them anymore
-  // const [viewOpen, setViewOpen] = useState(false);
-  // const [viewLocationId, setViewLocationId] = useState<string | null>(null);
-  // const [viewLocationAddress, setViewLocationAddress] = useState<string | null>(null);
 
   // Fetch & sort
   const loadLocations = async () => {
@@ -267,7 +268,7 @@ export default function LocationManager() {
               )}
             </CardDescription>
           </div>
-          <AddClient onAdd={handleAddLocation} />
+          {canCreate && <AddClient onAdd={handleAddLocation} />}
         </div>
       </CardHeader>
 
@@ -355,15 +356,14 @@ export default function LocationManager() {
               ) : (
                 currentItems.map((loc) => (
                   <TableRow key={loc.uid}>
-                    <TableCell className="font-mono text-xs">
-                      {loc.uid}
-                    </TableCell>
+                    <TableCell className="font-mono text-xs">{loc.uid}</TableCell>
                     <TableCell>
                       {editingId === loc.uid ? (
                         <Input
                           value={editAddress}
                           onChange={(e) => setEditAddress(e.target.value)}
                           className="w-full"
+                          disabled={!canUpdate}
                         />
                       ) : (
                         loc.address
@@ -392,6 +392,7 @@ export default function LocationManager() {
                             variant="default"
                             size="sm"
                             onClick={() => handleUpdateLocation(loc.uid)}
+                            disabled={!canUpdate}
                           >
                             Save
                           </Button>
@@ -406,25 +407,34 @@ export default function LocationManager() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setEditingId(loc.uid);
-                                setEditAddress(loc.address);
-                              }}
-                            >
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleViewClients(loc.uid)}
-                            >
-                              View Clients
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onClick={() => openDeleteModal(loc.uid)}
-                            >
-                              Delete
-                            </DropdownMenuItem>
+
+                            {canUpdate && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setEditingId(loc.uid);
+                                  setEditAddress(loc.address);
+                                }}
+                              >
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+
+                            {canView && (
+                              <DropdownMenuItem
+                                onClick={() => handleViewClients(loc.uid)}
+                              >
+                                View Clients
+                              </DropdownMenuItem>
+                            )}
+
+                            {canDelete && (
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => openDeleteModal(loc.uid)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
@@ -449,9 +459,7 @@ export default function LocationManager() {
                         handlePageChange(currentPage - 1);
                       }}
                       className={
-                        currentPage === 1
-                          ? "pointer-events-none opacity-50"
-                          : ""
+                        currentPage === 1 ? "pointer-events-none opacity-50" : ""
                       }
                     />
                   </PaginationItem>
@@ -501,8 +509,6 @@ export default function LocationManager() {
         confirmText="Delete"
         cancelText="Cancel"
       />
-
-      {/* Remove the ViewClientsModal since we're not using it anymore */}
     </Card>
   );
 }

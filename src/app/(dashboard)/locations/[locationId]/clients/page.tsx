@@ -26,18 +26,21 @@ import { MoreHorizontal } from "lucide-react";
 
 import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
 import ProjectsModal from "@/app/(dashboard)/projects/modal/viewProjects";
+import { useAuth } from "@/app/context/AuthContext";
+
 
 interface Client {
   uid: string;
   name: string;
   createdAt: string;
   updatedAt: string;
-  projects?: any[]; // Adjust type accordingly
+  projects?: any[];
 }
 
 export default function ClientsPage() {
   const { locationId } = useParams();
   const router = useRouter();
+  const { user, loading } = useAuth();
 
   const [clients, setClients] = useState<Client[]>([]);
   const [newName, setNewName] = useState("");
@@ -51,22 +54,26 @@ export default function ClientsPage() {
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
 
   const [projectsOpen, setProjectsOpen] = useState(false);
-  const [clientForProjects, setClientForProjects] = useState<Client | null>(
-    null
-  );
+  const [clientForProjects, setClientForProjects] = useState<Client | null>(null);
 
-  const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!locationId) return;
-    setLoading(true);
+    setLoadingData(true);
     getClientsByLocation(locationId as string)
       .then(setClients)
       .catch(() => toast.error("Failed to fetch clients"))
-      .finally(() => setLoading(false));
+      .finally(() => setLoadingData(false));
   }, [locationId]);
 
+  // Permissions checks
+  const canCreate = user?.permissions.includes("CREATE") ?? false;
+  const canUpdate = user?.permissions.includes("UPDATE") ?? false;
+  const canDelete = user?.permissions.includes("DELETE") ?? false;
+  const canView = user?.permissions.includes("VIEW") ?? false;
+console.log("User permissions:", user?.permissions)
   async function handleCreate() {
     if (!newName.trim() || !locationId) {
       toast.error("Client name and location are required.");
@@ -141,7 +148,6 @@ export default function ClientsPage() {
     if (!open) setClientForProjects(null);
   }
 
-  // Define columns, rendering inline edit and dropdown menu
   const columns: Column<Client>[] = [
     {
       key: "name",
@@ -208,29 +214,38 @@ export default function ClientsPage() {
             <DropdownMenuContent align="end" className="w-40">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() =>
-                  router.push(
-                    `/locations/${locationId}/clients/${client.uid}/projects`
-                  )
-                }
-              >
-                View Projects
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setEditingUid(client.uid);
-                  setEditName(client.name);
-                }}
-              >
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-red-600"
-                onClick={() => confirmDelete(client)}
-              >
-                Delete
-              </DropdownMenuItem>
+
+              {canView && (
+                <DropdownMenuItem
+                  onClick={() =>
+                    router.push(
+                      `/locations/${locationId}/clients/${client.uid}/projects`
+                    )
+                  }
+                >
+                  View Projects
+                </DropdownMenuItem>
+              )}
+
+              {canUpdate && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEditingUid(client.uid);
+                    setEditName(client.name);
+                  }}
+                >
+                  Edit
+                </DropdownMenuItem>
+              )}
+
+              {canDelete && (
+                <DropdownMenuItem
+                  className="text-red-600"
+                  onClick={() => confirmDelete(client)}
+                >
+                  Delete
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -244,7 +259,7 @@ export default function ClientsPage() {
         <DataTable<Client>
           data={clients}
           columns={columns}
-          loading={loading}
+          loading={loadingData}
           refreshing={refreshing}
           searchable
           sortable
@@ -263,21 +278,23 @@ export default function ClientsPage() {
             }
           }}
           actions={
-            <div className="flex gap-2">
-              <input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="border px-2 py-1 rounded"
-                placeholder="Enter new client name"
-                disabled={creating}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreate();
-                }}
-              />
-              <Button onClick={handleCreate} disabled={creating}>
-                {creating ? "Creating..." : "Add Client"}
-              </Button>
-            </div>
+            canCreate ? (
+              <div className="flex gap-2">
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="border px-2 py-1 rounded"
+                  placeholder="Enter new client name"
+                  disabled={creating}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreate();
+                  }}
+                />
+                <Button onClick={handleCreate} disabled={creating}>
+                  {creating ? "Creating..." : "Add Client"}
+                </Button>
+              </div>
+            ) : null
           }
         />
       </div>
@@ -288,7 +305,6 @@ export default function ClientsPage() {
         clientId={clientForProjects?.uid ?? ""}
         clientName={clientForProjects?.name ?? ""}
         onProjectsChange={async () => {
-          // Refresh clients after projects update if needed
           if (!locationId) return;
           const freshClients = await getClientsByLocation(locationId as string);
           setClients(freshClients);

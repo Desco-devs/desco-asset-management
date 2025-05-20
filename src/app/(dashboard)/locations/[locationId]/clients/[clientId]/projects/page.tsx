@@ -1,4 +1,3 @@
-// File: app/(dashboard)/locations/[locationId]/clients/[clientId]/projects/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -22,11 +21,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
 
+import { useAuth } from "@/app/context/AuthContext";
+
 export default function ProjectsPage() {
   const router = useRouter();
   const params = useParams();
   const locationId = params.locationId as string;
   const clientId = params.clientId as string;
+
+  const { user } = useAuth();
+
+  const canCreate = user?.permissions.includes("CREATE") ?? false;
+  const canUpdate = user?.permissions.includes("UPDATE") ?? false;
+  const canDelete = user?.permissions.includes("DELETE") ?? false;
+  const canView = user?.permissions.includes("VIEW") ?? false;
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,7 +110,7 @@ export default function ProjectsPage() {
             className="w-full border rounded px-2 py-1"
             value={editingName}
             onChange={(e) => setEditingName(e.target.value)}
-            disabled={updatingId === project.uid}
+            disabled={updatingId === project.uid || !canUpdate}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleUpdate(project.uid);
               if (e.key === "Escape") {
@@ -144,7 +152,7 @@ export default function ProjectsPage() {
               <Button
                 size="sm"
                 onClick={() => handleUpdate(project.uid)}
-                disabled={updatingId === project.uid}
+                disabled={updatingId === project.uid || !canUpdate}
               >
                 {updatingId === project.uid ? "Saving..." : "Save"}
               </Button>
@@ -163,49 +171,61 @@ export default function ProjectsPage() {
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() =>
-                  router.push(
-                    `/locations/${locationId}/clients/${clientId}/projects/equipments/${project.uid}/equipments`
-                  )
-                }
-              >
-                Equipments {project.equipments?.length ?? "0"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  router.push(
-                    `/locations/${locationId}/clients/${clientId}/projects/vehicles/${project.uid}`
-                  )
-                }
-              >
-                Vehicles {project.vehicles?.length ?? "0"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setEditingId(project.uid);
-                  setEditingName(project.name);
-                }}
-              >
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-red-600"
-                onClick={() => {
-                  setDeleteId(project.uid);
-                  setConfirmOpen(true);
-                }}
-              >
-                Delete
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  setCreateModalOpen(true);
-                }}
-              >
-                New Project
-              </DropdownMenuItem>
+
+              {canView && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      router.push(
+                        `/locations/${locationId}/clients/${clientId}/projects/equipments/${project.uid}/equipments`
+                      )
+                    }
+                  >
+                    Equipments {project.equipments?.length ?? "0"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      router.push(
+                        `/locations/${locationId}/clients/${clientId}/projects/vehicles/${project.uid}`
+                      )
+                    }
+                  >
+                    Vehicles {project.vehicles?.length ?? "0"}
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {canUpdate && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEditingId(project.uid);
+                    setEditingName(project.name);
+                  }}
+                >
+                  Edit
+                </DropdownMenuItem>
+              )}
+
+              {canDelete && (
+                <DropdownMenuItem
+                  className="text-red-600"
+                  onClick={() => {
+                    setDeleteId(project.uid);
+                    setConfirmOpen(true);
+                  }}
+                >
+                  Delete
+                </DropdownMenuItem>
+              )}
+
+              {canCreate && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setCreateModalOpen(true)}>
+                    New Project
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -224,7 +244,11 @@ export default function ProjectsPage() {
         sortable
         onRefresh={loadProjects}
         refreshing={false}
-        actions={<Button onClick={() => setCreateModalOpen(true)}>New Project</Button>}
+        actions={
+          canCreate ? (
+            <Button onClick={() => setCreateModalOpen(true)}>New Project</Button>
+          ) : null
+        }
       />
 
       <CreateProjectModal

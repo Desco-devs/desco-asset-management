@@ -1,19 +1,18 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { getEquipmentsByProject } from "@/app/service/client/dynamicClients"
-import { deleteEquipment } from "@/app/service/equipments/equipment"
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { getEquipmentsByProject } from "@/app/service/client/dynamicClients";
+import { deleteEquipment } from "@/app/service/equipments/equipment";
 
-import AlertModal from "@/app/components/custom-reuseable/modal/alertModal"
-import AddEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/addEquipment"
-import EditEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/editEquipment"
+import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
+import AddEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/addEquipment";
+import EditEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/editEquipment";
 
-
-import DataTable, { Column } from "@/app/components/custom-reuseable/table/ReusableTable"
-import type { Equipment } from "@/app/service/types"
+import DataTable, { Column } from "@/app/components/custom-reuseable/table/ReusableTable";
+import type { Equipment } from "@/app/service/types";
 
 import {
   DropdownMenu,
@@ -22,82 +21,88 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
-import { MoreHorizontal } from "lucide-react"
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import ViewDetailsModal from "@/app/(dashboard)/projects/modal/tools/modal/viewEquipment"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import ViewDetailsModal from "@/app/(dashboard)/projects/modal/tools/modal/viewEquipment";
+
+import { useAuth } from "@/app/context/AuthContext";
 
 function formatCountdown(ms: number) {
-  if (ms <= 0) return "0d 0h 0m 0s"
-  const totalSeconds = Math.floor(ms / 1000)
-  const days = Math.floor(totalSeconds / (3600 * 24))
-  const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-  return `${days}d ${hours}h ${minutes}m ${seconds}s`
+  if (ms <= 0) return "0d 0h 0m 0s";
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / (3600 * 24));
+  const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${days}d ${hours}h ${minutes}m ${seconds}s`;
 }
 
 function getColorByDaysLeft(daysLeft: number, warningThreshold = 5) {
-  if (daysLeft < 0) return "text-red-600"
-  if (daysLeft <= warningThreshold) return "text-yellow-600"
-  return "text-gray-700"
+  if (daysLeft < 0) return "text-red-600";
+  if (daysLeft <= warningThreshold) return "text-yellow-600";
+  return "text-gray-700";
 }
 
 export default function EquipmentsPage() {
-  const { projectId: rawProjectId } = useParams()
-  const projectId = Array.isArray(rawProjectId) ? rawProjectId[0] : rawProjectId ?? ""
+  const { projectId: rawProjectId } = useParams();
+  const projectId = Array.isArray(rawProjectId) ? rawProjectId[0] : rawProjectId ?? "";
 
-  const [equipments, setEquipments] = useState<Equipment[]>([])
-  const [loading, setLoading] = useState(true)
+  const { user } = useAuth();
 
-  const [addOpen, setAddOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
+  const canCreate = user?.permissions.includes("CREATE") ?? false;
+  const canUpdate = user?.permissions.includes("UPDATE") ?? false;
+  const canDelete = user?.permissions.includes("DELETE") ?? false;
+  const canView = user?.permissions.includes("VIEW") ?? false;
 
-  const [alertOpen, setAlertOpen] = useState(false)
-  const [toDeleteUid, setToDeleteUid] = useState<string | null>(null)
+  const [equipments, setEquipments] = useState<Equipment[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [viewDetailsOpen, setViewDetailsOpen] = useState(false)
-  const [viewingEquipment, setViewingEquipment] = useState<Equipment | null>(null)
+  const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
 
-  const [now, setNow] = useState(new Date())
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [toDeleteUid, setToDeleteUid] = useState<string | null>(null);
 
+  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
+  const [viewingEquipment, setViewingEquipment] = useState<Equipment | null>(null);
 
+  const [now, setNow] = useState(new Date());
 
-  // Update "now" every second for countdown timers
   useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(interval)
-  }, [])
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function loadEquipments() {
-    setLoading(true)
+    setLoading(true);
     try {
-      if (!projectId) return
-      const data = await getEquipmentsByProject(projectId)
-      setEquipments(data)
+      if (!projectId) return;
+      const data = await getEquipmentsByProject(projectId);
+      setEquipments(data);
     } catch {
-      toast.error("Failed to fetch equipments.")
+      toast.error("Failed to fetch equipments.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadEquipments()
-  }, [projectId])
+    loadEquipments();
+  }, [projectId]);
 
   async function handleDelete() {
-    if (!toDeleteUid) return
+    if (!toDeleteUid) return;
     try {
-      await deleteEquipment(toDeleteUid)
-      toast.success("Equipment deleted")
-      setToDeleteUid(null)
-      setAlertOpen(false)
-      loadEquipments()
+      await deleteEquipment(toDeleteUid);
+      toast.success("Equipment deleted");
+      setToDeleteUid(null);
+      setAlertOpen(false);
+      loadEquipments();
     } catch (error: any) {
-      toast.error(error.message || "Failed to delete equipment")
+      toast.error(error.message || "Failed to delete equipment");
     }
   }
 
@@ -139,11 +144,11 @@ export default function EquipmentsPage() {
       key: "expirationDate",
       title: "Expiration",
       render: (_value, equipment) => {
-        if (!equipment.expirationDate) return "-"
-        const expDate = new Date(equipment.expirationDate)
-        const diffMs = expDate.getTime() - now.getTime()
-        const daysLeft = diffMs / (1000 * 60 * 60 * 24)
-        const colorClass = getColorByDaysLeft(daysLeft, 5)
+        if (!equipment.expirationDate) return "-";
+        const expDate = new Date(equipment.expirationDate);
+        const diffMs = expDate.getTime() - now.getTime();
+        const daysLeft = diffMs / (1000 * 60 * 60 * 24);
+        const colorClass = getColorByDaysLeft(daysLeft, 5);
         return (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -161,7 +166,7 @@ export default function EquipmentsPage() {
               })}
             </TooltipContent>
           </Tooltip>
-        )
+        );
       },
       sortable: true,
     },
@@ -177,11 +182,11 @@ export default function EquipmentsPage() {
       key: "inspectionDate",
       title: "Inspection Date",
       render: (_value, equipment) => {
-        if (!equipment.inspectionDate) return "-"
-        const inspDate = new Date(equipment.inspectionDate)
-        const diffMs = inspDate.getTime() - now.getTime()
-        const daysLeft = diffMs / (1000 * 60 * 60 * 24)
-        const colorClass = getColorByDaysLeft(daysLeft, 5)
+        if (!equipment.inspectionDate) return "-";
+        const inspDate = new Date(equipment.inspectionDate);
+        const diffMs = inspDate.getTime() - now.getTime();
+        const daysLeft = diffMs / (1000 * 60 * 60 * 24);
+        const colorClass = getColorByDaysLeft(daysLeft, 5);
         return (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -199,7 +204,7 @@ export default function EquipmentsPage() {
               })}
             </TooltipContent>
           </Tooltip>
-        )
+        );
       },
     },
     {
@@ -222,38 +227,47 @@ export default function EquipmentsPage() {
           <DropdownMenuContent align="end" className="w-36">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => {
-                setViewingEquipment(equipment)
-                setViewDetailsOpen(true)
-              }}
-            >
-              View details
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer"
-              onClick={() => {
-                setEditingEquipment(equipment)
-                setEditOpen(true)
-              }}
-            >
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-destructive cursor-pointer"
-              onClick={() => {
-                setToDeleteUid(equipment.uid)
-                setAlertOpen(true)
-              }}
-            >
-              Delete
-            </DropdownMenuItem>
+
+            {canView && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => {
+                  setViewingEquipment(equipment);
+                  setViewDetailsOpen(true);
+                }}
+              >
+                View details
+              </DropdownMenuItem>
+            )}
+
+            {canUpdate && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => {
+                  setEditingEquipment(equipment);
+                  setEditOpen(true);
+                }}
+              >
+                Edit
+              </DropdownMenuItem>
+            )}
+
+            {canDelete && (
+              <DropdownMenuItem
+                className="text-destructive cursor-pointer"
+                onClick={() => {
+                  setToDeleteUid(equipment.uid);
+                  setAlertOpen(true);
+                }}
+              >
+                Delete
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
     },
-  ]
+  ];
 
   return (
     <div className="py-4">
@@ -265,40 +279,41 @@ export default function EquipmentsPage() {
         searchable
         sortable
         onRefresh={loadEquipments}
-        actions={<Button onClick={() => setAddOpen(true)}>Add Equipment</Button>}
+        actions={canCreate ? <Button onClick={() => setAddOpen(true)}>Add Equipment</Button> : null}
       />
 
-      <AddEquipmentModal
-        isOpen={addOpen}
-        onOpenChange={setAddOpen}
-        projectId={projectId}
-        onCreated={() => {
-          loadEquipments()
-          setAddOpen(false)
-        }}
-      />
+      {canCreate && (
+        <AddEquipmentModal
+          isOpen={addOpen}
+          onOpenChange={setAddOpen}
+          projectId={projectId}
+          onCreated={() => {
+            loadEquipments();
+            setAddOpen(false);
+          }}
+        />
+      )}
 
-      {editingEquipment && (
+      {editingEquipment && canUpdate && (
         <EditEquipmentModal
           isOpen={editOpen}
           onOpenChange={(open) => {
-            setEditOpen(open)
-            if (!open) setEditingEquipment(null)
+            setEditOpen(open);
+            if (!open) setEditingEquipment(null);
           }}
           equipment={editingEquipment}
           onUpdated={() => {
-            loadEquipments()
-            setEditOpen(false)
+            loadEquipments();
+            setEditOpen(false);
           }}
         />
       )}
 
       <ViewDetailsModal
-        isOpen={viewDetailsOpen}
+        isOpen={viewDetailsOpen && canView}
         onOpenChange={setViewDetailsOpen}
         equipment={viewingEquipment}
       />
-
 
       <AlertModal
         isOpen={alertOpen}
@@ -310,5 +325,6 @@ export default function EquipmentsPage() {
         onConfirm={handleDelete}
       />
     </div>
-  )
+  );
 }
+// 
