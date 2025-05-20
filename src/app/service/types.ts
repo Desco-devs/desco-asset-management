@@ -1,26 +1,24 @@
 // File: app/service/types.ts
-
-/**
- * Permission flags for User
- */
-export type Permission = "VIEW" | "DELETE" | "UPDATE" | "CREATE";
-
-/**
- * Operational status for assets
- */
+import { PrismaClient, Permission, userStatus } from '@prisma/client'
 export type Status = "OPERATIONAL" | "NON_OPERATIONAL";
 
-/**
- * User model returned from API
- */
+
+
+const prisma = new PrismaClient()
+
+
+
+
 export interface User {
-  uid: string;
-  username: string;
-  fullname: string;
-  phone?: string;
-  permissions: Permission[];
-  createdAt: string;
-  updatedAt: string;
+  uid?: string
+  username?: string
+  password?: string
+  fullname?: string
+  phone?: string | null
+  permissions?: string[]
+  userStatus?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 /**

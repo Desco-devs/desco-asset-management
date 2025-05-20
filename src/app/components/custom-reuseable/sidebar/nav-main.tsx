@@ -23,15 +23,12 @@ export function NavMain({
   items,
 }: {
   items: {
-    title: string;
-    url: string;
-    icon?: LucideIcon;
-    isActive?: boolean;
-    items?: {
-      title: string;
-      url: string;
-    }[];
-  }[];
+    title: string
+    url: string
+    icon?: LucideIcon
+    isActive?: boolean
+    items?: { title: string; url: string }[]
+  }[]
 }) {
   const pathname = usePathname();
 
@@ -40,56 +37,79 @@ export function NavMain({
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => {
+          const hasSubItems = item.items && item.items.length > 0;
           const isMainActive =
             pathname === item.url ||
-            item.items?.some((subItem) => subItem.url === pathname);
+            (hasSubItems && item.items!.some((subItem) => subItem.url === pathname));
+
+          if (hasSubItems) {
+            // Render collapsible dropdown if submenu items exist
+            return (
+              <Collapsible
+                key={item.title}
+                asChild
+                defaultOpen={isMainActive || item.isActive}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      tooltip={item.title}
+                      className={`hover:bg-foreground/15 ${
+                        pathname === item.url
+                          ? "bg-foreground/14 text-accent-foreground"
+                          : ""
+                      }`}
+                    >
+                      {item.icon && <item.icon />}
+                      <span>{item.title}</span>
+                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {item.items!.map((subItem) => (
+                        <SidebarMenuSubItem key={subItem.title}>
+                          <SidebarMenuSubButton asChild>
+                            <a
+                              href={subItem.url}
+                              className={`hover:bg-foreground/15 ${
+                                pathname === subItem.url
+                                  ? "bg-foreground/14 text-accent-foreground"
+                                  : ""
+                              }`}
+                            >
+                              <span>{subItem.title}</span>
+                            </a>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            )
+          }
+
+          // Render a simple link button if no submenu
           return (
-            <Collapsible
-              key={item.title}
-              asChild
-              defaultOpen={isMainActive || item.isActive}
-              className="group/collapsible"
-            >
-              <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                  <SidebarMenuButton
-                    tooltip={item.title}
-                    className={`hover:bg-foreground/15 ${
-                      pathname === item.url
-                        ? "bg-foreground/14 text-accent-foreground"
-                        : ""
-                    }`}
-                  >
-                    {item.icon && <item.icon />}
-                    <span>{item.title}</span>
-                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                  </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <SidebarMenuSub>
-                    {item.items?.map((subItem) => (
-                      <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton asChild>
-                          <a
-                            href={subItem.url}
-                            className={`hover:bg-foreground/15 ${
-                              pathname === subItem.url
-                                ? "bg-foreground/14 text-accent-foreground"
-                                : ""
-                            }`}
-                          >
-                            <span>{subItem.title}</span>
-                          </a>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
-                </CollapsibleContent>
-              </SidebarMenuItem>
-            </Collapsible>
-          );
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton
+                asChild
+                tooltip={item.title}
+                className={`hover:bg-foreground/15 ${
+                  pathname === item.url ? "bg-foreground/14 text-accent-foreground" : ""
+                }`}
+              >
+                <a href={item.url} className="flex items-center gap-2 w-full">
+                  {item.icon && <item.icon />}
+                  <span>{item.title}</span>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )
         })}
       </SidebarMenu>
     </SidebarGroup>
-  );
+  )
 }

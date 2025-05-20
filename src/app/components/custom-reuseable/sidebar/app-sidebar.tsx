@@ -7,6 +7,7 @@ import {
   Map,
   GalleryVerticalEnd,
   AudioWaveform,
+  User,
 } from "lucide-react";
 
 import {
@@ -43,20 +44,21 @@ const data = {
   navMain: [
     {
       title: "Home",
-      url: "/",
+      url: "/home",
       icon: Frame,
       isActive: true,
-      items: [],
     },
     {
       title: "Projects",
-      url: "#",
-      icon: PieChart,
-      items: [
-        { title: "All Projects", url: "/projects" },
-        { title: "Equipments", url: "/equipments" },
-        { title: "Vehicles", url: "/vehicles" },
-      ],
+      url: "/projects",
+      icon: GalleryVerticalEnd,
+      isActive: true,
+    },
+       {
+      title: "User & Permissions",
+      url: "/users",
+      icon: User,  
+      isActive: true,
     },
   ],
 };

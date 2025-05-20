@@ -1,13 +1,14 @@
 'use client'
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
-
+import { userStatus, Permission } from '@prisma/client'
 export interface User {
   uid: string
   username: string
   fullname: string
   phone: string | null
-  permissions: string[]
+  permissions: Permission[]
+  userStatus: userStatus
   createdAt: string
   updatedAt: string
   iat: number

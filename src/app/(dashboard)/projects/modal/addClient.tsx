@@ -1,81 +1,88 @@
-"use client";
+"use client"
 
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import * as React from "react"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"  // <-- import ShadCN Input
+import { toast } from "sonner"
 
-interface AddClientProps {
-  onAdd: (address: string) => Promise<void>;
+interface AddClientModalProps {
+  locationId: string
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+  onClientAdded: (client: { uid: string; name: string }) => void
+  creating: boolean
+  createClient: (name: string, locationId: string) => Promise<{ uid: string; name: string }>
 }
 
-export default function AddClient({ onAdd }: AddClientProps) {
-  const [open, setOpen] = useState(false);
-  const [address, setAddress] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function AddClientModal({
+  locationId,
+  isOpen,
+  onOpenChange,
+  onClientAdded,
+  creating,
+  createClient,
+}: AddClientModalProps) {
+  const [newName, setNewName] = React.useState("")
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!address.trim()) {
-      setError("Address is required");
-      return;
+  async function handleCreate() {
+    if (!newName.trim() || !locationId) {
+      toast.error("Client name and location are required.")
+      return
     }
-    setLoading(true);
+
     try {
-      await onAdd(address);
-      setAddress("");
-      setOpen(false);
+      const client = await createClient(newName.trim(), locationId)
+      onClientAdded(client)
+      setNewName("")
+      toast.success("Client added successfully.")
+      onOpenChange(false)
     } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      toast.error(err.message || "Failed to add client.")
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="w-fit text-sm bg-chart-1 dark:text-accent-foreground hover:bg-chart-3">
-          New Location
-        </Button>
-      </DialogTrigger>
-
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add New Location</DialogTitle>
-          <DialogDescription>
-            Enter the address for the new location.
-          </DialogDescription>
+          <DialogTitle>Add New Client</DialogTitle>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <div className="mt-2">
           <Input
             type="text"
-            placeholder="Enter address"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            disabled={loading}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Enter client name"
+            disabled={creating}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                handleCreate()
+              }
+              if (e.key === "Escape") {
+                onOpenChange(false)
+                setNewName("")
+              }
+            }}
             autoFocus
           />
-          {error && <p className="text-red-600">{error}</p>}
-
-          <DialogFooter>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Adding..." : "Add Location"}
-            </Button>
-          </DialogFooter>
-        </form>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={creating}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreate} disabled={creating}>
+            {creating ? "Creating..." : "Add Client"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

@@ -79,6 +79,10 @@ export default function Home() {
           <label className="block font-medium">Updated At:</label>
           <p>{new Date(user.updatedAt).toLocaleString()}</p>
         </div>
+        <div>
+          <label className="block font-medium">STATUS</label>
+          <p>{user.userStatus}</p>
+        </div>
 
         <button
           type="button"

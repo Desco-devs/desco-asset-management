@@ -1,3 +1,4 @@
+// SessionGuard.tsx
 "use client";
 
 import { useEffect } from "react";
@@ -10,17 +11,17 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace("/"); // or your login route
+    if (!loading && (!user || user.userStatus === "INACTIVE")) {
+      router.replace("/") // Redirect to login or home page
     }
   }, [loading, user, router]);
 
   if (loading) {
-    return <GuardLoader />; // or spinner
+    return <GuardLoader />; // Loading spinner or placeholder
   }
 
   if (!user) {
-    return null; // prevent flicker
+    return null; // Prevent flicker before redirect
   }
 
   return <>{children}</>;

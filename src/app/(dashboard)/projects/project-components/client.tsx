@@ -71,7 +71,7 @@ import { toast } from "sonner";
 
 import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
 
-import AddClient from "../modal/addClient";
+import AddClient from "../modal/addLocation";
 
 import { useAuth } from "@/app/context/AuthContext";
 

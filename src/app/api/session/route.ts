@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
-
+import { Permission, userStatus } from '@prisma/client'
 const JWT_SECRET = process.env.JWT_SECRET!
 const TOKEN_NAME = 'desco_token'
 
 interface JwtPayload {
-  uid: string
-  username: string
-  fullname: string
-  phone?: string | null
-  permissions: string[]
-  createdAt: string
-  updatedAt: string
-  iat: number
-  exp: number
+    uid: string;
+    username: string;
+    password: string;
+    fullname: string;
+    phone: string | null;
+    permissions: Permission[];
+    userStatus: userStatus;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 export async function GET(req: NextRequest) {

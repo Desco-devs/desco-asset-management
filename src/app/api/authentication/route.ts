@@ -27,6 +27,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid username or password.' }, { status: 401 })
     }
 
+      if (user.userStatus !== 'ACTIVE') {
+      return NextResponse.json({ error: 'User status is no longer Active' }, { status: 401 })
+    }
+
     const valid = await bcrypt.compare(password, user.password)
     if (!valid) {
       return NextResponse.json({ error: 'Invalid username or password.' }, { status: 401 })
