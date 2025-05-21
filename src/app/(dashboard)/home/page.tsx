@@ -3,47 +3,49 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { useState } from "react";
 import { toast } from "sonner";
+import { VehiclesCount } from "./components/vehicle-count";
+import { EquipmentStatusChart } from "./components/equipments-count";
 
 export default function Home() {
-  const { user, loading, clearUser } = useAuth();
-  const [loggingOut, setLoggingOut] = useState(false);
+  // const { user, loading, clearUser } = useAuth();
+  // const [loggingOut, setLoggingOut] = useState(false);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading user data...</p>
-      </div>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center">
+  //       <p>Loading user data...</p>
+  //     </div>
+  //   );
+  // }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>User is not authenticated.</p>
-      </div>
-    );
-  }
-  async function handleLogout() {
-    setLoggingOut(true);
-    try {
-      const res = await fetch("/api/authentication/logout", { method: "POST" });
-      if (res.ok) {
-        clearUser();
-        toast.success("Logout successful!");
-      } else {
-        toast.error("Logout failed");
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("Logout error");
-    } finally {
-      setLoggingOut(false);
-    }
-  }
+  // if (!user) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center">
+  //       <p>User is not authenticated.</p>
+  //     </div>
+  //   );
+  // }
+  // async function handleLogout() {
+  //   setLoggingOut(true);
+  //   try {
+  //     const res = await fetch("/api/authentication/logout", { method: "POST" });
+  //     if (res.ok) {
+  //       clearUser();
+  //       toast.success("Logout successful!");
+  //     } else {
+  //       toast.error("Logout failed");
+  //     }
+  //   } catch (error) {
+  //     console.error(error);
+  //     toast.error("Logout error");
+  //   } finally {
+  //     setLoggingOut(false);
+  //   }
+  // }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <form className="max-w-md w-full bg-white p-8 rounded-lg shadow space-y-4">
+    <div className="min-h-screen py-4">
+      {/* <form className="max-w-md w-full bg-white p-8 rounded-lg shadow space-y-4">
         <h2 className="text-2xl font-semibold mb-6 text-center">Home</h2>
 
         <div>
@@ -92,7 +94,12 @@ export default function Home() {
         >
           {loggingOut ? "Logging out..." : "Logout"}
         </button>
-      </form>
+      </form> */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4"></div>
+      <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+        <EquipmentStatusChart />
+        <VehiclesCount />
+      </div>
     </div>
   );
 }

@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { deleteProject, updateProject } from "@/app/service/client/project";
 import { getProjectsByClient } from "@/app/service/client/dynamicClients";
-import DataTable, { Column } from "@/app/components/custom-reuseable/table/ReusableTable";
+import DataTable, {
+  Column,
+} from "@/app/components/custom-reuseable/table/ReusableTable";
 import CreateProjectModal from "@/app/(dashboard)/projects/modal/addProjects";
 import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
 import { Project } from "@/app/service/types";
@@ -22,6 +24,7 @@ import {
 import { MoreHorizontal } from "lucide-react";
 
 import { useAuth } from "@/app/context/AuthContext";
+import { color } from "@/lib/color";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -47,6 +50,8 @@ export default function ProjectsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  const [clientName, setClientName] = useState<string | null>(null);
+
   async function loadProjects() {
     setLoading(true);
     try {
@@ -59,6 +64,13 @@ export default function ProjectsPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    // Get client name from URL search params
+    const searchParams = new URLSearchParams(window.location.search);
+    const name = searchParams.get("clientName");
+    setClientName(name ? decodeURIComponent(name) : null);
+  }, []);
 
   useEffect(() => {
     if (clientId) loadProjects();
@@ -177,7 +189,11 @@ export default function ProjectsPage() {
                   <DropdownMenuItem
                     onClick={() =>
                       router.push(
-                        `/locations/${locationId}/clients/${clientId}/projects/equipments/${project.uid}/equipments`
+                        `/locations/${locationId}/clients/${clientId}/projects/equipments/${
+                          project.uid
+                        }/equipments?projectName=${encodeURIComponent(
+                          project.name
+                        )}`
                       )
                     }
                   >
@@ -186,7 +202,9 @@ export default function ProjectsPage() {
                   <DropdownMenuItem
                     onClick={() =>
                       router.push(
-                        `/locations/${locationId}/clients/${clientId}/projects/vehicles/${project.uid}`
+                        `/locations/${locationId}/clients/${clientId}/projects/vehicles/${
+                          project.uid
+                        }?projectName=${encodeURIComponent(project.name)}`
                       )
                     }
                   >
@@ -239,6 +257,7 @@ export default function ProjectsPage() {
         data={projects}
         columns={columns}
         loading={loading}
+        badgeText={`All Projects from ${clientName ?? "Client"}`}
         pagination
         searchable
         sortable
@@ -246,7 +265,12 @@ export default function ProjectsPage() {
         refreshing={false}
         actions={
           canCreate ? (
-            <Button onClick={() => setCreateModalOpen(true)}>New Project</Button>
+            <Button
+              onClick={() => setCreateModalOpen(true)}
+              className={`${color} w-fit text-sm bg-chart-1 `}
+            >
+              New Project
+            </Button>
           ) : null
         }
       />

@@ -1,32 +1,33 @@
-"use client"
+"use client";
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
-import { Calendar, RefreshCw } from "lucide-react"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Calendar, RefreshCw } from "lucide-react";
 
-import { Client } from "@/app/service/types"
+import { Client } from "@/app/service/types";
 import {
   fetchClients,
   createClient,
   updateClient,
   deleteClient,
-} from "@/app/service/client/clientService"
-import AlertModal from "@/app/components/custom-reuseable/modal/alertModal"
-import ProjectsModal from "./viewProjects"
+} from "@/app/service/client/clientService";
+import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
+import ProjectsModal from "./viewProjects";
+import { color } from "@/lib/color";
 
 interface ViewClientsModalProps {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  locationId: string | null
-  locationAddress?: string | null
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  locationId: string | null;
+  locationAddress?: string | null;
 }
 
 export default function ViewClientsModal({
@@ -35,123 +36,124 @@ export default function ViewClientsModal({
   locationId,
   locationAddress,
 }: ViewClientsModalProps) {
-  const [clients, setClients] = useState<Client[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [newName, setNewName] = useState("")
-  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  const [editingUid, setEditingUid] = useState<string | null>(null)
-  const [editName, setEditName] = useState("")
-  const [savingUid, setSavingUid] = useState<string | null>(null) // ← loader state
+  const [editingUid, setEditingUid] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [savingUid, setSavingUid] = useState<string | null>(null); // ← loader state
 
-  const [alertOpen, setAlertOpen] = useState(false)
-  const [clientToDelete, setClientToDelete] = useState<Client | null>(null)
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
 
-  const [projectsOpen, setProjectsOpen] = useState(false)
-  const [clientForProjects, setClientForProjects] = useState<Client | null>(null)
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  const [clientForProjects, setClientForProjects] = useState<Client | null>(
+    null
+  );
 
   async function refreshClients() {
     try {
-      const data = await fetchClients()
+      const data = await fetchClients();
       setClients(
-        locationId ? data.filter(c => c.locationId === locationId) : data
-      )
+        locationId ? data.filter((c) => c.locationId === locationId) : data
+      );
     } catch (err: any) {
-      toast.error(err.message || "Failed to refresh clients")
+      toast.error(err.message || "Failed to refresh clients");
     }
   }
 
   useEffect(() => {
-    if (!isOpen) return
-    setLoading(true)
-    setError(null)
+    if (!isOpen) return;
+    setLoading(true);
+    setError(null);
     fetchClients()
-      .then(data => {
+      .then((data) => {
         setClients(
-          locationId ? data.filter(c => c.locationId === locationId) : data
-        )
+          locationId ? data.filter((c) => c.locationId === locationId) : data
+        );
       })
-      .catch(err => {
-        setError(err.message)
-        toast.error(err.message || "Failed to load clients")
+      .catch((err) => {
+        setError(err.message);
+        toast.error(err.message || "Failed to load clients");
       })
-      .finally(() => setLoading(false))
-  }, [isOpen, locationId])
+      .finally(() => setLoading(false));
+  }, [isOpen, locationId]);
 
   async function handleCreate() {
     if (!newName.trim() || !locationId) {
-      toast.error("Client name and location are required.")
-      return
+      toast.error("Client name and location are required.");
+      return;
     }
-    setCreating(true)
+    setCreating(true);
     try {
-      const client = await createClient(newName.trim(), locationId)
-      setClients(prev => [client, ...prev])
-      setNewName("")
-      toast.success("Client added successfully.")
+      const client = await createClient(newName.trim(), locationId);
+      setClients((prev) => [client, ...prev]);
+      setNewName("");
+      toast.success("Client added successfully.");
     } catch (err: any) {
-      toast.error(err.message || "Failed to add client.")
+      toast.error(err.message || "Failed to add client.");
     } finally {
-      setCreating(false)
+      setCreating(false);
     }
   }
 
-async function handleSaveEdit(uid: string) {
-  if (!editName.trim() || !locationId) return
-  setSavingUid(uid)
+  async function handleSaveEdit(uid: string) {
+    if (!editName.trim() || !locationId) return;
+    setSavingUid(uid);
 
-  // capture the old projects
-  const old = clients.find(c => c.uid === uid)
+    // capture the old projects
+    const old = clients.find((c) => c.uid === uid);
 
-  try {
-    const updated = await updateClient(uid, editName.trim(), locationId)
-    setClients(prev =>
-      prev.map(c =>
-        c.uid === uid
-          ? {
-              ...updated,
-              projects: old?.projects || [],  // ← re-attach the previous projects so when editing the client, the projects are not lost
-            }
-          : c
-      )
-    )
-    setEditingUid(null)
-    setEditName("")
-    toast.success("Client updated successfully.")
-  } catch (err: any) {
-    toast.error(err.message || "Failed to update client.")
-  } finally {
-    setSavingUid(null)
+    try {
+      const updated = await updateClient(uid, editName.trim(), locationId);
+      setClients((prev) =>
+        prev.map((c) =>
+          c.uid === uid
+            ? {
+                ...updated,
+                projects: old?.projects || [], // ← re-attach the previous projects so when editing the client, the projects are not lost
+              }
+            : c
+        )
+      );
+      setEditingUid(null);
+      setEditName("");
+      toast.success("Client updated successfully.");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update client.");
+    } finally {
+      setSavingUid(null);
+    }
   }
-}
-
 
   function confirmDelete(client: Client) {
-    setClientToDelete(client)
-    setAlertOpen(true)
+    setClientToDelete(client);
+    setAlertOpen(true);
   }
 
   async function handleDelete() {
-    if (!clientToDelete) return
+    if (!clientToDelete) return;
     try {
-      await deleteClient(clientToDelete.uid)
-      setClients(prev => prev.filter(c => c.uid !== clientToDelete.uid))
-      toast.success("Client deleted successfully.")
+      await deleteClient(clientToDelete.uid);
+      setClients((prev) => prev.filter((c) => c.uid !== clientToDelete.uid));
+      toast.success("Client deleted successfully.");
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete client.")
+      toast.error(err.message || "Failed to delete client.");
     }
   }
 
   function openProjects(client: Client) {
-    setClientForProjects(client)
-    setProjectsOpen(true)
+    setClientForProjects(client);
+    setProjectsOpen(true);
   }
 
   function closeProjects(open: boolean) {
-    setProjectsOpen(open)
-    if (!open) setClientForProjects(null)
+    setProjectsOpen(open);
+    if (!open) setClientForProjects(null);
   }
 
   return (
@@ -159,7 +161,9 @@ async function handleSaveEdit(uid: string) {
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Clients for location: {locationAddress || "—"}</DialogTitle>
+            <DialogTitle>
+              Clients for location: {locationAddress || "—"}
+            </DialogTitle>
             {!loading && !error && (
               <DialogDescription>
                 Overall Clients: {clients?.length ?? "0"}
@@ -174,10 +178,14 @@ async function handleSaveEdit(uid: string) {
               placeholder="Client name"
               className="flex-1 border p-2 rounded"
               value={newName}
-              onChange={e => setNewName(e.target.value)}
+              onChange={(e) => setNewName(e.target.value)}
               disabled={creating}
             />
-            <Button onClick={handleCreate} disabled={creating}>
+            <Button
+              onClick={handleCreate}
+              disabled={creating}
+              className={`${color} w-fit text-sm bg-chart-1 hover:bg-chart-1/20`}
+            >
               {creating ? "Adding…" : "Add Client"}
             </Button>
           </div>
@@ -194,8 +202,9 @@ async function handleSaveEdit(uid: string) {
               <p>No clients for this location.</p>
             )}
 
-            {!loading && !error &&
-              clients.map(c => (
+            {!loading &&
+              !error &&
+              clients.map((c) => (
                 <div
                   key={c.uid}
                   className="py-2 border-b last:border-b-0 flex items-start justify-between"
@@ -206,7 +215,7 @@ async function handleSaveEdit(uid: string) {
                         type="text"
                         className="flex-1 border p-1 rounded"
                         value={editName}
-                        onChange={e => setEditName(e.target.value)}
+                        onChange={(e) => setEditName(e.target.value)}
                       />
                       <Button
                         size="sm"
@@ -233,17 +242,23 @@ async function handleSaveEdit(uid: string) {
                             <Calendar className="w-3 h-3 mt-[2px]" />
                             <div className="flex flex-col">
                               <span>
-                                {new Date(c.createdAt).toLocaleDateString(undefined, {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                })}
+                                {new Date(c.createdAt).toLocaleDateString(
+                                  undefined,
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  }
+                                )}
                               </span>
                               <span className="mt-0.5">
-                                {new Date(c.createdAt).toLocaleTimeString(undefined, {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
+                                {new Date(c.createdAt).toLocaleTimeString(
+                                  undefined,
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  }
+                                )}
                               </span>
                             </div>
                           </div>
@@ -251,17 +266,23 @@ async function handleSaveEdit(uid: string) {
                             <RefreshCw className="w-3 h-3 mt-[2px]" />
                             <div className="flex flex-col">
                               <span>
-                                {new Date(c.updatedAt).toLocaleDateString(undefined, {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                })}
+                                {new Date(c.updatedAt).toLocaleDateString(
+                                  undefined,
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  }
+                                )}
                               </span>
                               <span className="mt-0.5">
-                                {new Date(c.updatedAt).toLocaleTimeString(undefined, {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
+                                {new Date(c.updatedAt).toLocaleTimeString(
+                                  undefined,
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  }
+                                )}
                               </span>
                             </div>
                           </div>
@@ -283,8 +304,8 @@ async function handleSaveEdit(uid: string) {
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            setEditingUid(c.uid)
-                            setEditName(c.name)
+                            setEditingUid(c.uid);
+                            setEditName(c.name);
                           }}
                         >
                           Edit
@@ -327,5 +348,5 @@ async function handleSaveEdit(uid: string) {
         onConfirm={handleDelete}
       />
     </>
-  )
+  );
 }

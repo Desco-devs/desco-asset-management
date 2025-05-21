@@ -11,7 +11,9 @@ import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
 import AddEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/addEquipment";
 import EditEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/editEquipment";
 
-import DataTable, { Column } from "@/app/components/custom-reuseable/table/ReusableTable";
+import DataTable, {
+  Column,
+} from "@/app/components/custom-reuseable/table/ReusableTable";
 import type { Equipment } from "@/app/service/types";
 
 import {
@@ -24,10 +26,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
 
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import ViewDetailsModal from "@/app/(dashboard)/projects/modal/tools/modal/viewEquipment";
 
 import { useAuth } from "@/app/context/AuthContext";
+import { color } from "@/lib/color";
 
 function formatCountdown(ms: number) {
   if (ms <= 0) return "0d 0h 0m 0s";
@@ -35,21 +42,24 @@ function formatCountdown(ms: number) {
   const days = Math.floor(totalSeconds / (3600 * 24));
   const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+  // const seconds = totalSeconds % 60;
+  return `${days}d ${hours}h ${minutes}m `;
 }
 
 function getColorByDaysLeft(daysLeft: number, warningThreshold = 5) {
   if (daysLeft < 0) return "text-red-600";
   if (daysLeft <= warningThreshold) return "text-yellow-600";
-  return "text-gray-700";
+  return "text-green-600";
 }
 
 export default function EquipmentsPage() {
   const { projectId: rawProjectId } = useParams();
-  const projectId = Array.isArray(rawProjectId) ? rawProjectId[0] : rawProjectId ?? "";
+  const projectId = Array.isArray(rawProjectId)
+    ? rawProjectId[0]
+    : rawProjectId ?? "";
 
   const { user } = useAuth();
+  const [projectName, setProjectName] = useState<string | null>(null);
 
   const canCreate = user?.permissions.includes("CREATE") ?? false;
   const canUpdate = user?.permissions.includes("UPDATE") ?? false;
@@ -61,19 +71,30 @@ export default function EquipmentsPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(
+    null
+  );
 
   const [alertOpen, setAlertOpen] = useState(false);
   const [toDeleteUid, setToDeleteUid] = useState<string | null>(null);
 
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
-  const [viewingEquipment, setViewingEquipment] = useState<Equipment | null>(null);
+  const [viewingEquipment, setViewingEquipment] = useState<Equipment | null>(
+    null
+  );
 
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    // Get project name from URL search params
+    const searchParams = new URLSearchParams(window.location.search);
+    const name = searchParams.get("projectName");
+    setProjectName(name ? decodeURIComponent(name) : null);
   }, []);
 
   async function loadEquipments() {
@@ -275,11 +296,21 @@ export default function EquipmentsPage() {
         data={equipments}
         columns={columns}
         loading={loading}
+        badgeText={`All Equipments from ${projectName ?? "Equipments"}`}
         pagination
         searchable
         sortable
         onRefresh={loadEquipments}
-        actions={canCreate ? <Button onClick={() => setAddOpen(true)}>Add Equipment</Button> : null}
+        actions={
+          canCreate ? (
+            <Button
+              onClick={() => setAddOpen(true)}
+              className={`${color} w-fit text-sm bg-chart-1 `}
+            >
+              Add Equipment
+            </Button>
+          ) : null
+        }
       />
 
       {canCreate && (
@@ -327,4 +358,4 @@ export default function EquipmentsPage() {
     </div>
   );
 }
-// 
+//

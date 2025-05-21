@@ -219,15 +219,19 @@ export default function DataTable<T>({
       <CardHeader>
         <div className="flex flex-col justify-between items-center gap-4">
           <div className="flex items-center justify-between w-full">
-            <CardTitle>{badgeText ?? "Data Table"}</CardTitle>
-            {badgeText && (
-              <CardDescription>
-                Manage all {badgeText}{" "}
-                {refreshing && (
-                  <span className="text-xs ml-2">(refreshing...)</span>
-                )}
-              </CardDescription>
-            )}
+            <div>
+              <CardTitle className="">
+                <span className="capitalize">{badgeText ?? "Data Table"}</span>
+              </CardTitle>
+              {badgeText && (
+                <CardDescription>
+                  Manage all {badgeText}{" "}
+                  {refreshing && (
+                    <span className="text-xs ml-2">(refreshing...)</span>
+                  )}
+                </CardDescription>
+              )}
+            </div>
 
             {actions}
           </div>

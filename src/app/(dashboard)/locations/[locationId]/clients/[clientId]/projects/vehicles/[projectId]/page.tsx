@@ -1,16 +1,18 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
-import AlertModal from "@/app/components/custom-reuseable/modal/alertModal"
-import AddVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/addVehicle"
-import EditVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/editVehicle"
+import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
+import AddVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/addVehicle";
+import EditVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/editVehicle";
 
-import DataTable, { Column } from "@/app/components/custom-reuseable/table/ReusableTable"
-import type { Vehicle } from "@/app/service/types"
+import DataTable, {
+  Column,
+} from "@/app/components/custom-reuseable/table/ReusableTable";
+import type { Vehicle } from "@/app/service/types";
 
 import {
   DropdownMenu,
@@ -19,93 +21,109 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
-import { MoreHorizontal } from "lucide-react"
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 
-import ViewVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/viewVehicle"
-import { useAuth } from "@/app/context/AuthContext"
+import ViewVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/viewVehicle";
+import { useAuth } from "@/app/context/AuthContext";
 
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
-} from "@/components/ui/tooltip"
-import { deleteVehicle, getVehiclesByProject } from "@/app/service/vehicles/vehicles"
+} from "@/components/ui/tooltip";
+import {
+  deleteVehicle,
+  getVehiclesByProject,
+} from "@/app/service/vehicles/vehicles";
+import { color } from "@/lib/color";
 
 function formatCountdown(ms: number) {
-  if (ms <= 0) return "0d 0h 0m 0s"
-  const totalSeconds = Math.floor(ms / 1000)
-  const days = Math.floor(totalSeconds / (3600 * 24))
-  const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-  return `${days}d ${hours}h ${minutes}m ${seconds}s`
+  if (ms <= 0) return "0d 0h 0m 0s";
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / (3600 * 24));
+  const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  // const seconds = totalSeconds % 60;
+  return `${days}d ${hours}h ${minutes}m `;
 }
 
 function getColorByDaysLeft(daysLeft: number, warningThreshold = 5) {
-  if (daysLeft < 0) return "text-red-600"
-  if (daysLeft <= warningThreshold) return "text-yellow-600"
-  return "text-gray-700"
+  if (daysLeft < 0) return "text-red-600";
+  if (daysLeft <= warningThreshold) return "text-yellow-600";
+  return "text-green-600";
 }
 
 export default function VehiclesPage() {
-  const { projectId: rawProjectId } = useParams()
-  const projectId = Array.isArray(rawProjectId) ? rawProjectId[0] : rawProjectId ?? ""
+  const { projectId: rawProjectId } = useParams();
+  const projectId = Array.isArray(rawProjectId)
+    ? rawProjectId[0]
+    : rawProjectId ?? "";
 
-  const { user } = useAuth()
-  const canCreate = user?.permissions.includes("CREATE") ?? false
-  const canUpdate = user?.permissions.includes("UPDATE") ?? false
-  const canDelete = user?.permissions.includes("DELETE") ?? false
-  const canView = user?.permissions.includes("VIEW") ?? false
+  const { user } = useAuth();
 
-  const [vehicles, setVehicles] = useState<Vehicle[]>([])
-  const [loading, setLoading] = useState(true)
+  const [projectName, setProjectName] = useState<string | null>(null);
 
-  const [addOpen, setAddOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
+  const canCreate = user?.permissions.includes("CREATE") ?? false;
+  const canUpdate = user?.permissions.includes("UPDATE") ?? false;
+  const canDelete = user?.permissions.includes("DELETE") ?? false;
+  const canView = user?.permissions.includes("VIEW") ?? false;
 
-  const [alertOpen, setAlertOpen] = useState(false)
-  const [toDeleteUid, setToDeleteUid] = useState<string | null>(null)
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [viewDetailsOpen, setViewDetailsOpen] = useState(false)
-  const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null)
+  const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
 
-  const [now, setNow] = useState(new Date())
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [toDeleteUid, setToDeleteUid] = useState<string | null>(null);
+
+  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
+  const [viewingVehicle, setViewingVehicle] = useState<Vehicle | null>(null);
+
+  const [now, setNow] = useState(new Date());
 
   useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(interval)
-  }, [])
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    // Get project name from URL search params
+    const searchParams = new URLSearchParams(window.location.search);
+    const name = searchParams.get("projectName");
+    setProjectName(name ? decodeURIComponent(name) : null);
+  }, []);
 
   async function loadVehicles() {
-    setLoading(true)
+    setLoading(true);
     try {
-      if (!projectId) return
-      const data = await getVehiclesByProject(projectId)
-      setVehicles(data)
+      if (!projectId) return;
+      const data = await getVehiclesByProject(projectId);
+      setVehicles(data);
     } catch {
-      toast.error("Failed to fetch vehicles.")
+      toast.error("Failed to fetch vehicles.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadVehicles()
-  }, [projectId])
+    loadVehicles();
+  }, [projectId]);
 
   async function handleDelete() {
-    if (!toDeleteUid) return
+    if (!toDeleteUid) return;
     try {
-      await deleteVehicle(toDeleteUid)
-      toast.success("Vehicle deleted")
-      setToDeleteUid(null)
-      setAlertOpen(false)
-      loadVehicles()
+      await deleteVehicle(toDeleteUid);
+      toast.success("Vehicle deleted");
+      setToDeleteUid(null);
+      setAlertOpen(false);
+      loadVehicles();
     } catch (error: any) {
-      toast.error(error.message || "Failed to delete vehicle")
+      toast.error(error.message || "Failed to delete vehicle");
     }
   }
 
@@ -133,16 +151,16 @@ export default function VehiclesPage() {
       key: "inspectionDate",
       title: "Inspection Date",
       render: (_value, vehicle) => {
-        if (!vehicle.inspectionDate) return "-"
-        const inspDate = new Date(vehicle.inspectionDate)
-        const diffMs = inspDate.getTime() - now.getTime()
-        const daysLeft = diffMs / (1000 * 60 * 60 * 24)
-        const colorClass = getColorByDaysLeft(daysLeft, 5)
+        if (!vehicle.inspectionDate) return "-";
+        const inspDate = new Date(vehicle.inspectionDate);
+        const diffMs = inspDate.getTime() - now.getTime();
+        const daysLeft = diffMs / (1000 * 60 * 60 * 24);
+        const colorClass = getColorByDaysLeft(daysLeft, 5);
         const formattedDate = inspDate.toLocaleDateString(undefined, {
           year: "numeric",
           month: "long",
           day: "numeric",
-        })
+        });
         return (
           <TooltipProvider>
             <Tooltip>
@@ -158,7 +176,7 @@ export default function VehiclesPage() {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        )
+        );
       },
       sortable: true,
     },
@@ -166,16 +184,16 @@ export default function VehiclesPage() {
       key: "expiryDate",
       title: "Expiry Date",
       render: (_value, vehicle) => {
-        if (!vehicle.expiryDate) return "-"
-        const expDate = new Date(vehicle.expiryDate)
-        const diffMs = expDate.getTime() - now.getTime()
-        const daysLeft = diffMs / (1000 * 60 * 60 * 24)
-        const colorClass = getColorByDaysLeft(daysLeft, 5)
+        if (!vehicle.expiryDate) return "-";
+        const expDate = new Date(vehicle.expiryDate);
+        const diffMs = expDate.getTime() - now.getTime();
+        const daysLeft = diffMs / (1000 * 60 * 60 * 24);
+        const colorClass = getColorByDaysLeft(daysLeft, 5);
         const formattedDate = expDate.toLocaleDateString(undefined, {
           year: "numeric",
           month: "long",
           day: "numeric",
-        })
+        });
         return (
           <TooltipProvider>
             <Tooltip>
@@ -191,7 +209,7 @@ export default function VehiclesPage() {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        )
+        );
       },
       sortable: true,
     },
@@ -228,8 +246,8 @@ export default function VehiclesPage() {
               <DropdownMenuItem
                 className="cursor-pointer"
                 onClick={() => {
-                  setViewingVehicle(vehicle)
-                  setViewDetailsOpen(true)
+                  setViewingVehicle(vehicle);
+                  setViewDetailsOpen(true);
                 }}
               >
                 View details
@@ -240,8 +258,8 @@ export default function VehiclesPage() {
               <DropdownMenuItem
                 className="cursor-pointer"
                 onClick={() => {
-                  setEditingVehicle(vehicle)
-                  setEditOpen(true)
+                  setEditingVehicle(vehicle);
+                  setEditOpen(true);
                 }}
               >
                 Edit
@@ -252,8 +270,8 @@ export default function VehiclesPage() {
               <DropdownMenuItem
                 className="text-destructive cursor-pointer"
                 onClick={() => {
-                  setToDeleteUid(vehicle.uid)
-                  setAlertOpen(true)
+                  setToDeleteUid(vehicle.uid);
+                  setAlertOpen(true);
                 }}
               >
                 Delete
@@ -263,7 +281,7 @@ export default function VehiclesPage() {
         </DropdownMenu>
       ),
     },
-  ]
+  ];
 
   return (
     <div className="py-4">
@@ -271,11 +289,21 @@ export default function VehiclesPage() {
         data={vehicles}
         columns={columns}
         loading={loading}
+        badgeText={`All Vehicles from ${projectName ?? "Vehicles"}`}
         pagination
         searchable
         sortable
         onRefresh={loadVehicles}
-        actions={canCreate ? <Button onClick={() => setAddOpen(true)}>Add Vehicle</Button> : null}
+        actions={
+          canCreate ? (
+            <Button
+              onClick={() => setAddOpen(true)}
+              className={`${color} w-fit text-sm bg-chart-1 `}
+            >
+              Add Vehicle
+            </Button>
+          ) : null
+        }
       />
 
       {canCreate && (
@@ -284,8 +312,8 @@ export default function VehiclesPage() {
           onOpenChange={setAddOpen}
           projectId={projectId}
           onCreated={() => {
-            loadVehicles()
-            setAddOpen(false)
+            loadVehicles();
+            setAddOpen(false);
           }}
         />
       )}
@@ -294,13 +322,13 @@ export default function VehiclesPage() {
         <EditVehicleModal
           isOpen={editOpen}
           onOpenChange={(open) => {
-            setEditOpen(open)
-            if (!open) setEditingVehicle(null)
+            setEditOpen(open);
+            if (!open) setEditingVehicle(null);
           }}
           vehicle={editingVehicle}
           onUpdated={() => {
-            loadVehicles()
-            setEditOpen(false)
+            loadVehicles();
+            setEditOpen(false);
           }}
         />
       )}
@@ -321,5 +349,5 @@ export default function VehiclesPage() {
         onConfirm={handleDelete}
       />
     </div>
-  )
+  );
 }

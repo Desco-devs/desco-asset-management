@@ -7,6 +7,7 @@ export interface User {
   username: string
   fullname: string
   phone: string | null
+  userProfile: string | null
   permissions: Permission[]
   userStatus: userStatus
   createdAt: string

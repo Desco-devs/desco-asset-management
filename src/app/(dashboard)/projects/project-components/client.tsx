@@ -238,8 +238,12 @@ export default function LocationManager() {
   }
 
   // Navigation handler for viewing clients
-  const handleViewClients = (locationId: string) => {
-    router.push(`/locations/${locationId}/clients`);
+  const handleViewClients = (locationId: string, locationName: string) => {
+    router.push(
+      `/locations/${locationId}/clients?locationName=${encodeURIComponent(
+        locationName
+      )}`
+    );
   };
 
   // Pagination logic
@@ -356,7 +360,9 @@ export default function LocationManager() {
               ) : (
                 currentItems.map((loc) => (
                   <TableRow key={loc.uid}>
-                    <TableCell className="font-mono text-xs">{loc.uid}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {loc.uid}
+                    </TableCell>
                     <TableCell>
                       {editingId === loc.uid ? (
                         <Input
@@ -421,7 +427,7 @@ export default function LocationManager() {
 
                             {canView && (
                               <DropdownMenuItem
-                                onClick={() => handleViewClients(loc.uid)}
+                                onClick={() => handleViewClients(loc.uid, loc.address)}
                               >
                                 View Clients
                               </DropdownMenuItem>
@@ -459,7 +465,9 @@ export default function LocationManager() {
                         handlePageChange(currentPage - 1);
                       }}
                       className={
-                        currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                        currentPage === 1
+                          ? "pointer-events-none opacity-50"
+                          : ""
                       }
                     />
                   </PaginationItem>

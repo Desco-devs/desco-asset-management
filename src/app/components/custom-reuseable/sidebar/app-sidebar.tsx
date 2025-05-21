@@ -30,9 +30,9 @@ const data = {
   },
   teams: [
     {
-      name: "Acme Inc",
+      name: "DESCO",
       logo: GalleryVerticalEnd,
-      plan: "Enterprise",
+      plan: "company",
     },
     {
       name: "Acme Corp.",
@@ -54,10 +54,10 @@ const data = {
       icon: GalleryVerticalEnd,
       isActive: true,
     },
-       {
+    {
       title: "User & Permissions",
       url: "/users",
-      icon: User,  
+      icon: User,
       isActive: true,
     },
   ],
