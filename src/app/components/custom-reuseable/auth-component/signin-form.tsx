@@ -120,7 +120,7 @@ const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
                 <button
                   type="button"
                   onClick={togglePasswordVisibility}
-                  className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover"
+                  className="absolute inset-y-0 right-3 flex items-center text-gray-500"
                 >
                   {passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
