@@ -74,6 +74,7 @@ import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
 import AddClient from "../modal/addLocation";
 
 import { useAuth } from "@/app/context/AuthContext";
+import { formatCreatedAt } from "@/lib/format";
 
 interface Location {
   uid: string;
@@ -257,6 +258,12 @@ export default function LocationManager() {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
+  // Helper function to get the display index for a location
+  const getLocationDisplayIndex = (locationUid: string) => {
+    const index = filteredLocations.findIndex((loc) => loc.uid === locationUid);
+    return index + 1;
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -326,7 +333,10 @@ export default function LocationManager() {
           <Table>
             <TableHeader>
               <TableRow>
-                {["uid", "address", "createdAt", "updatedAt"].map((col) => (
+                <TableHead>
+                  <div className="flex items-center">ID</div>
+                </TableHead>
+                {["address", "createdAt", "updatedAt"].map((col) => (
                   <TableHead key={col}>
                     <div
                       className="flex items-center cursor-pointer"
@@ -358,10 +368,10 @@ export default function LocationManager() {
                   </TableCell>
                 </TableRow>
               ) : (
-                currentItems.map((loc) => (
+                currentItems.map((loc, index) => (
                   <TableRow key={loc.uid}>
-                    <TableCell className="font-mono text-xs">
-                      {loc.uid}
+                    <TableCell className="font-semibold">
+                      {indexOfFirst + index + 1}
                     </TableCell>
                     <TableCell>
                       {editingId === loc.uid ? (
@@ -375,12 +385,8 @@ export default function LocationManager() {
                         loc.address
                       )}
                     </TableCell>
-                    <TableCell>
-                      {new Date(loc.createdAt).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(loc.updatedAt).toLocaleString()}
-                    </TableCell>
+                    <TableCell>{formatCreatedAt(loc.createdAt)}</TableCell>
+                    <TableCell>{formatCreatedAt(loc.updatedAt)}</TableCell>
                     <TableCell className="text-right">
                       {editingId === loc.uid ? (
                         <div className="flex justify-end gap-2">
@@ -427,7 +433,9 @@ export default function LocationManager() {
 
                             {canView && (
                               <DropdownMenuItem
-                                onClick={() => handleViewClients(loc.uid, loc.address)}
+                                onClick={() =>
+                                  handleViewClients(loc.uid, loc.address)
+                                }
                               >
                                 View Clients
                               </DropdownMenuItem>

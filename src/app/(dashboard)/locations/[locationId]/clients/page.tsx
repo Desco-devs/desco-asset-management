@@ -142,6 +142,14 @@ export default function ClientsPage() {
 
   const columns: Column<Client>[] = [
     {
+      key: "id",
+      title: "ID",
+      sortable: false,
+      render: (_value, client, index) => (
+        <span className="font-semibold">{(index || 0) + 1}</span>
+      ),
+    },
+    {
       key: "name",
       title: "Client Name",
       render: (_value, client) =>
@@ -169,6 +177,7 @@ export default function ClientsPage() {
       key: "actions",
       title: "Actions",
       className: "text-right",
+      sortable: false,
       render: (_value, client) => {
         if (editingUid === client.uid) {
           return (

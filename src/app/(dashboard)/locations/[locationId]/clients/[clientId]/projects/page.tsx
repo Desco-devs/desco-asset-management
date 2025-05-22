@@ -113,6 +113,14 @@ export default function ProjectsPage() {
 
   const columns: Column<Project>[] = [
     {
+      key: "id",
+      title: "ID",
+      sortable: false,
+      render: (_value, project, index) => (
+        <span className="font-semibold">{(index || 0) + 1}</span>
+      ),
+    },
+    {
       key: "name",
       title: "Project Name",
       render: (_value, project) =>
@@ -146,6 +154,7 @@ export default function ProjectsPage() {
       key: "actions",
       title: "Actions",
       className: "text-right",
+      sortable: false,
       render: (_value, project) => {
         if (editingId === project.uid) {
           return (

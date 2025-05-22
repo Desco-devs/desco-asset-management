@@ -129,6 +129,14 @@ export default function EquipmentsPage() {
 
   const columns: Column<Equipment>[] = [
     {
+      key: "id",
+      title: "ID",
+      sortable: false,
+      render: (_value, equipment, index) => (
+        <span className="font-semibold">{(index || 0) + 1}</span>
+      ),
+    },
+    {
       key: "brand",
       title: "Brand",
       render: (_value, equipment) => <span>{equipment.brand}</span>,
@@ -237,6 +245,7 @@ export default function EquipmentsPage() {
       key: "actions",
       title: "Actions",
       className: "text-center",
+      sortable: false,
       render: (_value, equipment) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -358,4 +367,3 @@ export default function EquipmentsPage() {
     </div>
   );
 }
-//

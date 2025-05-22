@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
+import Image from "next/image";
 
 interface SigninProps {
   onToggle: () => void;
@@ -74,19 +75,24 @@ const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
 
   return (
     <div className="flex items-center justify-center min-h-screen w-full p-4">
-      <Card className="w-full max-w-md shadow-lg relative">
+      <Card className="w-full max-w-md shadow-lg relative bg-white">
         <CardHeader className="space-y-1 flex flex-col items-center">
           <div className="flex flex-col items-center">
-            <img className="h-16 mb-2" src="/images/logo.png" alt="logo" />
-            <CardTitle className="text-xl font-semibold text-black">
-              DESCO
+            <CardTitle className="text-xl font-semibold">
+              <Image
+                className="h-28 w-28 mb-2 rounded-sm"
+                src="/images/logo/logo2.svg"
+                alt="logo"
+                width={75}
+                height={75}
+              />
             </CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="text-accent-foreground dark:text-accent">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username" className="ml-1 text-black">
+              <Label htmlFor="username" className="ml-1">
                 Username
               </Label>
               <Input
@@ -96,11 +102,11 @@ const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
                 value={formData.username}
                 onChange={handleChange}
                 required
-                className="bg-white border-black/30 text-black"
+                className="border-chart-1 focus-visible:border-chart-1 focus-visible:ring-chart-1/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="ml-1 text-black">
+              <Label htmlFor="password" className="ml-1">
                 Password
               </Label>
               <div className="relative">
@@ -111,12 +117,12 @@ const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  className="bg-white border-black/30 text-black pr-10"
+                  className="border-chart-1 pr-10 focus-visible:border-chart-1 focus-visible:ring-chart-1/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"
                 />
                 <button
                   type="button"
                   onClick={togglePasswordVisibility}
-                  className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-black"
+                  className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover"
                 >
                   {passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -126,14 +132,14 @@ const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-chart-1 hover:bg-chart-2 text-white duration-300 ease-in-out transition-all mt-2"
+              className="w-full bg-chart-1 hover:bg-chart-2 text-accent dark:text-accent-foreground duration-300 ease-in-out transition-all mt-2"
             >
               {loading ? "Logging in..." : "LOGIN"}
             </Button>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col justify-center w-full pt-4">
-          <p className="text-center text-black text-sm">
+          {/* <p className="text-center text-sm">
             Don&apos;t have an account?{" "}
             <button
               onClick={onToggle}
@@ -141,15 +147,15 @@ const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
             >
               Sign up
             </button>
-          </p>
-          <p>
+          </p> */}
+          {/* <p>
             <button
               onClick={onForgotPassword}
               className="text-blue-500 hover:text-blue-600 font-thin cursor-pointer"
             >
               Forgot password?
             </button>
-          </p>
+          </p> */}
         </CardFooter>
       </Card>
     </div>

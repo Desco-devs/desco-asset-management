@@ -9,36 +9,41 @@ async function main() {
 
   const seedUsers = [
     {
-      username:    'superadmin',
-      fullname:    'Super Administrator',
-      permissions: [ Permission.VIEW, Permission.CREATE, Permission.UPDATE, Permission.DELETE ],
+      username: 'superadmin',
+      fullname: 'Super Administrator',
+      permissions: [
+        Permission.VIEW,
+        Permission.CREATE,
+        Permission.UPDATE,
+        Permission.DELETE,
+      ],
     },
     {
-      username:    'admin',
-      fullname:    'Administrator',
-      permissions: [ Permission.VIEW, Permission.CREATE, Permission.UPDATE, Permission.UPDATE ],
+      username: 'admin',
+      fullname: 'Administrator',
+      permissions: [Permission.VIEW, Permission.CREATE, Permission.UPDATE],
     },
     {
-      username:    'client',
-      fullname:    'Client User',
-      permissions: [ Permission.VIEW ],
+      username: 'client',
+      fullname: 'Client User',
+      permissions: [Permission.VIEW],
     },
   ]
 
   for (const u of seedUsers) {
     await prisma.user.upsert({
-      where:  { username: u.username },
+      where: { username: u.username },
       update: {
-        fullname:    u.fullname,
-        password:    hashedPassword,
-        phone:       null,
+        fullname: u.fullname,
+        password: hashedPassword,
+        phone: null,
         permissions: u.permissions,
       },
       create: {
-        username:    u.username,
-        fullname:    u.fullname,
-        password:    hashedPassword,
-        phone:       null,
+        username: u.username,
+        fullname: u.fullname,
+        password: hashedPassword,
+        phone: null,
         permissions: u.permissions,
       },
     })
@@ -48,7 +53,7 @@ async function main() {
 }
 
 main()
-  .catch(e => {
+  .catch((e) => {
     console.error(e)
     process.exit(1)
   })
