@@ -12,7 +12,7 @@ const MenuHeader = () => {
       <ul className="w-fit flex flex-row items-center gap-12">
         {items.map((item) => (
           <li
-            className="cursor-pointer font-semibold text-md text-muted-foreground hover:text-chart-1/80 dark:hover:text-green-400 duration-300 ease-in-out transition-all"
+            className="cursor-pointer font-semibold text-md text-muted-foreground hover:text-chart-1/80 dark:hover:text-accent-foreground duration-300 ease-in-out transition-all"
             key={item.id}
           >
             {item.title}

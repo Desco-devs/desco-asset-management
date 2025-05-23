@@ -1,9 +1,11 @@
 "use client";
 
+import HeroPage from "./landing-components/HeroPage";
+
 const LandingPageHolder = () => {
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-500 dark:bg-gray-900">
-      <h1>LandingPageHolder</h1>
+    <div className="flex flex-col items-center justify-center h-full w-full">
+      <HeroPage />
     </div>
   );
 };

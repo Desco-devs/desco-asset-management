@@ -9,15 +9,15 @@ const LogoHeader = () => {
         className="rounded-md dark:hidden block "
         src="/images/logo/logo3.svg"
         alt="Logo"
-        width={50}
-        height={50}
+        width={60}
+        height={60}
       />{" "}
       <Image
         className="rounded-md dark:block hidden"
         src="/images/logo/logo2.svg"
         alt="Logo"
-        width={50}
-        height={50}
+        width={60}
+        height={60}
       />
     </>
   );
