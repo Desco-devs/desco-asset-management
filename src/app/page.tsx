@@ -1,13 +1,12 @@
-import Image from "next/image";
-
-import LoginForm from "./auth/login/page";
-
-
+import HeaderHolder from "./components/custom-reuseable/landing-page/header/HeaderHolder";
+import LandingPageHolder from "./components/custom-reuseable/landing-page/LandingPageHolder";
 
 export default function Home() {
   return (
-    <>
-      <LoginForm />
-    </>
+    <div className="flex flex-col items-center justify-center h-full">
+      <HeaderHolder />
+      {/* <LoginForm /> */}
+      <LandingPageHolder />
+    </div>
   );
 }
