@@ -1,3 +1,4 @@
+// HeaderHolder.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,7 +8,11 @@ import MenuHeader from "./header-components/Menu";
 import ModeAndSearch from "./header-components/ModeAndSearch";
 import { AlignJustify } from "lucide-react";
 
-const HeaderHolder = () => {
+interface HeaderHolderProps {
+  onMenuClick: (targetId: string) => void;
+}
+
+const HeaderHolder: React.FC<HeaderHolderProps> = ({ onMenuClick }) => {
   const [isSticky, setIsSticky] = useState(false);
 
   useEffect(() => {
@@ -21,6 +26,7 @@ const HeaderHolder = () => {
 
   return (
     <div
+      data-header="true" // Add this for dynamic header height detection
       className={`
         w-full  flex flex-row items-center md:justify-evenly justify-between md:px-0 px-6 font-sans
         md:sticky fixed top-0 z-50 transition-all duration-300
@@ -35,7 +41,7 @@ const HeaderHolder = () => {
         <LogoHeader />
       </div>
       <div className="md:block hidden">
-        <MenuHeader />
+        <MenuHeader onMenuClick={onMenuClick} />
       </div>
       <div className="md:flex hidden flex-row items-center gap-8">
         <Buttons />

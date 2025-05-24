@@ -131,3 +131,7 @@
 .scroll-none::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Edge */
 }
+
+html {
+  scroll-behavior: smooth;
+}
