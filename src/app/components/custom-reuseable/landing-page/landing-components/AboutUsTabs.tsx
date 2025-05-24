@@ -5,9 +5,9 @@ import Image from "next/image";
 
 const AboutUsTabs = () => {
   return (
-    <div className="w-full max-w-[80%]">
+    <div className="w-full ">
       <Tabs defaultValue="about" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-transparent border-b border-border/20 rounded-none h-auto p-0">
+        <TabsList className="grid w-full md:max-w-[80%] mx-auto md:px-0 px-6 grid-cols-3 bg-transparent border-b border-border/20 rounded-none h-auto p-0">
           <TabsTrigger
             value="about"
             className="text-lg font-semibold py-4 px-6 bg-transparent border-0 border-b-2 border-transparent rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-chart-1 data-[state=active]:text-chart-1 data-[state=active]:shadow-none hover:text-chart-1 dark:hover:text-chart-1 hover:border-b-chart-1 transition-all duration-300 ease-in-out"
@@ -28,7 +28,7 @@ const AboutUsTabs = () => {
           </TabsTrigger>
         </TabsList>
 
-        <div className="mt-8">
+        <div className="mt-8 w-full max-w-[80%] mx-auto">
           <TabsContent value="about" className="space-y-4 w-full">
             <div className="w-full md:flex md:flex-row-reverse md:gap-12">
               <div className="w-full">
@@ -85,8 +85,8 @@ const AboutUsTabs = () => {
           </TabsContent>
 
           <TabsContent value="mission" className="space-y-4 w-full">
-            <div className="w-full flex flex-row gap-12">
-              <div className="w-full">
+            <div className="w-full flex md:flex-row md:gap-12">
+              <div className="w-full md:block hidden">
                 <Image
                   width={700}
                   height={700}
@@ -130,9 +130,9 @@ const AboutUsTabs = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="vision" className="space-y-4">
-            <div className="w-full flex flex-row-reverse gap-12">
-              <div className="w-full">
+          <TabsContent value="vision" className="space-y-4 w-full">
+            <div className="w-full flex md:flex-row-reverse md:gap-12">
+              <div className="w-full md:block hidden">
                 <Image
                   width={700}
                   height={700}

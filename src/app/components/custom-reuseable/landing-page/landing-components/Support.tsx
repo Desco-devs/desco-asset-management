@@ -38,11 +38,11 @@ const SupportPage = () => {
         </div>
       </div>
       <Separator className="w-full max-w-[80%] mx-auto bg-amber-700/30" />
-      <div className="grid grid-cols1 sm:grid-cols-2 md:grid-cols-4 w-full max-w-[80%] mx-auto pb-[20dvh]">
+      <div className="grid grid-cols1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-[80%] mx-auto pb-[20dvh]">
         {contactUs.map((contact, index) => (
           <div
             key={index}
-            className="flex flex-col items-start justify-center p-4 group w-full"
+            className="flex flex-col items-start justify-center  group w-full"
           >
             <span className="text-xl font-bold">{contact.title}</span>
             <span className="text-lg text-muted-foreground font-semibold">
@@ -50,8 +50,8 @@ const SupportPage = () => {
             </span>
           </div>
         ))}
-        <div className="flex flex-col items-start justify-start p-4 group w-full">
-          <div className="text-xl font-bold flex flex-row gap-2 md:ml-4 items-center">
+        <div className="flex flex-col items-start justify-start  group w-full">
+          <div className="text-xl font-bold flex flex-row gap-2 md:ml-4 -ml-2 items-center">
             <Icon icon="gg:facebook" className="w-8 h-8 cursor-pointer" />
             <Icon icon="uil:linkedin" className="w-8 h-8 cursor-pointer" />
             <Icon icon="ri:twitter-fill" className="w-8 h-8 cursor-pointer" />
