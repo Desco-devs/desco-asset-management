@@ -3,6 +3,8 @@
 import AboutUs from "./landing-components/AboutUs";
 import FeaturesPage from "./landing-components/Features";
 import HeroPage from "./landing-components/HeroPage";
+import OurTeam from "./landing-components/OurTeam";
+import SupportPage from "./landing-components/Support";
 
 const LandingPageHolder = () => {
   return (
@@ -10,6 +12,8 @@ const LandingPageHolder = () => {
       <HeroPage />
       <FeaturesPage />
       <AboutUs />
+      <OurTeam />
+      <SupportPage />
     </div>
   );
 };

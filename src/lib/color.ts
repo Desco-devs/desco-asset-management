@@ -36,3 +36,20 @@ export const features = [
     },
 
 ]
+
+
+export const contactUs = [
+    {
+        title: "Email",
+        value: "example@gmail.com",
+    },
+    {
+        title: "Phone",
+        value: "+63 912 345 6789",
+    },
+    {
+        title: "Office Location",
+        value: "1234 Example St, City, Country",
+    },
+
+]

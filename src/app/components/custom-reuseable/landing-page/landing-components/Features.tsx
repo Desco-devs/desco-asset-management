@@ -5,8 +5,8 @@ import { Icon } from "@iconify/react";
 
 const FeaturesPage = () => {
   return (
-    <div className="h-full flex flex-col gap-[10dvh] items-center justify-center w-full md:max-w-full max-w-[80%] bg-white/10 dark:bg-chart-3/10">
-      <div className="flex flex-col gap-8 mt-[25dvh] relative items-center justify-center h-fit md:w-fit ">
+    <div className="h-full flex flex-col gap-[10dvh] items-center justify-center w-full bg-white/10 dark:bg-chart-3/10">
+      <div className="flex flex-col gap-8 mt-[25dvh] relative items-center justify-center h-fit md:w-fit w-full md:max-w-full max-w-[80%] ">
         <span
           className="absolute z-10 md:-top-[5rem] -top-[3rem] md:text-8xl text-5xl font-extrabold bg-gradient-to-b from-accent-foreground/20 via-accent-foreground/10 to-accent-foreground/0 
         dark:from-muted-foreground/40 dark:via-muted-foreground/20 dark:to-muted-foreground/0 text-transparent bg-clip-text inline-block"
@@ -22,7 +22,7 @@ const FeaturesPage = () => {
           sectors.
         </p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 md:gap-4 p-4 md:h-screen h-full md:pb-0 pb-[5dvh]">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 md:gap-4 p-4 md:h-screen h-full md:pb-0 pb-[5dvh] w-full md:max-w-full max-w-[80%]">
         {features.map((feature, index) => (
           <div
             key={index}
