@@ -60,12 +60,12 @@ const Auth = () => {
   }, [api, handleSelect]);
 
   return (
-    <div className="w-full h-screen flex flex-col md:flex-row dark:bg-gray-900 bg-gray-200">
+    <div className="w-full h-screen flex flex-col md:flex-row dark:bg-chart-2 bg-gray-200">
       {/* Left: Fullscreen Carousel */}
       <div className="hidden md:block w-full h-full bg-muted relative overflow-hidden">
         <div
-          className="absolute w-full h-full z-50 bg-gradient-to-r dark:from-gray-900/30 dark:via-gray-900/50
-                 dark:to-gray-900 from-gray-200/10 via-gray-200/40 to-gray-200"
+          className="absolute w-full h-full z-[500] bg-gradient-to-r dark:from-chart-2/30 dark:via-chart-2/50
+                 dark:to-chart-2 from-gray-200/10 via-gray-200/40 to-gray-200"
         ></div>
         <Carousel
           setApi={setApi}

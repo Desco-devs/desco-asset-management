@@ -81,7 +81,7 @@ const HeroPage = () => {
             <Button className="rounded-sm flex items-center text-lg gap-2 py-6.5 w-full md:max-w-48 bg-chart-1 hover:bg-chart-1/80 dark:text-accent-foreground">
               Get Started <ArrowRight stroke="currentColor" size={32} />
             </Button>
-            <Button className="rounded-sm bg-transparent bg-none flex items-center text-lg gap-3 py-6.5 w-full md:max-w-48 border border-accent-foreground text-accent-foreground shadow-none hover:bg-transparent hover:text-chart-1">
+            <Button className="rounded-sm bg-transparent bg-none flex items-center text-lg gap-3 py-6.5 w-full md:max-w-48 border md:border-none border-accent-foreground text-accent-foreground shadow-none hover:bg-transparent hover:text-chart-1">
               <Triangle
                 fill="currentColor"
                 className="hover:text-chart-1 rotate-90"

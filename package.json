@@ -66,6 +66,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@iconify/react": "^6.0.0",
     "@prisma/client": "^6.8.2",
     "@tailwindcss/postcss": "^4",
     "@types/bcrypt": "^5.0.2",
