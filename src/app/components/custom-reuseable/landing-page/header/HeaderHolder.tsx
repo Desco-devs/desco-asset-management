@@ -23,7 +23,7 @@ const HeaderHolder = () => {
     <div
       className={`
         w-full  flex flex-row items-center md:justify-evenly justify-between md:px-0 px-6 font-sans
-        sticky top-0 z-50 transition-all duration-300
+        md:sticky fixed top-0 z-50 transition-all duration-300
         ${
           isSticky
             ? "bg-white/40 dark:bg-chart-3/10 backdrop-blur-md h-[12dvh]"

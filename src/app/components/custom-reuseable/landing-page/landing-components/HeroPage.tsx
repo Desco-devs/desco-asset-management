@@ -50,7 +50,7 @@ const HeroPage = () => {
   }, [currentText, isDeleting, isPaused, currentWordIndex, words]);
 
   return (
-    <div className="md:h-dvh h-full w-full flex md:flex-row flex-col md:gap-0 md:py-0 py-[5dvh] gap-12">
+    <div className="md:h-dvh h-full w-full flex md:flex-row flex-col md:gap-0 md:py-0 py-[5dvh] md:mt-0 mt-[15dvh] gap-12">
       {/* left */}
       <div className="md:w-[110%] w-full">
         <div className="flex flex-col gap-8 w-full max-w-[80%] mx-auto h-full justify-center items-start">
@@ -58,7 +58,7 @@ const HeroPage = () => {
             <span className="w-2 h-2 rounded-full bg-chart-1 dark:bg-green-400"></span>
             Desco Company Trusted partner
           </div>
-          <div>
+          <div className=" md:h-fit h-20">
             <p className="text-accent-foreground md:text-5xl text-3xl font-sans font-bold">
               Desco Company
               <br />

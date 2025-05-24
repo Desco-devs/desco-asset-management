@@ -7,7 +7,7 @@ const LogoHeader = () => {
     <>
       <Image
         className="rounded-md dark:hidden block "
-        src="/images/logo/logo3.svg"
+        src="/images/logo/logo4.svg"
         alt="Logo"
         width={60}
         height={60}
