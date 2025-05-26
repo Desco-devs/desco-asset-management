@@ -39,8 +39,8 @@ const HeaderHolder: React.FC<HeaderHolderProps> = ({
         md:sticky fixed top-0 z-[150] transition-all duration-300
         ${
           isSticky || isSidebarOpen
-            ? "bg-white/40 dark:bg-chart-3/10 backdrop-blur-sm h-[12dvh]"
-            : "bg-transparent h-[15dvh] pt-5"
+            ? "bg-white/40 dark:bg-chart-3/10 backdrop-blur-sm md:h-[12dvh] h-[10dvh]"
+            : "bg-transparent md:h-[15dvh] h-[12dvh] pt-5"
         }
       `}
     >
