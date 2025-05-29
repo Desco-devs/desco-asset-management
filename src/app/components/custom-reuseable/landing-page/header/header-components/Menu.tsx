@@ -10,7 +10,7 @@ interface MenuHeaderProps {
   onMenuClick: (targetId: string) => void;
 }
 
-export const items: MenuItem[] = [
+const items: MenuItem[] = [
   { title: "Home", id: "homepage" },
   { title: "Features", id: "features" },
   { title: "About", id: "about" },

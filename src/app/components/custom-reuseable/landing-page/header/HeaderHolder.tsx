@@ -8,6 +8,7 @@ import MenuHeader from "./header-components/Menu";
 import ModeAndSearch from "./header-components/ModeAndSearch";
 import { AlignJustify, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ModeToggle } from "../../darkmode-button/ThemeButton";
 
 interface HeaderHolderProps {
   onMenuClick: (targetId: string) => void;
@@ -54,12 +55,15 @@ const HeaderHolder: React.FC<HeaderHolderProps> = ({
         <Buttons />
         <ModeAndSearch />
       </div>
-      <div className="md:hidden block p-0 bg-transparent hover:bg-transparent focus:bg-transparent shadow-none text-accent-foreground">
-        <div className="md:hidden block text-accent-foreground">
-          <div className="relative w-8 h-8">
+
+      <div className="md:hidden flex items-center gap-4 p-0 bg-transparent hover:bg-transparent focus:bg-transparent shadow-none text-accent-foreground">
+        <ModeToggle />
+
+        <div className="md:hidden block ">
+          <div className="relative w-10 h-10">
             <AlignJustify
               onClick={onToggleSidebar}
-              className={`absolute inset-0 w-8 h-8 cursor-pointer transform transition duration-300 ease-in-out 
+              className={`absolute inset-0 text-accent-foreground w-10 h-10 cursor-pointer transform transition duration-300 ease-in-out 
         ${
           isSidebarOpen
             ? "opacity-0 rotate-90 scale-75"
@@ -68,7 +72,7 @@ const HeaderHolder: React.FC<HeaderHolderProps> = ({
             />
             <X
               onClick={onToggleSidebar}
-              className={`absolute inset-0 w-8 h-8 cursor-pointer transform transition duration-300 ease-in-out 
+              className={`absolute inset-0 w-10 h-10 text-accent cursor-pointer transform transition duration-300 ease-in-out 
         ${
           isSidebarOpen
             ? "opacity-100 rotate-0 scale-100"
