@@ -72,7 +72,7 @@ const HeaderHolder: React.FC<HeaderHolderProps> = ({
             />
             <X
               onClick={onToggleSidebar}
-              className={`absolute inset-0 w-10 h-10 text-accent cursor-pointer transform transition duration-300 ease-in-out 
+              className={`absolute inset-0 w-10 h-10 text-accent dark:text-accent-foreground cursor-pointer transform transition duration-300 ease-in-out 
         ${
           isSidebarOpen
             ? "opacity-100 rotate-0 scale-100"
