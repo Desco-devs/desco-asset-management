@@ -1,22 +1,31 @@
-// app/equipment/page.tsx or wherever you want to use the component
+// app/equipment/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import EquipmentCards from "./equip-components/Equipments";
-// You'll need to create these API functions based on your backend setup
+
+// API functions
 async function getEquipments() {
-  // This should match your Prisma query with includes
   const response = await fetch("/api/equipments/getall");
+  if (!response.ok) {
+    throw new Error("Failed to fetch equipments");
+  }
   return response.json();
 }
 
 async function getClients() {
   const response = await fetch("/api/clients/getall");
+  if (!response.ok) {
+    throw new Error("Failed to fetch clients");
+  }
   return response.json();
 }
 
 async function getLocations() {
   const response = await fetch("/api/locations/getall");
+  if (!response.ok) {
+    throw new Error("Failed to fetch locations");
+  }
   return response.json();
 }
 
@@ -26,30 +35,53 @@ export default function EquipmentPage() {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [equipmentsData, clientsData, locationsData] = await Promise.all([
-          getEquipments(),
-          getClients(),
-          getLocations(),
-        ]);
+  // Create a memoized fetch function that can be called to refresh data
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [equipmentsData, clientsData, locationsData] = await Promise.all([
+        getEquipments(),
+        getClients(),
+        getLocations(),
+      ]);
 
-        setEquipments(equipmentsData);
-        setClients(clientsData);
-        setLocations(locationsData);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
+      setEquipments(equipmentsData);
+      setClients(clientsData);
+      setLocations(locationsData);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
     }
-
-    fetchData();
   }, []);
 
+  // Function to handle equipment added/updated - this will refresh the equipment data
+  const handleEquipmentAdded = useCallback(async () => {
+    try {
+      // Only refresh equipment data since clients and locations don't change
+      const equipmentsData = await getEquipments();
+      setEquipments(equipmentsData);
+    } catch (error) {
+      console.error("Error refreshing equipment data:", error);
+    }
+  }, []);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
   if (loading) {
-    return <div className="p-6">Loading equipment...</div>;
+    return (
+      <div className="container mx-auto py-[5dvh]">
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading equipment...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -65,6 +97,7 @@ export default function EquipmentPage() {
         equipments={equipments}
         clients={clients}
         locations={locations}
+        onEquipmentAdded={handleEquipmentAdded}
       />
     </div>
   );
