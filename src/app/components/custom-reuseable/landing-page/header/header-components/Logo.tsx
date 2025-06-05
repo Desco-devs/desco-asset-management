@@ -5,19 +5,15 @@ import Image from "next/image";
 const LogoHeader = () => {
   return (
     <>
-      <Image
+      <img
         className="rounded-md dark:hidden block md:w-14 md:h-14 w-12 h-12"
         src="/images/logo/logo4.svg"
         alt="Logo"
-        width={60}
-        height={60}
       />{" "}
-      <Image
+      <img
         className="rounded-md dark:block hidden md:w-14 md:h-14 w-12 h-12"
         src="/images/logo/logo2.svg"
         alt="Logo"
-        width={60}
-        height={60}
       />
     </>
   );
