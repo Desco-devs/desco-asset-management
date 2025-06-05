@@ -16,8 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Settings, Edit } from "lucide-react";
 import EquipmentModal from "./EquipmentModal";
+import AddEquipmentModal from "./EquipmentAddModal";
 
 // Types based on your Prisma schema
 interface Equipment {
@@ -63,12 +65,14 @@ interface EquipmentCardsProps {
   equipments?: Equipment[];
   clients?: Client[];
   locations?: Location[];
+  onEquipmentAdded: () => void;
 }
 
 const EquipmentCards = ({
   equipments = [],
   clients = [],
   locations = [],
+  onEquipmentAdded,
 }: EquipmentCardsProps) => {
   const [filteredEquipments, setFilteredEquipments] =
     useState<Equipment[]>(equipments);
@@ -78,6 +82,7 @@ const EquipmentCards = ({
     null
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Filter equipments based on selected client and location
   useEffect(() => {
@@ -107,6 +112,14 @@ const EquipmentCards = ({
   };
 
   const handleCardClick = (equipment: Equipment) => {
+    if (!isEditMode) {
+      setSelectedEquipment(equipment);
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleEditClick = (e: React.MouseEvent, equipment: Equipment) => {
+    e.stopPropagation(); // Prevent card click
     setSelectedEquipment(equipment);
     setIsModalOpen(true);
   };
@@ -122,48 +135,84 @@ const EquipmentCards = ({
     setIsModalOpen(open);
   };
 
+  const toggleEditMode = () => {
+    setIsEditMode(!isEditMode);
+  };
+
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
-          <label className="text-sm font-medium mb-2 block">
-            Filter by Client
-          </label>
-          <Select value={selectedClient} onValueChange={setSelectedClient}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Clients" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Clients</SelectItem>
-              {clients.map((client) => (
-                <SelectItem key={client.uid} value={client.uid}>
-                  {client.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="flex flex-row gap-4 items-center">
+          <div className="">
+            <label className="text-sm font-medium mb-2 block">
+              Filter by Client
+            </label>
+            <Select value={selectedClient} onValueChange={setSelectedClient}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Clients" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Clients</SelectItem>
+                {clients.map((client) => (
+                  <SelectItem key={client.uid} value={client.uid}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="">
+            <label className="text-sm font-medium mb-2 block">
+              Filter by Location
+            </label>
+            <Select
+              value={selectedLocation}
+              onValueChange={setSelectedLocation}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Locations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map((location) => (
+                  <SelectItem key={location.uid} value={location.uid}>
+                    {location.address}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="flex-1">
-          <label className="text-sm font-medium mb-2 block">
-            Filter by Location
-          </label>
-          <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Locations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations.map((location) => (
-                <SelectItem key={location.uid} value={location.uid}>
-                  {location.address}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button
+            variant={isEditMode ? "default" : "outline"}
+            onClick={toggleEditMode}
+            className={isEditMode ? "bg-blue-600 hover:bg-blue-700" : ""}
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            {isEditMode ? "Exit Edit" : "Edit Mode"}
+          </Button>
+
+          <AddEquipmentModal
+            onEquipmentAdded={onEquipmentAdded}
+            editEquipment={null}
+          />
         </div>
       </div>
+
+      {/* Edit Mode Notice */}
+      {isEditMode && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-blue-800 text-sm font-medium">
+            Edit mode is active. Click the edit button on any equipment card to
+            modify it.
+          </p>
+        </div>
+      )}
 
       {/* Results Summary */}
       <div className="text-sm text-muted-foreground">
@@ -184,17 +233,19 @@ const EquipmentCards = ({
         )}
       </div>
 
-      {/* Equipment Cards Grid - Simplified */}
+      {/* Equipment Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredEquipments.map((equipment) => (
           <Card
             key={equipment.uid}
-            className="hover:shadow-lg transition-shadow cursor-pointer"
+            className={`hover:shadow-lg transition-shadow ${
+              !isEditMode ? "cursor-pointer" : ""
+            }`}
             onClick={() => handleCardClick(equipment)}
           >
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Settings className="h-5 w-5" />
                     {equipment.brand} {equipment.model}
@@ -206,6 +257,18 @@ const EquipmentCards = ({
                     {equipment.status}
                   </Badge>
                 </div>
+
+                {/* Edit Button */}
+                {isEditMode && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-2"
+                    onClick={(e) => handleEditClick(e, equipment)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </CardHeader>
 
@@ -249,6 +312,20 @@ const EquipmentCards = ({
         onOpenChange={closeModal}
         equipment={selectedEquipment}
       />
+
+      {/* Edit Equipment Modal */}
+      {isEditMode && selectedEquipment && (
+        <AddEquipmentModal
+          onEquipmentAdded={() => {
+            onEquipmentAdded();
+            setIsModalOpen(false);
+            setSelectedEquipment(null);
+          }}
+          editEquipment={selectedEquipment}
+          isOpen={isModalOpen}
+          onOpenChange={closeModal}
+        />
+      )}
     </div>
   );
 };

@@ -108,9 +108,6 @@ const EquipmentModal = ({
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <p className="text-sm text-center text-muted-foreground mt-2">
-                    Equipment Image
-                  </p>
                 </div>
               </div>
             )}
