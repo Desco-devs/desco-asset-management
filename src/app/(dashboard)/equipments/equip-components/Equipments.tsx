@@ -17,9 +17,20 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Settings, Edit } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Settings, Edit, Trash2, AlertTriangle } from "lucide-react";
 import EquipmentModal from "./EquipmentModal";
 import AddEquipmentModal from "./EquipmentAddModal";
+import { toast } from "sonner";
 
 // Types based on your Prisma schema
 interface Equipment {
@@ -83,6 +94,15 @@ const EquipmentCards = ({
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [deletingEquipmentId, setDeletingEquipmentId] = useState<string | null>(
+    null
+  );
+
+  // Delete confirmation dialog states
+  const [equipmentToDelete, setEquipmentToDelete] = useState<Equipment | null>(
+    null
+  );
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Filter equipments based on selected client and location
   useEffect(() => {
@@ -122,6 +142,66 @@ const EquipmentCards = ({
     e.stopPropagation(); // Prevent card click
     setSelectedEquipment(equipment);
     setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, equipment: Equipment) => {
+    e.stopPropagation(); // Prevent card click
+    setEquipmentToDelete(equipment);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!equipmentToDelete) return;
+
+    setDeletingEquipmentId(equipmentToDelete.uid);
+    setShowDeleteDialog(false);
+
+    try {
+      const response = await fetch(
+        `/api/equipments?equipmentId=${equipmentToDelete.uid}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete equipment");
+      }
+
+      const result = await response.json();
+
+      toast.success(
+        `Equipment ${equipmentToDelete.brand} ${equipmentToDelete.model} deleted successfully`
+      );
+
+      // Show additional info if image deletion had issues
+      if (
+        result.imageDeletionStatus?.attempted &&
+        !result.imageDeletionStatus.successful
+      ) {
+        toast.warning(
+          `Equipment deleted, but image couldn't be removed from storage: ${result.imageDeletionStatus.error}`
+        );
+      }
+
+      onEquipmentAdded(); // Refresh the equipment list
+    } catch (error) {
+      console.error("Error deleting equipment:", error);
+      toast.error(
+        `Failed to delete equipment: ${
+          error instanceof Error ? error.message : "Unknown error occurred"
+        }`
+      );
+    } finally {
+      setDeletingEquipmentId(null);
+      setEquipmentToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteDialog(false);
+    setEquipmentToDelete(null);
   };
 
   const closeModal = (open: boolean) => {
@@ -191,7 +271,9 @@ const EquipmentCards = ({
           <Button
             variant={isEditMode ? "default" : "outline"}
             onClick={toggleEditMode}
-            className={isEditMode ? "bg-blue-600 hover:bg-blue-700" : ""}
+            className={`${
+              isEditMode ? "bg-blue-600 hover:bg-blue-700" : ""
+            } dark:text-accent-foreground`}
           >
             <Edit className="w-4 h-4 mr-2" />
             {isEditMode ? "Exit Edit" : "Edit Mode"}
@@ -203,16 +285,6 @@ const EquipmentCards = ({
           />
         </div>
       </div>
-
-      {/* Edit Mode Notice */}
-      {isEditMode && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <p className="text-blue-800 text-sm font-medium">
-            Edit mode is active. Click the edit button on any equipment card to
-            modify it.
-          </p>
-        </div>
-      )}
 
       {/* Results Summary */}
       <div className="text-sm text-muted-foreground">
@@ -258,16 +330,30 @@ const EquipmentCards = ({
                   </Badge>
                 </div>
 
-                {/* Edit Button */}
+                {/* Edit and Delete Buttons */}
                 {isEditMode && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="ml-2"
-                    onClick={(e) => handleEditClick(e, equipment)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-1 ml-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => handleEditClick(e, equipment)}
+                      disabled={deletingEquipmentId === equipment.uid}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={(e) => handleDeleteClick(e, equipment)}
+                      disabled={deletingEquipmentId === equipment.uid}
+                    >
+                      {deletingEquipmentId === equipment.uid ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 )}
               </div>
             </CardHeader>
@@ -326,6 +412,39 @@ const EquipmentCards = ({
           onOpenChange={closeModal}
         />
       )}
+
+      {/* Delete Confirmation AlertDialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Delete Equipment
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-semibold">
+                {equipmentToDelete?.brand} {equipmentToDelete?.model}
+              </span>{" "}
+              of type{" "}
+              <span className="font-semibold">{equipmentToDelete?.type}</span>?
+            </AlertDialogDescription>
+            <AlertDialogDescription className="text-red-600 font-medium">
+              This will permanently delete the equipment and its image. This
+              action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDelete}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-500 hover:bg-red-600 focus:ring-red-500 dark:text-accent-foreground"
+            >
+              Delete Equipment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

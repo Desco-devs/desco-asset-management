@@ -241,3 +241,149 @@ export async function PUT(request: Request) {
     )
   }
 }
+
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const equipmentId = searchParams.get('equipmentId')
+
+    if (!equipmentId) {
+      return NextResponse.json(
+        { error: 'equipmentId is required' },
+        { status: 400 }
+      )
+    }
+
+    // Get equipment data before deletion to access project info and image URL
+    const existingEquipment = await prisma.equipment.findUnique({
+      where: { uid: equipmentId },
+      include: {
+        project: true // Include project to get projectId
+      }
+    })
+
+    if (!existingEquipment) {
+      return NextResponse.json(
+        { error: 'Equipment not found' },
+        { status: 404 }
+      )
+    }
+
+    const projectId = existingEquipment.projectId;
+
+    // Delete equipment from database first
+    await prisma.equipment.delete({
+      where: { uid: equipmentId }
+    })
+
+    // Handle image deletion from Supabase storage
+    let imageDeletionResult = {
+      attempted: false,
+      successful: false,
+      error: null as string | null
+    };
+
+    if (existingEquipment.image_url) {
+      try {
+        imageDeletionResult.attempted = true;
+
+        // Equipment storage structure: equipments/projectId/equipmentId/filename
+        const equipmentFolderPath = `${projectId}/${equipmentId}`;
+        console.log(`Attempting to delete equipment folder: ${equipmentFolderPath}`);
+
+        // List all files in the equipment folder
+        const { data: allFiles, error: listError } = await supabase.storage
+          .from('equipments')
+          .list(equipmentFolderPath, {
+            limit: 100,
+            offset: 0
+          });
+
+        if (listError) {
+          console.error('Error listing equipment folder:', listError);
+          throw new Error(`Failed to list equipment folder: ${listError.message}`);
+        }
+
+        if (allFiles && allFiles.length > 0) {
+          // Delete all files in the equipment folder
+          const filePaths = allFiles
+            .filter(file => file.name && file.name !== '.emptyFolderPlaceholder')
+            .map(file => `${equipmentFolderPath}/${file.name}`);
+
+          if (filePaths.length > 0) {
+            console.log(`Deleting ${filePaths.length} files:`, filePaths);
+
+            const { error: deleteError } = await supabase.storage
+              .from('equipments')
+              .remove(filePaths);
+
+            if (deleteError) {
+              console.error('Failed to delete equipment files:', deleteError);
+              imageDeletionResult.error = deleteError.message;
+            } else {
+              console.log(`Successfully deleted ${filePaths.length} equipment files`);
+              imageDeletionResult.successful = true;
+            }
+          } else {
+            console.log('No files found to delete in equipment folder');
+            imageDeletionResult.successful = true;
+          }
+        } else {
+          console.log('Equipment folder is empty or does not exist');
+          imageDeletionResult.successful = true;
+        }
+
+      } catch (storageError) {
+        console.error('Storage deletion failed, trying fallback method:', storageError);
+
+        // Fallback: Try individual file deletion using URL
+        try {
+          const url = new URL(existingEquipment.image_url);
+          const pathParts = url.pathname.split('/').filter(part => part !== '');
+
+          // For equipment URL: /storage/v1/object/public/equipments/projectId/equipmentId/filename
+          // Find 'equipments' and get path after it
+          const equipmentsIndex = pathParts.findIndex(part => part === 'equipments');
+
+          if (equipmentsIndex !== -1 && equipmentsIndex < pathParts.length - 1) {
+            const filePath = pathParts.slice(equipmentsIndex + 1).join('/');
+
+            console.log(`Fallback: Attempting to delete file: ${filePath}`);
+
+            const { error } = await supabase.storage
+              .from('equipments')
+              .remove([filePath]);
+
+            if (error) {
+              console.error('Fallback deletion failed:', error);
+              imageDeletionResult.error = `Primary and fallback deletion failed: ${error.message}`;
+            } else {
+              console.log('Fallback deletion successful');
+              imageDeletionResult.successful = true;
+            }
+          } else {
+            imageDeletionResult.error = 'Could not extract file path from URL';
+          }
+        } catch (fallbackError) {
+          console.error('Fallback deletion error:', fallbackError);
+          imageDeletionResult.error = `Primary and fallback deletion failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`;
+        }
+      }
+    }
+
+    const response = {
+      message: 'Equipment deleted successfully',
+      imageDeletionStatus: imageDeletionResult
+    };
+
+    return NextResponse.json(response, { status: 200 });
+
+  } catch (err) {
+    console.error('DELETE /api/equipments error:', err);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

@@ -396,6 +396,14 @@ const AddEquipmentModal = ({
     formData.owner &&
     formData.projectId;
 
+  // Function to trigger form submission from button click
+  const triggerSubmit = () => {
+    const form = document.querySelector("form") as HTMLFormElement;
+    if (form) {
+      form.requestSubmit();
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {!isEditMode && (
@@ -737,9 +745,10 @@ const AddEquipmentModal = ({
               Cancel
             </Button>
             <Button
+              onClick={triggerSubmit}
               type="submit"
               disabled={!isFormValid || loading}
-              className="bg-chart-3 hover:bg-chart-3/80"
+              className="bg-chart-3 hover:bg-chart-3/80 dark:text-accent-foreground"
             >
               {loading
                 ? isEditMode

@@ -16,12 +16,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   CalendarDays,
   User,
@@ -30,8 +41,13 @@ import {
   Car,
   FileText,
   Image,
+  Edit,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import VehicleModal from "./VehicleModal";
+import AddVehicleModal from "./AddVehicleModal";
+import { toast } from "sonner";
 
 // Types based on your Prisma schema
 interface Vehicle {
@@ -84,18 +100,28 @@ interface VehicleCardsProps {
   vehicles?: Vehicle[];
   clients?: Client[];
   locations?: Location[];
+  onVehicleAdded: () => void;
 }
 
 const VehicleCards = ({
   vehicles = [],
   clients = [],
   locations = [],
+  onVehicleAdded,
 }: VehicleCardsProps) => {
   const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>(vehicles);
   const [selectedClient, setSelectedClient] = useState<string>("all");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [deletingVehicleId, setDeletingVehicleId] = useState<string | null>(
+    null
+  );
+
+  // Delete confirmation dialog states
+  const [vehicleToDelete, setVehicleToDelete] = useState<Vehicle | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Filter vehicles based on selected client and location
   useEffect(() => {
@@ -163,8 +189,73 @@ const VehicleCards = ({
   };
 
   const handleCardClick = (vehicle: Vehicle) => {
+    if (!isEditMode) {
+      setSelectedVehicle(vehicle);
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleEditClick = (e: React.MouseEvent, vehicle: Vehicle) => {
+    e.stopPropagation(); // Prevent card click
     setSelectedVehicle(vehicle);
     setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, vehicle: Vehicle) => {
+    e.stopPropagation(); // Prevent card click
+    setVehicleToDelete(vehicle);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!vehicleToDelete) return;
+
+    setDeletingVehicleId(vehicleToDelete.uid);
+    setShowDeleteDialog(false);
+
+    try {
+      const response = await fetch(
+        `/api/vehicles?vehicleId=${vehicleToDelete.uid}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete vehicle");
+      }
+
+      const result = await response.json();
+
+      toast.success(
+        `Vehicle ${vehicleToDelete.brand} ${vehicleToDelete.model} deleted successfully`
+      );
+
+      // Show additional info if some images failed to delete
+      if (result.imagesDeletionStatus?.failed > 0) {
+        toast.warning(
+          `Vehicle deleted, but ${result.imagesDeletionStatus.failed} images couldn't be removed from storage`
+        );
+      }
+
+      onVehicleAdded(); // Refresh the vehicle list
+    } catch (error) {
+      console.error("Error deleting vehicle:", error);
+      toast.error(
+        `Failed to delete vehicle: ${
+          error instanceof Error ? error.message : "Unknown error occurred"
+        }`
+      );
+    } finally {
+      setDeletingVehicleId(null);
+      setVehicleToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteDialog(false);
+    setVehicleToDelete(null);
   };
 
   const closeModal = (open: boolean) => {
@@ -178,46 +269,71 @@ const VehicleCards = ({
     setIsModalOpen(open);
   };
 
+  const toggleEditMode = () => {
+    setIsEditMode(!isEditMode);
+  };
+
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
-          <label className="text-sm font-medium mb-2 block">
-            Filter by Client
-          </label>
-          <Select value={selectedClient} onValueChange={setSelectedClient}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Clients" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Clients</SelectItem>
-              {clients.map((client) => (
-                <SelectItem key={client.uid} value={client.uid}>
-                  {client.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="flex flex-row gap-4 items-center">
+          <div className="">
+            <label className="text-sm font-medium mb-2 block">
+              Filter by Client
+            </label>
+            <Select value={selectedClient} onValueChange={setSelectedClient}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Clients" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Clients</SelectItem>
+                {clients.map((client) => (
+                  <SelectItem key={client.uid} value={client.uid}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="">
+            <label className="text-sm font-medium mb-2 block">
+              Filter by Location
+            </label>
+            <Select
+              value={selectedLocation}
+              onValueChange={setSelectedLocation}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All Locations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map((location) => (
+                  <SelectItem key={location.uid} value={location.uid}>
+                    {location.address}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="flex-1">
-          <label className="text-sm font-medium mb-2 block">
-            Filter by Location
-          </label>
-          <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Locations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations.map((location) => (
-                <SelectItem key={location.uid} value={location.uid}>
-                  {location.address}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button
+            variant={isEditMode ? "default" : "outline"}
+            onClick={toggleEditMode}
+            className={`${
+              isEditMode ? "bg-blue-600 hover:bg-blue-700" : ""
+            } dark:text-accent-foreground`}
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            {isEditMode ? "Exit Edit" : "Edit Mode"}
+          </Button>
+
+          <AddVehicleModal onVehicleAdded={onVehicleAdded} editVehicle={null} />
         </div>
       </div>
 
@@ -245,12 +361,14 @@ const VehicleCards = ({
         {filteredVehicles.map((vehicle) => (
           <Card
             key={vehicle.uid}
-            className="hover:shadow-lg transition-shadow cursor-pointer"
+            className={`hover:shadow-lg transition-shadow ${
+              !isEditMode ? "cursor-pointer" : ""
+            }`}
             onClick={() => handleCardClick(vehicle)}
           >
             <CardHeader>
               <div className="flex justify-between items-start">
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1">
                   <CardTitle className="text-sm flex items-center gap-2 ">
                     <Car className="h-5 w-5" />
                     {vehicle.brand} {vehicle.model}
@@ -264,6 +382,32 @@ const VehicleCards = ({
                     {vehicle.status}
                   </Badge>
                 </div>
+
+                {/* Edit and Delete Buttons */}
+                {isEditMode && (
+                  <div className="flex gap-1 ml-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => handleEditClick(e, vehicle)}
+                      disabled={deletingVehicleId === vehicle.uid}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={(e) => handleDeleteClick(e, vehicle)}
+                      disabled={deletingVehicleId === vehicle.uid}
+                    >
+                      {deletingVehicleId === vehicle.uid ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
             </CardHeader>
 
@@ -306,6 +450,56 @@ const VehicleCards = ({
         onOpenChange={closeModal}
         vehicle={selectedVehicle}
       />
+
+      {/* Edit Vehicle Modal */}
+      {isEditMode && selectedVehicle && (
+        <AddVehicleModal
+          onVehicleAdded={() => {
+            onVehicleAdded();
+            setIsModalOpen(false);
+            setSelectedVehicle(null);
+          }}
+          editVehicle={selectedVehicle}
+          isOpen={isModalOpen}
+          onOpenChange={closeModal}
+        />
+      )}
+
+      {/* Delete Confirmation AlertDialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500 " />
+              Delete Vehicle
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-semibold">
+                {vehicleToDelete?.brand} {vehicleToDelete?.model}
+              </span>{" "}
+              with plate number{" "}
+              <span className="font-semibold">
+                {vehicleToDelete?.plateNumber}
+              </span>
+              ?
+            </AlertDialogDescription>
+            <AlertDialogDescription className="text-red-600 font-medium">
+              This will permanently delete the vehicle and all its images. This
+              action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelDelete}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-500 hover:bg-red-600 focus:ring-red-500 dark:text-accent-foreground"
+            >
+              Delete Vehicle
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
