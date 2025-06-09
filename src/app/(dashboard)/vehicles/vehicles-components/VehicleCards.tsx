@@ -18,12 +18,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -33,18 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  CalendarDays,
-  User,
-  Building2,
-  MapPin,
-  Car,
-  FileText,
-  Image,
-  Edit,
-  Trash2,
-  AlertTriangle,
-} from "lucide-react";
+import { Car, Edit, Trash2, AlertTriangle } from "lucide-react";
 import VehicleModal from "./VehicleModal";
 import AddVehicleModal from "./AddVehicleModal";
 import { toast } from "sonner";
@@ -357,7 +340,7 @@ const VehicleCards = ({
       </div>
 
       {/* Vehicle Cards Grid - Simplified */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredVehicles.map((vehicle) => (
           <Card
             key={vehicle.uid}
