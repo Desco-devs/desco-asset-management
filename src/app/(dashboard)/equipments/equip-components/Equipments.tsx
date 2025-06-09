@@ -27,12 +27,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Settings, Edit, Trash2, AlertTriangle } from "lucide-react";
+import {
+  Settings,
+  Edit,
+  Trash2,
+  AlertTriangle,
+  Car,
+  FileText,
+  Receipt,
+  Image as ImageIcon,
+} from "lucide-react";
 import EquipmentModal from "./EquipmentModal";
 import AddEquipmentModal from "./EquipmentAddModal";
 import { toast } from "sonner";
 
-// Types based on your Prisma schema
+// Types based on your updated Prisma schema
 interface Equipment {
   uid: string;
   brand: string;
@@ -44,6 +53,9 @@ interface Equipment {
   owner: string;
   image_url?: string;
   inspectionDate?: string;
+  plateNumber?: string;
+  originalReceiptUrl?: string;
+  equipmentRegistrationUrl?: string;
   project: {
     uid: string;
     name: string;
@@ -131,6 +143,44 @@ const EquipmentCards = ({
       : "bg-red-100 text-red-800 hover:bg-red-200";
   };
 
+  const isExpiringSoon = (expirationDate: string) => {
+    const expiry = new Date(expirationDate);
+    const today = new Date();
+    const daysDiff = (expiry.getTime() - today.getTime()) / (1000 * 3600 * 24);
+    return daysDiff <= 30 && daysDiff >= 0;
+  };
+
+  const isExpired = (expirationDate: string) => {
+    const expiry = new Date(expirationDate);
+    const today = new Date();
+    return expiry < today;
+  };
+
+  const getExpirationBadge = (expirationDate: string) => {
+    if (isExpired(expirationDate)) {
+      return (
+        <Badge className="bg-red-500 text-white hover:bg-red-600">
+          Expired
+        </Badge>
+      );
+    } else if (isExpiringSoon(expirationDate)) {
+      return (
+        <Badge className="bg-orange-500 text-white hover:bg-orange-600">
+          Expiring Soon
+        </Badge>
+      );
+    }
+    return null;
+  };
+
+  const getDocumentCount = (equipment: Equipment) => {
+    let count = 0;
+    if (equipment.image_url) count++;
+    if (equipment.originalReceiptUrl) count++;
+    if (equipment.equipmentRegistrationUrl) count++;
+    return count;
+  };
+
   const handleCardClick = (equipment: Equipment) => {
     if (!isEditMode) {
       setSelectedEquipment(equipment);
@@ -175,13 +225,13 @@ const EquipmentCards = ({
         `Equipment ${equipmentToDelete.brand} ${equipmentToDelete.model} deleted successfully`
       );
 
-      // Show additional info if image deletion had issues
+      // Show additional info if file deletion had issues
       if (
-        result.imageDeletionStatus?.attempted &&
-        !result.imageDeletionStatus.successful
+        result.fileDeletionStatus?.attempted &&
+        !result.fileDeletionStatus.successful
       ) {
         toast.warning(
-          `Equipment deleted, but image couldn't be removed from storage: ${result.imageDeletionStatus.error}`
+          `Equipment deleted, but some files couldn't be removed from storage: ${result.fileDeletionStatus.error}`
         );
       }
 
@@ -312,12 +362,12 @@ const EquipmentCards = ({
             key={equipment.uid}
             className={`hover:shadow-lg transition-shadow ${
               !isEditMode ? "cursor-pointer" : ""
-            }`}
+            } relative`}
             onClick={() => handleCardClick(equipment)}
           >
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
-                <div className="space-y-1 flex-1">
+                <div className="space-y-2 flex-1">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Settings className="h-5 w-5" />
                     {equipment.brand} {equipment.model}
@@ -325,9 +375,36 @@ const EquipmentCards = ({
                   <CardDescription className="font-medium text-gray-600 text-xs">
                     {equipment.type}
                   </CardDescription>
-                  <Badge className={getStatusColor(equipment.status)}>
-                    {equipment.status}
-                  </Badge>
+
+                  {/* Status and Badges Row */}
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className={getStatusColor(equipment.status)}>
+                      {equipment.status}
+                    </Badge>
+
+                    {equipment.plateNumber && (
+                      <Badge
+                        variant="outline"
+                        className="flex items-center gap-1"
+                      >
+                        <Car className="h-3 w-3" />
+                        {equipment.plateNumber}
+                      </Badge>
+                    )}
+
+                    {getExpirationBadge(equipment.expirationDate)}
+                  </div>
+
+                  {/* Document Count Badge */}
+                  {getDocumentCount(equipment) > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <FileText className="h-3 w-3" />
+                      <span>
+                        {getDocumentCount(equipment)} document
+                        {getDocumentCount(equipment) !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Edit and Delete Buttons */}
@@ -358,7 +435,7 @@ const EquipmentCards = ({
               </div>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="space-y-3">
               {/* Equipment Image */}
               {equipment.image_url && (
                 <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
@@ -376,6 +453,60 @@ const EquipmentCards = ({
                   <Settings className="h-12 w-12 text-gray-400" />
                 </div>
               )}
+
+              {/* Document Icons Row */}
+              {(equipment.originalReceiptUrl ||
+                equipment.equipmentRegistrationUrl) && (
+                <div className="flex justify-center gap-3 pt-2 border-t">
+                  {equipment.originalReceiptUrl && (
+                    <div className="flex flex-col items-center gap-1">
+                      <Receipt className="h-4 w-4 text-green-600" />
+                      <span className="text-xs text-muted-foreground">
+                        Receipt
+                      </span>
+                    </div>
+                  )}
+                  {equipment.equipmentRegistrationUrl && (
+                    <div className="flex flex-col items-center gap-1">
+                      <FileText className="h-4 w-4 text-purple-600" />
+                      <span className="text-xs text-muted-foreground">
+                        Registration
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Equipment Info Footer */}
+              <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
+                <div className="flex justify-between">
+                  <span>Owner:</span>
+                  <span className="font-medium">{equipment.owner}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Project:</span>
+                  <span
+                    className="font-medium truncate ml-2"
+                    title={equipment.project.name}
+                  >
+                    {equipment.project.name}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Expires:</span>
+                  <span
+                    className={`font-medium ${
+                      isExpired(equipment.expirationDate)
+                        ? "text-red-600"
+                        : isExpiringSoon(equipment.expirationDate)
+                        ? "text-orange-600"
+                        : ""
+                    }`}
+                  >
+                    {new Date(equipment.expirationDate).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -425,13 +556,24 @@ const EquipmentCards = ({
               Are you sure you want to delete{" "}
               <span className="font-semibold">
                 {equipmentToDelete?.brand} {equipmentToDelete?.model}
-              </span>{" "}
+              </span>
+              {equipmentToDelete?.plateNumber && (
+                <span>
+                  {" "}
+                  (Plate:{" "}
+                  <span className="font-semibold">
+                    {equipmentToDelete.plateNumber}
+                  </span>
+                  )
+                </span>
+              )}{" "}
               of type{" "}
               <span className="font-semibold">{equipmentToDelete?.type}</span>?
             </AlertDialogDescription>
             <AlertDialogDescription className="text-red-600 font-medium">
-              This will permanently delete the equipment and its image. This
-              action cannot be undone.
+              This will permanently delete the equipment and all its associated
+              files (image, receipt, registration documents). This action cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

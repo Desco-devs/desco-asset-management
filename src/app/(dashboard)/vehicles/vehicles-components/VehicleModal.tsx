@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   CalendarDays,
   User,
@@ -15,6 +16,8 @@ import {
   Car,
   FileText,
   Image,
+  Receipt,
+  ExternalLink,
 } from "lucide-react";
 
 // Vehicle interface (should match your main component)
@@ -93,12 +96,38 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
     return nextDate;
   };
 
+  const getFileNameFromUrl = (url: string) => {
+    try {
+      const urlPath = new URL(url).pathname;
+      return urlPath.split("/").pop() || "Document";
+    } catch {
+      return "Document";
+    }
+  };
+
+  const isImageFile = (url: string) => {
+    const imageExtensions = [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".gif",
+      ".webp",
+      ".bmp",
+      ".svg",
+    ];
+    return imageExtensions.some((ext) => url.toLowerCase().includes(ext));
+  };
+
+  const openFile = (url: string) => {
+    window.open(url, "_blank");
+  };
+
   const vehicleImages = (vehicle: Vehicle) => {
     const images = [
-      { url: vehicle.frontImgUrl, label: "Front" },
-      { url: vehicle.backImgUrl, label: "Back" },
-      { url: vehicle.side1ImgUrl, label: "Side 1" },
-      { url: vehicle.side2ImgUrl, label: "Side 2" },
+      { url: vehicle.frontImgUrl, label: "Front View" },
+      { url: vehicle.backImgUrl, label: "Back View" },
+      { url: vehicle.side1ImgUrl, label: "Left Side" },
+      { url: vehicle.side2ImgUrl, label: "Right Side" },
     ].filter((img) => img.url);
 
     return images;
@@ -108,7 +137,12 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+      <DialogContent
+        className="max-w-6xl max-h-[90vh] flex flex-col p-4"
+        style={{
+          maxWidth: "1024px",
+        }}
+      >
         {/* Fixed Header - no scrolling */}
         <DialogHeader className="p-6 pb-0 flex-shrink-0 border-b">
           <DialogTitle className="flex items-center gap-2">
@@ -117,10 +151,12 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
             <Badge className={getStatusColor(vehicle.status)}>
               {vehicle.status}
             </Badge>
+            <Badge variant="outline" className="flex items-center gap-1">
+              <Car className="h-3 w-3" />
+              {vehicle.plateNumber}
+            </Badge>
           </DialogTitle>
-          <p className="text-muted-foreground">
-            {vehicle.type} • {vehicle.plateNumber}
-          </p>
+          <p className="text-muted-foreground">{vehicle.type}</p>
         </DialogHeader>
 
         {/* Scrollable Content Area */}
@@ -128,21 +164,39 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
           <div className="space-y-6">
             {/* Vehicle Images Grid */}
             {vehicleImages(vehicle).length > 0 && (
-              <div className="grid grid-cols-2 gap-4">
-                {vehicleImages(vehicle).map((image, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                      <img
-                        src={image.url}
-                        alt={`${vehicle.brand} ${vehicle.model} - ${image.label}`}
-                        className="w-full h-full object-cover"
-                      />
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Vehicle Photos</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+                  {vehicleImages(vehicle).map((image, index) => (
+                    <div
+                      key={index}
+                      className="border rounded-lg p-3 space-y-2"
+                    >
+                      <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                        <img
+                          src={image.url}
+                          alt={`${vehicle.brand} ${vehicle.model} - ${image.label}`}
+                          className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => openFile(image.url!)}
+                        />
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">
+                          {image.label}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs"
+                          onClick={() => openFile(image.url!)}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          View Full Size
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-sm text-center text-muted-foreground">
-                      {image.label}
-                    </p>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
 
@@ -173,6 +227,12 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                   <div className="text-sm">
                     <span className="font-medium">Project:</span>
                     <span className="ml-2">{vehicle.project.name}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-sm">
+                    <Car className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">Plate Number:</span>
+                    <span>{vehicle.plateNumber}</span>
                   </div>
                 </div>
               </div>
@@ -247,13 +307,101 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
               </div>
             </div>
 
-            {/* Documents */}
-            <div className="space-y-3">
-              <h3 className="text-lg font-semibold">Documents</h3>
+            {/* Documents Section */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Documents & Files</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Original Receipt */}
+                {vehicle.originalReceiptUrl && (
+                  <div className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Receipt className="h-4 w-4 text-green-500" />
+                      <span className="font-medium text-sm">
+                        Original Receipt (OR)
+                      </span>
+                    </div>
+
+                    {isImageFile(vehicle.originalReceiptUrl) ? (
+                      <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                        <img
+                          src={vehicle.originalReceiptUrl}
+                          alt="Original Receipt"
+                          className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => openFile(vehicle.originalReceiptUrl!)}
+                        />
+                      </div>
+                    ) : (
+                      <div className="aspect-video bg-gray-50 rounded-md flex items-center justify-center">
+                        <div className="text-center">
+                          <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                          <p className="text-xs text-gray-500 truncate px-2">
+                            {getFileNameFromUrl(vehicle.originalReceiptUrl)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => openFile(vehicle.originalReceiptUrl!)}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Open Document
+                    </Button>
+                  </div>
+                )}
+
+                {/* Car Registration */}
+                {vehicle.carRegistrationUrl && (
+                  <div className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-blue-500" />
+                      <span className="font-medium text-sm">
+                        Car Registration (CR)
+                      </span>
+                    </div>
+
+                    {isImageFile(vehicle.carRegistrationUrl) ? (
+                      <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                        <img
+                          src={vehicle.carRegistrationUrl}
+                          alt="Car Registration"
+                          className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => openFile(vehicle.carRegistrationUrl!)}
+                        />
+                      </div>
+                    ) : (
+                      <div className="aspect-video bg-gray-50 rounded-md flex items-center justify-center">
+                        <div className="text-center">
+                          <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                          <p className="text-xs text-gray-500 truncate px-2">
+                            {getFileNameFromUrl(vehicle.carRegistrationUrl)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => openFile(vehicle.carRegistrationUrl!)}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Open Document
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Documents Summary */}
               <div className="flex flex-wrap gap-2">
                 {vehicle.originalReceiptUrl && (
                   <Badge variant="outline" className="text-xs">
-                    <FileText className="h-3 w-3 mr-1" />
+                    <Receipt className="h-3 w-3 mr-1" />
                     OR Available
                   </Badge>
                 )}
@@ -270,6 +418,13 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                     {vehicleImages(vehicle).length !== 1 ? "s" : ""}
                   </Badge>
                 )}
+                {!vehicle.originalReceiptUrl &&
+                  !vehicle.carRegistrationUrl &&
+                  vehicleImages(vehicle).length === 0 && (
+                    <span className="text-sm text-muted-foreground">
+                      No documents or photos uploaded
+                    </span>
+                  )}
               </div>
             </div>
 
@@ -277,7 +432,9 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
             {vehicle.remarks && (
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold">Remarks</h3>
-                <p className="text-muted-foreground">{vehicle.remarks}</p>
+                <p className="text-muted-foreground bg-gray-50 p-3 rounded-md">
+                  {vehicle.remarks}
+                </p>
               </div>
             )}
           </div>

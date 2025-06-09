@@ -25,7 +25,12 @@ export async function POST(request: Request) {
     const owner = formData.get('owner') as string
     const projectId = formData.get('projectId') as string
     const inspectionDateStr = formData.get('inspectionDate') as string | null
+    const plateNumber = (formData.get('plateNumber') as string) || null
+
+    // Get file uploads
     const imageFile = formData.get('image') as File | null
+    const originalReceiptFile = formData.get('originalReceipt') as File | null
+    const equipmentRegistrationFile = formData.get('equipmentRegistration') as File | null
 
     if (!brand || !model || !type || !expirationDate || !owner || !projectId) {
       return NextResponse.json(
@@ -34,7 +39,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // 1) create equipment record (without image_url for now)
+    // 1) create equipment record (without file URLs for now)
     const createData: any = {
       brand,
       model,
@@ -43,6 +48,7 @@ export async function POST(request: Request) {
       status,
       remarks,
       owner,
+      plateNumber,
       project: { connect: { uid: projectId } },
     }
     if (inspectionDateStr) {
@@ -53,43 +59,114 @@ export async function POST(request: Request) {
       data: createData,
     })
 
-    // 2) if an image was uploaded, push to Supabase and update the record
+    // 2) Upload files to Supabase and update the record
+    const fileUploads = []
+
+    // Handle image upload
     if (imageFile && imageFile.size > 0) {
       const timestamp = Date.now()
-      const fileName = `${timestamp}_${imageFile.name}`
+      const fileName = `image_${timestamp}_${imageFile.name}`
       const filePath = `${projectId}/${equipment.uid}/${fileName}`
       const buffer = Buffer.from(await imageFile.arrayBuffer())
 
-      const { data: uploadData, error: uploadError } = await supabase
-        .storage
-        .from('equipments')
-        .upload(filePath, buffer, {
-          cacheControl: '3600',
-          upsert: false,
+      fileUploads.push(
+        supabase.storage
+          .from('equipments')
+          .upload(filePath, buffer, {
+            cacheControl: '3600',
+            upsert: false,
+          })
+          .then(({ data: uploadData, error: uploadError }) => {
+            if (uploadError || !uploadData) {
+              throw new Error(`Image upload failed: ${uploadError?.message}`)
+            }
+            const { data: urlData } = supabase.storage
+              .from('equipments')
+              .getPublicUrl(uploadData.path)
+            return { field: 'image_url', url: urlData.publicUrl }
+          })
+      )
+    }
+
+    // Handle original receipt upload
+    if (originalReceiptFile && originalReceiptFile.size > 0) {
+      const timestamp = Date.now()
+      const fileName = `receipt_${timestamp}_${originalReceiptFile.name}`
+      const filePath = `${projectId}/${equipment.uid}/${fileName}`
+      const buffer = Buffer.from(await originalReceiptFile.arrayBuffer())
+
+      fileUploads.push(
+        supabase.storage
+          .from('equipments')
+          .upload(filePath, buffer, {
+            cacheControl: '3600',
+            upsert: false,
+          })
+          .then(({ data: uploadData, error: uploadError }) => {
+            if (uploadError || !uploadData) {
+              throw new Error(`Original receipt upload failed: ${uploadError?.message}`)
+            }
+            const { data: urlData } = supabase.storage
+              .from('equipments')
+              .getPublicUrl(uploadData.path)
+            return { field: 'originalReceiptUrl', url: urlData.publicUrl }
+          })
+      )
+    }
+
+    // Handle equipment registration upload
+    if (equipmentRegistrationFile && equipmentRegistrationFile.size > 0) {
+      const timestamp = Date.now()
+      const fileName = `registration_${timestamp}_${equipmentRegistrationFile.name}`
+      const filePath = `${projectId}/${equipment.uid}/${fileName}`
+      const buffer = Buffer.from(await equipmentRegistrationFile.arrayBuffer())
+
+      fileUploads.push(
+        supabase.storage
+          .from('equipments')
+          .upload(filePath, buffer, {
+            cacheControl: '3600',
+            upsert: false,
+          })
+          .then(({ data: uploadData, error: uploadError }) => {
+            if (uploadError || !uploadData) {
+              throw new Error(`Equipment registration upload failed: ${uploadError?.message}`)
+            }
+            const { data: urlData } = supabase.storage
+              .from('equipments')
+              .getPublicUrl(uploadData.path)
+            return { field: 'equipmentRegistrationUrl', url: urlData.publicUrl }
+          })
+      )
+    }
+
+    // Wait for all file uploads to complete
+    if (fileUploads.length > 0) {
+      try {
+        const uploadResults = await Promise.all(fileUploads)
+
+        // Build update data with file URLs
+        const updateData: any = {}
+        uploadResults.forEach(result => {
+          updateData[result.field] = result.url
         })
 
-      if (uploadError || !uploadData) {
-        console.error('Supabase upload error:', uploadError)
-        // optional: rollback the record
+        await prisma.equipment.update({
+          where: { uid: equipment.uid },
+          data: updateData,
+        })
+      } catch (uploadError) {
+        console.error('File upload error:', uploadError)
+        // Rollback the equipment record
         await prisma.equipment.delete({ where: { uid: equipment.uid } })
         return NextResponse.json(
-          { error: 'Image upload failed' },
+          { error: 'File upload failed' },
           { status: 500 }
         )
       }
-
-      const { data: urlData } = supabase
-        .storage
-        .from('equipments')
-        .getPublicUrl(uploadData.path)
-
-      await prisma.equipment.update({
-        where: { uid: equipment.uid },
-        data: { image_url: urlData.publicUrl },
-      })
     }
 
-    // 3) return the equipment (with or without image_url)
+    // 3) return the equipment (with file URLs if uploaded)
     const result = await prisma.equipment.findUnique({
       where: { uid: equipment.uid },
     })
@@ -116,8 +193,17 @@ export async function PUT(request: Request) {
     const owner = formData.get('owner') as string
     const projectId = formData.get('projectId') as string
     const inspectionDateStr = formData.get('inspectionDate') as string | null
+    const plateNumber = (formData.get('plateNumber') as string) || null
+
+    // Get file uploads
     const imageFile = formData.get('image') as File | null
+    const originalReceiptFile = formData.get('originalReceipt') as File | null
+    const equipmentRegistrationFile = formData.get('equipmentRegistration') as File | null
+
+    // Get keep existing file flags
     const keepExistingImage = formData.get('keepExistingImage') as string
+    const keepExistingReceipt = formData.get('keepExistingReceipt') as string
+    const keepExistingRegistration = formData.get('keepExistingRegistration') as string
 
     if (!equipmentId || !brand || !model || !type || !expirationDate || !owner || !projectId) {
       return NextResponse.json(
@@ -147,6 +233,7 @@ export async function PUT(request: Request) {
       status,
       remarks,
       owner,
+      plateNumber,
       project: { connect: { uid: projectId } },
     }
 
@@ -156,7 +243,10 @@ export async function PUT(request: Request) {
       updateData.inspectionDate = null
     }
 
-    // Handle image upload if new image provided
+    // Handle file uploads and deletions
+    const fileUploads = []
+
+    // Handle image
     if (imageFile && imageFile.size > 0) {
       // Delete old image from Supabase if it exists
       if (existingEquipment.image_url) {
@@ -170,34 +260,29 @@ export async function PUT(request: Request) {
 
       // Upload new image
       const timestamp = Date.now()
-      const fileName = `${timestamp}_${imageFile.name}`
+      const fileName = `image_${timestamp}_${imageFile.name}`
       const filePath = `${projectId}/${equipmentId}/${fileName}`
       const buffer = Buffer.from(await imageFile.arrayBuffer())
 
-      const { data: uploadData, error: uploadError } = await supabase
-        .storage
-        .from('equipments')
-        .upload(filePath, buffer, {
-          cacheControl: '3600',
-          upsert: false,
-        })
-
-      if (uploadError || !uploadData) {
-        console.error('Supabase upload error:', uploadError)
-        return NextResponse.json(
-          { error: 'Image upload failed' },
-          { status: 500 }
-        )
-      }
-
-      const { data: urlData } = supabase
-        .storage
-        .from('equipments')
-        .getPublicUrl(uploadData.path)
-
-      updateData.image_url = urlData.publicUrl
+      fileUploads.push(
+        supabase.storage
+          .from('equipments')
+          .upload(filePath, buffer, {
+            cacheControl: '3600',
+            upsert: false,
+          })
+          .then(({ data: uploadData, error: uploadError }) => {
+            if (uploadError || !uploadData) {
+              throw new Error(`Image upload failed: ${uploadError?.message}`)
+            }
+            const { data: urlData } = supabase.storage
+              .from('equipments')
+              .getPublicUrl(uploadData.path)
+            return { field: 'image_url', url: urlData.publicUrl }
+          })
+      )
     } else if (keepExistingImage !== 'true') {
-      // If no new image and not keeping existing, remove the image
+      // Remove existing image
       if (existingEquipment.image_url) {
         try {
           const oldImagePath = existingEquipment.image_url.split('/').slice(-3).join('/')
@@ -208,7 +293,120 @@ export async function PUT(request: Request) {
       }
       updateData.image_url = null
     }
-    // If keepExistingImage is 'true', don't update image_url (keep existing)
+
+    // Handle original receipt
+    if (originalReceiptFile && originalReceiptFile.size > 0) {
+      // Delete old receipt from Supabase if it exists
+      if (existingEquipment.originalReceiptUrl) {
+        try {
+          const oldReceiptPath = existingEquipment.originalReceiptUrl.split('/').slice(-3).join('/')
+          await supabase.storage.from('equipments').remove([oldReceiptPath])
+        } catch (error) {
+          console.log('Old receipt deletion failed (non-critical):', error)
+        }
+      }
+
+      // Upload new receipt
+      const timestamp = Date.now()
+      const fileName = `receipt_${timestamp}_${originalReceiptFile.name}`
+      const filePath = `${projectId}/${equipmentId}/${fileName}`
+      const buffer = Buffer.from(await originalReceiptFile.arrayBuffer())
+
+      fileUploads.push(
+        supabase.storage
+          .from('equipments')
+          .upload(filePath, buffer, {
+            cacheControl: '3600',
+            upsert: false,
+          })
+          .then(({ data: uploadData, error: uploadError }) => {
+            if (uploadError || !uploadData) {
+              throw new Error(`Original receipt upload failed: ${uploadError?.message}`)
+            }
+            const { data: urlData } = supabase.storage
+              .from('equipments')
+              .getPublicUrl(uploadData.path)
+            return { field: 'originalReceiptUrl', url: urlData.publicUrl }
+          })
+      )
+    } else if (keepExistingReceipt !== 'true') {
+      // Remove existing receipt
+      if (existingEquipment.originalReceiptUrl) {
+        try {
+          const oldReceiptPath = existingEquipment.originalReceiptUrl.split('/').slice(-3).join('/')
+          await supabase.storage.from('equipments').remove([oldReceiptPath])
+        } catch (error) {
+          console.log('Old receipt deletion failed (non-critical):', error)
+        }
+      }
+      updateData.originalReceiptUrl = null
+    }
+
+    // Handle equipment registration
+    if (equipmentRegistrationFile && equipmentRegistrationFile.size > 0) {
+      // Delete old registration from Supabase if it exists
+      if (existingEquipment.equipmentRegistrationUrl) {
+        try {
+          const oldRegistrationPath = existingEquipment.equipmentRegistrationUrl.split('/').slice(-3).join('/')
+          await supabase.storage.from('equipments').remove([oldRegistrationPath])
+        } catch (error) {
+          console.log('Old registration deletion failed (non-critical):', error)
+        }
+      }
+
+      // Upload new registration
+      const timestamp = Date.now()
+      const fileName = `registration_${timestamp}_${equipmentRegistrationFile.name}`
+      const filePath = `${projectId}/${equipmentId}/${fileName}`
+      const buffer = Buffer.from(await equipmentRegistrationFile.arrayBuffer())
+
+      fileUploads.push(
+        supabase.storage
+          .from('equipments')
+          .upload(filePath, buffer, {
+            cacheControl: '3600',
+            upsert: false,
+          })
+          .then(({ data: uploadData, error: uploadError }) => {
+            if (uploadError || !uploadData) {
+              throw new Error(`Equipment registration upload failed: ${uploadError?.message}`)
+            }
+            const { data: urlData } = supabase.storage
+              .from('equipments')
+              .getPublicUrl(uploadData.path)
+            return { field: 'equipmentRegistrationUrl', url: urlData.publicUrl }
+          })
+      )
+    } else if (keepExistingRegistration !== 'true') {
+      // Remove existing registration
+      if (existingEquipment.equipmentRegistrationUrl) {
+        try {
+          const oldRegistrationPath = existingEquipment.equipmentRegistrationUrl.split('/').slice(-3).join('/')
+          await supabase.storage.from('equipments').remove([oldRegistrationPath])
+        } catch (error) {
+          console.log('Old registration deletion failed (non-critical):', error)
+        }
+      }
+      updateData.equipmentRegistrationUrl = null
+    }
+
+    // Wait for all file uploads to complete
+    if (fileUploads.length > 0) {
+      try {
+        const uploadResults = await Promise.all(fileUploads)
+
+        // Add file URLs to update data
+        uploadResults.forEach(result => {
+          updateData[result.field] = result.url
+        })
+      } catch (uploadError) {
+        console.error('File upload error:', uploadError)
+        return NextResponse.json(
+          { error: 'File upload failed' },
+          { status: 500 }
+        )
+      }
+    }
 
     // Update the equipment
     const equipment = await prisma.equipment.update({
@@ -242,7 +440,6 @@ export async function PUT(request: Request) {
   }
 }
 
-
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -255,7 +452,7 @@ export async function DELETE(request: Request) {
       )
     }
 
-    // Get equipment data before deletion to access project info and image URL
+    // Get equipment data before deletion to access project info and file URLs
     const existingEquipment = await prisma.equipment.findUnique({
       where: { uid: equipmentId },
       include: {
@@ -277,16 +474,16 @@ export async function DELETE(request: Request) {
       where: { uid: equipmentId }
     })
 
-    // Handle image deletion from Supabase storage
-    let imageDeletionResult = {
+    // Handle file deletions from Supabase storage
+    let fileDeletionResult = {
       attempted: false,
       successful: false,
       error: null as string | null
     };
 
-    if (existingEquipment.image_url) {
+    if (existingEquipment.image_url || existingEquipment.originalReceiptUrl || existingEquipment.equipmentRegistrationUrl) {
       try {
-        imageDeletionResult.attempted = true;
+        fileDeletionResult.attempted = true;
 
         // Equipment storage structure: equipments/projectId/equipmentId/filename
         const equipmentFolderPath = `${projectId}/${equipmentId}`;
@@ -320,61 +517,71 @@ export async function DELETE(request: Request) {
 
             if (deleteError) {
               console.error('Failed to delete equipment files:', deleteError);
-              imageDeletionResult.error = deleteError.message;
+              fileDeletionResult.error = deleteError.message;
             } else {
               console.log(`Successfully deleted ${filePaths.length} equipment files`);
-              imageDeletionResult.successful = true;
+              fileDeletionResult.successful = true;
             }
           } else {
             console.log('No files found to delete in equipment folder');
-            imageDeletionResult.successful = true;
+            fileDeletionResult.successful = true;
           }
         } else {
           console.log('Equipment folder is empty or does not exist');
-          imageDeletionResult.successful = true;
+          fileDeletionResult.successful = true;
         }
 
       } catch (storageError) {
         console.error('Storage deletion failed, trying fallback method:', storageError);
 
-        // Fallback: Try individual file deletion using URL
+        // Fallback: Try individual file deletion using URLs
         try {
-          const url = new URL(existingEquipment.image_url);
-          const pathParts = url.pathname.split('/').filter(part => part !== '');
+          const urlsToDelete = [
+            existingEquipment.image_url,
+            existingEquipment.originalReceiptUrl,
+            existingEquipment.equipmentRegistrationUrl
+          ].filter(url => url !== null);
 
-          // For equipment URL: /storage/v1/object/public/equipments/projectId/equipmentId/filename
-          // Find 'equipments' and get path after it
-          const equipmentsIndex = pathParts.findIndex(part => part === 'equipments');
+          for (const fileUrl of urlsToDelete) {
+            try {
+              const url = new URL(fileUrl!);
+              const pathParts = url.pathname.split('/').filter(part => part !== '');
 
-          if (equipmentsIndex !== -1 && equipmentsIndex < pathParts.length - 1) {
-            const filePath = pathParts.slice(equipmentsIndex + 1).join('/');
+              // For equipment URL: /storage/v1/object/public/equipments/projectId/equipmentId/filename
+              // Find 'equipments' and get path after it
+              const equipmentsIndex = pathParts.findIndex(part => part === 'equipments');
 
-            console.log(`Fallback: Attempting to delete file: ${filePath}`);
+              if (equipmentsIndex !== -1 && equipmentsIndex < pathParts.length - 1) {
+                const filePath = pathParts.slice(equipmentsIndex + 1).join('/');
 
-            const { error } = await supabase.storage
-              .from('equipments')
-              .remove([filePath]);
+                console.log(`Fallback: Attempting to delete file: ${filePath}`);
 
-            if (error) {
-              console.error('Fallback deletion failed:', error);
-              imageDeletionResult.error = `Primary and fallback deletion failed: ${error.message}`;
-            } else {
-              console.log('Fallback deletion successful');
-              imageDeletionResult.successful = true;
+                const { error } = await supabase.storage
+                  .from('equipments')
+                  .remove([filePath]);
+
+                if (error) {
+                  console.error('Fallback deletion failed for file:', filePath, error);
+                } else {
+                  console.log('Fallback deletion successful for file:', filePath);
+                }
+              }
+            } catch (fileError) {
+              console.error('Error deleting individual file:', fileError);
             }
-          } else {
-            imageDeletionResult.error = 'Could not extract file path from URL';
           }
+
+          fileDeletionResult.successful = true;
         } catch (fallbackError) {
           console.error('Fallback deletion error:', fallbackError);
-          imageDeletionResult.error = `Primary and fallback deletion failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`;
+          fileDeletionResult.error = `Primary and fallback deletion failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`;
         }
       }
     }
 
     const response = {
       message: 'Equipment deleted successfully',
-      imageDeletionStatus: imageDeletionResult
+      fileDeletionStatus: fileDeletionResult
     };
 
     return NextResponse.json(response, { status: 200 });

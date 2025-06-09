@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarIcon, Plus, Upload, X } from "lucide-react";
+import { CalendarIcon, Plus, Upload, X, FileText, Receipt } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -67,6 +67,9 @@ interface Equipment {
   owner: string;
   image_url?: string;
   inspectionDate?: string;
+  plateNumber?: string;
+  originalReceiptUrl?: string;
+  equipmentRegistrationUrl?: string;
   project: {
     uid: string;
     name: string;
@@ -118,15 +121,32 @@ const AddEquipmentModal = ({
     status: "OPERATIONAL" as "OPERATIONAL" | "NON_OPERATIONAL",
     remarks: "",
     owner: "",
+    plateNumber: "",
     inspectionDate: undefined as Date | undefined,
     locationId: "",
     clientId: "",
     projectId: "",
   });
 
+  // File states
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [keepExistingImage, setKeepExistingImage] = useState(true);
+
+  const [originalReceiptFile, setOriginalReceiptFile] = useState<File | null>(
+    null
+  );
+  const [originalReceiptPreview, setOriginalReceiptPreview] = useState<
+    string | null
+  >(null);
+  const [keepExistingReceipt, setKeepExistingReceipt] = useState(true);
+
+  const [equipmentRegistrationFile, setEquipmentRegistrationFile] =
+    useState<File | null>(null);
+  const [equipmentRegistrationPreview, setEquipmentRegistrationPreview] =
+    useState<string | null>(null);
+  const [keepExistingRegistration, setKeepExistingRegistration] =
+    useState(true);
 
   // Populate form when editing
   useEffect(() => {
@@ -139,6 +159,7 @@ const AddEquipmentModal = ({
         status: editEquipment.status,
         remarks: editEquipment.remarks || "",
         owner: editEquipment.owner,
+        plateNumber: editEquipment.plateNumber || "",
         inspectionDate: editEquipment.inspectionDate
           ? new Date(editEquipment.inspectionDate)
           : undefined,
@@ -147,10 +168,20 @@ const AddEquipmentModal = ({
         projectId: editEquipment.project.uid,
       });
 
-      // Set existing image preview
+      // Set existing file previews
       if (editEquipment.image_url) {
         setImagePreview(editEquipment.image_url);
         setKeepExistingImage(true);
+      }
+
+      if (editEquipment.originalReceiptUrl) {
+        setOriginalReceiptPreview(editEquipment.originalReceiptUrl);
+        setKeepExistingReceipt(true);
+      }
+
+      if (editEquipment.equipmentRegistrationUrl) {
+        setEquipmentRegistrationPreview(editEquipment.equipmentRegistrationUrl);
+        setKeepExistingRegistration(true);
       }
     }
   }, [editEquipment]);
@@ -262,6 +293,7 @@ const AddEquipmentModal = ({
     }
   };
 
+  // File handling functions
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -277,6 +309,50 @@ const AddEquipmentModal = ({
     }
   };
 
+  const handleOriginalReceiptChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setOriginalReceiptFile(file);
+      setKeepExistingReceipt(false);
+
+      if (file.type.startsWith("image/")) {
+        // Create preview URL for images
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setOriginalReceiptPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // For non-image files, just show file name
+        setOriginalReceiptPreview(file.name);
+      }
+    }
+  };
+
+  const handleEquipmentRegistrationChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setEquipmentRegistrationFile(file);
+      setKeepExistingRegistration(false);
+
+      if (file.type.startsWith("image/")) {
+        // Create preview URL for images
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setEquipmentRegistrationPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // For non-image files, just show file name
+        setEquipmentRegistrationPreview(file.name);
+      }
+    }
+  };
+
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(
@@ -289,6 +365,80 @@ const AddEquipmentModal = ({
     setImageFile(null);
     setImagePreview(null);
     setKeepExistingImage(false);
+  };
+
+  const removeOriginalReceipt = () => {
+    setOriginalReceiptFile(null);
+    setOriginalReceiptPreview(
+      isEditMode && editEquipment?.originalReceiptUrl
+        ? editEquipment.originalReceiptUrl
+        : null
+    );
+    setKeepExistingReceipt(
+      isEditMode && editEquipment?.originalReceiptUrl ? true : false
+    );
+  };
+
+  const removeExistingOriginalReceipt = () => {
+    setOriginalReceiptFile(null);
+    setOriginalReceiptPreview(null);
+    setKeepExistingReceipt(false);
+  };
+
+  const removeEquipmentRegistration = () => {
+    setEquipmentRegistrationFile(null);
+    setEquipmentRegistrationPreview(
+      isEditMode && editEquipment?.equipmentRegistrationUrl
+        ? editEquipment.equipmentRegistrationUrl
+        : null
+    );
+    setKeepExistingRegistration(
+      isEditMode && editEquipment?.equipmentRegistrationUrl ? true : false
+    );
+  };
+
+  const removeExistingEquipmentRegistration = () => {
+    setEquipmentRegistrationFile(null);
+    setEquipmentRegistrationPreview(null);
+    setKeepExistingRegistration(false);
+  };
+
+  const renderFilePreview = (
+    preview: string | null,
+    isImage: boolean,
+    placeholder: string
+  ) => {
+    if (!preview) {
+      return (
+        <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center text-gray-500">
+          <Upload className="mx-auto h-8 w-8 mb-2" />
+          <p className="text-sm">{placeholder}</p>
+        </div>
+      );
+    }
+
+    if (
+      isImage &&
+      (preview.startsWith("data:") || preview.startsWith("http"))
+    ) {
+      return (
+        <img
+          src={preview}
+          alt="File preview"
+          className="w-full h-32 object-cover rounded-md border"
+        />
+      );
+    }
+
+    // For non-image files, show file name or URL
+    return (
+      <div className="border rounded-md p-4 text-center">
+        <FileText className="mx-auto h-8 w-8 mb-2 text-blue-500" />
+        <p className="text-sm text-gray-600 truncate">
+          {preview.includes("/") ? preview.split("/").pop() : preview}
+        </p>
+      </div>
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -318,6 +468,10 @@ const AddEquipmentModal = ({
         submitFormData.append("remarks", formData.remarks);
       }
 
+      if (formData.plateNumber) {
+        submitFormData.append("plateNumber", formData.plateNumber);
+      }
+
       if (formData.inspectionDate) {
         submitFormData.append(
           "inspectionDate",
@@ -325,14 +479,35 @@ const AddEquipmentModal = ({
         );
       }
 
+      // Add file uploads
       if (imageFile) {
         submitFormData.append("image", imageFile);
       }
 
+      if (originalReceiptFile) {
+        submitFormData.append("originalReceipt", originalReceiptFile);
+      }
+
+      if (equipmentRegistrationFile) {
+        submitFormData.append(
+          "equipmentRegistration",
+          equipmentRegistrationFile
+        );
+      }
+
+      // Add keep existing file flags for edit mode
       if (isEditMode) {
         submitFormData.append(
           "keepExistingImage",
           keepExistingImage.toString()
+        );
+        submitFormData.append(
+          "keepExistingReceipt",
+          keepExistingReceipt.toString()
+        );
+        submitFormData.append(
+          "keepExistingRegistration",
+          keepExistingRegistration.toString()
         );
       }
 
@@ -361,15 +536,23 @@ const AddEquipmentModal = ({
         status: "OPERATIONAL",
         remarks: "",
         owner: "",
+        plateNumber: "",
         inspectionDate: undefined,
         locationId: "",
         clientId: "",
         projectId: "",
       });
 
+      // Reset file states
       setImageFile(null);
       setImagePreview(null);
       setKeepExistingImage(true);
+      setOriginalReceiptFile(null);
+      setOriginalReceiptPreview(null);
+      setKeepExistingReceipt(true);
+      setEquipmentRegistrationFile(null);
+      setEquipmentRegistrationPreview(null);
+      setKeepExistingRegistration(true);
 
       setIsOpen(false);
       onEquipmentAdded();
@@ -415,9 +598,9 @@ const AddEquipmentModal = ({
       )}
 
       <DialogContent
-        className="max-w-4xl max-h-[90vh] flex flex-col p-4"
+        className="max-w-6xl max-h-[90vh] flex flex-col p-4"
         style={{
-          maxWidth: "768px", // equivalent to max-w-7xl (80rem = 1280px)
+          maxWidth: "1024px",
         }}
       >
         <DialogHeader className="">
@@ -575,6 +758,22 @@ const AddEquipmentModal = ({
               />
             </div>
 
+            {/* Plate Number */}
+            <div className="space-y-2">
+              <Label htmlFor="plateNumber">Plate Number</Label>
+              <Input
+                id="plateNumber"
+                value={formData.plateNumber}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    plateNumber: e.target.value,
+                  }))
+                }
+                placeholder="Enter plate number (optional)"
+              />
+            </div>
+
             {/* Expiration Date */}
             <div className="space-y-2">
               <Label>Expiration Date *</Label>
@@ -642,80 +841,243 @@ const AddEquipmentModal = ({
             </div>
           </div>
 
-          {/* Image Upload */}
-          <div className="space-y-2">
-            <Label htmlFor="image">Equipment Image</Label>
+          {/* File Upload Sections */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Equipment Image */}
             <div className="space-y-2">
-              <Input
-                id="image"
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="cursor-pointer"
-              />
+              <Label htmlFor="image">Equipment Image</Label>
+              <div className="space-y-2">
+                <Input
+                  id="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="cursor-pointer"
+                />
 
-              {imagePreview && (
-                <div className="relative">
-                  <img
-                    src={imagePreview}
-                    alt="Equipment preview"
-                    className="w-full h-48 object-cover rounded-md border"
-                  />
-                  <div className="absolute top-2 right-2 flex gap-1">
-                    {isEditMode &&
-                      editEquipment?.image_url &&
-                      keepExistingImage &&
-                      !imageFile && (
+                {imagePreview && (
+                  <div className="relative">
+                    {renderFilePreview(imagePreview, true, "")}
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      {isEditMode &&
+                        editEquipment?.image_url &&
+                        keepExistingImage &&
+                        !imageFile && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={removeExistingImage}
+                            title="Remove existing image"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      {imageFile && (
                         <Button
                           type="button"
                           variant="destructive"
                           size="sm"
-                          onClick={removeExistingImage}
-                          title="Remove existing image"
+                          onClick={removeImage}
+                          title="Remove new image"
                         >
                           <X className="h-4 w-4" />
                         </Button>
                       )}
-                    {imageFile && (
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={removeImage}
-                        title="Remove new image"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                    </div>
 
-                  {isEditMode &&
-                    editEquipment?.image_url &&
-                    keepExistingImage &&
-                    !imageFile && (
+                    {isEditMode &&
+                      editEquipment?.image_url &&
+                      keepExistingImage &&
+                      !imageFile && (
+                        <div className="absolute bottom-2 left-2">
+                          <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                            Current Image
+                          </span>
+                        </div>
+                      )}
+
+                    {imageFile && (
                       <div className="absolute bottom-2 left-2">
-                        <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
-                          Current Image
+                        <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
+                          New Image
                         </span>
                       </div>
                     )}
+                  </div>
+                )}
 
-                  {imageFile && (
-                    <div className="absolute bottom-2 left-2">
-                      <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
-                        New Image
-                      </span>
-                    </div>
+                {!imagePreview &&
+                  renderFilePreview(
+                    null,
+                    true,
+                    "Click above to upload an image"
                   )}
-                </div>
-              )}
+              </div>
+            </div>
 
-              {!imagePreview && (
-                <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center text-gray-500">
-                  <Upload className="mx-auto h-8 w-8 mb-2" />
-                  <p className="text-sm">Click above to upload an image</p>
-                </div>
-              )}
+            {/* Original Receipt */}
+            <div className="space-y-2">
+              <Label htmlFor="originalReceipt">Original Receipt</Label>
+              <div className="space-y-2">
+                <Input
+                  id="originalReceipt"
+                  type="file"
+                  accept="image/*,.pdf,.doc,.docx"
+                  onChange={handleOriginalReceiptChange}
+                  className="cursor-pointer"
+                />
+
+                {originalReceiptPreview && (
+                  <div className="relative">
+                    {renderFilePreview(
+                      originalReceiptPreview,
+                      originalReceiptFile?.type?.startsWith("image/") ||
+                        originalReceiptPreview.includes("data:image") ||
+                        originalReceiptPreview.match(
+                          /\.(jpg|jpeg|png|gif|webp)$/i
+                        ) !== null,
+                      ""
+                    )}
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      {isEditMode &&
+                        editEquipment?.originalReceiptUrl &&
+                        keepExistingReceipt &&
+                        !originalReceiptFile && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={removeExistingOriginalReceipt}
+                            title="Remove existing receipt"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      {originalReceiptFile && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={removeOriginalReceipt}
+                          title="Remove new receipt"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    {isEditMode &&
+                      editEquipment?.originalReceiptUrl &&
+                      keepExistingReceipt &&
+                      !originalReceiptFile && (
+                        <div className="absolute bottom-2 left-2">
+                          <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                            Current Receipt
+                          </span>
+                        </div>
+                      )}
+
+                    {originalReceiptFile && (
+                      <div className="absolute bottom-2 left-2">
+                        <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
+                          New Receipt
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!originalReceiptPreview &&
+                  renderFilePreview(
+                    null,
+                    false,
+                    "Click above to upload receipt"
+                  )}
+              </div>
+            </div>
+
+            {/* Equipment Registration */}
+            <div className="space-y-2">
+              <Label htmlFor="equipmentRegistration">
+                Equipment Registration
+              </Label>
+              <div className="space-y-2">
+                <Input
+                  id="equipmentRegistration"
+                  type="file"
+                  accept="image/*,.pdf,.doc,.docx"
+                  onChange={handleEquipmentRegistrationChange}
+                  className="cursor-pointer"
+                />
+
+                {equipmentRegistrationPreview && (
+                  <div className="relative">
+                    {renderFilePreview(
+                      equipmentRegistrationPreview,
+                      equipmentRegistrationFile?.type?.startsWith("image/") ||
+                        equipmentRegistrationPreview.includes("data:image") ||
+                        equipmentRegistrationPreview.match(
+                          /\.(jpg|jpeg|png|gif|webp)$/i
+                        ) !== null,
+                      ""
+                    )}
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      {isEditMode &&
+                        editEquipment?.equipmentRegistrationUrl &&
+                        keepExistingRegistration &&
+                        !equipmentRegistrationFile && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={removeExistingEquipmentRegistration}
+                            title="Remove existing registration"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      {equipmentRegistrationFile && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={removeEquipmentRegistration}
+                          title="Remove new registration"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    {isEditMode &&
+                      editEquipment?.equipmentRegistrationUrl &&
+                      keepExistingRegistration &&
+                      !equipmentRegistrationFile && (
+                        <div className="absolute bottom-2 left-2">
+                          <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                            Current Registration
+                          </span>
+                        </div>
+                      )}
+
+                    {equipmentRegistrationFile && (
+                      <div className="absolute bottom-2 left-2">
+                        <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
+                          New Registration
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!equipmentRegistrationPreview &&
+                  renderFilePreview(
+                    null,
+                    false,
+                    "Click above to upload registration"
+                  )}
+              </div>
             </div>
           </div>
 

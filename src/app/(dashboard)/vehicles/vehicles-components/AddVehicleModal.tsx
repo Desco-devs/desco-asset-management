@@ -626,7 +626,7 @@ const AddVehicleModal = ({
       {!isEditMode && (
         <DialogTrigger asChild>
           <Button className="dark:text-accent-foreground dark:bg-chart-1 dark:hover:chart-1/80 bg-chart-3 hover:bg-chart-3/80">
-            <Plus className="w-4 h-4 mr-2" /> Add New Vehicle
+            <Plus className="w-4 h-4 mr-2" /> Add New
           </Button>
         </DialogTrigger>
       )}
