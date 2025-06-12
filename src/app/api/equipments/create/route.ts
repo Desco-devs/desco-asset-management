@@ -47,7 +47,6 @@ export async function POST(request: NextRequest) {
                 brand,
                 model,
                 type,
-                expirationDate: new Date(expirationDate),
                 status: status || 'OPERATIONAL',
                 remarks,
                 owner,
