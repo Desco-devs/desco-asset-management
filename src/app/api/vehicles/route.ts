@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT: Update an existing vehicle with image management
+
 export async function PUT(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -197,42 +197,60 @@ export async function PUT(request: NextRequest) {
     const owner = formData.get('owner') as string
     const projectId = formData.get('projectId') as string
 
-    // Image files
-    const frontImg = formData.get('frontImg') as File | null
-    const backImg = formData.get('backImg') as File | null
-    const side1Img = formData.get('side1Img') as File | null
-    const side2Img = formData.get('side2Img') as File | null
-    const originalReceipt = formData.get('originalReceipt') as File | null
-    const carRegistration = formData.get('carRegistration') as File | null
-
-    // Keep existing image flags
-    const keepFrontImg = formData.get('keepFrontImg') === 'true'
-    const keepBackImg = formData.get('keepBackImg') === 'true'
-    const keepSide1Img = formData.get('keepSide1Img') === 'true'
-    const keepSide2Img = formData.get('keepSide2Img') === 'true'
-    const keepOriginalReceipt = formData.get('keepOriginalReceipt') === 'true'
-    const keepCarRegistration = formData.get('keepCarRegistration') === 'true'
+    const imageFields = [
+      {
+        newFile: formData.get('frontImg') as File | null,
+        keepFlag: formData.get('keepFrontImg') === 'true',
+        existingUrlKey: 'frontImgUrl',
+        prefix: 'front',
+        displayName: 'front image'
+      },
+      {
+        newFile: formData.get('backImg') as File | null,
+        keepFlag: formData.get('keepBackImg') === 'true',
+        existingUrlKey: 'backImgUrl',
+        prefix: 'back',
+        displayName: 'back image'
+      },
+      {
+        newFile: formData.get('side1Img') as File | null,
+        keepFlag: formData.get('keepSide1Img') === 'true',
+        existingUrlKey: 'side1ImgUrl',
+        prefix: 'side1',
+        displayName: 'side1 image'
+      },
+      {
+        newFile: formData.get('side2Img') as File | null,
+        keepFlag: formData.get('keepSide2Img') === 'true',
+        existingUrlKey: 'side2ImgUrl',
+        prefix: 'side2',
+        displayName: 'side2 image'
+      },
+      {
+        newFile: formData.get('originalReceipt') as File | null,
+        keepFlag: formData.get('keepOriginalReceipt') === 'true',
+        existingUrlKey: 'originalReceiptUrl',
+        prefix: 'original-receipt',
+        displayName: 'original receipt'
+      },
+      {
+        newFile: formData.get('carRegistration') as File | null,
+        keepFlag: formData.get('keepCarRegistration') === 'true',
+        existingUrlKey: 'carRegistrationUrl',
+        prefix: 'car-registration',
+        displayName: 'car registration'
+      }
+    ]
 
     if (!vehicleId || !brand || !model || !type || !plateNumber || !inspectionDate || !before || !expiryDate || !owner || !projectId) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Check if vehicle exists
-    const existingVehicle = await prisma.vehicle.findUnique({
-      where: { uid: vehicleId }
-    })
-
+    const existingVehicle = await prisma.vehicle.findUnique({ where: { uid: vehicleId } })
     if (!existingVehicle) {
-      return NextResponse.json(
-        { error: 'Vehicle not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 })
     }
 
-    // Prepare update data
     const updateData: any = {
       brand,
       model,
@@ -247,101 +265,53 @@ export async function PUT(request: NextRequest) {
       project: { connect: { uid: projectId } },
     }
 
-    // Handle image updates
-    const imageFields = [
-      { file: frontImg, dbField: 'frontImgUrl', side: 'front', keep: keepFrontImg, existing: existingVehicle.frontImgUrl },
-      { file: backImg, dbField: 'backImgUrl', side: 'back', keep: keepBackImg, existing: existingVehicle.backImgUrl },
-      { file: side1Img, dbField: 'side1ImgUrl', side: 'side1', keep: keepSide1Img, existing: existingVehicle.side1ImgUrl },
-      { file: side2Img, dbField: 'side2ImgUrl', side: 'side2', keep: keepSide2Img, existing: existingVehicle.side2ImgUrl },
-      { file: originalReceipt, dbField: 'originalReceiptUrl', side: 'original-receipt', keep: keepOriginalReceipt, existing: existingVehicle.originalReceiptUrl },
-      { file: carRegistration, dbField: 'carRegistrationUrl', side: 'car-registration', keep: keepCarRegistration, existing: existingVehicle.carRegistrationUrl },
-    ]
+    const extractPath = (url: string) => url?.replace("https://zlavplinpqkxivkbthag.supabase.co/storage/v1/object/public/", '')
 
-    for (const { file, dbField, side, keep, existing } of imageFields) {
-      if (file && file.size > 0) {
-        // Delete old image if it exists
-        if (existing) {
-          try {
-            const oldImagePath = existing.split('/').slice(-4).join('/')
-            await supabase.storage.from('vehicles').remove([oldImagePath])
-          } catch (error) {
-            console.log(`Old ${side} image deletion failed (non-critical):`, error)
+    for (const config of imageFields) {
+      const existingUrl = existingVehicle[config.existingUrlKey as keyof typeof existingVehicle] as string | null
+
+      const folderPath = `vehicles/${projectId}/${vehicleId}/${config.prefix}`
+
+      if (config.newFile && config.newFile.size > 0) {
+        // Delete all files in the folder
+        const { data: files, error: listError } = await supabase.storage.from('vehicles').list(folderPath)
+        if (files) {
+          const pathsToDelete = files.map(f => `${folderPath}/${f.name}`)
+          if (pathsToDelete.length > 0) {
+            await supabase.storage.from('vehicles').remove(pathsToDelete)
           }
         }
 
-        // Upload new image
-        const timestamp = Date.now()
-        const fileName = `${timestamp}_${file.name}`
-        const filePath = `vehicles/${projectId}/${vehicleId}/${side}/${fileName}`
-        const buffer = Buffer.from(await file.arrayBuffer())
-
-        const { error: uploadError } = await supabase
-          .storage
-          .from('vehicles')
-          .upload(filePath, buffer, {
-            cacheControl: '3600',
-            upsert: false,
-          })
-
-        if (uploadError) {
-          console.error(`Supabase upload error for ${side}:`, uploadError)
-          return NextResponse.json(
-            { error: `Failed to upload ${side} image` },
-            { status: 500 }
-          )
-        }
-
-        const { data: urlData } = supabase.storage
-          .from('vehicles')
-          .getPublicUrl(filePath)
-
-        updateData[dbField] = urlData.publicUrl
-      } else if (!keep) {
-        // Remove existing image if not keeping it
-        if (existing) {
-          try {
-            const oldImagePath = existing.split('/').slice(-4).join('/')
-            await supabase.storage.from('vehicles').remove([oldImagePath])
-          } catch (error) {
-            console.log(`Image deletion failed (non-critical):`, error)
-          }
-        }
-        updateData[dbField] = null
+        // Upload new file
+        const fileName = `${Date.now()}_${config.newFile.name}`
+        const path = `${folderPath}/${fileName}`
+        const buffer = Buffer.from(await config.newFile.arrayBuffer())
+        const { error: uploadError } = await supabase.storage.from('vehicles').upload(path, buffer)
+        if (uploadError) return NextResponse.json({ error: `Failed to upload ${config.displayName}` }, { status: 500 })
+        const { data } = supabase.storage.from('vehicles').getPublicUrl(path)
+        updateData[config.existingUrlKey] = data.publicUrl
+      } else if (!config.keepFlag && existingUrl) {
+        await supabase.storage.from('vehicles').remove([extractPath(existingUrl)])
+        updateData[config.existingUrlKey] = null
       }
-      // If keep is true and no new file, don't update the field (keep existing)
     }
 
-    // Update the vehicle
-    const vehicle = await prisma.vehicle.update({
-      where: { uid: vehicleId },
-      data: updateData,
-    })
-
-    // Return updated vehicle with relations
+    const vehicle = await prisma.vehicle.update({ where: { uid: vehicleId }, data: updateData })
     const result = await prisma.vehicle.findUnique({
       where: { uid: vehicle.uid },
-      include: {
-        project: {
-          include: {
-            client: {
-              include: {
-                location: true
-              }
-            }
-          }
-        }
-      }
+      include: { project: { include: { client: { include: { location: true } } } } }
     })
 
     return NextResponse.json(result)
   } catch (err) {
     console.error('PUT /api/vehicles error:', err)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+
+
+
 
 
 export async function DELETE(request: NextRequest) {

@@ -97,6 +97,11 @@ const VehicleCards = ({
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Separate state for edit modal
+  const [editVehicle, setEditVehicle] = useState<Vehicle | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [deletingVehicleId, setDeletingVehicleId] = useState<string | null>(
     null
@@ -180,8 +185,8 @@ const VehicleCards = ({
 
   const handleEditClick = (e: React.MouseEvent, vehicle: Vehicle) => {
     e.stopPropagation(); // Prevent card click
-    setSelectedVehicle(vehicle);
-    setIsModalOpen(true);
+    setEditVehicle(vehicle);
+    setIsEditModalOpen(true);
   };
 
   const handleDeleteClick = (e: React.MouseEvent, vehicle: Vehicle) => {
@@ -250,6 +255,15 @@ const VehicleCards = ({
       }, 200); // Adjust timing based on your dialog animation duration
     }
     setIsModalOpen(open);
+  };
+
+  const closeEditModal = (open: boolean) => {
+    if (!open) {
+      setTimeout(() => {
+        setEditVehicle(null);
+      }, 200);
+    }
+    setIsEditModalOpen(open);
   };
 
   const toggleEditMode = () => {
@@ -428,6 +442,7 @@ const VehicleCards = ({
         </Card>
       )}
 
+      {/* View Vehicle Modal */}
       <VehicleModal
         isOpen={isModalOpen}
         onOpenChange={closeModal}
@@ -435,18 +450,16 @@ const VehicleCards = ({
       />
 
       {/* Edit Vehicle Modal */}
-      {isEditMode && selectedVehicle && (
-        <AddVehicleModal
-          onVehicleAdded={() => {
-            onVehicleAdded();
-            setIsModalOpen(false);
-            setSelectedVehicle(null);
-          }}
-          editVehicle={selectedVehicle}
-          isOpen={isModalOpen}
-          onOpenChange={closeModal}
-        />
-      )}
+      <AddVehicleModal
+        onVehicleAdded={() => {
+          onVehicleAdded();
+          setIsEditModalOpen(false);
+          setEditVehicle(null);
+        }}
+        editVehicle={editVehicle}
+        isOpen={isEditModalOpen}
+        onOpenChange={closeEditModal}
+      />
 
       {/* Delete Confirmation AlertDialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

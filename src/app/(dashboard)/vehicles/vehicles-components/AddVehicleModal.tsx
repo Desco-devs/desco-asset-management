@@ -960,7 +960,7 @@ const AddVehicleModal = ({
             type="button"
             variant="outline"
             disabled={!isFormValid || loading}
-            className="bg-chart-3 hover:bg-chart-3/80 dark:text-accent-foreground"
+            className="bg-chart-3 hover:bg-chart-3/80 text-accent hover:text-accent dark:text-accent-foreground"
           >
             {loading
               ? isEditMode
