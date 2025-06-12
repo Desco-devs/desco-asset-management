@@ -75,7 +75,7 @@ model Equipment {
   brand                     String
   model                     String
   type                      String
-  expirationDate            DateTime? @default(now())
+  insuranceExpirationDate   DateTime? @default(now())
   status                    Status
   remarks                   String?
   owner                     String

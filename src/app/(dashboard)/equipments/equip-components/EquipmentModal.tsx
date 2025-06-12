@@ -18,16 +18,18 @@ import {
   Receipt,
   Car,
   ExternalLink,
+  Shield,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Equipment interface (updated to match new schema)
+// Equipment interface (updated to match new schema with inspection images)
 interface Equipment {
   uid: string;
   brand: string;
   model: string;
   type: string;
-  expirationDate: string;
+  insuranceExpirationDate: string;
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;
   owner: string;
@@ -36,6 +38,8 @@ interface Equipment {
   plateNumber?: string;
   originalReceiptUrl?: string;
   equipmentRegistrationUrl?: string;
+  thirdpartyInspectionImage?: string;
+  pgpcInspectionImage?: string;
   project: {
     uid: string;
     name: string;
@@ -72,15 +76,15 @@ const EquipmentModal = ({
       : "bg-red-100 text-red-800 hover:bg-red-200";
   };
 
-  const isExpiringSoon = (expirationDate: string) => {
-    const expiry = new Date(expirationDate);
+  const isExpiringSoon = (insuranceExpirationDate: string) => {
+    const expiry = new Date(insuranceExpirationDate);
     const today = new Date();
     const daysDiff = (expiry.getTime() - today.getTime()) / (1000 * 3600 * 24);
     return daysDiff <= 30 && daysDiff >= 0;
   };
 
-  const isExpired = (expirationDate: string) => {
-    const expiry = new Date(expirationDate);
+  const isExpired = (insuranceExpirationDate: string) => {
+    const expiry = new Date(insuranceExpirationDate);
     const today = new Date();
     return expiry < today;
   };
@@ -206,20 +210,21 @@ const EquipmentModal = ({
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm">
                     <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Expires:</span>
+                    <span className="font-medium">Insurance Expiration:</span>
                     <span
                       className={`${
-                        isExpired(equipment.expirationDate)
+                        isExpired(equipment.insuranceExpirationDate)
                           ? "text-red-600 font-semibold"
-                          : isExpiringSoon(equipment.expirationDate)
+                          : isExpiringSoon(equipment.insuranceExpirationDate)
                           ? "text-orange-600 font-semibold"
                           : ""
                       }`}
                     >
-                      {formatDate(equipment.expirationDate)}
-                      {isExpired(equipment.expirationDate) && " (Expired)"}
-                      {isExpiringSoon(equipment.expirationDate) &&
-                        !isExpired(equipment.expirationDate) &&
+                      {formatDate(equipment.insuranceExpirationDate)}
+                      {isExpired(equipment.insuranceExpirationDate) &&
+                        " (Expired)"}
+                      {isExpiringSoon(equipment.insuranceExpirationDate) &&
+                        !isExpired(equipment.insuranceExpirationDate) &&
                         " (Expiring Soon)"}
                     </span>
                   </div>
@@ -239,7 +244,7 @@ const EquipmentModal = ({
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Documents & Files</h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Equipment Image */}
                 {equipment.image_url && (
                   <div className="border rounded-lg p-4 space-y-2">
@@ -358,6 +363,98 @@ const EquipmentModal = ({
                     </Button>
                   </div>
                 )}
+
+                {/* Third-Party Inspection Image */}
+                {equipment.thirdpartyInspectionImage && (
+                  <div className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-orange-500" />
+                      <span className="font-medium text-sm">
+                        Third-Party Inspection
+                      </span>
+                    </div>
+
+                    {isImageFile(equipment.thirdpartyInspectionImage) ? (
+                      <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                        <img
+                          src={equipment.thirdpartyInspectionImage}
+                          alt="Third-Party Inspection"
+                          className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() =>
+                            openFile(equipment.thirdpartyInspectionImage!)
+                          }
+                        />
+                      </div>
+                    ) : (
+                      <div className="aspect-video bg-gray-50 rounded-md flex items-center justify-center">
+                        <div className="text-center">
+                          <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                          <p className="text-xs text-gray-500 truncate px-2">
+                            {getFileNameFromUrl(
+                              equipment.thirdpartyInspectionImage
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() =>
+                        openFile(equipment.thirdpartyInspectionImage!)
+                      }
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Open Document
+                    </Button>
+                  </div>
+                )}
+
+                {/* PGPC Inspection Image */}
+                {equipment.pgpcInspectionImage && (
+                  <div className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-teal-500" />
+                      <span className="font-medium text-sm">
+                        PGPC Inspection
+                      </span>
+                    </div>
+
+                    {isImageFile(equipment.pgpcInspectionImage) ? (
+                      <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                        <img
+                          src={equipment.pgpcInspectionImage}
+                          alt="PGPC Inspection"
+                          className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() =>
+                            openFile(equipment.pgpcInspectionImage!)
+                          }
+                        />
+                      </div>
+                    ) : (
+                      <div className="aspect-video bg-gray-50 rounded-md flex items-center justify-center">
+                        <div className="text-center">
+                          <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                          <p className="text-xs text-gray-500 truncate px-2">
+                            {getFileNameFromUrl(equipment.pgpcInspectionImage)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => openFile(equipment.pgpcInspectionImage!)}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Open Document
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Documents Summary */}
@@ -380,9 +477,23 @@ const EquipmentModal = ({
                     Registration Available
                   </Badge>
                 )}
+                {equipment.thirdpartyInspectionImage && (
+                  <Badge variant="outline" className="text-xs">
+                    <Shield className="h-3 w-3 mr-1" />
+                    Third-Party Inspection
+                  </Badge>
+                )}
+                {equipment.pgpcInspectionImage && (
+                  <Badge variant="outline" className="text-xs">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    PGPC Inspection
+                  </Badge>
+                )}
                 {!equipment.image_url &&
                   !equipment.originalReceiptUrl &&
-                  !equipment.equipmentRegistrationUrl && (
+                  !equipment.equipmentRegistrationUrl &&
+                  !equipment.thirdpartyInspectionImage &&
+                  !equipment.pgpcInspectionImage && (
                     <span className="text-sm text-muted-foreground">
                       No documents uploaded
                     </span>

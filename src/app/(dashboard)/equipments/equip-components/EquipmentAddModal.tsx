@@ -20,7 +20,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarIcon, Plus, Upload, X, FileText, Receipt } from "lucide-react";
+import {
+  CalendarIcon,
+  Plus,
+  Upload,
+  X,
+  FileText,
+  Receipt,
+  Shield,
+  CheckCircle,
+} from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -61,7 +70,7 @@ interface Equipment {
   brand: string;
   model: string;
   type: string;
-  expirationDate: string;
+  insuranceExpirationDate: string;
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;
   owner: string;
@@ -70,6 +79,8 @@ interface Equipment {
   plateNumber?: string;
   originalReceiptUrl?: string;
   equipmentRegistrationUrl?: string;
+  thirdpartyInspectionImage?: string;
+  pgpcInspectionImage?: string;
   project: {
     uid: string;
     name: string;
@@ -117,7 +128,7 @@ const AddEquipmentModal = ({
     brand: "",
     model: "",
     type: "",
-    expirationDate: undefined as Date | undefined,
+    insuranceExpirationDate: undefined as Date | undefined,
     status: "OPERATIONAL" as "OPERATIONAL" | "NON_OPERATIONAL",
     remarks: "",
     owner: "",
@@ -148,21 +159,47 @@ const AddEquipmentModal = ({
   const [keepExistingRegistration, setKeepExistingRegistration] =
     useState(true);
 
+  // New file states for inspection images
+  const [thirdpartyInspectionFile, setThirdpartyInspectionFile] =
+    useState<File | null>(null);
+  const [thirdpartyInspectionPreview, setThirdpartyInspectionPreview] =
+    useState<string | null>(null);
+  const [
+    keepExistingThirdpartyInspection,
+    setKeepExistingThirdpartyInspection,
+  ] = useState(true);
+
+  const [pgpcInspectionFile, setPgpcInspectionFile] = useState<File | null>(
+    null
+  );
+  const [pgpcInspectionPreview, setPgpcInspectionPreview] = useState<
+    string | null
+  >(null);
+  const [keepExistingPgpcInspection, setKeepExistingPgpcInspection] =
+    useState(true);
+
   // Populate form when editing
   useEffect(() => {
     if (editEquipment) {
+      // Helper function to safely parse dates
+      const safeParseDate = (dateString: string) => {
+        if (!dateString) return undefined;
+        const date = new Date(dateString);
+        return isNaN(date.getTime()) ? undefined : date;
+      };
+
       setFormData({
         brand: editEquipment.brand,
         model: editEquipment.model,
         type: editEquipment.type,
-        expirationDate: new Date(editEquipment.expirationDate),
+        insuranceExpirationDate: safeParseDate(
+          editEquipment.insuranceExpirationDate
+        ),
         status: editEquipment.status,
         remarks: editEquipment.remarks || "",
         owner: editEquipment.owner,
         plateNumber: editEquipment.plateNumber || "",
-        inspectionDate: editEquipment.inspectionDate
-          ? new Date(editEquipment.inspectionDate)
-          : undefined,
+        inspectionDate: safeParseDate(editEquipment.inspectionDate || ""),
         locationId: editEquipment.project.client.location.uid,
         clientId: editEquipment.project.client.uid,
         projectId: editEquipment.project.uid,
@@ -182,6 +219,16 @@ const AddEquipmentModal = ({
       if (editEquipment.equipmentRegistrationUrl) {
         setEquipmentRegistrationPreview(editEquipment.equipmentRegistrationUrl);
         setKeepExistingRegistration(true);
+      }
+
+      if (editEquipment.thirdpartyInspectionImage) {
+        setThirdpartyInspectionPreview(editEquipment.thirdpartyInspectionImage);
+        setKeepExistingThirdpartyInspection(true);
+      }
+
+      if (editEquipment.pgpcInspectionImage) {
+        setPgpcInspectionPreview(editEquipment.pgpcInspectionImage);
+        setKeepExistingPgpcInspection(true);
       }
     }
   }, [editEquipment]);
@@ -353,6 +400,51 @@ const AddEquipmentModal = ({
     }
   };
 
+  // New file handling functions for inspection images
+  const handleThirdpartyInspectionChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setThirdpartyInspectionFile(file);
+      setKeepExistingThirdpartyInspection(false);
+
+      if (file.type.startsWith("image/")) {
+        // Create preview URL for images
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setThirdpartyInspectionPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // For non-image files, just show file name
+        setThirdpartyInspectionPreview(file.name);
+      }
+    }
+  };
+
+  const handlePgpcInspectionChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPgpcInspectionFile(file);
+      setKeepExistingPgpcInspection(false);
+
+      if (file.type.startsWith("image/")) {
+        // Create preview URL for images
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPgpcInspectionPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // For non-image files, just show file name
+        setPgpcInspectionPreview(file.name);
+      }
+    }
+  };
+
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(
@@ -401,6 +493,43 @@ const AddEquipmentModal = ({
     setEquipmentRegistrationFile(null);
     setEquipmentRegistrationPreview(null);
     setKeepExistingRegistration(false);
+  };
+
+  // New remove functions for inspection images
+  const removeThirdpartyInspection = () => {
+    setThirdpartyInspectionFile(null);
+    setThirdpartyInspectionPreview(
+      isEditMode && editEquipment?.thirdpartyInspectionImage
+        ? editEquipment.thirdpartyInspectionImage
+        : null
+    );
+    setKeepExistingThirdpartyInspection(
+      isEditMode && editEquipment?.thirdpartyInspectionImage ? true : false
+    );
+  };
+
+  const removeExistingThirdpartyInspection = () => {
+    setThirdpartyInspectionFile(null);
+    setThirdpartyInspectionPreview(null);
+    setKeepExistingThirdpartyInspection(false);
+  };
+
+  const removePgpcInspection = () => {
+    setPgpcInspectionFile(null);
+    setPgpcInspectionPreview(
+      isEditMode && editEquipment?.pgpcInspectionImage
+        ? editEquipment.pgpcInspectionImage
+        : null
+    );
+    setKeepExistingPgpcInspection(
+      isEditMode && editEquipment?.pgpcInspectionImage ? true : false
+    );
+  };
+
+  const removeExistingPgpcInspection = () => {
+    setPgpcInspectionFile(null);
+    setPgpcInspectionPreview(null);
+    setKeepExistingPgpcInspection(false);
   };
 
   const renderFilePreview = (
@@ -457,8 +586,8 @@ const AddEquipmentModal = ({
       submitFormData.append("model", formData.model);
       submitFormData.append("type", formData.type);
       submitFormData.append(
-        "expirationDate",
-        formData.expirationDate!.toISOString()
+        "insuranceExpirationDate",
+        formData.insuranceExpirationDate!.toISOString()
       );
       submitFormData.append("status", formData.status);
       submitFormData.append("owner", formData.owner);
@@ -495,6 +624,15 @@ const AddEquipmentModal = ({
         );
       }
 
+      // Add new inspection image files
+      if (thirdpartyInspectionFile) {
+        submitFormData.append("thirdpartyInspection", thirdpartyInspectionFile);
+      }
+
+      if (pgpcInspectionFile) {
+        submitFormData.append("pgpcInspection", pgpcInspectionFile);
+      }
+
       // Add keep existing file flags for edit mode
       if (isEditMode) {
         submitFormData.append(
@@ -508,6 +646,14 @@ const AddEquipmentModal = ({
         submitFormData.append(
           "keepExistingRegistration",
           keepExistingRegistration.toString()
+        );
+        submitFormData.append(
+          "keepExistingThirdpartyInspection",
+          keepExistingThirdpartyInspection.toString()
+        );
+        submitFormData.append(
+          "keepExistingPgpcInspection",
+          keepExistingPgpcInspection.toString()
         );
       }
 
@@ -532,7 +678,7 @@ const AddEquipmentModal = ({
         brand: "",
         model: "",
         type: "",
-        expirationDate: undefined,
+        insuranceExpirationDate: undefined,
         status: "OPERATIONAL",
         remarks: "",
         owner: "",
@@ -553,6 +699,12 @@ const AddEquipmentModal = ({
       setEquipmentRegistrationFile(null);
       setEquipmentRegistrationPreview(null);
       setKeepExistingRegistration(true);
+      setThirdpartyInspectionFile(null);
+      setThirdpartyInspectionPreview(null);
+      setKeepExistingThirdpartyInspection(true);
+      setPgpcInspectionFile(null);
+      setPgpcInspectionPreview(null);
+      setKeepExistingPgpcInspection(true);
 
       setIsOpen(false);
       onEquipmentAdded();
@@ -575,7 +727,7 @@ const AddEquipmentModal = ({
     formData.brand &&
     formData.model &&
     formData.type &&
-    formData.expirationDate &&
+    formData.insuranceExpirationDate &&
     formData.owner &&
     formData.projectId;
 
@@ -776,19 +928,21 @@ const AddEquipmentModal = ({
 
             {/* Expiration Date */}
             <div className="space-y-2">
-              <Label>Expiration Date *</Label>
+              <Label>Insurance Expiration *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !formData.expirationDate && "text-muted-foreground"
+                      !formData.insuranceExpirationDate &&
+                        "text-muted-foreground"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.expirationDate ? (
-                      format(formData.expirationDate, "PPP")
+                    {formData.insuranceExpirationDate &&
+                    !isNaN(formData.insuranceExpirationDate.getTime()) ? (
+                      format(formData.insuranceExpirationDate, "PPP")
                     ) : (
                       <span>Pick expiration date</span>
                     )}
@@ -797,9 +951,17 @@ const AddEquipmentModal = ({
                 <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
-                    selected={formData.expirationDate}
+                    selected={
+                      formData.insuranceExpirationDate &&
+                      !isNaN(formData.insuranceExpirationDate.getTime())
+                        ? formData.insuranceExpirationDate
+                        : undefined
+                    }
                     onSelect={(date) =>
-                      setFormData((prev) => ({ ...prev, expirationDate: date }))
+                      setFormData((prev) => ({
+                        ...prev,
+                        insuranceExpirationDate: date,
+                      }))
                     }
                     initialFocus
                   />
@@ -820,7 +982,8 @@ const AddEquipmentModal = ({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.inspectionDate ? (
+                    {formData.inspectionDate &&
+                    !isNaN(formData.inspectionDate.getTime()) ? (
                       format(formData.inspectionDate, "PPP")
                     ) : (
                       <span>Pick inspection date</span>
@@ -830,7 +993,12 @@ const AddEquipmentModal = ({
                 <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
-                    selected={formData.inspectionDate}
+                    selected={
+                      formData.inspectionDate &&
+                      !isNaN(formData.inspectionDate.getTime())
+                        ? formData.inspectionDate
+                        : undefined
+                    }
                     onSelect={(date) =>
                       setFormData((prev) => ({ ...prev, inspectionDate: date }))
                     }
@@ -842,7 +1010,7 @@ const AddEquipmentModal = ({
           </div>
 
           {/* File Upload Sections */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
             {/* Equipment Image */}
             <div className="space-y-2">
               <Label htmlFor="image">Equipment Image</Label>
@@ -1076,6 +1244,180 @@ const AddEquipmentModal = ({
                     null,
                     false,
                     "Click above to upload registration"
+                  )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 gap-4">
+            {/* Third-Party Inspection Image */}
+            <div className="space-y-2">
+              <Label htmlFor="thirdpartyInspection">
+                <div className="flex items-center gap-1">
+                  <Shield className="h-4 w-4 text-orange-500" />
+                  Third-Party Inspection
+                </div>
+              </Label>
+              <div className="space-y-2">
+                <Input
+                  id="thirdpartyInspection"
+                  type="file"
+                  accept="image/*,.pdf,.doc,.docx"
+                  onChange={handleThirdpartyInspectionChange}
+                  className="cursor-pointer"
+                />
+
+                {thirdpartyInspectionPreview && (
+                  <div className="relative">
+                    {renderFilePreview(
+                      thirdpartyInspectionPreview,
+                      thirdpartyInspectionFile?.type?.startsWith("image/") ||
+                        thirdpartyInspectionPreview.includes("data:image") ||
+                        thirdpartyInspectionPreview.match(
+                          /\.(jpg|jpeg|png|gif|webp)$/i
+                        ) !== null,
+                      ""
+                    )}
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      {isEditMode &&
+                        editEquipment?.thirdpartyInspectionImage &&
+                        keepExistingThirdpartyInspection &&
+                        !thirdpartyInspectionFile && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={removeExistingThirdpartyInspection}
+                            title="Remove existing third-party inspection"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      {thirdpartyInspectionFile && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={removeThirdpartyInspection}
+                          title="Remove new third-party inspection"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    {isEditMode &&
+                      editEquipment?.thirdpartyInspectionImage &&
+                      keepExistingThirdpartyInspection &&
+                      !thirdpartyInspectionFile && (
+                        <div className="absolute bottom-2 left-2">
+                          <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                            Current Inspection
+                          </span>
+                        </div>
+                      )}
+
+                    {thirdpartyInspectionFile && (
+                      <div className="absolute bottom-2 left-2">
+                        <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
+                          New Inspection
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!thirdpartyInspectionPreview &&
+                  renderFilePreview(
+                    null,
+                    false,
+                    "Click above to upload third-party inspection"
+                  )}
+              </div>
+            </div>
+
+            {/* PGPC Inspection Image */}
+            <div className="space-y-2">
+              <Label htmlFor="pgpcInspection">
+                <div className="flex items-center gap-1">
+                  <CheckCircle className="h-4 w-4 text-teal-500" />
+                  PGPC Inspection
+                </div>
+              </Label>
+              <div className="space-y-2">
+                <Input
+                  id="pgpcInspection"
+                  type="file"
+                  accept="image/*,.pdf,.doc,.docx"
+                  onChange={handlePgpcInspectionChange}
+                  className="cursor-pointer"
+                />
+
+                {pgpcInspectionPreview && (
+                  <div className="relative">
+                    {renderFilePreview(
+                      pgpcInspectionPreview,
+                      pgpcInspectionFile?.type?.startsWith("image/") ||
+                        pgpcInspectionPreview.includes("data:image") ||
+                        pgpcInspectionPreview.match(
+                          /\.(jpg|jpeg|png|gif|webp)$/i
+                        ) !== null,
+                      ""
+                    )}
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      {isEditMode &&
+                        editEquipment?.pgpcInspectionImage &&
+                        keepExistingPgpcInspection &&
+                        !pgpcInspectionFile && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={removeExistingPgpcInspection}
+                            title="Remove existing PGPC inspection"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      {pgpcInspectionFile && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={removePgpcInspection}
+                          title="Remove new PGPC inspection"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    {isEditMode &&
+                      editEquipment?.pgpcInspectionImage &&
+                      keepExistingPgpcInspection &&
+                      !pgpcInspectionFile && (
+                        <div className="absolute bottom-2 left-2">
+                          <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                            Current PGPC
+                          </span>
+                        </div>
+                      )}
+
+                    {pgpcInspectionFile && (
+                      <div className="absolute bottom-2 left-2">
+                        <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
+                          New PGPC
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!pgpcInspectionPreview &&
+                  renderFilePreview(
+                    null,
+                    false,
+                    "Click above to upload PGPC inspection"
                   )}
               </div>
             </div>

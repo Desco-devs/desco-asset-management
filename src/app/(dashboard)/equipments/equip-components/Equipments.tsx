@@ -36,6 +36,8 @@ import {
   FileText,
   Receipt,
   Image as ImageIcon,
+  Shield,
+  CheckCircle,
 } from "lucide-react";
 import EquipmentModal from "./EquipmentModal";
 import AddEquipmentModal from "./EquipmentAddModal";
@@ -47,7 +49,7 @@ interface Equipment {
   brand: string;
   model: string;
   type: string;
-  expirationDate: string;
+  insuranceExpirationDate: string;
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;
   owner: string;
@@ -56,6 +58,8 @@ interface Equipment {
   plateNumber?: string;
   originalReceiptUrl?: string;
   equipmentRegistrationUrl?: string;
+  thirdpartyInspectionImage?: string;
+  pgpcInspectionImage?: string;
   project: {
     uid: string;
     name: string;
@@ -143,27 +147,27 @@ const EquipmentCards = ({
       : "bg-red-100 text-red-800 hover:bg-red-200";
   };
 
-  const isExpiringSoon = (expirationDate: string) => {
-    const expiry = new Date(expirationDate);
+  const isExpiringSoon = (insuranceExpirationDate: string) => {
+    const expiry = new Date(insuranceExpirationDate);
     const today = new Date();
     const daysDiff = (expiry.getTime() - today.getTime()) / (1000 * 3600 * 24);
     return daysDiff <= 30 && daysDiff >= 0;
   };
 
-  const isExpired = (expirationDate: string) => {
-    const expiry = new Date(expirationDate);
+  const isExpired = (insuranceExpirationDate: string) => {
+    const expiry = new Date(insuranceExpirationDate);
     const today = new Date();
     return expiry < today;
   };
 
-  const getExpirationBadge = (expirationDate: string) => {
-    if (isExpired(expirationDate)) {
+  const getExpirationBadge = (insuranceExpirationDate: string) => {
+    if (isExpired(insuranceExpirationDate)) {
       return (
         <Badge className="bg-red-500 text-white hover:bg-red-600">
           Expired
         </Badge>
       );
-    } else if (isExpiringSoon(expirationDate)) {
+    } else if (isExpiringSoon(insuranceExpirationDate)) {
       return (
         <Badge className="bg-orange-500 text-white hover:bg-orange-600">
           Expiring Soon
@@ -178,7 +182,39 @@ const EquipmentCards = ({
     if (equipment.image_url) count++;
     if (equipment.originalReceiptUrl) count++;
     if (equipment.equipmentRegistrationUrl) count++;
+    if (equipment.thirdpartyInspectionImage) count++;
+    if (equipment.pgpcInspectionImage) count++;
     return count;
+  };
+
+  const getInspectionBadges = (equipment: Equipment) => {
+    const badges = [];
+
+    if (equipment.thirdpartyInspectionImage) {
+      badges.push(
+        <Badge
+          key="thirdparty"
+          variant="outline"
+          className="flex items-center gap-1 text-orange-600 border-orange-200"
+        >
+          <Shield className="h-3 w-3" />
+        </Badge>
+      );
+    }
+
+    if (equipment.pgpcInspectionImage) {
+      badges.push(
+        <Badge
+          key="pgpc"
+          variant="outline"
+          className="flex items-center gap-1 text-teal-600 border-teal-200"
+        >
+          <CheckCircle className="h-3 w-3" />
+        </Badge>
+      );
+    }
+
+    return badges;
   };
 
   const handleCardClick = (equipment: Equipment) => {
@@ -377,7 +413,7 @@ const EquipmentCards = ({
                   </CardDescription>
 
                   {/* Status and Badges Row */}
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-row flex-wrap gap-2">
                     <Badge className={getStatusColor(equipment.status)}>
                       {equipment.status}
                     </Badge>
@@ -392,7 +428,13 @@ const EquipmentCards = ({
                       </Badge>
                     )}
 
-                    {getExpirationBadge(equipment.expirationDate)}
+                    {getExpirationBadge(equipment.insuranceExpirationDate)}
+                    {/* Inspection Badges Row */}
+                    {getInspectionBadges(equipment).length > 0 && (
+                      <div className="flex flex-row flex-wrap gap-2">
+                        {getInspectionBadges(equipment)}
+                      </div>
+                    )}
                   </div>
 
                   {/* Document Count Badge */}
@@ -454,29 +496,6 @@ const EquipmentCards = ({
                 </div>
               )}
 
-              {/* Document Icons Row */}
-              {(equipment.originalReceiptUrl ||
-                equipment.equipmentRegistrationUrl) && (
-                <div className="flex justify-center gap-3 pt-2 border-t">
-                  {equipment.originalReceiptUrl && (
-                    <div className="flex flex-col items-center gap-1">
-                      <Receipt className="h-4 w-4 text-green-600" />
-                      <span className="text-xs text-muted-foreground">
-                        Receipt
-                      </span>
-                    </div>
-                  )}
-                  {equipment.equipmentRegistrationUrl && (
-                    <div className="flex flex-col items-center gap-1">
-                      <FileText className="h-4 w-4 text-purple-600" />
-                      <span className="text-xs text-muted-foreground">
-                        Registration
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Equipment Info Footer */}
               <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
                 <div className="flex justify-between">
@@ -496,14 +515,16 @@ const EquipmentCards = ({
                   <span>Expires:</span>
                   <span
                     className={`font-medium ${
-                      isExpired(equipment.expirationDate)
+                      isExpired(equipment.insuranceExpirationDate)
                         ? "text-red-600"
-                        : isExpiringSoon(equipment.expirationDate)
+                        : isExpiringSoon(equipment.insuranceExpirationDate)
                         ? "text-orange-600"
                         : ""
                     }`}
                   >
-                    {new Date(equipment.expirationDate).toLocaleDateString()}
+                    {new Date(
+                      equipment.insuranceExpirationDate
+                    ).toLocaleDateString()}
                   </span>
                 </div>
               </div>
@@ -572,8 +593,8 @@ const EquipmentCards = ({
             </AlertDialogDescription>
             <AlertDialogDescription className="text-red-600 font-medium">
               This will permanently delete the equipment and all its associated
-              files (image, receipt, registration documents). This action cannot
-              be undone.
+              files (image, receipt, registration documents, inspection images).
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
