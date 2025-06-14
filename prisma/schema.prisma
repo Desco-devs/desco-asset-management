@@ -76,6 +76,7 @@ model Equipment {
   model                     String
   type                      String
   insuranceExpirationDate   DateTime? @default(now())
+  before                    Int? // in months
   status                    Status
   remarks                   String?
   owner                     String

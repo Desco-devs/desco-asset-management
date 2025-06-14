@@ -72,6 +72,7 @@ interface Equipment {
   model: string;
   type: string;
   insuranceExpirationDate: string;
+  before?: number; // Added from schema
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;
   owner: string;
@@ -109,15 +110,11 @@ const AddEquipmentModal = ({
   isOpen: controlledIsOpen,
   onOpenChange: controlledOnOpenChange,
 }: AddEquipmentModalProps) => {
-
-
-    const { user } = useAuth();
-    
-    const isAdmin = user?.permissions.some(p =>
-      ["CREATE", "UPDATE", "DELETE"].includes(p)
-    ) ?? false;
-    
-
+  const { user } = useAuth();
+  
+  const isAdmin = user?.permissions.some(p =>
+    ["CREATE", "UPDATE", "DELETE"].includes(p)
+  ) ?? false;
 
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -140,6 +137,7 @@ const AddEquipmentModal = ({
     model: "",
     type: "",
     insuranceExpirationDate: undefined as Date | undefined,
+    before: "" as string, // Added for 'before' field
     status: "OPERATIONAL" as "OPERATIONAL" | "NON_OPERATIONAL",
     remarks: "",
     owner: "",
@@ -170,7 +168,6 @@ const AddEquipmentModal = ({
   const [keepExistingRegistration, setKeepExistingRegistration] =
     useState(true);
 
-  // New file states for inspection images
   const [thirdpartyInspectionFile, setThirdpartyInspectionFile] =
     useState<File | null>(null);
   const [thirdpartyInspectionPreview, setThirdpartyInspectionPreview] =
@@ -206,6 +203,7 @@ const AddEquipmentModal = ({
         insuranceExpirationDate: safeParseDate(
           editEquipment.insuranceExpirationDate
         ),
+        before: editEquipment.before?.toString() || "", // Populate 'before'
         status: editEquipment.status,
         remarks: editEquipment.remarks || "",
         owner: editEquipment.owner,
@@ -411,7 +409,6 @@ const AddEquipmentModal = ({
     }
   };
 
-  // New file handling functions for inspection images
   const handleThirdpartyInspectionChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -506,7 +503,6 @@ const AddEquipmentModal = ({
     setKeepExistingRegistration(false);
   };
 
-  // New remove functions for inspection images
   const removeThirdpartyInspection = () => {
     setThirdpartyInspectionFile(null);
     setThirdpartyInspectionPreview(
@@ -570,7 +566,6 @@ const AddEquipmentModal = ({
       );
     }
 
-    // For non-image files, show file name or URL
     return (
       <div className="border rounded-md p-4 text-center">
         <FileText className="mx-auto h-8 w-8 mb-2 text-blue-500" />
@@ -600,6 +595,9 @@ const AddEquipmentModal = ({
         "insuranceExpirationDate",
         formData.insuranceExpirationDate!.toISOString()
       );
+      if (formData.before) {
+        submitFormData.append("before", formData.before); // Submit 'before'
+      }
       submitFormData.append("status", formData.status);
       submitFormData.append("owner", formData.owner);
       submitFormData.append("projectId", formData.projectId);
@@ -635,7 +633,6 @@ const AddEquipmentModal = ({
         );
       }
 
-      // Add new inspection image files
       if (thirdpartyInspectionFile) {
         submitFormData.append("thirdpartyInspection", thirdpartyInspectionFile);
       }
@@ -690,6 +687,7 @@ const AddEquipmentModal = ({
         model: "",
         type: "",
         insuranceExpirationDate: undefined,
+        before: "", // Reset 'before'
         status: "OPERATIONAL",
         remarks: "",
         owner: "",
@@ -934,6 +932,24 @@ const AddEquipmentModal = ({
                   }))
                 }
                 placeholder="Enter plate number (optional)"
+              />
+            </div>
+
+            {/* Before (Months) */}
+            <div className="space-y-2">
+              <Label htmlFor="before">Before (Months)</Label>
+              <Input
+                id="before"
+                type="number"
+                min="0"
+                value={formData.before}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    before: e.target.value,
+                  }))
+                }
+                placeholder="Enter months before expiration (optional)"
               />
             </div>
 
