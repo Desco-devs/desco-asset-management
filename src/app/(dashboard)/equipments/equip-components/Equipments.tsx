@@ -42,6 +42,7 @@ import {
 import EquipmentModal from "./EquipmentModal";
 import AddEquipmentModal from "./EquipmentAddModal";
 import { toast } from "sonner";
+import { useAuth } from "@/app/context/AuthContext";
 
 // Types based on your updated Prisma schema
 interface Equipment {
@@ -101,6 +102,15 @@ const EquipmentCards = ({
   locations = [],
   onEquipmentAdded,
 }: EquipmentCardsProps) => {
+
+
+    const { user } = useAuth();
+    
+    const isAdmin = user?.permissions.some(p =>
+      ["CREATE", "UPDATE", "DELETE"].includes(p)
+    ) ?? false;
+    
+
   const [filteredEquipments, setFilteredEquipments] =
     useState<Equipment[]>(equipments);
   const [selectedClient, setSelectedClient] = useState<string>("all");
@@ -353,7 +363,8 @@ const EquipmentCards = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
+        {isAdmin && (
+       <div className="flex gap-2">
           <Button
             variant={isEditMode ? "default" : "outline"}
             onClick={toggleEditMode}
@@ -370,6 +381,8 @@ const EquipmentCards = ({
             editEquipment={null}
           />
         </div>
+        )}
+
       </div>
 
       {/* Results Summary */}

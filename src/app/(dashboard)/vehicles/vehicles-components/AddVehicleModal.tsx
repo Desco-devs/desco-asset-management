@@ -30,6 +30,7 @@ import {
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAuth } from "@/app/context/AuthContext";
 
 interface Location {
   uid: string;
@@ -101,6 +102,16 @@ const AddVehicleModal = ({
   isOpen: controlledIsOpen,
   onOpenChange: controlledOnOpenChange,
 }: AddVehicleModalProps) => {
+
+const { user } = useAuth();
+
+const isAdmin = user?.permissions.some(p =>
+  ["CREATE", "UPDATE", "DELETE"].includes(p)
+) ?? false;
+
+
+
+
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -623,7 +634,7 @@ const AddVehicleModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      {!isEditMode && (
+      {!isEditMode && isAdmin && (
         <DialogTrigger asChild>
           <Button className="dark:text-accent-foreground dark:bg-chart-1 dark:hover:chart-1/80 bg-chart-3 hover:bg-chart-3/80">
             <Plus className="w-4 h-4 mr-2" /> Add New

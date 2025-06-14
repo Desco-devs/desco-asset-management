@@ -31,6 +31,7 @@ import { Car, Edit, Trash2, AlertTriangle } from "lucide-react";
 import VehicleModal from "./VehicleModal";
 import AddVehicleModal from "./AddVehicleModal";
 import { toast } from "sonner";
+import { useAuth } from "@/app/context/AuthContext";
 
 // Types based on your Prisma schema
 interface Vehicle {
@@ -92,6 +93,16 @@ const VehicleCards = ({
   locations = [],
   onVehicleAdded,
 }: VehicleCardsProps) => {
+
+
+  const { user } = useAuth();
+  
+  const isAdmin = user?.permissions.some(p =>
+    ["CREATE", "UPDATE", "DELETE"].includes(p)
+  ) ?? false;
+  
+
+
   const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>(vehicles);
   const [selectedClient, setSelectedClient] = useState<string>("all");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
@@ -318,7 +329,9 @@ const VehicleCards = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
+
+        {isAdmin && (
+             <div className="flex gap-2">
           <Button
             variant={isEditMode ? "default" : "outline"}
             onClick={toggleEditMode}
@@ -332,6 +345,9 @@ const VehicleCards = ({
 
           <AddVehicleModal onVehicleAdded={onVehicleAdded} editVehicle={null} />
         </div>
+
+        )}
+     
       </div>
 
       {/* Results Summary */}
