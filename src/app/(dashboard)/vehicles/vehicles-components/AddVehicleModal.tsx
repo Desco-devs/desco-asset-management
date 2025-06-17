@@ -75,6 +75,7 @@ interface Vehicle {
   side2ImgUrl?: string;
   originalReceiptUrl?: string;
   carRegistrationUrl?: string;
+  pgpcInspectionImage?: string; // Added the new field
   project: {
     uid: string;
     name: string;
@@ -102,15 +103,11 @@ const AddVehicleModal = ({
   isOpen: controlledIsOpen,
   onOpenChange: controlledOnOpenChange,
 }: AddVehicleModalProps) => {
+  const { user } = useAuth();
 
-const { user } = useAuth();
-
-const isAdmin = user?.permissions.some(p =>
-  ["CREATE", "UPDATE", "DELETE"].includes(p)
-) ?? false;
-
-
-
+  const isAdmin =
+    user?.permissions.some((p) => ["CREATE", "UPDATE", "DELETE"].includes(p)) ??
+    false;
 
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -144,7 +141,7 @@ const isAdmin = user?.permissions.some(p =>
     projectId: "",
   });
 
-  // Image files state
+  // Image files state - Updated to include PGPC inspection image
   const [imageFiles, setImageFiles] = useState({
     frontImg: null as File | null,
     backImg: null as File | null,
@@ -152,9 +149,10 @@ const isAdmin = user?.permissions.some(p =>
     side2Img: null as File | null,
     originalReceipt: null as File | null,
     carRegistration: null as File | null,
+    pgpcInspectionImg: null as File | null, // Added PGPC inspection image
   });
 
-  // Image previews state
+  // Image previews state - Updated to include PGPC inspection image
   const [imagePreviews, setImagePreviews] = useState({
     frontImg: null as string | null,
     backImg: null as string | null,
@@ -162,9 +160,10 @@ const isAdmin = user?.permissions.some(p =>
     side2Img: null as string | null,
     originalReceipt: null as string | null,
     carRegistration: null as string | null,
+    pgpcInspectionImg: null as string | null, // Added PGPC inspection image
   });
 
-  // Keep existing image flags
+  // Keep existing image flags - Updated to include PGPC inspection image
   const [keepExistingImages, setKeepExistingImages] = useState({
     frontImg: true,
     backImg: true,
@@ -172,6 +171,7 @@ const isAdmin = user?.permissions.some(p =>
     side2Img: true,
     originalReceipt: true,
     carRegistration: true,
+    pgpcInspectionImg: true, // Added PGPC inspection image
   });
 
   // Populate form when editing
@@ -193,7 +193,7 @@ const isAdmin = user?.permissions.some(p =>
         projectId: editVehicle.project.uid,
       });
 
-      // Set existing image previews
+      // Set existing image previews - Updated to include PGPC inspection image
       setImagePreviews({
         frontImg: editVehicle.frontImgUrl || null,
         backImg: editVehicle.backImgUrl || null,
@@ -201,6 +201,7 @@ const isAdmin = user?.permissions.some(p =>
         side2Img: editVehicle.side2ImgUrl || null,
         originalReceipt: editVehicle.originalReceiptUrl || null,
         carRegistration: editVehicle.carRegistrationUrl || null,
+        pgpcInspectionImg: editVehicle.pgpcInspectionImage || null, // Added PGPC inspection image
       });
 
       setKeepExistingImages({
@@ -210,6 +211,7 @@ const isAdmin = user?.permissions.some(p =>
         side2Img: !!editVehicle.side2ImgUrl,
         originalReceipt: !!editVehicle.originalReceiptUrl,
         carRegistration: !!editVehicle.carRegistrationUrl,
+        pgpcInspectionImg: !!editVehicle.pgpcInspectionImage, // Added PGPC inspection image
       });
     }
   }, [editVehicle]);
@@ -355,7 +357,10 @@ const isAdmin = user?.permissions.some(p =>
 
     if (isEditMode) {
       // Reset to existing image if in edit mode
-      const existingImageKey = `${imageType}Url` as keyof Vehicle;
+      const existingImageKey =
+        imageType === "pgpcInspectionImg"
+          ? "pgpcInspectionImage"
+          : (`${imageType}Url` as keyof Vehicle);
       const existingImage = editVehicle?.[
         existingImageKey as keyof Vehicle
       ] as string;
@@ -427,7 +432,7 @@ const isAdmin = user?.permissions.some(p =>
         }
       });
 
-      // Add keep existing image flags for edit mode
+      // Add keep existing image flags for edit mode - Updated to include PGPC inspection image
       if (isEditMode) {
         submitFormData.append(
           "keepFrontImg",
@@ -453,6 +458,10 @@ const isAdmin = user?.permissions.some(p =>
           "keepCarRegistration",
           keepExistingImages.carRegistration.toString()
         );
+        submitFormData.append(
+          "keepPgpcInspectionImg",
+          keepExistingImages.pgpcInspectionImg.toString()
+        );
       }
 
       const method = isEditMode ? "PUT" : "POST";
@@ -469,7 +478,7 @@ const isAdmin = user?.permissions.some(p =>
 
       toast.success(`Vehicle ${isEditMode ? "updated" : "added"} successfully`);
 
-      // Reset form
+      // Reset form - Updated to include PGPC inspection image
       setFormData({
         brand: "",
         model: "",
@@ -493,6 +502,7 @@ const isAdmin = user?.permissions.some(p =>
         side2Img: null,
         originalReceipt: null,
         carRegistration: null,
+        pgpcInspectionImg: null, // Added PGPC inspection image
       });
 
       setImagePreviews({
@@ -502,6 +512,7 @@ const isAdmin = user?.permissions.some(p =>
         side2Img: null,
         originalReceipt: null,
         carRegistration: null,
+        pgpcInspectionImg: null, // Added PGPC inspection image
       });
 
       setKeepExistingImages({
@@ -511,6 +522,7 @@ const isAdmin = user?.permissions.some(p =>
         side2Img: true,
         originalReceipt: true,
         carRegistration: true,
+        pgpcInspectionImg: true, // Added PGPC inspection image
       });
 
       setIsOpen(false);
@@ -567,7 +579,11 @@ const isAdmin = user?.permissions.some(p =>
             />
             <div className="absolute top-1 right-1 flex gap-1">
               {isEditMode &&
-                editVehicle?.[`${imageType}Url` as keyof Vehicle] &&
+                editVehicle?.[
+                  imageType === "pgpcInspectionImg"
+                    ? "pgpcInspectionImage"
+                    : (`${imageType}Url` as keyof Vehicle)
+                ] &&
                 keepExistingImages[imageType] &&
                 !imageFiles[imageType] && (
                   <Button
@@ -594,7 +610,11 @@ const isAdmin = user?.permissions.some(p =>
             </div>
 
             {isEditMode &&
-              editVehicle?.[`${imageType}Url` as keyof Vehicle] &&
+              editVehicle?.[
+                imageType === "pgpcInspectionImg"
+                  ? "pgpcInspectionImage"
+                  : (`${imageType}Url` as keyof Vehicle)
+              ] &&
               keepExistingImages[imageType] &&
               !imageFiles[imageType] && (
                 <div className="absolute bottom-1 left-1">
@@ -919,7 +939,7 @@ const isAdmin = user?.permissions.some(p =>
             />
           </div>
 
-          {/* Image Uploads */}
+          {/* Image Uploads - Updated to include PGPC Inspection Image */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Vehicle Images</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -952,6 +972,11 @@ const isAdmin = user?.permissions.some(p =>
                 title="Car Registration"
                 imageType="carRegistration"
                 preview={imagePreviews.carRegistration}
+              />
+              <ImageUploadSection
+                title="PGPC Inspection Image"
+                imageType="pgpcInspectionImg"
+                preview={imagePreviews.pgpcInspectionImg}
               />
             </div>
           </div>

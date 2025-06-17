@@ -93,15 +93,11 @@ const VehicleCards = ({
   locations = [],
   onVehicleAdded,
 }: VehicleCardsProps) => {
-
-
   const { user } = useAuth();
-  
-  const isAdmin = user?.permissions.some(p =>
-    ["CREATE", "UPDATE", "DELETE"].includes(p)
-  ) ?? false;
-  
 
+  const isAdmin =
+    user?.permissions.some((p) => ["CREATE", "UPDATE", "DELETE"].includes(p)) ??
+    false;
 
   const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>(vehicles);
   const [selectedClient, setSelectedClient] = useState<string>("all");
@@ -331,23 +327,24 @@ const VehicleCards = ({
         {/* Action Buttons */}
 
         {isAdmin && (
-             <div className="flex gap-2">
-          <Button
-            variant={isEditMode ? "default" : "outline"}
-            onClick={toggleEditMode}
-            className={`${
-              isEditMode ? "bg-blue-600 hover:bg-blue-700" : ""
-            } dark:text-accent-foreground`}
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            {isEditMode ? "Exit Edit" : "Edit Mode"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant={isEditMode ? "default" : "outline"}
+              onClick={toggleEditMode}
+              className={`${
+                isEditMode ? "bg-blue-600 hover:bg-blue-700" : ""
+              } dark:text-accent-foreground`}
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              {isEditMode ? "Exit Edit" : "Edit Mode"}
+            </Button>
 
-          <AddVehicleModal onVehicleAdded={onVehicleAdded} editVehicle={null} />
-        </div>
-
+            <AddVehicleModal
+              onVehicleAdded={onVehicleAdded}
+              editVehicle={null}
+            />
+          </div>
         )}
-     
       </div>
 
       {/* Results Summary */}

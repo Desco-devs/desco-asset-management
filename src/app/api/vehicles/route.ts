@@ -11,25 +11,49 @@ const supabase = createClient(
   }
 )
 
-// GET: Retrieve vehicles by projectId
+// GET: Retrieve vehicles by projectId OR all vehicles if no projectId provided
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId')
 
-    if (!projectId) {
-      return NextResponse.json(
-        { error: 'projectId is required' },
-        { status: 400 }
-      )
+    if (projectId) {
+      // Get vehicles for specific project
+      const vehicles = await prisma.vehicle.findMany({
+        where: { projectId },
+        include: {
+          project: {
+            include: {
+              client: {
+                include: {
+                  location: true
+                }
+              }
+            }
+          }
+        },
+      })
+      return NextResponse.json(vehicles, { status: 200 })
+    } else {
+      // Get all vehicles if no projectId specified
+      const vehicles = await prisma.vehicle.findMany({
+        include: {
+          project: {
+            include: {
+              client: {
+                include: {
+                  location: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      })
+      return NextResponse.json(vehicles, { status: 200 })
     }
-
-    const vehicles = await prisma.vehicle.findMany({
-      where: { projectId },
-      include: { project: true },
-    })
-
-    return NextResponse.json(vehicles, { status: 200 })
   } catch (err) {
     console.error('GET /api/vehicles error:', err)
     return NextResponse.json(
@@ -60,6 +84,7 @@ export async function POST(request: NextRequest) {
     const side2Img = formData.get('side2Img') as File | null
     const originalReceipt = formData.get('originalReceipt') as File | null
     const carRegistration = formData.get('carRegistration') as File | null
+    const pgpcInspectionImg = formData.get('pgpcInspectionImg') as File | null
 
     // Validate required fields
     const requiredFields = [
@@ -110,6 +135,7 @@ export async function POST(request: NextRequest) {
       { file: side2Img, dbField: 'side2ImgUrl', side: 'side2' },
       { file: originalReceipt, dbField: 'originalReceiptUrl', side: 'original-receipt' },
       { file: carRegistration, dbField: 'carRegistrationUrl', side: 'car-registration' },
+      { file: pgpcInspectionImg, dbField: 'pgpcInspectionImage', side: 'pgpc-inspection' },
     ]
 
     const updateData: Record<string, string> = {}
@@ -239,6 +265,13 @@ export async function PUT(request: NextRequest) {
         existingUrlKey: 'carRegistrationUrl',
         prefix: 'car-registration',
         displayName: 'car registration'
+      },
+      {
+        newFile: formData.get('pgpcInspectionImg') as File | null,
+        keepFlag: formData.get('keepPgpcInspectionImg') === 'true',
+        existingUrlKey: 'pgpcInspectionImage',
+        prefix: 'pgpc-inspection',
+        displayName: 'PGPC inspection image'
       }
     ]
 
@@ -309,11 +342,6 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-
-
-
-
-
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -348,8 +376,7 @@ export async function DELETE(request: NextRequest) {
       where: { uid: vehicleId }
     })
 
-    // CORRECTED: Account for the nested "vehicles" folder structure
-    // Your actual path is: vehicles/vehicles/projectId/vehicleId/...
+    // Delete all vehicle files from storage
     try {
       const vehicleFolderPath = `vehicles/${projectId}/${vehicleId}`;
       console.log(`Attempting to delete entire vehicle folder: ${vehicleFolderPath}`);
@@ -466,6 +493,7 @@ export async function DELETE(request: NextRequest) {
         existingVehicle.side2ImgUrl,
         existingVehicle.originalReceiptUrl,
         existingVehicle.carRegistrationUrl,
+        existingVehicle.pgpcInspectionImage, // Added the new field
       ].filter((url): url is string => Boolean(url));
 
       const deletionPromises = imageUrls.map(async (imageUrl) => {

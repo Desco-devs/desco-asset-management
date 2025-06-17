@@ -18,6 +18,7 @@ import {
   Image,
   Receipt,
   ExternalLink,
+  Shield, // Added for PGPC inspection icon
 } from "lucide-react";
 
 // Vehicle interface (should match your main component)
@@ -39,6 +40,7 @@ interface Vehicle {
   side2ImgUrl?: string;
   originalReceiptUrl?: string;
   carRegistrationUrl?: string;
+  pgpcInspectionImage?: string; // Added the new field
   project: {
     uid: string;
     name: string;
@@ -307,11 +309,11 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
               </div>
             </div>
 
-            {/* Documents Section */}
+            {/* Documents Section - Updated to include PGPC Inspection */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Documents & Files</h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Original Receipt */}
                 {vehicle.originalReceiptUrl && (
                   <div className="border rounded-lg p-4 space-y-2">
@@ -395,9 +397,51 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                     </Button>
                   </div>
                 )}
+
+                {/* PGPC Inspection Image - NEW SECTION */}
+                {vehicle.pgpcInspectionImage && (
+                  <div className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-purple-500" />
+                      <span className="font-medium text-sm">
+                        PGPC Inspection
+                      </span>
+                    </div>
+
+                    {isImageFile(vehicle.pgpcInspectionImage) ? (
+                      <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                        <img
+                          src={vehicle.pgpcInspectionImage}
+                          alt="PGPC Inspection"
+                          className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => openFile(vehicle.pgpcInspectionImage!)}
+                        />
+                      </div>
+                    ) : (
+                      <div className="aspect-video bg-gray-50 rounded-md flex items-center justify-center">
+                        <div className="text-center">
+                          <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                          <p className="text-xs text-gray-500 truncate px-2">
+                            {getFileNameFromUrl(vehicle.pgpcInspectionImage)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => openFile(vehicle.pgpcInspectionImage!)}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Open Document
+                    </Button>
+                  </div>
+                )}
               </div>
 
-              {/* Documents Summary */}
+              {/* Documents Summary - Updated to include PGPC */}
               <div className="flex flex-wrap gap-2">
                 {vehicle.originalReceiptUrl && (
                   <Badge variant="outline" className="text-xs">
@@ -411,6 +455,12 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                     CR Available
                   </Badge>
                 )}
+                {vehicle.pgpcInspectionImage && (
+                  <Badge variant="outline" className="text-xs">
+                    <Shield className="h-3 w-3 mr-1" />
+                    PGPC Available
+                  </Badge>
+                )}
                 {vehicleImages(vehicle).length > 0 && (
                   <Badge variant="outline" className="text-xs">
                     <Image className="h-3 w-3 mr-1" />
@@ -420,6 +470,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                 )}
                 {!vehicle.originalReceiptUrl &&
                   !vehicle.carRegistrationUrl &&
+                  !vehicle.pgpcInspectionImage &&
                   vehicleImages(vehicle).length === 0 && (
                     <span className="text-sm text-muted-foreground">
                       No documents or photos uploaded
