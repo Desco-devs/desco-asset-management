@@ -662,7 +662,7 @@ const AddVehicleModal = ({
         </DialogTrigger>
       )}
       <DialogContent
-        className="max-w-4xl max-h-[90vh] flex flex-col p-4"
+        className="max-w-[95%] max-h-[90vh] flex flex-col p-4 dark:bg-primary"
         style={{
           maxWidth: "768px",
         }}

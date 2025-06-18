@@ -3,6 +3,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -33,7 +34,7 @@ interface Equipment {
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;
   owner: string;
-  before?: number;              // <— new field
+  before?: number; // <— new field
   image_url?: string;
   inspectionDate?: string;
   plateNumber?: string;
@@ -76,7 +77,8 @@ const EquipmentModal = ({
       : "bg-red-100 text-red-800 hover:bg-red-200";
 
   const isExpiringSoon = (d: string) => {
-    const expiry = new Date(d), today = new Date();
+    const expiry = new Date(d),
+      today = new Date();
     const diff = (expiry.getTime() - today.getTime()) / (1000 * 3600 * 24);
     return diff <= 30 && diff >= 0;
   };
@@ -91,7 +93,7 @@ const EquipmentModal = ({
   };
 
   const isImage = (url: string) =>
-    [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg"].some(ext =>
+    [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg"].some((ext) =>
       url.toLowerCase().endsWith(ext)
     );
 
@@ -99,9 +101,14 @@ const EquipmentModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] p-4">
+      <DialogContent
+        className="w-full max-h-[90vh] p-0 flex flex-col dark:bg-primary"
+        style={{
+          maxWidth: "1024px",
+        }}
+      >
         <DialogHeader className="p-6 pb-0 border-b flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2 text-lg">
+          <DialogTitle className="flex md:flex-row flex-col md:items-center items-start gap-2 md:text-lg text-base">
             <Settings className="h-6 w-6" />
             {equipment.brand} {equipment.model}
             <Badge className={getStatusColor(equipment.status)}>
@@ -114,24 +121,23 @@ const EquipmentModal = ({
               </Badge>
             )}
           </DialogTitle>
-          <p className="text-muted-foreground">{equipment.type}</p>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto scroll-none p-6 space-y-6">
           {/* Image Preview */}
           {equipment.image_url && (
             <div className="flex justify-center">
-              <div className="w-full max-w-md aspect-video bg-gray-100 rounded-md overflow-hidden">
+              <div className="w-full aspect-video rounded-md overflow-hidden relative">
                 <img
                   src={equipment.image_url}
                   alt={`${equipment.brand} ${equipment.model}`}
-                  className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition"
+                  className="w-full h-full object-cover cursor-pointer"
                   onClick={() => openFile(equipment.image_url!)}
                 />
+                <p className="text-xs text-center text-muted-foreground mt-1 absolute top-0">
+                  Click to view full size
+                </p>
               </div>
-              <p className="text-xs text-center text-muted-foreground mt-1">
-                Click to view full size
-              </p>
             </div>
           )}
 
@@ -156,9 +162,7 @@ const EquipmentModal = ({
                   {equipment.project.client.location.address}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-blue-100 text-blue-800">
-                    Project
-                  </Badge>{" "}
+                  <Badge className="bg-blue-100 text-blue-800">Project</Badge>{" "}
                   {equipment.project.name}
                 </div>
               </div>
@@ -244,7 +248,9 @@ const EquipmentModal = ({
                 <div className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-center gap-2">
                     <Receipt className="h-4 w-4 text-green-500" />
-                    <span className="font-medium text-sm">Original Receipt</span>
+                    <span className="font-medium text-sm">
+                      Original Receipt
+                    </span>
                   </div>
                   {isImage(equipment.originalReceiptUrl) ? (
                     <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
@@ -370,9 +376,7 @@ const EquipmentModal = ({
                         src={equipment.pgpcInspectionImage}
                         alt="PGPC"
                         className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition"
-                        onClick={() =>
-                          openFile(equipment.pgpcInspectionImage!)
-                        }
+                        onClick={() => openFile(equipment.pgpcInspectionImage!)}
                       />
                     </div>
                   ) : (
@@ -387,9 +391,7 @@ const EquipmentModal = ({
                     variant="outline"
                     size="sm"
                     className="w-full text-xs"
-                    onClick={() =>
-                      openFile(equipment.pgpcInspectionImage!)
-                    }
+                    onClick={() => openFile(equipment.pgpcInspectionImage!)}
                   >
                     <ExternalLink className="h-3 w-3 mr-1" />
                     Open Document
@@ -409,6 +411,7 @@ const EquipmentModal = ({
             )}
           </div>
         </div>
+        <DialogFooter></DialogFooter>
       </DialogContent>
     </Dialog>
   );

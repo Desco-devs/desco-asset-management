@@ -111,10 +111,10 @@ const AddEquipmentModal = ({
   onOpenChange: controlledOnOpenChange,
 }: AddEquipmentModalProps) => {
   const { user } = useAuth();
-  
-  const isAdmin = user?.permissions.some(p =>
-    ["CREATE", "UPDATE", "DELETE"].includes(p)
-  ) ?? false;
+
+  const isAdmin =
+    user?.permissions.some((p) => ["CREATE", "UPDATE", "DELETE"].includes(p)) ??
+    false;
 
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -759,7 +759,7 @@ const AddEquipmentModal = ({
       )}
 
       <DialogContent
-        className="max-w-6xl max-h-[90vh] flex flex-col p-4"
+        className="max-w-[95%] max-h-[90vh] flex flex-col p-4"
         style={{
           maxWidth: "1024px",
         }}

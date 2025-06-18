@@ -339,9 +339,16 @@ const VehicleCards = ({
               {isEditMode ? "Exit Edit" : "Edit Mode"}
             </Button>
 
+            {/* Edit Vehicle Modal */}
             <AddVehicleModal
-              onVehicleAdded={onVehicleAdded}
-              editVehicle={null}
+              onVehicleAdded={() => {
+                onVehicleAdded();
+                setIsEditModalOpen(false);
+                setEditVehicle(null);
+              }}
+              editVehicle={editVehicle}
+              isOpen={isEditModalOpen}
+              onOpenChange={closeEditModal}
             />
           </div>
         )}
@@ -460,18 +467,6 @@ const VehicleCards = ({
         isOpen={isModalOpen}
         onOpenChange={closeModal}
         vehicle={selectedVehicle}
-      />
-
-      {/* Edit Vehicle Modal */}
-      <AddVehicleModal
-        onVehicleAdded={() => {
-          onVehicleAdded();
-          setIsEditModalOpen(false);
-          setEditVehicle(null);
-        }}
-        editVehicle={editVehicle}
-        isOpen={isEditModalOpen}
-        onOpenChange={closeEditModal}
       />
 
       {/* Delete Confirmation AlertDialog */}

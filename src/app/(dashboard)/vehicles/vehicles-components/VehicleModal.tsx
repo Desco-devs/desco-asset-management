@@ -140,7 +140,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-6xl max-h-[90vh] flex flex-col p-4"
+        className="max-w-[95%] max-h-[90vh] flex flex-col p-4"
         style={{
           maxWidth: "1024px",
         }}
