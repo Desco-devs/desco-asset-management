@@ -30,7 +30,7 @@ interface Equipment {
   brand: string;
   model: string;
   type: string;
-  insuranceExpirationDate: string;
+  insuranceExpirationDate?: string;
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;
   owner: string;
@@ -59,7 +59,7 @@ interface Equipment {
 interface EquipmentModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  equipment: Equipment | null;
+  equipment: Equipment | null | '';
 }
 
 const EquipmentModal = ({
@@ -131,7 +131,7 @@ const EquipmentModal = ({
                 <img
                   src={equipment.image_url}
                   alt={`${equipment.brand} ${equipment.model}`}
-                  className="w-full h-full object-cover cursor-pointer"
+                  className="w-full h-full object-contain cursor-pointer"
                   onClick={() => openFile(equipment.image_url!)}
                 />
                 <p className="text-xs text-center text-muted-foreground mt-1 absolute top-0">
@@ -177,17 +177,19 @@ const EquipmentModal = ({
                   <span className="font-medium">Insurance Expiry:</span>
                   <span
                     className={`${
-                      isExpired(equipment.insuranceExpirationDate)
+                      isExpired(equipment.insuranceExpirationDate || "")
                         ? "text-red-600 font-semibold"
-                        : isExpiringSoon(equipment.insuranceExpirationDate)
+                        : isExpiringSoon(
+                            equipment.insuranceExpirationDate || ""
+                          )
                         ? "text-orange-600 font-semibold"
                         : ""
                     }`}
                   >
-                    {formatDate(equipment.insuranceExpirationDate)}
-                    {isExpired(equipment.insuranceExpirationDate)
+                    {formatDate(equipment.insuranceExpirationDate || "")}
+                    {isExpired(equipment.insuranceExpirationDate || "")
                       ? " (Expired)"
-                      : isExpiringSoon(equipment.insuranceExpirationDate)
+                      : isExpiringSoon(equipment.insuranceExpirationDate || "")
                       ? " (Expiring Soon)"
                       : ""}
                   </span>

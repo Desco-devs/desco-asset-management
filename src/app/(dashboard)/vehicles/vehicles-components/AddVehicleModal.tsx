@@ -836,7 +836,7 @@ const AddVehicleModal = ({
 
             {/* Dates and Before (Months) */}
             <div className="space-y-2">
-              <Label>Inspection Date *</Label>
+              <Label>PGPC Inspection Date *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -959,7 +959,7 @@ const AddVehicleModal = ({
                 preview={imagePreviews.side1Img}
               />
               <ImageUploadSection
-                title="Side 2 Image"
+                title="INSURANCE"
                 imageType="side2Img"
                 preview={imagePreviews.side2Img}
               />

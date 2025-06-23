@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -9,8 +9,26 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Car, FileText, Shield, CheckCircle } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  Settings,
+  Car,
+  FileText,
+  Shield,
+  CheckCircle,
+  Filter,
+  X,
+  Search,
+} from "lucide-react";
 import EquipmentModal from "@/app/(dashboard)/equipments/equip-components/EquipmentModal";
+import { Input } from "@/components/ui/input";
 
 interface Equipment {
   uid: string;
@@ -42,31 +60,158 @@ interface Equipment {
   };
 }
 
+interface Client {
+  uid: string;
+  name: string;
+  location: {
+    uid: string;
+    address: string;
+  };
+}
+
+interface Location {
+  uid: string;
+  address: string;
+}
+
+interface Project {
+  uid: string;
+  name: string;
+  client: {
+    uid: string;
+    name: string;
+  };
+}
+
 export default function EquipmentViewer() {
   const [equipments, setEquipments] = useState<Equipment[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(
     null
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Filter states
+  const [selectedClient, setSelectedClient] = useState<string>("all");
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
+  const [selectedProject, setSelectedProject] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
   useEffect(() => {
-    const fetchEquipments = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/equipments/getall");
-        if (!response.ok) throw new Error("Failed to fetch equipments");
-        const data = await response.json();
-        setEquipments(data);
+        const [equipmentsData, clientsData, locationsData, projectsData] =
+          await Promise.all([
+            fetch("/api/equipments/getall").then((res) => res.json()),
+            fetch("/api/clients/getall").then((res) => res.json()),
+            fetch("/api/locations/getall").then((res) => res.json()),
+            fetch("/api/projects/getall").then((res) => res.json()),
+          ]);
+
+        setEquipments(equipmentsData);
+        setClients(clientsData);
+        setLocations(locationsData);
+        setProjects(projectsData);
       } catch (error) {
-        console.error("Error fetching equipments:", error);
+        console.error("Error fetching data:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchEquipments();
+    fetchData();
   }, []);
+
+  // Filter equipments based on selected filters and search query
+  const filteredEquipments = useMemo(() => {
+    return equipments.filter((equipment) => {
+      const matchesClient =
+        selectedClient === "all" ||
+        equipment.project.client.uid === selectedClient;
+      const matchesLocation =
+        selectedLocation === "all" ||
+        equipment.project.client.location.uid === selectedLocation;
+      const matchesProject =
+        selectedProject === "all" || equipment.project.uid === selectedProject;
+      const matchesStatus =
+        selectedStatus === "all" || equipment.status === selectedStatus;
+
+      // Search functionality - searches through multiple fields
+      const matchesSearch =
+        searchQuery === "" ||
+        equipment.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        equipment.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        equipment.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        equipment.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        equipment.project.name
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        equipment.project.client.name
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        equipment.project.client.location.address
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        (equipment.plateNumber &&
+          equipment.plateNumber
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())) ||
+        (equipment.remarks &&
+          equipment.remarks.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      return (
+        matchesClient &&
+        matchesLocation &&
+        matchesProject &&
+        matchesStatus &&
+        matchesSearch
+      );
+    });
+  }, [
+    equipments,
+    selectedClient,
+    selectedLocation,
+    selectedProject,
+    selectedStatus,
+    searchQuery,
+  ]);
+
+  // Get projects filtered by selected client and location
+  const availableProjects = useMemo(() => {
+    return projects.filter((project) => {
+      const matchesClient =
+        selectedClient === "all" || project.client.uid === selectedClient;
+      // For location filtering of projects, we need to check if the project's client is in the selected location
+      const projectClient = clients.find((c) => c.uid === project.client.uid);
+      const matchesLocation =
+        selectedLocation === "all" ||
+        (projectClient && projectClient.location.uid === selectedLocation);
+
+      return matchesClient && matchesLocation;
+    });
+  }, [projects, clients, selectedClient, selectedLocation]);
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedClient("all");
+    setSelectedLocation("all");
+    setSelectedProject("all");
+    setSelectedStatus("all");
+    setSearchQuery("");
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters =
+    selectedClient !== "all" ||
+    selectedLocation !== "all" ||
+    selectedProject !== "all" ||
+    selectedStatus !== "all" ||
+    searchQuery !== "";
 
   const getStatusColor = (status: string) => {
     return status === "OPERATIONAL"
@@ -86,23 +231,6 @@ export default function EquipmentViewer() {
     const today = new Date();
     return expiry < today;
   };
-
-  //   const getExpirationBadge = (insuranceExpirationDate: string) => {
-  //     if (isExpired(insuranceExpirationDate)) {
-  //       return (
-  //         <Badge className="bg-red-500 text-white hover:bg-red-600">
-  //           Expired
-  //         </Badge>
-  //       );
-  //     } else if (isExpiringSoon(insuranceExpirationDate)) {
-  //       return (
-  //         <Badge className="bg-orange-500 text-white hover:bg-orange-600">
-  //           Expiring Soon
-  //         </Badge>
-  //       );
-  //     }
-  //     return null;
-  //   };
 
   const getDocumentCount = (equipment: Equipment) => {
     let count = 0;
@@ -154,11 +282,142 @@ export default function EquipmentViewer() {
 
   return (
     <div className="space-y-6">
+      {/* Filters Section */}
+      <Card className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Client Filter */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+              Client
+            </label>
+            <Select value={selectedClient} onValueChange={setSelectedClient}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="All Clients" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Clients</SelectItem>
+                {clients.map((client) => (
+                  <SelectItem key={client.uid} value={client.uid}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Location Filter */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+              Location
+            </label>
+            <Select
+              value={selectedLocation}
+              onValueChange={setSelectedLocation}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="All Locations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map((location) => (
+                  <SelectItem key={location.uid} value={location.uid}>
+                    {location.address}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Project Filter */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+              Project
+            </label>
+            <Select value={selectedProject} onValueChange={setSelectedProject}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="All Projects" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Projects</SelectItem>
+                {availableProjects.map((project) => (
+                  <SelectItem key={project.uid} value={project.uid}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Status Filter */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+              Status
+            </label>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="OPERATIONAL">Operational</SelectItem>
+                <SelectItem value="NON_OPERATIONAL">Non-Operational</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Search Input */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+              Search
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search equipment..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Results count and clear filters */}
+        <div className="flex items-center justify-between pt-4 border-t">
+          <p className="text-sm text-muted-foreground">
+            Showing {filteredEquipments.length} of {equipments.length} equipment
+            {hasActiveFilters && " (filtered)"}
+          </p>
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={clearFilters}
+              className="text-xs"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Clear All
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      {/* Equipment Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {equipments.map((equipment) => (
+        {filteredEquipments.map((equipment) => (
           <Card
             key={equipment.uid}
-            className="hover:shadow-lg  cursor-pointer z-40 bg-chart-3/20"
+            className="hover:shadow-lg cursor-pointer z-40 bg-chart-3/20"
             onClick={() => {
               setSelectedEquipment(equipment);
               setIsModalOpen(true);
@@ -189,7 +448,6 @@ export default function EquipmentViewer() {
                     </Badge>
                   )}
 
-                  {/* {getExpirationBadge(equipment.insuranceExpirationDate)} */}
                   {getInspectionBadges(equipment).length > 0 && (
                     <div className="flex flex-row flex-wrap gap-2">
                       {getInspectionBadges(equipment)}
@@ -211,15 +469,15 @@ export default function EquipmentViewer() {
 
             <CardContent className="space-y-3">
               {equipment.image_url ? (
-                <div className="aspect-video  rounded-md overflow-hidden">
+                <div className="aspect-video rounded-md overflow-hidden bg-white">
                   <img
                     src={equipment.image_url}
                     alt={`${equipment.brand} ${equipment.model}`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain object-center"
                   />
                 </div>
               ) : (
-                <div className="aspect-video  rounded-md flex items-center justify-center">
+                <div className="aspect-video rounded-md flex items-center justify-center">
                   <Settings className="h-12 w-12 text-gray-400" />
                 </div>
               )}
@@ -239,8 +497,26 @@ export default function EquipmentViewer() {
                   </span>
                 </div>
                 <div className="flex justify-between">
+                  <span>Client:</span>
+                  <span
+                    className="font-medium truncate ml-2"
+                    title={equipment.project.client.name}
+                  >
+                    {equipment.project.client.name}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Location:</span>
+                  <span
+                    className="font-medium truncate ml-2"
+                    title={equipment.project.client.location.address}
+                  >
+                    {equipment.project.client.location.address}
+                  </span>
+                </div>
+                <div className="flex justify-between">
                   <span>Expires:</span>
-                  {/* <span
+                  <span
                     className={`font-medium ${
                       isExpired(equipment.insuranceExpirationDate)
                         ? "text-red-600"
@@ -252,7 +528,7 @@ export default function EquipmentViewer() {
                     {new Date(
                       equipment.insuranceExpirationDate
                     ).toLocaleDateString()}
-                  </span> */}
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -260,10 +536,24 @@ export default function EquipmentViewer() {
         ))}
       </div>
 
+      {filteredEquipments.length === 0 && equipments.length > 0 && (
+        <Card className="p-8">
+          <div className="text-center text-muted-foreground">
+            <Settings className="h-12 w-12 mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">No equipment found</h3>
+            <p>
+              {searchQuery
+                ? `No equipment matches your search "${searchQuery}". Try a different search term or adjust your filters.`
+                : "Try adjusting your filters to see more results."}
+            </p>
+          </div>
+        </Card>
+      )}
+
       {equipments.length === 0 && (
         <Card className="p-8">
           <div className="text-center text-muted-foreground">
-            <Settings className="h-12 w-12 mx-auto mb-4 " />
+            <Settings className="h-12 w-12 mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No equipment found</h3>
             <p>Check back later for equipment listings.</p>
           </div>

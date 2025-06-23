@@ -29,6 +29,8 @@ import {
   Receipt,
   Shield,
   CheckCircle,
+  Image as ImageIcon,
+  Settings,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -71,8 +73,8 @@ interface Equipment {
   brand: string;
   model: string;
   type: string;
-  insuranceExpirationDate: string;
-  before?: number; // Added from schema
+  insuranceExpirationDate?: string;
+  before?: number;
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;
   owner: string;
@@ -83,6 +85,7 @@ interface Equipment {
   equipmentRegistrationUrl?: string;
   thirdpartyInspectionImage?: string;
   pgpcInspectionImage?: string;
+  equipmentParts?: string[]; // Added equipment parts
   project: {
     uid: string;
     name: string;
@@ -95,6 +98,13 @@ interface Equipment {
       };
     };
   };
+}
+
+interface EquipmentPart {
+  file: File | null;
+  preview: string | null;
+  isExisting: boolean;
+  existingUrl?: string;
 }
 
 interface AddEquipmentModalProps {
@@ -137,7 +147,7 @@ const AddEquipmentModal = ({
     model: "",
     type: "",
     insuranceExpirationDate: undefined as Date | undefined,
-    before: "" as string, // Added for 'before' field
+    before: "" as string,
     status: "OPERATIONAL" as "OPERATIONAL" | "NON_OPERATIONAL",
     remarks: "",
     owner: "",
@@ -186,6 +196,9 @@ const AddEquipmentModal = ({
   const [keepExistingPgpcInspection, setKeepExistingPgpcInspection] =
     useState(true);
 
+  // Equipment parts state
+  const [equipmentParts, setEquipmentParts] = useState<EquipmentPart[]>([]);
+
   // Populate form when editing
   useEffect(() => {
     if (editEquipment) {
@@ -201,9 +214,9 @@ const AddEquipmentModal = ({
         model: editEquipment.model,
         type: editEquipment.type,
         insuranceExpirationDate: safeParseDate(
-          editEquipment.insuranceExpirationDate
+          editEquipment.insuranceExpirationDate || ""
         ),
-        before: editEquipment.before?.toString() || "", // Populate 'before'
+        before: editEquipment.before?.toString() || "",
         status: editEquipment.status,
         remarks: editEquipment.remarks || "",
         owner: editEquipment.owner,
@@ -239,6 +252,22 @@ const AddEquipmentModal = ({
         setPgpcInspectionPreview(editEquipment.pgpcInspectionImage);
         setKeepExistingPgpcInspection(true);
       }
+
+      // Set existing equipment parts
+      if (
+        editEquipment.equipmentParts &&
+        editEquipment.equipmentParts.length > 0
+      ) {
+        const existingParts: EquipmentPart[] = editEquipment.equipmentParts.map(
+          (url) => ({
+            file: null,
+            preview: url,
+            isExisting: true,
+            existingUrl: url,
+          })
+        );
+        setEquipmentParts(existingParts);
+      }
     }
   }, [editEquipment]);
 
@@ -259,7 +288,6 @@ const AddEquipmentModal = ({
       );
       setFilteredClients(clientsInLocation);
 
-      // Only reset client and project if not in edit mode or if location actually changed
       if (
         !isEditMode ||
         (isEditMode &&
@@ -284,7 +312,6 @@ const AddEquipmentModal = ({
       );
       setFilteredProjects(projectsForClient);
 
-      // Only reset project if not in edit mode or if client actually changed
       if (
         !isEditMode ||
         (isEditMode && editEquipment?.project.client.uid !== formData.clientId)
@@ -349,14 +376,72 @@ const AddEquipmentModal = ({
     }
   };
 
-  // File handling functions
+  // Equipment Parts Functions
+  const handleEquipmentPartsChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(e.target.files || []);
+
+    if (files.length === 0) return;
+
+    const newParts: EquipmentPart[] = files.map((file) => {
+      const reader = new FileReader();
+      const preview = URL.createObjectURL(file);
+
+      return {
+        file,
+        preview,
+        isExisting: false,
+      };
+    });
+
+    setEquipmentParts((prev) => [...prev, ...newParts]);
+  };
+
+  const addEquipmentPart = () => {
+    const newPart: EquipmentPart = {
+      file: null,
+      preview: null,
+      isExisting: false,
+    };
+    setEquipmentParts((prev) => [...prev, newPart]);
+  };
+
+  const removeEquipmentPart = (index: number) => {
+    setEquipmentParts((prev) => {
+      const newParts = [...prev];
+      // Clean up object URL if it exists
+      if (newParts[index].preview && !newParts[index].isExisting) {
+        URL.revokeObjectURL(newParts[index].preview!);
+      }
+      newParts.splice(index, 1);
+      return newParts;
+    });
+  };
+
+  const updateEquipmentPart = (index: number, file: File) => {
+    setEquipmentParts((prev) => {
+      const newParts = [...prev];
+      // Clean up old object URL if it exists
+      if (newParts[index].preview && !newParts[index].isExisting) {
+        URL.revokeObjectURL(newParts[index].preview!);
+      }
+      newParts[index] = {
+        file,
+        preview: URL.createObjectURL(file),
+        isExisting: false,
+      };
+      return newParts;
+    });
+  };
+
+  // Regular file handling functions
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
       setKeepExistingImage(false);
 
-      // Create preview URL
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -374,14 +459,12 @@ const AddEquipmentModal = ({
       setKeepExistingReceipt(false);
 
       if (file.type.startsWith("image/")) {
-        // Create preview URL for images
         const reader = new FileReader();
         reader.onloadend = () => {
           setOriginalReceiptPreview(reader.result as string);
         };
         reader.readAsDataURL(file);
       } else {
-        // For non-image files, just show file name
         setOriginalReceiptPreview(file.name);
       }
     }
@@ -396,14 +479,12 @@ const AddEquipmentModal = ({
       setKeepExistingRegistration(false);
 
       if (file.type.startsWith("image/")) {
-        // Create preview URL for images
         const reader = new FileReader();
         reader.onloadend = () => {
           setEquipmentRegistrationPreview(reader.result as string);
         };
         reader.readAsDataURL(file);
       } else {
-        // For non-image files, just show file name
         setEquipmentRegistrationPreview(file.name);
       }
     }
@@ -418,14 +499,12 @@ const AddEquipmentModal = ({
       setKeepExistingThirdpartyInspection(false);
 
       if (file.type.startsWith("image/")) {
-        // Create preview URL for images
         const reader = new FileReader();
         reader.onloadend = () => {
           setThirdpartyInspectionPreview(reader.result as string);
         };
         reader.readAsDataURL(file);
       } else {
-        // For non-image files, just show file name
         setThirdpartyInspectionPreview(file.name);
       }
     }
@@ -440,14 +519,12 @@ const AddEquipmentModal = ({
       setKeepExistingPgpcInspection(false);
 
       if (file.type.startsWith("image/")) {
-        // Create preview URL for images
         const reader = new FileReader();
         reader.onloadend = () => {
           setPgpcInspectionPreview(reader.result as string);
         };
         reader.readAsDataURL(file);
       } else {
-        // For non-image files, just show file name
         setPgpcInspectionPreview(file.name);
       }
     }
@@ -587,16 +664,19 @@ const AddEquipmentModal = ({
       if (isEditMode && editEquipment) {
         submitFormData.append("equipmentId", editEquipment.uid);
       }
+      if (formData.insuranceExpirationDate) {
+        submitFormData.append(
+          "insuranceExpirationDate",
+          formData.insuranceExpirationDate.toISOString()
+        );
+      }
 
       submitFormData.append("brand", formData.brand);
       submitFormData.append("model", formData.model);
       submitFormData.append("type", formData.type);
-      submitFormData.append(
-        "insuranceExpirationDate",
-        formData.insuranceExpirationDate!.toISOString()
-      );
+
       if (formData.before) {
-        submitFormData.append("before", formData.before); // Submit 'before'
+        submitFormData.append("before", formData.before);
       }
       submitFormData.append("status", formData.status);
       submitFormData.append("owner", formData.owner);
@@ -617,7 +697,7 @@ const AddEquipmentModal = ({
         );
       }
 
-      // Add file uploads
+      // Add regular file uploads
       if (imageFile) {
         submitFormData.append("image", imageFile);
       }
@@ -640,6 +720,16 @@ const AddEquipmentModal = ({
       if (pgpcInspectionFile) {
         submitFormData.append("pgpcInspection", pgpcInspectionFile);
       }
+
+      // Add equipment parts
+      equipmentParts.forEach((part, index) => {
+        if (part.file) {
+          submitFormData.append(`equipmentPart_${index}`, part.file);
+        } else if (part.isExisting && part.existingUrl) {
+          // For existing parts, send a flag to keep them
+          submitFormData.append(`keepExistingPart_${index}`, "true");
+        }
+      });
 
       // Add keep existing file flags for edit mode
       if (isEditMode) {
@@ -687,7 +777,7 @@ const AddEquipmentModal = ({
         model: "",
         type: "",
         insuranceExpirationDate: undefined,
-        before: "", // Reset 'before'
+        before: "",
         status: "OPERATIONAL",
         remarks: "",
         owner: "",
@@ -715,6 +805,14 @@ const AddEquipmentModal = ({
       setPgpcInspectionPreview(null);
       setKeepExistingPgpcInspection(true);
 
+      // Reset equipment parts
+      equipmentParts.forEach((part) => {
+        if (part.preview && !part.isExisting) {
+          URL.revokeObjectURL(part.preview);
+        }
+      });
+      setEquipmentParts([]);
+
       setIsOpen(false);
       onEquipmentAdded();
     } catch (error) {
@@ -736,7 +834,6 @@ const AddEquipmentModal = ({
     formData.brand &&
     formData.model &&
     formData.type &&
-    formData.insuranceExpirationDate &&
     formData.owner &&
     formData.projectId;
 
@@ -955,7 +1052,7 @@ const AddEquipmentModal = ({
 
             {/* Expiration Date */}
             <div className="space-y-2">
-              <Label>Insurance Expiration *</Label>
+              <Label>Insurance Expiration </Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -1448,6 +1545,131 @@ const AddEquipmentModal = ({
                   )}
               </div>
             </div>
+          </div>
+
+          {/* Equipment Parts Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-medium">
+                <div className="flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-blue-500" />
+                  Equipment Parts
+                </div>
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleEquipmentPartsChange}
+                  className="hidden"
+                  id="batch-parts-upload"
+                />
+                <Label htmlFor="batch-parts-upload" className="cursor-pointer">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    asChild
+                  >
+                    <span>
+                      <Upload className="h-3 w-3 mr-1" />
+                      Batch Upload
+                    </span>
+                  </Button>
+                </Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addEquipmentPart}
+                  className="text-xs"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Part
+                </Button>
+              </div>
+            </div>
+
+            {equipmentParts.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {equipmentParts.map((part, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Part {index + 1}</Label>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => removeEquipmentPart(index)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          updateEquipmentPart(index, file);
+                        }
+                      }}
+                      className="cursor-pointer text-xs"
+                    />
+
+                    {part.preview && (
+                      <div className="relative">
+                        <img
+                          src={part.preview}
+                          alt={`Equipment part ${index + 1}`}
+                          className="w-full h-24 object-cover rounded border"
+                        />
+                        {part.isExisting && (
+                          <div className="absolute bottom-1 left-1">
+                            <span className="bg-blue-600 text-white text-xs px-1 py-0.5 rounded">
+                              Current
+                            </span>
+                          </div>
+                        )}
+                        {!part.isExisting && part.file && (
+                          <div className="absolute bottom-1 left-1">
+                            <span className="bg-green-600 text-white text-xs px-1 py-0.5 rounded">
+                              New
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {!part.preview && (
+                      <div className="border-2 border-dashed border-gray-300 rounded p-4 text-center">
+                        <ImageIcon className="mx-auto h-6 w-6 text-gray-400 mb-1" />
+                        <p className="text-xs text-gray-500">
+                          Upload part image
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {equipmentParts.length === 0 && (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <Settings className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                <p className="text-sm text-gray-500 mb-2">
+                  No equipment parts added yet
+                </p>
+                <p className="text-xs text-gray-400">
+                  Use "Batch Upload" to add multiple images at once, or "Add
+                  Part" to add them one by one
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Remarks */}

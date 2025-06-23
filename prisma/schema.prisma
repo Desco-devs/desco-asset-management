@@ -88,6 +88,7 @@ model Equipment {
   equipmentRegistrationUrl  String?
   thirdpartyInspectionImage String?
   pgpcInspectionImage       String?
+  equipmentParts            String[]
   project                   Project   @relation(fields: [projectId], references: [uid])
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt

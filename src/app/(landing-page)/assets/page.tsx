@@ -37,13 +37,14 @@ const AssetsPage = ({}: AssetsPageProps) => {
   }
 
   return (
-    <div className="min-h-screen w-full md:py-[10dvh] py-[15dvh] md:max-w-[80dvw] max-w-[85dvw] mx-auto ">
+    <div className="min-h-screen w-full md:py-[10dvh] py-[15dvh] md:max-w-[80dvw] max-w-[85dvw] mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 z-40">
         <div>
           <h1 className="text-3xl font-bold">Assets Viewer</h1>
           <p className="text-muted-foreground">
-            View all {viewMode === "equipment" ? "equipment" : "vehicles"}{" "}
-            across projects
+            View and filter all{" "}
+            {viewMode === "equipment" ? "equipment" : "vehicles"} across
+            projects
           </p>
         </div>
 
@@ -54,7 +55,7 @@ const AssetsPage = ({}: AssetsPageProps) => {
               setViewMode(value)
             }
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="sm:w-[180px] w-full">
               <SelectValue placeholder="Select view mode" />
             </SelectTrigger>
             <SelectContent>

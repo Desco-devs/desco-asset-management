@@ -50,7 +50,8 @@ interface Equipment {
   brand: string;
   model: string;
   type: string;
-  insuranceExpirationDate: string;
+  insuranceExpirationDate?: string;
+  before?: number; // Added from schema
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;
   owner: string;
@@ -61,6 +62,7 @@ interface Equipment {
   equipmentRegistrationUrl?: string;
   thirdpartyInspectionImage?: string;
   pgpcInspectionImage?: string;
+  equipmentParts?: string[]; // Added equipment parts array
   project: {
     uid: string;
     name: string;
@@ -102,22 +104,19 @@ const EquipmentCards = ({
   locations = [],
   onEquipmentAdded,
 }: EquipmentCardsProps) => {
+  const { user } = useAuth();
 
-
-    const { user } = useAuth();
-    
-    const isAdmin = user?.permissions.some(p =>
-      ["CREATE", "UPDATE", "DELETE"].includes(p)
-    ) ?? false;
-    
+  const isAdmin =
+    user?.permissions.some((p) => ["CREATE", "UPDATE", "DELETE"].includes(p)) ??
+    false;
 
   const [filteredEquipments, setFilteredEquipments] =
     useState<Equipment[]>(equipments);
   const [selectedClient, setSelectedClient] = useState<string>("all");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
-  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(
-    null
-  );
+  const [selectedEquipment, setSelectedEquipment] = useState<
+    Equipment | null | ""
+  >(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [deletingEquipmentId, setDeletingEquipmentId] = useState<string | null>(
@@ -157,11 +156,24 @@ const EquipmentCards = ({
       : "bg-red-100 text-red-800 hover:bg-red-200";
   };
 
-  const isExpiringSoon = (insuranceExpirationDate: string) => {
-    const expiry = new Date(insuranceExpirationDate);
+  const isExpiringSoon = (
+    insuranceExpirationDate?: string,
+    beforeMonths?: number
+  ) => {
+    const expiry = new Date(insuranceExpirationDate || "");
     const today = new Date();
-    const daysDiff = (expiry.getTime() - today.getTime()) / (1000 * 3600 * 24);
-    return daysDiff <= 30 && daysDiff >= 0;
+
+    if (beforeMonths) {
+      // Use the custom 'before' months if specified
+      const warningDate = new Date(expiry);
+      warningDate.setMonth(warningDate.getMonth() - beforeMonths);
+      return today >= warningDate && today < expiry;
+    } else {
+      // Default to 30 days
+      const daysDiff =
+        (expiry.getTime() - today.getTime()) / (1000 * 3600 * 24);
+      return daysDiff <= 30 && daysDiff >= 0;
+    }
   };
 
   const isExpired = (insuranceExpirationDate: string) => {
@@ -170,14 +182,17 @@ const EquipmentCards = ({
     return expiry < today;
   };
 
-  const getExpirationBadge = (insuranceExpirationDate: string) => {
-    if (isExpired(insuranceExpirationDate)) {
+  const getExpirationBadge = (
+    insuranceExpirationDate?: string,
+    beforeMonths?: number
+  ) => {
+    if (isExpired(insuranceExpirationDate || "")) {
       return (
         <Badge className="bg-red-500 text-white hover:bg-red-600">
           Expired
         </Badge>
       );
-    } else if (isExpiringSoon(insuranceExpirationDate)) {
+    } else if (isExpiringSoon(insuranceExpirationDate, beforeMonths)) {
       return (
         <Badge className="bg-orange-500 text-white hover:bg-orange-600">
           Expiring Soon
@@ -194,7 +209,17 @@ const EquipmentCards = ({
     if (equipment.equipmentRegistrationUrl) count++;
     if (equipment.thirdpartyInspectionImage) count++;
     if (equipment.pgpcInspectionImage) count++;
+
+    // Add equipment parts count
+    if (equipment.equipmentParts && equipment.equipmentParts.length > 0) {
+      count += equipment.equipmentParts.length;
+    }
+
     return count;
+  };
+
+  const getPartsCount = (equipment: Equipment) => {
+    return equipment.equipmentParts ? equipment.equipmentParts.length : 0;
   };
 
   const getInspectionBadges = (equipment: Equipment) => {
@@ -364,25 +389,24 @@ const EquipmentCards = ({
 
         {/* Action Buttons */}
         {isAdmin && (
-       <div className="flex gap-2">
-          <Button
-            variant={isEditMode ? "default" : "outline"}
-            onClick={toggleEditMode}
-            className={`${
-              isEditMode ? "bg-blue-600 hover:bg-blue-700" : ""
-            } dark:text-accent-foreground`}
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            {isEditMode ? "Exit Edit" : "Edit Mode"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant={isEditMode ? "default" : "outline"}
+              onClick={toggleEditMode}
+              className={`${
+                isEditMode ? "bg-blue-600 hover:bg-blue-700" : ""
+              } dark:text-accent-foreground`}
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              {isEditMode ? "Exit Edit" : "Edit Mode"}
+            </Button>
 
-          <AddEquipmentModal
-            onEquipmentAdded={onEquipmentAdded}
-            editEquipment={null}
-          />
-        </div>
+            <AddEquipmentModal
+              onEquipmentAdded={onEquipmentAdded}
+              editEquipment={null}
+            />
+          </div>
         )}
-
       </div>
 
       {/* Results Summary */}
@@ -441,7 +465,11 @@ const EquipmentCards = ({
                       </Badge>
                     )}
 
-                    {getExpirationBadge(equipment.insuranceExpirationDate)}
+                    {getExpirationBadge(
+                      equipment?.insuranceExpirationDate || "",
+                      equipment.before
+                    )}
+
                     {/* Inspection Badges Row */}
                     {getInspectionBadges(equipment).length > 0 && (
                       <div className="flex flex-row flex-wrap gap-2">
@@ -450,16 +478,28 @@ const EquipmentCards = ({
                     )}
                   </div>
 
-                  {/* Document Count Badge */}
-                  {getDocumentCount(equipment) > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <FileText className="h-3 w-3" />
-                      <span>
-                        {getDocumentCount(equipment)} document
-                        {getDocumentCount(equipment) !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                  )}
+                  {/* Document and Parts Count Badges */}
+                  <div className="flex flex-wrap gap-2">
+                    {getDocumentCount(equipment) > 0 && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <FileText className="h-3 w-3" />
+                        <span>
+                          {getDocumentCount(equipment)} document
+                          {getDocumentCount(equipment) !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    )}
+
+                    {getPartsCount(equipment) > 0 && (
+                      <div className="flex items-center gap-1 text-xs text-blue-600">
+                        <Settings className="h-3 w-3" />
+                        <span>
+                          {getPartsCount(equipment)} part
+                          {getPartsCount(equipment) !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Edit and Delete Buttons */}
@@ -493,11 +533,11 @@ const EquipmentCards = ({
             <CardContent className="space-y-3">
               {/* Equipment Image */}
               {equipment.image_url && (
-                <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                <div className="aspect-video bg-white rounded-md overflow-hidden">
                   <img
                     src={equipment.image_url}
                     alt={`${equipment.brand} ${equipment.model}`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain object-center"
                   />
                 </div>
               )}
@@ -528,15 +568,18 @@ const EquipmentCards = ({
                   <span>Expires:</span>
                   <span
                     className={`font-medium ${
-                      isExpired(equipment.insuranceExpirationDate)
+                      isExpired(equipment.insuranceExpirationDate || "")
                         ? "text-red-600"
-                        : isExpiringSoon(equipment.insuranceExpirationDate)
+                        : isExpiringSoon(
+                            equipment.insuranceExpirationDate || "",
+                            equipment.before
+                          )
                         ? "text-orange-600"
                         : ""
                     }`}
                   >
                     {new Date(
-                      equipment.insuranceExpirationDate
+                      equipment.insuranceExpirationDate || ""
                     ).toLocaleDateString()}
                   </span>
                 </div>
@@ -606,8 +649,8 @@ const EquipmentCards = ({
             </AlertDialogDescription>
             <AlertDialogDescription className="text-red-600 font-medium">
               This will permanently delete the equipment and all its associated
-              files (image, receipt, registration documents, inspection images).
-              This action cannot be undone.
+              files (image, receipt, registration documents, inspection images,
+              and all equipment parts). This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

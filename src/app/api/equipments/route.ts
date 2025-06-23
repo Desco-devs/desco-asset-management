@@ -65,40 +65,72 @@ const uploadFileToSupabase = async (
   return { field: getFieldName(prefix), url: urlData.publicUrl }
 }
 
+// Upload equipment part with numbered prefix
+const uploadEquipmentPart = async (
+  file: File,
+  projectId: string,
+  equipmentId: string,
+  partNumber: number
+): Promise<string> => {
+  const timestamp = Date.now()
+  const ext = file.name.split('.').pop()
+  const filename = `${partNumber}_${file.name.replace(/\.[^/.]+$/, "")}_${timestamp}.${ext}`
+  const filepath = `${projectId}/${equipmentId}/${filename}`
+  const buffer = Buffer.from(await file.arrayBuffer())
+
+  const { data: uploadData, error: uploadErr } = await supabase
+    .storage
+    .from('equipments')
+    .upload(filepath, buffer, { cacheControl: '3600', upsert: false })
+
+  if (uploadErr || !uploadData) {
+    throw new Error(`Upload part ${partNumber} failed: ${uploadErr?.message}`)
+  }
+
+  const { data: urlData } = supabase
+    .storage
+    .from('equipments')
+    .getPublicUrl(uploadData.path)
+
+  return urlData.publicUrl
+}
+
 // Map file-prefix to Prisma field name
 const getFieldName = (prefix: string): string => {
   switch (prefix) {
-    case 'image':               return 'image_url'
-    case 'receipt':             return 'originalReceiptUrl'
-    case 'registration':        return 'equipmentRegistrationUrl'
+    case 'image': return 'image_url'
+    case 'receipt': return 'originalReceiptUrl'
+    case 'registration': return 'equipmentRegistrationUrl'
     case 'thirdparty_inspection': return 'thirdpartyInspectionImage'
-    case 'pgpc_inspection':     return 'pgpcInspectionImage'
+    case 'pgpc_inspection': return 'pgpcInspectionImage'
     default: throw new Error(`Unknown prefix: ${prefix}`)
   }
 }
+
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData()
 
-    const brand   = formData.get('brand')   as string
-    const model   = formData.get('model')   as string
-    const type    = formData.get('type')    as string
-    const insExp  = formData.get('insuranceExpirationDate') as string
-    const status  = formData.get('status')  as keyof typeof EquipmentStatus
+    const brand = formData.get('brand') as string
+    const model = formData.get('model') as string
+    const type = formData.get('type') as string
+    const insExp = formData.get('insuranceExpirationDate') as string | null  // Changed to allow null
+    const status = formData.get('status') as keyof typeof EquipmentStatus
     const remarks = (formData.get('remarks') as string) || null
-    const owner   = formData.get('owner')   as string
+    const owner = formData.get('owner') as string
     const projectId = formData.get('projectId') as string
 
     // Dates & plate:
     const inspDateStr = formData.get('inspectionDate') as string | null
-    const plateNum    = (formData.get('plateNumber') as string) || null
+    const plateNum = (formData.get('plateNumber') as string) || null
 
     // BEFORE field as string
     const rawBefore = formData.get('before')
     const beforeStr = typeof rawBefore === 'string' ? rawBefore : ''
 
-    if (!brand || !model || !type || !insExp || !owner || !projectId) {
+    // Removed !insExp from validation - insurance date is now optional
+    if (!brand || !model || !type || !owner || !projectId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -107,14 +139,16 @@ export async function POST(request: Request) {
       brand,
       model,
       type,
-      insuranceExpirationDate: new Date(insExp),
       status,
       remarks,
       owner,
       plateNumber: plateNum,
       project: { connect: { uid: projectId } },
+      equipmentParts: [], // Initialize empty array
       // only include `before` if provided
-      ...(beforeStr !== '' ? { before: parseInt(beforeStr, 10) } : {})
+      ...(beforeStr !== '' ? { before: parseInt(beforeStr, 10) } : {}),
+      // only include insurance date if provided
+      ...(insExp ? { insuranceExpirationDate: new Date(insExp) } : {})
     }
 
     if (inspDateStr) {
@@ -123,7 +157,8 @@ export async function POST(request: Request) {
 
     const equipment = await prisma.equipment.create({ data: createData })
 
-    // 2) handle file uploads
+    // Rest of the function remains the same...
+    // 2) handle regular file uploads
     const fileJobs = [
       { file: formData.get('image') as File | null, prefix: 'image' },
       { file: formData.get('originalReceipt') as File | null, prefix: 'receipt' },
@@ -134,12 +169,22 @@ export async function POST(request: Request) {
       .filter(f => f.file && f.file.size > 0)
       .map(f => uploadFileToSupabase(f.file!, projectId, equipment.uid, f.prefix))
 
+    // 3) handle equipment parts
+    const partFiles: File[] = []
+    let partIndex = 0
+    while (true) {
+      const partFile = formData.get(`equipmentPart_${partIndex}`) as File | null
+      if (!partFile || partFile.size === 0) break
+      partFiles.push(partFile)
+      partIndex++
+    }
+
+    const updateData: any = {}
+
     if (fileJobs.length) {
       try {
         const uploads = await Promise.all(fileJobs)
-        const updateFiles: any = {}
-        uploads.forEach(u => { updateFiles[u.field] = u.url })
-        await prisma.equipment.update({ where: { uid: equipment.uid }, data: updateFiles })
+        uploads.forEach(u => { updateData[u.field] = u.url })
       } catch (e) {
         console.error('Upload error:', e)
         await prisma.equipment.delete({ where: { uid: equipment.uid } })
@@ -147,7 +192,35 @@ export async function POST(request: Request) {
       }
     }
 
-    const result = await prisma.equipment.findUnique({ where: { uid: equipment.uid } })
+    // Upload equipment parts
+    if (partFiles.length > 0) {
+      try {
+        const partUrls: string[] = []
+        for (let i = 0; i < partFiles.length; i++) {
+          const partUrl = await uploadEquipmentPart(partFiles[i], projectId, equipment.uid, i + 1)
+          partUrls.push(partUrl)
+        }
+        updateData.equipmentParts = partUrls
+      } catch (e) {
+        console.error('Part upload error:', e)
+        await prisma.equipment.delete({ where: { uid: equipment.uid } })
+        return NextResponse.json({ error: 'Equipment parts upload failed' }, { status: 500 })
+      }
+    }
+
+    // Update if we have any files
+    if (Object.keys(updateData).length > 0) {
+      await prisma.equipment.update({ where: { uid: equipment.uid }, data: updateData })
+    }
+
+    const result = await prisma.equipment.findUnique({
+      where: { uid: equipment.uid },
+      include: {
+        project: {
+          include: { client: { include: { location: true } } }
+        }
+      }
+    })
     return NextResponse.json(result)
   } catch (err) {
     console.error('POST error:', err)
@@ -155,28 +228,31 @@ export async function POST(request: Request) {
   }
 }
 
+// Also replace your PUT function with this updated version:
+
 export async function PUT(request: Request) {
   try {
     const formData = await request.formData()
 
     const equipmentId = formData.get('equipmentId') as string
-    const brand   = formData.get('brand')   as string
-    const model   = formData.get('model')   as string
-    const type    = formData.get('type')    as string
-    const insExp  = formData.get('insuranceExpirationDate') as string
-    const status  = formData.get('status')  as keyof typeof EquipmentStatus
+    const brand = formData.get('brand') as string
+    const model = formData.get('model') as string
+    const type = formData.get('type') as string
+    const insExp = formData.get('insuranceExpirationDate') as string | null  // Changed to allow null
+    const status = formData.get('status') as keyof typeof EquipmentStatus
     const remarks = (formData.get('remarks') as string) || null
-    const owner   = formData.get('owner')   as string
+    const owner = formData.get('owner') as string
     const projectId = formData.get('projectId') as string
 
     const inspDateStr = formData.get('inspectionDate') as string | null
-    const plateNum    = (formData.get('plateNumber') as string) || null
+    const plateNum = (formData.get('plateNumber') as string) || null
 
     // BEFORE field
     const rawBefore = formData.get('before')
     const beforeStr = typeof rawBefore === 'string' ? rawBefore : ''
 
-    if (!equipmentId || !brand || !model || !type || !insExp || !owner || !projectId) {
+    // Removed !insExp from validation - insurance date is now optional
+    if (!equipmentId || !brand || !model || !type || !owner || !projectId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -190,13 +266,14 @@ export async function PUT(request: Request) {
       brand,
       model,
       type,
-      insuranceExpirationDate: new Date(insExp),
       status,
       remarks,
       owner,
       plateNumber: plateNum,
       before: beforeStr !== '' ? parseInt(beforeStr, 10) : null,
       project: { connect: { uid: projectId } },
+      // Handle insurance date conditionally
+      ...(insExp ? { insuranceExpirationDate: new Date(insExp) } : { insuranceExpirationDate: null })
     }
 
     if (inspDateStr) {
@@ -205,7 +282,8 @@ export async function PUT(request: Request) {
       updateData.inspectionDate = null
     }
 
-    // files config
+    // Rest of the PUT function remains the same...
+    // Handle regular files
     const configs = [
       {
         newFile: formData.get('image') as File | null,
@@ -257,6 +335,44 @@ export async function PUT(request: Request) {
       }
     }
 
+    // Handle equipment parts updates
+    const currentParts = existing.equipmentParts || []
+    const newParts: string[] = [...currentParts] // Start with existing parts
+
+    // Check for new parts or replacements
+    let partIndex = 0
+    while (true) {
+      const newPartFile = formData.get(`equipmentPart_${partIndex}`) as File | null
+      const keepExisting = formData.get(`keepExistingPart_${partIndex}`) as string
+
+      if (!newPartFile && keepExisting !== 'true' && partIndex >= currentParts.length) {
+        // No more parts to process
+        break
+      }
+
+      if (newPartFile && newPartFile.size > 0) {
+        // Replace or add new part
+        if (partIndex < currentParts.length) {
+          // Replace existing part - delete old one first
+          await deleteFileFromSupabase(currentParts[partIndex], `part ${partIndex + 1}`)
+        }
+
+        // Upload new part
+        const newPartUrl = await uploadEquipmentPart(newPartFile, projectId, equipmentId, partIndex + 1)
+        newParts[partIndex] = newPartUrl
+      } else if (keepExisting !== 'true' && partIndex < currentParts.length) {
+        // Remove existing part
+        await deleteFileFromSupabase(currentParts[partIndex], `part ${partIndex + 1}`)
+        newParts.splice(partIndex, 1)
+        partIndex-- // Adjust index since we removed an item
+      }
+
+      partIndex++
+    }
+
+    // Update parts array
+    updateData.equipmentParts = newParts
+
     if (fileJobs.length) {
       try {
         const ups = await Promise.all(fileJobs)
@@ -305,9 +421,11 @@ export async function DELETE(request: Request) {
     }
 
     const projectId = existing.projectId
+
+    // Delete equipment record first
     await prisma.equipment.delete({ where: { uid: equipmentId } })
 
-    // delete all files in folder
+    // Delete all files in folder (including all parts)
     const folder = `${projectId}/${equipmentId}`
     const { data: files } = await supabase.storage.from('equipments').list(folder)
     if (files?.length) {

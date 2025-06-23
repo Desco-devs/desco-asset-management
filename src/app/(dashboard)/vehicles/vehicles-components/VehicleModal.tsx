@@ -174,11 +174,11 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                       key={index}
                       className="border rounded-lg p-3 space-y-2"
                     >
-                      <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                      <div className="aspect-video bg-white rounded-md overflow-hidden">
                         <img
                           src={image.url}
                           alt={`${vehicle.brand} ${vehicle.model} - ${image.label}`}
-                          className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          className="w-full h-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
                           onClick={() => openFile(image.url!)}
                         />
                       </div>
