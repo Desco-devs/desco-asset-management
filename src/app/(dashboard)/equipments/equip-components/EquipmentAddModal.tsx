@@ -1052,7 +1052,7 @@ const AddEquipmentModal = ({
 
             {/* Expiration Date */}
             <div className="space-y-2">
-              <Label>Insurance Expiration </Label>
+              <Label>PGPC Inspection (1 month) </Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button

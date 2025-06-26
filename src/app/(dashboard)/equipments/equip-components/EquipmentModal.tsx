@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Equipment interface (updated to include `before`)
+// Equipment interface (updated to include `before` and `equipmentParts`)
 interface Equipment {
   uid: string;
   brand: string;
@@ -34,7 +34,7 @@ interface Equipment {
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;
   owner: string;
-  before?: number; // <— new field
+  before?: number;
   image_url?: string;
   inspectionDate?: string;
   plateNumber?: string;
@@ -42,6 +42,7 @@ interface Equipment {
   equipmentRegistrationUrl?: string;
   thirdpartyInspectionImage?: string;
   pgpcInspectionImage?: string;
+  equipmentParts?: string[];
   project: {
     uid: string;
     name: string;
@@ -82,6 +83,7 @@ const EquipmentModal = ({
     const diff = (expiry.getTime() - today.getTime()) / (1000 * 3600 * 24);
     return diff <= 30 && diff >= 0;
   };
+
   const isExpired = (d: string) => new Date(d) < new Date();
 
   const getFileName = (url: string) => {
@@ -174,7 +176,8 @@ const EquipmentModal = ({
               <div className="space-y-3 text-sm">
                 <div className="flex items-center gap-2">
                   <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">Insurance Expiry:</span>
+                  {/* rename this  from insurance expiration to PGPC Inspection */}
+                  <span className="font-medium">PGPC Inspection:</span>
                   <span
                     className={`${
                       isExpired(equipment.insuranceExpirationDate || "")
@@ -203,7 +206,6 @@ const EquipmentModal = ({
                   </div>
                 )}
 
-                {/* NEW: display `before` */}
                 {equipment.before != null && (
                   <div className="flex items-center gap-2">
                     <CalendarDays className="h-4 w-4 text-muted-foreground" />
@@ -219,6 +221,7 @@ const EquipmentModal = ({
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Documents & Files</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Equipment Image */}
               {equipment.image_url && (
                 <div className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-center gap-2">
@@ -400,6 +403,52 @@ const EquipmentModal = ({
                   </Button>
                 </div>
               )}
+
+              {/* Equipment Parts */}
+              {equipment.equipmentParts &&
+                equipment.equipmentParts.length > 0 && (
+                  <>
+                    {equipment.equipmentParts.map((partUrl, index) => (
+                      <div
+                        key={`part-${index}`}
+                        className="border rounded-lg p-4 space-y-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Settings className="h-4 w-4 text-indigo-500" />
+                          <span className="font-medium text-sm">
+                            Equipment Part {index + 1}
+                          </span>
+                        </div>
+                        {isImage(partUrl) ? (
+                          <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                            <img
+                              src={partUrl}
+                              alt={`Part ${index + 1}`}
+                              className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition"
+                              onClick={() => openFile(partUrl)}
+                            />
+                          </div>
+                        ) : (
+                          <div className="aspect-video bg-gray-50 rounded-md flex items-center justify-center">
+                            <FileText className="h-8 w-8 text-gray-400 mb-2" />
+                            <p className="text-xs text-gray-500 px-2 truncate">
+                              {getFileName(partUrl)}
+                            </p>
+                          </div>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs"
+                          onClick={() => openFile(partUrl)}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Open Document
+                        </Button>
+                      </div>
+                    ))}
+                  </>
+                )}
             </div>
 
             {/* Remarks */}

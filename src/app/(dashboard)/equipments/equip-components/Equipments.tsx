@@ -51,7 +51,7 @@ interface Equipment {
   model: string;
   type: string;
   insuranceExpirationDate?: string;
-  before?: number; // Added from schema
+  before?: number;
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;
   owner: string;
@@ -62,7 +62,7 @@ interface Equipment {
   equipmentRegistrationUrl?: string;
   thirdpartyInspectionImage?: string;
   pgpcInspectionImage?: string;
-  equipmentParts?: string[]; // Added equipment parts array
+  equipmentParts?: string[];
   project: {
     uid: string;
     name: string;
@@ -564,25 +564,27 @@ const EquipmentCards = ({
                     {equipment.project.name}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Expires:</span>
-                  <span
-                    className={`font-medium ${
-                      isExpired(equipment.insuranceExpirationDate || "")
-                        ? "text-red-600"
-                        : isExpiringSoon(
-                            equipment.insuranceExpirationDate || "",
-                            equipment.before
-                          )
-                        ? "text-orange-600"
-                        : ""
-                    }`}
-                  >
-                    {new Date(
-                      equipment.insuranceExpirationDate || ""
-                    ).toLocaleDateString()}
-                  </span>
-                </div>
+                {equipment.insuranceExpirationDate && (
+                  <div className="flex justify-between">
+                    <span>Expires:</span>
+                    <span
+                      className={`font-medium ${
+                        isExpired(equipment.insuranceExpirationDate)
+                          ? "text-red-600"
+                          : isExpiringSoon(
+                              equipment.insuranceExpirationDate,
+                              equipment.before
+                            )
+                          ? "text-orange-600"
+                          : ""
+                      }`}
+                    >
+                      {new Date(
+                        equipment.insuranceExpirationDate
+                      ).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
