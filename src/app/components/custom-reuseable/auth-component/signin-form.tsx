@@ -47,23 +47,28 @@ const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
 
     if (id === "password") {
       setTyping(true);
-      setTimeout(() => setTyping(false), 1000); // Delays hiding dots when stopping typing
+      setTimeout(() => setTyping(false), 1000);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       const user = await login({
         username: formData.username,
         password: formData.password,
       });
+
+      // Set user in context
       setUser(user);
-      toast.success("Login successful! Redirecting...");
-      setTimeout(() => {
-        router.push("/home");
-      }, 1500);
+
+      // Show success message
+      toast.success("Login successful!");
+
+      // Immediate redirect without delay
+      router.replace("/home");
     } catch (err: any) {
       toast.error(err.message || "Login failed");
     } finally {

@@ -4,8 +4,8 @@ import bcrypt from 'bcrypt'
 const prisma = new PrismaClient()
 
 async function main() {
-  const passwordPlain = 'desco'
-  const hashedPassword = await bcrypt.hash(passwordPlain, 10)
+  // const passwordPlain = 'desco'
+
 
   const seedUsers = [
     {
@@ -17,20 +17,26 @@ async function main() {
         Permission.UPDATE,
         Permission.DELETE,
       ],
+      passwordPlain: 'desco',
     },
     {
       username: 'admin',
       fullname: 'Administrator',
       permissions: [Permission.VIEW, Permission.CREATE, Permission.UPDATE],
+      passwordPlain: 'desco',
     },
     {
-      username: 'client',
+      username: 'DESCO',
       fullname: 'Client User',
       permissions: [Permission.VIEW],
+      passwordPlain: 'EQUIPMENTS',
     },
   ]
 
+
+
   for (const u of seedUsers) {
+    const hashedPassword = await bcrypt.hash(u.passwordPlain, 10)
     await prisma.user.upsert({
       where: { username: u.username },
       update: {

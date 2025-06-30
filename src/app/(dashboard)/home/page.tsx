@@ -1,8 +1,5 @@
 "use client";
 
-import { useAuth } from "@/app/context/AuthContext";
-import { useState } from "react";
-import { toast } from "sonner";
 import { VehiclesCount } from "./components/vehicle-count";
 import { EquipmentStatusChart } from "./components/equipments-count";
 

@@ -1,3 +1,4 @@
+//equipment cards component
 "use client";
 
 import { useState, useEffect } from "react";
@@ -17,32 +18,31 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+
 import {
   Settings,
   Edit,
   Trash2,
-  AlertTriangle,
   Car,
   FileText,
-  Receipt,
   Image as ImageIcon,
   Shield,
   CheckCircle,
+  Plus,
+  AlertTriangle,
+  Eye,
 } from "lucide-react";
 import EquipmentModal from "./EquipmentModal";
 import AddEquipmentModal from "./EquipmentAddModal";
 import { toast } from "sonner";
 import { useAuth } from "@/app/context/AuthContext";
+import EquipmentDeleteAlertDialog from "./AlertDialog";
+import MaintenanceReportModal, {
+  MaintenanceReport,
+} from "./MaintenanceReportModal";
+
+import ReportSelectionDialog from "./ReportSelection";
+import ViewReportsModal from "./ViewReportsModa";
 
 // Types based on your updated Prisma schema
 interface Equipment {
@@ -117,8 +117,11 @@ const EquipmentCards = ({
   const [selectedEquipment, setSelectedEquipment] = useState<
     Equipment | null | ""
   >(null);
+  const [selectedEquipmentThatHasIssues, setSelectedEquipmentThatHasIssues] =
+    useState<Equipment | null | "">(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isIssuesEnabled, setIsIssuesEnabled] = useState(false);
   const [deletingEquipmentId, setDeletingEquipmentId] = useState<string | null>(
     null
   );
@@ -128,6 +131,35 @@ const EquipmentCards = ({
     null
   );
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+
+  const [selectedReportForEdit, setSelectedReportForEdit] =
+    useState<MaintenanceReport | null>(null);
+  const [equipmentReports, setEquipmentReports] = useState<{
+    [equipmentId: string]: MaintenanceReport[];
+  }>({});
+  const [loadingReports, setLoadingReports] = useState<{
+    [equipmentId: string]: boolean;
+  }>({});
+
+  const [showReportSelection, setShowReportSelection] = useState(false);
+  const [reportSelectionAction, setReportSelectionAction] = useState<
+    "edit" | "delete"
+  >("edit");
+  const [currentEquipmentReports, setCurrentEquipmentReports] = useState<
+    MaintenanceReport[]
+  >([]);
+
+  const [showViewReportsModal, setShowViewReportsModal] = useState(false);
+  const [viewReportsEquipment, setViewReportsEquipment] =
+    useState<Equipment | null>(null);
+  const [viewReportsData, setViewReportsData] = useState<MaintenanceReport[]>(
+    []
+  );
+  const [reportCounts, setReportCounts] = useState<{
+    [equipmentId: string]: number;
+  }>({});
 
   // Filter equipments based on selected client and location
   useEffect(() => {
@@ -265,10 +297,154 @@ const EquipmentCards = ({
     setIsModalOpen(true);
   };
 
-  const handleDeleteClick = (e: React.MouseEvent, equipment: Equipment) => {
-    e.stopPropagation(); // Prevent card click
-    setEquipmentToDelete(equipment);
-    setShowDeleteDialog(true);
+  const fetchEquipmentReports = async (equipmentId: string) => {
+    if (loadingReports[equipmentId]) return; // Prevent multiple simultaneous requests
+
+    setLoadingReports((prev) => ({ ...prev, [equipmentId]: true }));
+
+    try {
+      const response = await fetch(
+        `/api/maintenance-reports?equipmentId=${equipmentId}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch maintenance reports");
+      }
+
+      const reports = await response.json();
+      setEquipmentReports((prev) => ({ ...prev, [equipmentId]: reports }));
+      return reports;
+    } catch (error) {
+      console.error("Error fetching maintenance reports:", error);
+      toast.error("Failed to fetch maintenance reports");
+      return [];
+    } finally {
+      setLoadingReports((prev) => ({ ...prev, [equipmentId]: false }));
+    }
+  };
+
+  const handleAddIssue = (e: React.MouseEvent, equipment: Equipment) => {
+    e.stopPropagation();
+    setSelectedEquipmentThatHasIssues(equipment);
+    setShowMaintenanceModal(true);
+  };
+
+  // Implement the missing handler functions
+  const handleEditIssue = async (e: React.MouseEvent, equipment: Equipment) => {
+    e.stopPropagation();
+
+    const reports = await fetchEquipmentReports(equipment.uid);
+
+    if (!reports || reports.length === 0) {
+      toast.info("No maintenance reports found for this equipment");
+      return;
+    }
+
+    if (reports.length === 1) {
+      // Single report - edit directly
+      setSelectedReportForEdit(reports[0]);
+      setSelectedEquipmentThatHasIssues(equipment);
+      setShowMaintenanceModal(true);
+    } else {
+      // Multiple reports - show selection dialog
+      setCurrentEquipmentReports(reports);
+      setSelectedEquipmentThatHasIssues(equipment);
+      setReportSelectionAction("edit");
+      setShowReportSelection(true);
+    }
+  };
+
+  const handleDeleteIssue = async (
+    e: React.MouseEvent,
+    equipment: Equipment
+  ) => {
+    e.stopPropagation();
+
+    const reports = await fetchEquipmentReports(equipment.uid);
+
+    if (!reports || reports.length === 0) {
+      toast.info("No maintenance reports found for this equipment");
+      return;
+    }
+
+    if (reports.length === 1) {
+      // Single report - delete directly with confirmation
+      const report = reports[0];
+      if (
+        confirm(
+          `Are you sure you want to delete the maintenance report: "${report.issueDescription.substring(
+            0,
+            50
+          )}..."?`
+        )
+      ) {
+        await deleteMaintenanceReport(report);
+      }
+    } else {
+      // Multiple reports - show selection dialog
+      setCurrentEquipmentReports(reports);
+      setSelectedEquipmentThatHasIssues(equipment);
+      setReportSelectionAction("delete");
+      setShowReportSelection(true);
+    }
+  };
+
+  const deleteMaintenanceReport = async (report: MaintenanceReport) => {
+    try {
+      const response = await fetch(
+        `/api/maintenance-reports/delete?reportId=${report.uid}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || "Failed to delete maintenance report"
+        );
+      }
+
+      toast.success("Maintenance report deleted successfully");
+
+      // Refresh the reports for this equipment
+      if (selectedEquipmentThatHasIssues) {
+        await fetchEquipmentReports(selectedEquipmentThatHasIssues.uid);
+      }
+
+      setShowReportSelection(false);
+    } catch (error) {
+      console.error("Error deleting maintenance report:", error);
+      toast.error(
+        `Failed to delete maintenance report: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  };
+
+  const handleSelectReportForEdit = (report: MaintenanceReport) => {
+    setSelectedReportForEdit(report);
+    setShowReportSelection(false);
+    setShowMaintenanceModal(true);
+  };
+
+  const handleDeleteReportFromSelection = async (report: MaintenanceReport) => {
+    if (
+      confirm(
+        `Are you sure you want to delete this maintenance report: "${report.issueDescription.substring(
+          0,
+          50
+        )}..."?`
+      )
+    ) {
+      await deleteMaintenanceReport(report);
+    }
+  };
+
+  const closeMaintenanceModal = () => {
+    setShowMaintenanceModal(false);
+    setSelectedEquipmentThatHasIssues(null);
+    setSelectedReportForEdit(null);
   };
 
   const confirmDelete = async () => {
@@ -338,7 +514,56 @@ const EquipmentCards = ({
 
   const toggleEditMode = () => {
     setIsEditMode(!isEditMode);
+    setIsIssuesEnabled(false); // Disable issues when exiting edit mode
   };
+
+  const toggleIssuesEnabled = () => {
+    setIsIssuesEnabled(!isIssuesEnabled);
+    setIsEditMode(false); // Disable edit mode when enabling issues
+  };
+
+  // Add this function to fetch report count for display
+  const fetchReportCount = async (equipmentId: string) => {
+    try {
+      const response = await fetch(
+        `/api/maintenance-reports?equipmentId=${equipmentId}`
+      );
+      if (response.ok) {
+        const reports = await response.json();
+        setReportCounts((prev) => ({ ...prev, [equipmentId]: reports.length }));
+        return reports.length;
+      }
+    } catch (error) {
+      console.error("Error fetching report count:", error);
+    }
+    return 0;
+  };
+
+  // Add this function to handle viewing reports
+  const handleViewReports = async (
+    e: React.MouseEvent,
+    equipment: Equipment
+  ) => {
+    e.stopPropagation();
+
+    const reports = await fetchEquipmentReports(equipment.uid);
+    setViewReportsData(reports);
+    setViewReportsEquipment(equipment);
+    setShowViewReportsModal(true);
+  };
+
+  // Add this useEffect to fetch report counts for all equipment when component loads
+  useEffect(() => {
+    const fetchAllReportCounts = async () => {
+      for (const equipment of filteredEquipments) {
+        await fetchReportCount(equipment.uid);
+      }
+    };
+
+    if (filteredEquipments.length > 0) {
+      fetchAllReportCounts();
+    }
+  }, [filteredEquipments]);
 
   return (
     <div className="space-y-6">
@@ -391,6 +616,17 @@ const EquipmentCards = ({
         {isAdmin && (
           <div className="flex gap-2">
             <Button
+              variant={isIssuesEnabled ? "default" : "outline"}
+              onClick={toggleIssuesEnabled}
+              className={`${
+                isIssuesEnabled ? "bg-blue-600 hover:bg-blue-700" : ""
+              } dark:text-accent-foreground`}
+            >
+              <Plus className="h-2 w-2" />
+              {isIssuesEnabled ? "Disable Issue" : "Enable Issue"}
+            </Button>
+
+            <Button
               variant={isEditMode ? "default" : "outline"}
               onClick={toggleEditMode}
               className={`${
@@ -441,9 +677,27 @@ const EquipmentCards = ({
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
                 <div className="space-y-2 flex-1">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    {equipment.brand} {equipment.model}
+                  <CardTitle className="text-sm flex items-center justify-between gap-2">
+                    <div className=" flex items-center gap-2">
+                      <Settings className="h-5 w-5" />
+                      {equipment.brand} {equipment.model}
+                    </div>
+                    {!isIssuesEnabled && !isEditMode && (
+                      <>
+                        {reportCounts[equipment.uid] > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => handleViewReports(e, equipment)}
+                            className="h-6 px-2 text-xs border-red-300 text-red-600 hover:bg-red-100 hover:border-red-400"
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            {reportCounts[equipment.uid]} issue
+                            {reportCounts[equipment.uid] !== 1 ? "s" : ""}
+                          </Button>
+                        )}
+                      </>
+                    )}
                   </CardTitle>
                   <CardDescription className="font-medium text-gray-600 text-xs">
                     {equipment.type}
@@ -501,10 +755,43 @@ const EquipmentCards = ({
                     )}
                   </div>
                 </div>
-
+                {/* add issue */}
+                {isIssuesEnabled && (
+                  <div className="flex gap-2 ml-2">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={(e) => handleAddIssue(e, equipment)}
+                      disabled={deletingEquipmentId === equipment.uid}
+                      className="flex gap-1 items-center text-xs bg-chart-2 text-accent dark:text-accent-foreground hover:bg-chart-3"
+                    >
+                      <Plus className="h-2 w-2" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => handleEditIssue(e, equipment)}
+                      disabled={deletingEquipmentId === equipment.uid}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={(e) => handleDeleteIssue(e, equipment)}
+                      disabled={deletingEquipmentId === equipment.uid}
+                    >
+                      {deletingEquipmentId === equipment.uid ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                )}
                 {/* Edit and Delete Buttons */}
                 {isEditMode && (
-                  <div className="flex gap-1 ml-2">
+                  <div className="flex gap-2 ml-2">
                     <Button
                       size="sm"
                       variant="outline"
@@ -516,7 +803,7 @@ const EquipmentCards = ({
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={(e) => handleDeleteClick(e, equipment)}
+                      onClick={(e) => handleDeleteIssue(e, equipment)}
                       disabled={deletingEquipmentId === equipment.uid}
                     >
                       {deletingEquipmentId === equipment.uid ? (
@@ -623,49 +910,74 @@ const EquipmentCards = ({
         />
       )}
 
+      <MaintenanceReportModal
+        isOpen={showMaintenanceModal}
+        onOpenChange={setShowMaintenanceModal}
+        equipment={selectedEquipmentThatHasIssues || null}
+        locations={locations}
+        editReport={selectedReportForEdit} // Pass the report to edit
+        onReportSubmitted={() => {
+          // Refresh data and close modal
+          setShowMaintenanceModal(false);
+          setSelectedEquipmentThatHasIssues(null);
+          setSelectedReportForEdit(null);
+          onEquipmentAdded(); // You might want to also refresh maintenance reports
+        }}
+      />
+
       {/* Delete Confirmation AlertDialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              Delete Equipment
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete{" "}
-              <span className="font-semibold">
-                {equipmentToDelete?.brand} {equipmentToDelete?.model}
-              </span>
-              {equipmentToDelete?.plateNumber && (
-                <span>
-                  {" "}
-                  (Plate:{" "}
-                  <span className="font-semibold">
-                    {equipmentToDelete.plateNumber}
-                  </span>
-                  )
-                </span>
-              )}{" "}
-              of type{" "}
-              <span className="font-semibold">{equipmentToDelete?.type}</span>?
-            </AlertDialogDescription>
-            <AlertDialogDescription className="text-red-600 font-medium">
-              This will permanently delete the equipment and all its associated
-              files (image, receipt, registration documents, inspection images,
-              and all equipment parts). This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelDelete}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-500 hover:bg-red-600 focus:ring-red-500 dark:text-accent-foreground"
-            >
-              Delete Equipment
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <EquipmentDeleteAlertDialog
+        isOpen={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        equipment={equipmentToDelete}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+        isDeleting={deletingEquipmentId === equipmentToDelete?.uid}
+      />
+
+      <ReportSelectionDialog
+        isOpen={showReportSelection}
+        onOpenChange={setShowReportSelection}
+        reports={currentEquipmentReports}
+        onSelectReport={handleSelectReportForEdit}
+        onDeleteReport={handleDeleteReportFromSelection}
+        action={reportSelectionAction}
+      />
+
+      <ViewReportsModal
+        isOpen={showViewReportsModal}
+        onOpenChange={setShowViewReportsModal}
+        reports={viewReportsData}
+        equipment={viewReportsEquipment}
+        showActions={isAdmin} // Show edit/delete actions if user is admin
+        onEditReport={(report) => {
+          // Close view modal and open edit modal
+          setShowViewReportsModal(false);
+          setSelectedReportForEdit(report);
+          setSelectedEquipmentThatHasIssues(viewReportsEquipment);
+          setShowMaintenanceModal(true);
+        }}
+        onDeleteReport={async (report) => {
+          // Handle delete from view modal
+          if (
+            confirm(
+              `Are you sure you want to delete this maintenance report: "${report.issueDescription.substring(
+                0,
+                50
+              )}..."?`
+            )
+          ) {
+            await deleteMaintenanceReport(report);
+            // Refresh the view data
+            const updatedReports = await fetchEquipmentReports(
+              report.equipmentId
+            );
+            setViewReportsData(updatedReports);
+            // Update report count
+            await fetchReportCount(report.equipmentId);
+          }
+        }}
+      />
     </div>
   );
 };
