@@ -43,6 +43,7 @@ import MaintenanceReportModal, {
 
 import ReportSelectionDialog from "./ReportSelection";
 import ViewReportsModal from "./ViewReportsModa";
+import ReportDeleteAlertDialog from "./ReportDeleteAlertDialog";
 
 // Types based on your updated Prisma schema
 interface Equipment {
@@ -160,6 +161,11 @@ const EquipmentCards = ({
   const [reportCounts, setReportCounts] = useState<{
     [equipmentId: string]: number;
   }>({});
+
+  const [reportToDelete, setReportToDelete] =
+    useState<MaintenanceReport | null>(null);
+  const [showReportDeleteDialog, setShowReportDeleteDialog] = useState(false);
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
 
   // Filter equipments based on selected client and location
   useEffect(() => {
@@ -367,18 +373,9 @@ const EquipmentCards = ({
     }
 
     if (reports.length === 1) {
-      // Single report - delete directly with confirmation
-      const report = reports[0];
-      if (
-        confirm(
-          `Are you sure you want to delete the maintenance report: "${report.issueDescription.substring(
-            0,
-            50
-          )}..."?`
-        )
-      ) {
-        await deleteMaintenanceReport(report);
-      }
+      // Single report - show delete confirmation dialog
+      setReportToDelete(reports[0]);
+      setShowReportDeleteDialog(true);
     } else {
       // Multiple reports - show selection dialog
       setCurrentEquipmentReports(reports);
@@ -389,6 +386,7 @@ const EquipmentCards = ({
   };
 
   const deleteMaintenanceReport = async (report: MaintenanceReport) => {
+    setDeletingReportId(report.uid);
     try {
       const response = await fetch(
         `/api/maintenance-reports/delete?reportId=${report.uid}`,
@@ -408,10 +406,31 @@ const EquipmentCards = ({
 
       // Refresh the reports for this equipment
       if (selectedEquipmentThatHasIssues) {
-        await fetchEquipmentReports(selectedEquipmentThatHasIssues.uid);
+        const updatedReports = await fetchEquipmentReports(
+          selectedEquipmentThatHasIssues.uid
+        );
+
+        // Update view reports data if modal is open
+        if (
+          showViewReportsModal &&
+          viewReportsEquipment?.uid === selectedEquipmentThatHasIssues.uid
+        ) {
+          setViewReportsData(updatedReports);
+        }
+      }
+
+      // Update report count
+      if (report.equipmentId) {
+        await fetchReportCount(report.equipmentId);
       }
 
       setShowReportSelection(false);
+      setShowReportDeleteDialog(false);
+
+      // Close view reports modal if there are no reports left
+      if (showViewReportsModal && viewReportsData.length === 1) {
+        setShowViewReportsModal(false);
+      }
     } catch (error) {
       console.error("Error deleting maintenance report:", error);
       toast.error(
@@ -419,6 +438,9 @@ const EquipmentCards = ({
           error instanceof Error ? error.message : "Unknown error"
         }`
       );
+    } finally {
+      setDeletingReportId(null);
+      setReportToDelete(null);
     }
   };
 
@@ -429,16 +451,8 @@ const EquipmentCards = ({
   };
 
   const handleDeleteReportFromSelection = async (report: MaintenanceReport) => {
-    if (
-      confirm(
-        `Are you sure you want to delete this maintenance report: "${report.issueDescription.substring(
-          0,
-          50
-        )}..."?`
-      )
-    ) {
-      await deleteMaintenanceReport(report);
-    }
+    setReportToDelete(report);
+    setShowReportDeleteDialog(true);
   };
 
   const closeMaintenanceModal = () => {
@@ -530,7 +544,10 @@ const EquipmentCards = ({
       );
       if (response.ok) {
         const reports = await response.json();
-        setReportCounts((prev) => ({ ...prev, [equipmentId]: reports.length }));
+        setReportCounts((prev) => ({
+          ...prev,
+          [equipmentId]: reports.length,
+        }));
         return reports.length;
       }
     } catch (error) {
@@ -550,6 +567,9 @@ const EquipmentCards = ({
     setViewReportsData(reports);
     setViewReportsEquipment(equipment);
     setShowViewReportsModal(true);
+
+    // Ensure count is up to date
+    await fetchReportCount(equipment.uid);
   };
 
   // Add this useEffect to fetch report counts for all equipment when component loads
@@ -946,37 +966,44 @@ const EquipmentCards = ({
 
       <ViewReportsModal
         isOpen={showViewReportsModal}
-        onOpenChange={setShowViewReportsModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            // Refresh data when closing the modal
+            if (viewReportsEquipment) {
+              fetchEquipmentReports(viewReportsEquipment.uid);
+              fetchReportCount(viewReportsEquipment.uid);
+            }
+          }
+          setShowViewReportsModal(open);
+        }}
         reports={viewReportsData}
         equipment={viewReportsEquipment}
-        showActions={isAdmin} // Show edit/delete actions if user is admin
+        showActions={isAdmin}
         onEditReport={(report) => {
-          // Close view modal and open edit modal
           setShowViewReportsModal(false);
           setSelectedReportForEdit(report);
           setSelectedEquipmentThatHasIssues(viewReportsEquipment);
           setShowMaintenanceModal(true);
         }}
-        onDeleteReport={async (report) => {
-          // Handle delete from view modal
-          if (
-            confirm(
-              `Are you sure you want to delete this maintenance report: "${report.issueDescription.substring(
-                0,
-                50
-              )}..."?`
-            )
-          ) {
-            await deleteMaintenanceReport(report);
-            // Refresh the view data
-            const updatedReports = await fetchEquipmentReports(
-              report.equipmentId
-            );
-            setViewReportsData(updatedReports);
-            // Update report count
-            await fetchReportCount(report.equipmentId);
+        onDeleteReport={(report) => {
+          setReportToDelete(report);
+          setShowReportDeleteDialog(true);
+        }}
+      />
+      <ReportDeleteAlertDialog
+        isOpen={showReportDeleteDialog}
+        onOpenChange={setShowReportDeleteDialog}
+        report={reportToDelete}
+        onConfirm={() => {
+          if (reportToDelete) {
+            deleteMaintenanceReport(reportToDelete);
           }
         }}
+        onCancel={() => {
+          setShowReportDeleteDialog(false);
+          setReportToDelete(null);
+        }}
+        isDeleting={deletingReportId === reportToDelete?.uid}
       />
     </div>
   );
