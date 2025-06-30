@@ -374,7 +374,7 @@ const VehicleCards = ({
       </div>
 
       {/* Vehicle Cards Grid - Simplified */}
-      <div className="grid grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredVehicles.map((vehicle) => (
           <Card
             key={vehicle.uid}
