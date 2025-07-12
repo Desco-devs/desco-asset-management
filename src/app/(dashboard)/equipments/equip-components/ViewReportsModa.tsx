@@ -36,6 +36,7 @@ import {
   Download,
 } from "lucide-react";
 import { Equipment, MaintenanceReport } from "./MaintenanceReportModal";
+import { Separator } from "@/components/ui/separator";
 
 interface ViewReportsModalProps {
   isOpen: boolean;
@@ -405,7 +406,7 @@ const ViewReportsModal = ({
                 variant="outline"
                 size="sm"
                 onClick={clearFilters}
-                className="flex items-center gap-2 text-xs text-red-500 border border-red-500 hover:bg-red-50 hover:text-red-600"
+                className="flex items-center gap-2 text-xs text-red-500 border border-red-500  hover:text-red-600"
               >
                 <X className="h-3 w-3" />
                 Clear Filters
@@ -454,7 +455,7 @@ const ViewReportsModal = ({
               .map((report, index) => (
                 <div
                   key={report.uid}
-                  className="border rounded-lg p-4 hover:bg-gray-50/50 transition-colors"
+                  className="border rounded-lg p-4 hover:border-red-500/20 transition-colors"
                 >
                   {/* Header with Status and Priority */}
                   <div className="flex justify-between items-start mb-3">
@@ -601,35 +602,30 @@ const ViewReportsModal = ({
                       )}
                     </div>
                   </div>
+                  <Separator className="my-6" />
 
                   {/* Additional Details */}
                   <div className="space-y-2">
                     {report.inspectionDetails && (
-                      <div className="p-2 bg-blue-50 rounded text-xs">
-                        <strong className="text-blue-700">
+                      <div className="p-2 rounded text-xs">
+                        <strong className="font-semibold">
                           Inspection Details:
                         </strong>
-                        <p className="text-blue-600 mt-1">
-                          {report.inspectionDetails}
-                        </p>
+                        <p className=" mt-1">{report.inspectionDetails}</p>
                       </div>
                     )}
 
                     {report.actionTaken && (
-                      <div className="p-2 bg-green-50 rounded text-xs">
-                        <strong className="text-green-700">
-                          Action Taken:
-                        </strong>
-                        <p className="text-green-600 mt-1">
-                          {report.actionTaken}
-                        </p>
+                      <div className="p-2 rounded text-xs">
+                        <strong className="font-semibold">Action Taken:</strong>
+                        <p className=" mt-1">{report.actionTaken}</p>
                       </div>
                     )}
 
                     {report.remarks && (
-                      <div className="p-2 bg-gray-50 rounded text-xs">
-                        <strong className="text-gray-700">Remarks:</strong>
-                        <p className="text-gray-600 mt-1">{report.remarks}</p>
+                      <div className="p-2 rounded text-xs">
+                        <strong className="font-semibold">Remarks:</strong>
+                        <p className=" mt-1">{report.remarks}</p>
                       </div>
                     )}
                   </div>

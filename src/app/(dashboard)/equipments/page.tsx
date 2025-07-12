@@ -2,6 +2,20 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Download, AlertTriangle, FileSpreadsheet } from "lucide-react";
+import { toast } from "sonner";
 import EquipmentCards from "./equip-components/Equipments";
 
 // API functions
@@ -29,11 +43,21 @@ async function getLocations() {
   return response.json();
 }
 
+async function getAllMaintenanceReports() {
+  const response = await fetch("/api/maintenance-reports");
+  if (!response.ok) {
+    throw new Error("Failed to fetch maintenance reports");
+  }
+  return response.json();
+}
+
 export default function EquipmentPage() {
   const [equipments, setEquipments] = useState([]);
   const [clients, setClients] = useState([]);
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exportingReports, setExportingReports] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   // Create a memoized fetch function that can be called to refresh data
   const fetchData = useCallback(async () => {
@@ -66,6 +90,110 @@ export default function EquipmentPage() {
     }
   }, []);
 
+  // Export all maintenance reports function
+  const exportAllMaintenanceReports = async () => {
+    setExportingReports(true);
+    setShowExportDialog(false); // Close the dialog
+
+    try {
+      // Fetch all maintenance reports
+      const allReports = await getAllMaintenanceReports();
+
+      if (allReports.length === 0) {
+        toast.info("No maintenance reports found to export");
+        return;
+      }
+
+      // Prepare data for export
+      const dataToExport = allReports.map((report: any, index: number) => ({
+        "Report #": index + 1,
+        "Equipment Brand": report.equipment?.brand || "",
+        "Equipment Model": report.equipment?.model || "",
+        "Equipment Type": report.equipment?.type || "",
+        "Plate Number": report.equipment?.plateNumber || "",
+        "Equipment Owner": report.equipment?.owner || "",
+        "Project Name": report.equipment?.project?.name || "",
+        "Client Name": report.equipment?.project?.client?.name || "",
+        "Issue Description": report.issueDescription,
+        Priority: report.priority,
+        Status: report.status.replace("_", " "),
+        "Reported Date": new Date(report.dateReported).toLocaleDateString(),
+        "Reported By": report.reportedBy,
+        "Assigned To": report.repairedBy || "",
+        "Repaired Date": report.dateRepaired
+          ? new Date(report.dateRepaired).toLocaleDateString()
+          : "",
+        Location: report.location?.address || "",
+        "Downtime Hours": report.downtimeHours || "",
+        "Parts Replaced": report.partsReplaced?.join(", ") || "",
+        "Inspection Details": report.inspectionDetails || "",
+        "Action Taken": report.actionTaken || "",
+        Remarks: report.remarks || "",
+        "Attachments Count": report.attachmentUrls?.length || 0,
+        "Created Date": new Date(report.dateReported).toISOString(),
+      }));
+
+      // Create CSV content
+      const headers = Object.keys(dataToExport[0]);
+      const csvContent = [
+        headers.join(","),
+        ...dataToExport.map((row: any) =>
+          headers
+            .map((header) => {
+              const value = row[header as keyof typeof row];
+              // Escape commas and quotes in CSV
+              const stringValue = String(value);
+              if (
+                stringValue.includes(",") ||
+                stringValue.includes('"') ||
+                stringValue.includes("\n")
+              ) {
+                return `"${stringValue.replace(/"/g, '""')}"`;
+              }
+              return stringValue;
+            })
+            .join(",")
+        ),
+      ].join("\n");
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+
+        // Generate filename with timestamp
+        const dateStr = new Date().toISOString().split("T")[0];
+        const timeStr = new Date()
+          .toISOString()
+          .split("T")[1]
+          .split(".")[0]
+          .replace(/:/g, "-");
+
+        link.setAttribute(
+          "download",
+          `All_Maintenance_Reports_${dateStr}_${timeStr}.csv`
+        );
+        link.style.visibility = "hidden";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast.success(
+          `Successfully exported ${allReports.length} maintenance reports!`
+        );
+      }
+    } catch (error) {
+      console.error("Error exporting maintenance reports:", error);
+      toast.error("Failed to export maintenance reports. Please try again.");
+    } finally {
+      setExportingReports(false);
+    }
+  };
+
   // Initial data fetch
   useEffect(() => {
     fetchData();
@@ -87,10 +215,89 @@ export default function EquipmentPage() {
   return (
     <div className="container mx-auto py-[5dvh]">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">Equipment Management</h1>
-        <p className="text-muted-foreground">
-          View and filter all equipment across projects
-        </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold">Equipment Management</h1>
+            <p className="text-muted-foreground">
+              View and filter all equipment across projects
+            </p>
+          </div>
+
+          {/* Export All Reports Button with AlertDialog */}
+          <AlertDialog
+            open={showExportDialog}
+            onOpenChange={setShowExportDialog}
+          >
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                disabled={exportingReports}
+                className="flex items-center gap-2 border-orange-200 text-orange-700 hover:bg-orange-50 hover:border-orange-300"
+              >
+                {exportingReports ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-orange-600 border-t-transparent"></div>
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    <AlertTriangle className="h-4 w-4" />
+                    Export All Issues
+                  </>
+                )}
+              </Button>
+            </AlertDialogTrigger>
+
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-5 w-5 text-orange-600" />
+                  Export All Maintenance Reports
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  You are about to export ALL maintenance reports from ALL
+                  equipment in the system. This will download a comprehensive
+                  CSV file containing all maintenance data.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              {/* Content outside AlertDialogDescription to avoid nesting issues */}
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    The CSV file will include:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-sm ml-4 text-muted-foreground">
+                    <li>All equipment details and specifications</li>
+                    <li>Complete issue descriptions and priorities</li>
+                    <li>Maintenance history and status updates</li>
+                    <li>Personnel assignments and timelines</li>
+                    <li>Parts replacements and downtime records</li>
+                  </ul>
+                </div>
+
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <p className="text-sm text-orange-800">
+                    <strong>Note:</strong> This action cannot be undone and may
+                    take a moment to process.
+                  </p>
+                </div>
+              </div>
+
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={exportAllMaintenanceReports}
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV File
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       <EquipmentCards
