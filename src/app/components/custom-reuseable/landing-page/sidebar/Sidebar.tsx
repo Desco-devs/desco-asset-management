@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -41,6 +41,7 @@ export default function SidebarLandingPage({
   onClose,
 }: SidebarLandingPageProps) {
   const pathname = usePathname(); // e.g. "/assets" or "/landing-page"
+  const router = useRouter();
   const navigationList = pathname === "/assets" ? assetsPageItems : navigationItems;
   const [isVisible, setIsVisible] = useState(false);
 
@@ -53,6 +54,11 @@ export default function SidebarLandingPage({
     console.log("Menu item clicked:", id);
     onMenuClick(id);
     onClose?.(); // Close sidebar after menu item click
+  };
+
+  const handleAuthClick = (href: string) => {
+    // Modern Next.js navigation
+    router.push(href);
   };
 
   const handleClose = () => {
@@ -146,16 +152,13 @@ export default function SidebarLandingPage({
           {/* Footer Section - Login Button */}
           <div className="p-8 border-t border-white/20">
             {authItems.filter(item => item.type === 'auth').map((item) => (
-              <a
+              <button
                 key={item.id}
-                href={item.href}
-                className="block w-full"
-                onClick={() => handleClick(item.id)}
+                onClick={() => handleAuthClick(item.href)}
+                className="bg-chart-2 rounded-lg py-3 px-6 w-full hover:bg-chart-3 text-base dark:text-chart-1 dark:bg-accent-foreground text-white font-medium transition-colors duration-200 shadow-sm"
               >
-                <button className="bg-chart-2 rounded-lg py-3 px-6 w-full hover:bg-chart-3 text-base dark:text-chart-1 dark:bg-accent-foreground text-white font-medium transition-colors duration-200 shadow-sm">
-                  {item.title}
-                </button>
-              </a>
+                {item.title}
+              </button>
             ))}
             <div className="mt-4 text-center">
               <p className="text-xs text-white/50">
