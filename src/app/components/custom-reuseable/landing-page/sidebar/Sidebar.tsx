@@ -1,8 +1,8 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 // interface MenuItem {
@@ -42,7 +42,8 @@ export default function SidebarLandingPage({
 }: SidebarLandingPageProps) {
   const pathname = usePathname(); // e.g. "/assets" or "/landing-page"
   const router = useRouter();
-  const navigationList = pathname === "/assets" ? assetsPageItems : navigationItems;
+  const navigationList =
+    pathname === "/assets" ? assetsPageItems : navigationItems;
   const [isVisible, setIsVisible] = useState(false);
 
   // Trigger slide-in animation on mount
@@ -72,10 +73,11 @@ export default function SidebarLandingPage({
   return (
     <div className="md:hidden w-full h-dvh fixed inset-0 z-[100]">
       {/* Sliding sidebar panel */}
-      <div className={`absolute inset-y-0 left-0 w-full transform transition-transform duration-300 ease-out ${
-        isVisible ? 'translate-x-0' : '-translate-x-full'
-      } dark:bg-chart-3/90 bg-chart-3 backdrop-blur-sm z-[110]`}>
-        
+      <div
+        className={`absolute inset-y-0 left-0 w-full transform transition-transform duration-300 ease-out ${
+          isVisible ? "translate-x-0" : "-translate-x-full"
+        } dark:bg-chart-3/90 bg-chart-3 backdrop-blur-sm z-[110]`}
+      >
         {/* Close button */}
         <button
           onClick={handleClose}
@@ -133,17 +135,19 @@ export default function SidebarLandingPage({
                   Quick Access
                 </h3>
                 <ul className="space-y-3">
-                  {authItems.filter(item => item.type === 'link').map((item) => (
-                    <li key={item.id}>
-                      <a
-                        href={item.href}
-                        className="block py-3 px-4 rounded-lg font-medium text-white hover:text-white/80 hover:bg-white/10 transition-all duration-200 text-left"
-                        onClick={() => handleClick(item.id)}
-                      >
-                        {item.title}
-                      </a>
-                    </li>
-                  ))}
+                  {authItems
+                    .filter((item) => item.type === "link")
+                    .map((item) => (
+                      <li key={item.id}>
+                        <a
+                          href={item.href}
+                          className="block py-3 px-4 rounded-lg font-medium text-white hover:text-white/80 hover:bg-white/10 transition-all duration-200 text-left"
+                          onClick={() => handleClick(item.id)}
+                        >
+                          {item.title}
+                        </a>
+                      </li>
+                    ))}
                 </ul>
               </div>
             </div>
@@ -151,15 +155,17 @@ export default function SidebarLandingPage({
 
           {/* Footer Section - Login Button */}
           <div className="p-8 border-t border-white/20">
-            {authItems.filter(item => item.type === 'auth').map((item) => (
-              <button
-                key={item.id}
-                onClick={() => handleAuthClick(item.href)}
-                className="bg-chart-2 rounded-lg py-3 px-6 w-full hover:bg-chart-3 text-base dark:text-chart-1 dark:bg-accent-foreground text-white font-medium transition-colors duration-200 shadow-sm"
-              >
-                {item.title}
-              </button>
-            ))}
+            {authItems
+              .filter((item) => item.type === "auth")
+              .map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleAuthClick(item.href)}
+                  className="bg-chart-2 rounded-lg py-3 px-6 w-full hover:bg-chart-3 text-base dark:text-chart-1 dark:bg-accent-foreground text-white font-medium transition-colors duration-200 shadow-sm"
+                >
+                  {item.title}
+                </button>
+              ))}
             <div className="mt-4 text-center">
               <p className="text-xs text-white/50">
                 © 2024 DESCO. All rights reserved.
