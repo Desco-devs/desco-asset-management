@@ -31,6 +31,23 @@ async function main() {
       permissions: [Permission.VIEW],
       passwordPlain: 'EQUIPMENTS',
     },
+    {
+      username: 'DESCOINC_VIEWER',
+      fullname: 'DESCOINC Viewer Account',
+      permissions: [Permission.VIEW],
+      passwordPlain: 'ilovedesco1974',
+    },
+    {
+      username: 'DESCOINC_ADMIN',
+      fullname: 'DESCOINC Admin Account',
+      permissions: [
+        Permission.VIEW,
+        Permission.CREATE,
+        Permission.UPDATE,
+        Permission.DELETE,
+      ],
+      passwordPlain: 'maintenance',
+    },
   ]
 
 
