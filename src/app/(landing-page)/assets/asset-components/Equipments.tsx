@@ -26,8 +26,11 @@ import {
   Filter,
   X,
   Search,
+  Eye,
 } from "lucide-react";
 import EquipmentModal from "@/app/(dashboard)/equipments/equip-components/EquipmentModal";
+import ViewReportsModal from "@/app/(dashboard)/equipments/equip-components/ViewReportsModa";
+import { MaintenanceReport } from "@/app/(dashboard)/equipments/equip-components/MaintenanceReportModal";
 import { Input } from "@/components/ui/input";
 
 interface Equipment {
@@ -93,6 +96,14 @@ export default function EquipmentViewer() {
     null
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Maintenance reports states
+  const [reportCounts, setReportCounts] = useState<{
+    [equipmentId: string]: number;
+  }>({});
+  const [showViewReportsModal, setShowViewReportsModal] = useState(false);
+  const [viewReportsEquipment, setViewReportsEquipment] = useState<Equipment | null>(null);
+  const [viewReportsData, setViewReportsData] = useState<MaintenanceReport[]>([]);
 
   // Filter states
   const [selectedClient, setSelectedClient] = useState<string>("all");
@@ -269,6 +280,68 @@ export default function EquipmentViewer() {
     return badges;
   };
 
+  // Fetch maintenance report count for an equipment
+  const fetchReportCount = async (equipmentId: string) => {
+    try {
+      const response = await fetch(
+        `/api/maintenance-reports?equipmentId=${equipmentId}`
+      );
+      if (response.ok) {
+        const reports = await response.json();
+        setReportCounts((prev) => ({
+          ...prev,
+          [equipmentId]: reports.length,
+        }));
+        return reports.length;
+      }
+    } catch (error) {
+      console.error("Error fetching report count:", error);
+    }
+    return 0;
+  };
+
+  // Fetch equipment reports for viewing
+  const fetchEquipmentReports = async (equipmentId: string) => {
+    try {
+      const response = await fetch(
+        `/api/maintenance-reports?equipmentId=${equipmentId}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch maintenance reports");
+      }
+      const reports = await response.json();
+      return reports;
+    } catch (error) {
+      console.error("Error fetching maintenance reports:", error);
+      return [];
+    }
+  };
+
+  // Handle viewing maintenance reports
+  const handleViewReports = async (
+    e: React.MouseEvent,
+    equipment: Equipment
+  ) => {
+    e.stopPropagation();
+    const reports = await fetchEquipmentReports(equipment.uid);
+    setViewReportsData(reports);
+    setViewReportsEquipment(equipment);
+    setShowViewReportsModal(true);
+  };
+
+  // Fetch report counts for all equipment when data loads
+  useEffect(() => {
+    const fetchAllReportCounts = async () => {
+      for (const equipment of filteredEquipments) {
+        await fetchReportCount(equipment.uid);
+      }
+    };
+
+    if (filteredEquipments.length > 0) {
+      fetchAllReportCounts();
+    }
+  }, [filteredEquipments]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -425,9 +498,24 @@ export default function EquipmentViewer() {
           >
             <CardHeader className="pb-3">
               <div className="space-y-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  {equipment.brand} {equipment.model}
+                <CardTitle className="text-sm flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    {equipment.brand} {equipment.model}
+                  </div>
+                  {/* Issue Reports Button */}
+                  {reportCounts[equipment.uid] > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => handleViewReports(e, equipment)}
+                      className="h-6 px-2 text-xs border-red-300 text-red-600 hover:bg-red-100 hover:border-red-400"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      {reportCounts[equipment.uid]} issue
+                      {reportCounts[equipment.uid] !== 1 ? "s" : ""}
+                    </Button>
+                  )}
                 </CardTitle>
                 <CardDescription className="font-medium text-accent-foreground/70 text-xs">
                   {equipment.type}
@@ -569,6 +657,23 @@ export default function EquipmentViewer() {
           setIsModalOpen(open);
         }}
         equipment={selectedEquipment}
+      />
+
+      {/* Maintenance Reports Modal - View Only for Clients */}
+      <ViewReportsModal
+        isOpen={showViewReportsModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            // Refresh data when closing the modal
+            if (viewReportsEquipment) {
+              fetchReportCount(viewReportsEquipment.uid);
+            }
+          }
+          setShowViewReportsModal(open);
+        }}
+        reports={viewReportsData}
+        equipment={viewReportsEquipment}
+        showActions={false} // Clients can only view, not edit/delete
       />
     </div>
   );
