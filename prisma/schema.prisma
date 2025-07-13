@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Permission {
+  VIEW
+  DELETE
+  UPDATE
+  CREATE
+}
+
+enum userStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum Status {
+  OPERATIONAL
+  NON_OPERATIONAL
+}
+
+model User {
+  uid         String       @id @default(uuid())
+  username    String       @unique
+  password    String
+  fullname    String
+  phone       String?
+  userProfile String?
+  permissions Permission[] @default([]) // <-- enum array type, enforced by Prisma + PG
+  userStatus  userStatus   @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Location {
+  uid                        String                       @id @default(uuid())
+  address                    String
+  clients                    Client[]
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+  MaintenanceEquipmentReport MaintenanceEquipmentReport[]
+}
+
+model Client {
+  uid        String    @id @default(uuid())
+  name       String
+  locationId String
+  location   Location  @relation(fields: [locationId], references: [uid])
+  projects   Project[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Project {
+  uid  String @id @default(uuid())
+  name String
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [uid])
+
+  equipments Equipment[]
+  vehicles   Vehicle[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Equipment {
+  uid                       String                       @id @default(uuid())
+  brand                     String
+  model                     String
+  type                      String
+  insuranceExpirationDate   DateTime?                    @default(now())
+  before                    Int? // in months
+  status                    Status
+  remarks                   String?
+  owner                     String
+  image_url                 String?
+  inspectionDate            DateTime?
+  projectId                 String
+  plateNumber               String?
+  originalReceiptUrl        String?
+  equipmentRegistrationUrl  String?
+  thirdpartyInspectionImage String?
+  pgpcInspectionImage       String?
+  equipmentParts            String[]
+  project                   Project                      @relation(fields: [projectId], references: [uid])
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
+  MaintenanceReport         MaintenanceEquipmentReport[]
+}
+
+model Vehicle {
+  uid                 String   @id @default(uuid())
+  brand               String
+  model               String
+  type                String
+  plateNumber         String
+  inspectionDate      DateTime
+  before              Int // in months
+  expiryDate          DateTime
+  status              Status
+  remarks             String?
+  owner               String
+  frontImgUrl         String?
+  backImgUrl          String?
+  side1ImgUrl         String?
+  side2ImgUrl         String?
+  originalReceiptUrl  String? //image man ini para sa OR
+  carRegistrationUrl  String? //image man ini para sa CR
+  pgpcInspectionImage String? //same with the equipments igwa man pgpc
+  projectId           String
+  project             Project  @relation(fields: [projectId], references: [uid])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MaintenanceEquipmentReport {
+  uid               String          @id @default(uuid())
+  equipmentId       String
+  equipment         Equipment       @relation(fields: [equipmentId], references: [uid])
+  locationId        String
+  location          Location        @relation(fields: [locationId], references: [uid])
+  //reported and repaired by
+  reportedBy        String?
+  repairedBy        String?
+  //issue details
+  issueDescription  String
+  remarks           String?
+  inspectionDetails String?
+  actionTaken       String?
+  //parts
+  partsReplaced     String[]
+  priority          ReportPriority?
+  //status of the report
+  status            ReportStatus?
+  downtimeHours     String?
+  //dates
+  dateRepaired      DateTime?
+  dateReported      DateTime        @default(now())
+  //attachment URLs
+  attachmentUrls    String[]
+  //datecreated and updated
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+enum ReportPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ReportStatus {
+  REPORTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
