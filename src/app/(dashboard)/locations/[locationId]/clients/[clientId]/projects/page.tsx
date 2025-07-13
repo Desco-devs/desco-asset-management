@@ -193,7 +193,7 @@ export default function ProjectsPage() {
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
 
-              {canView && (
+              {/* {canView && (
                 <>
                   <DropdownMenuItem
                     onClick={() =>
@@ -220,7 +220,7 @@ export default function ProjectsPage() {
                     Vehicles {project.vehicles?.length ?? "0"}
                   </DropdownMenuItem>
                 </>
-              )}
+              )} */}
 
               {canUpdate && (
                 <DropdownMenuItem
