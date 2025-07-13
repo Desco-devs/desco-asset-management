@@ -47,7 +47,12 @@ export default function LandingLayout({ children }: { children: ReactNode }) {
       dark:from-chart-3/30 dark:from-30% dark:via-green-200/30 dark:via-75% dark:to-chart-3/20 dark:to-120%"
       />
 
-      {isSidebarOpen && <SidebarLandingPage onMenuClick={handleSmoothScroll} />}
+      {isSidebarOpen && (
+        <SidebarLandingPage
+          onMenuClick={handleSmoothScroll}
+          onClose={onToggleSidebar}
+        />
+      )}
       <HeaderHolder
         onMenuClick={handleSmoothScroll}
         onToggleSidebar={onToggleSidebar}
