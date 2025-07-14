@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -15,28 +18,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import {
-  Calendar,
-  User,
-  FileText,
-  Settings,
-  MapPin,
-  Clock,
   AlertTriangle,
+  Calendar,
   CheckCircle,
+  Clock,
+  Download,
   Eye,
+  FileText,
+  Filter,
+  MapPin,
   PenTool,
   Search,
-  Filter,
+  Settings,
+  User,
   X,
-  Download,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Equipment, MaintenanceReport } from "./MaintenanceReportModal";
-import { Separator } from "@/components/ui/separator";
 
 interface ViewReportsModalProps {
   isOpen: boolean;
@@ -154,7 +154,7 @@ const ViewReportsModal = ({
   // Export to Excel function
   const exportToExcel = () => {
     // Use the filtered reports for export
-    const dataToExport = filteredReports.map((report, index) => ({
+    const dataToExport = filteredReports.map((report) => ({
       "Report #": reports.findIndex((r) => r.uid === report.uid) + 1,
       Equipment: equipment
         ? `${equipment.brand} ${equipment.model}${
@@ -424,7 +424,7 @@ const ViewReportsModal = ({
 
               {searchTerm && (
                 <Badge variant="outline" className="text-xs">
-                  Search: "{searchTerm}"
+                  Search: &quot;{searchTerm}&quot;
                 </Badge>
               )}
 
@@ -452,7 +452,7 @@ const ViewReportsModal = ({
                   new Date(b.dateReported).getTime() -
                   new Date(a.dateReported).getTime()
               )
-              .map((report, index) => (
+              .map((report) => (
                 <div
                   key={report.uid}
                   className="border rounded-lg p-4 hover:border-red-500/20 transition-colors"

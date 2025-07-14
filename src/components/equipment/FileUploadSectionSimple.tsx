@@ -63,7 +63,7 @@ export function FileUploadSectionSimple({
 
   const handleKeepExisting = useCallback(() => {
     setSelectedFile(null);
-    setPreview(currentFileUrl);
+    setPreview(currentFileUrl || null);
     setKeepExisting(true);
     
     onFileChange(null);

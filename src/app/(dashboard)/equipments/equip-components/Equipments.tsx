@@ -135,7 +135,7 @@ const EquipmentCards = ({
 
   const [selectedReportForEdit, setSelectedReportForEdit] =
     useState<MaintenanceReport | null>(null);
-  const [equipmentReports, setEquipmentReports] = useState<{
+  const [, setEquipmentReports] = useState<{
     [equipmentId: string]: MaintenanceReport[];
   }>({});
   const [loadingReports, setLoadingReports] = useState<{
@@ -453,11 +453,6 @@ const EquipmentCards = ({
     setShowReportDeleteDialog(true);
   };
 
-  const closeMaintenanceModal = () => {
-    setShowMaintenanceModal(false);
-    setSelectedEquipmentThatHasIssues(null);
-    setSelectedReportForEdit(null);
-  };
 
   const confirmDelete = async () => {
     if (!equipmentToDelete) return;

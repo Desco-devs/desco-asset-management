@@ -105,39 +105,65 @@ export default function EquipmentPage() {
       }
 
       // Prepare data for export
-      const dataToExport = allReports.map((report: any, index: number) => ({
+      const dataToExport = allReports.map((report: unknown, index: number) => {
+        const r = report as {
+          equipment?: { 
+            brand?: string; 
+            model?: string; 
+            type?: string; 
+            plateNumber?: string;
+            owner?: string;
+            project?: { name?: string; client?: { name?: string } };
+          };
+          issueDescription?: string;
+          priority?: string;
+          status?: string;
+          dateReported?: string;
+          reportedBy?: string;
+          repairedBy?: string;
+          dateRepaired?: string;
+          location?: { address?: string };
+          downtimeHours?: string;
+          partsReplaced?: string[];
+          inspectionDetails?: string;
+          actionTaken?: string;
+          remarks?: string;
+          attachmentUrls?: string[];
+        };
+        return {
         "Report #": index + 1,
-        "Equipment Brand": report.equipment?.brand || "",
-        "Equipment Model": report.equipment?.model || "",
-        "Equipment Type": report.equipment?.type || "",
-        "Plate Number": report.equipment?.plateNumber || "",
-        "Equipment Owner": report.equipment?.owner || "",
-        "Project Name": report.equipment?.project?.name || "",
-        "Client Name": report.equipment?.project?.client?.name || "",
-        "Issue Description": report.issueDescription,
-        Priority: report.priority,
-        Status: report.status.replace("_", " "),
-        "Reported Date": new Date(report.dateReported).toLocaleDateString(),
-        "Reported By": report.reportedBy,
-        "Assigned To": report.repairedBy || "",
-        "Repaired Date": report.dateRepaired
-          ? new Date(report.dateRepaired).toLocaleDateString()
+        "Equipment Brand": r.equipment?.brand || "",
+        "Equipment Model": r.equipment?.model || "",
+        "Equipment Type": r.equipment?.type || "",
+        "Plate Number": r.equipment?.plateNumber || "",
+        "Equipment Owner": r.equipment?.owner || "",
+        "Project Name": r.equipment?.project?.name || "",
+        "Client Name": r.equipment?.project?.client?.name || "",
+        "Issue Description": r.issueDescription || "",
+        Priority: r.priority || "",
+        Status: r.status?.replace("_", " ") || "",
+        "Reported Date": r.dateReported ? new Date(r.dateReported).toLocaleDateString() : "",
+        "Reported By": r.reportedBy || "",
+        "Assigned To": r.repairedBy || "",
+        "Repaired Date": r.dateRepaired
+          ? new Date(r.dateRepaired).toLocaleDateString()
           : "",
-        Location: report.location?.address || "",
-        "Downtime Hours": report.downtimeHours || "",
-        "Parts Replaced": report.partsReplaced?.join(", ") || "",
-        "Inspection Details": report.inspectionDetails || "",
-        "Action Taken": report.actionTaken || "",
-        Remarks: report.remarks || "",
-        "Attachments Count": report.attachmentUrls?.length || 0,
-        "Created Date": new Date(report.dateReported).toISOString(),
-      }));
+        Location: r.location?.address || "",
+        "Downtime Hours": r.downtimeHours || "",
+        "Parts Replaced": r.partsReplaced?.join(", ") || "",
+        "Inspection Details": r.inspectionDetails || "",
+        "Action Taken": r.actionTaken || "",
+        Remarks: r.remarks || "",
+        "Attachments Count": r.attachmentUrls?.length || 0,
+        "Created Date": r.dateReported ? new Date(r.dateReported).toISOString() : "",
+        };
+      });
 
       // Create CSV content
       const headers = Object.keys(dataToExport[0]);
       const csvContent = [
         headers.join(","),
-        ...dataToExport.map((row: any) =>
+        ...dataToExport.map((row: Record<string, unknown>) =>
           headers
             .map((header) => {
               const value = row[header as keyof typeof row];
