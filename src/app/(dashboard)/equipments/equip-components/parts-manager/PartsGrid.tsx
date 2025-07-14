@@ -1,17 +1,18 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { X, Image as ImageIcon, Settings, Folder, Eye } from "lucide-react";
-import type { PartsGridProps } from "@/types/equipment-parts";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { getAllFolders } from "@/lib/equipment-parts-utils";
+import type { PartsGridProps } from "@/types/equipment-parts";
+import { Eye, Folder, Image as ImageIcon, Settings, X } from "lucide-react";
+import Image from "next/image"; // Import Next.js Image component
 import { useState } from "react";
 
 const PartsGrid = ({
@@ -35,6 +36,7 @@ const PartsGrid = ({
     setPreviewImage(null);
     setPreviewTitle("");
   };
+
   if (parts.length === 0) {
     return (
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 sm:p-6 text-center">
@@ -110,7 +112,9 @@ const PartsGrid = ({
                 type="button"
                 variant="destructive"
                 size="sm"
-                onClick={() => onRemovePart(index, selectedFolderId || undefined)}
+                onClick={() =>
+                  onRemovePart(index, selectedFolderId || undefined)
+                }
                 className="h-6 w-6 p-0"
               >
                 <X className="h-3 w-3" />
@@ -128,10 +132,10 @@ const PartsGrid = ({
               }
             }}
             className="hidden"
-            id={`part-file-${index}-${selectedFolderId || 'main'}`}
+            id={`part-file-${index}-${selectedFolderId || "main"}`}
           />
           <Label
-            htmlFor={`part-file-${index}-${selectedFolderId || 'main'}`}
+            htmlFor={`part-file-${index}-${selectedFolderId || "main"}`}
             className="cursor-pointer"
           >
             <Button
@@ -143,21 +147,29 @@ const PartsGrid = ({
             >
               <span>
                 <ImageIcon className="h-3 w-3 mr-1" />
-                {part.preview ? 'Change Image' : 'Choose Image'}
+                {part.preview ? "Change Image" : "Choose Image"}
               </span>
             </Button>
           </Label>
 
           {part.preview && (
-            <div className="relative group">
-              <img
+            <div className="relative group h-20 sm:h-24">
+              <Image
                 src={part.preview}
                 alt={`Equipment part ${index + 1}`}
-                className="w-full h-20 sm:h-24 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => openImagePreview(part.preview!, `Part ${index + 1}`)}
+                fill
+                className="object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() =>
+                  openImagePreview(part.preview!, `Part ${index + 1}`)
+                }
               />
-              {/* Hover overlay */}
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded border flex items-center justify-center opacity-0 group-hover:opacity-100">
+              {/* Hover overlay with click handler */}
+              <div
+                className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded border flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer"
+                onClick={() =>
+                  openImagePreview(part.preview!, `Part ${index + 1}`)
+                }
+              >
                 <Eye className="h-6 w-6 text-white" />
               </div>
               {part.isExisting && (
@@ -185,20 +197,23 @@ const PartsGrid = ({
           )}
         </div>
       ))}
-      
+
       {/* Image Preview Dialog */}
-      <Dialog open={!!previewImage} onOpenChange={() => closeImagePreview()}>
+      <Dialog open={!!previewImage} onOpenChange={closeImagePreview}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0">
           <DialogHeader className="p-4 pb-2">
             <DialogTitle>{previewTitle}</DialogTitle>
           </DialogHeader>
           <div className="flex justify-center p-4 pt-2">
             {previewImage && (
-              <img
-                src={previewImage}
-                alt={previewTitle}
-                className="max-w-full max-h-[70vh] object-contain rounded"
-              />
+              <div className="relative w-full h-[70vh]">
+                <Image
+                  src={previewImage}
+                  alt={previewTitle}
+                  fill
+                  className="object-contain rounded"
+                />
+              </div>
             )}
           </div>
         </DialogContent>
