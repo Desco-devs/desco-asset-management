@@ -1,7 +1,8 @@
 //equipment cards component
 "use client";
 
-import { useState, useEffect } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,34 +17,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 
-import {
-  Settings,
-  Edit,
-  Trash2,
-  Car,
-  FileText,
-  Image as ImageIcon,
-  Shield,
-  CheckCircle,
-  Plus,
-  AlertTriangle,
-  Eye,
-} from "lucide-react";
-import EquipmentModal from "./EquipmentModal";
-import AddEquipmentModal from "./EquipmentAddModal";
-import { toast } from "sonner";
 import { useAuth } from "@/app/context/AuthContext";
+import {
+  Car,
+  CheckCircle,
+  Edit,
+  Eye,
+  FileText,
+  Plus,
+  Settings,
+  Shield,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
 import EquipmentDeleteAlertDialog from "./AlertDialog";
+import AddEquipmentModal from "./EquipmentAddModal";
+import EquipmentModal from "./EquipmentModal";
 import MaintenanceReportModal, {
   MaintenanceReport,
 } from "./MaintenanceReportModal";
 
+import ReportDeleteAlertDialog from "./ReportDeleteAlertDialog";
 import ReportSelectionDialog from "./ReportSelection";
 import ViewReportsModal from "./ViewReportsModa";
-import ReportDeleteAlertDialog from "./ReportDeleteAlertDialog";
 
 // Types based on your updated Prisma schema
 interface Equipment {

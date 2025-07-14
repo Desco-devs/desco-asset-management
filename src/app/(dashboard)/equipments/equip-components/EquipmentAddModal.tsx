@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useAuth } from "@/app/context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +11,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -16,32 +25,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import type { EquipmentFolder, EquipmentPart } from "@/types/equipment-parts";
+import { format } from "date-fns";
 import {
   CalendarIcon,
+  CheckCircle,
+  FileText,
   Plus,
+  Shield,
   Upload,
   X,
-  FileText,
-  Receipt,
-  Shield,
-  CheckCircle,
-  Image as ImageIcon,
-  Settings,
 } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useAuth } from "@/app/context/AuthContext";
+import EquipmentPartsManager from "./EquipmentPartsManager";
 
 interface Location {
   uid: string;
@@ -98,13 +97,6 @@ interface Equipment {
       };
     };
   };
-}
-
-interface EquipmentPart {
-  file: File | null;
-  preview: string | null;
-  isExisting: boolean;
-  existingUrl?: string;
 }
 
 interface AddEquipmentModalProps {
@@ -198,6 +190,9 @@ const AddEquipmentModal = ({
 
   // Equipment parts state
   const [equipmentParts, setEquipmentParts] = useState<EquipmentPart[]>([]);
+  const [equipmentFolders, setEquipmentFolders] = useState<EquipmentFolder[]>(
+    []
+  );
 
   // Populate form when editing
   useEffect(() => {
@@ -376,6 +371,222 @@ const AddEquipmentModal = ({
     }
   };
 
+  // Helper function to find folder by path
+  const findFolderByPath = (
+    folders: EquipmentFolder[],
+    path: string[]
+  ): EquipmentFolder | null => {
+    if (path.length === 0) return null;
+
+    let currentFolders = folders;
+    let currentFolder = null;
+
+    for (const folderId of path) {
+      currentFolder = currentFolders.find((f) => f.id === folderId);
+      if (!currentFolder) return null;
+      currentFolders = currentFolder.subfolders;
+    }
+
+    return currentFolder;
+  };
+
+  // Helper function to update folders recursively
+  const updateFoldersRecursively = (
+    folders: EquipmentFolder[],
+    targetId: string,
+    updateFn: (folder: EquipmentFolder) => EquipmentFolder
+  ): EquipmentFolder[] => {
+    return folders.map((folder) => {
+      if (folder.id === targetId) {
+        return updateFn(folder);
+      }
+      return {
+        ...folder,
+        subfolders: updateFoldersRecursively(
+          folder.subfolders,
+          targetId,
+          updateFn
+        ),
+      };
+    });
+  };
+
+  // Helper function to delete folder recursively
+  const deleteFolderRecursively = (
+    folders: EquipmentFolder[],
+    targetId: string
+  ): EquipmentFolder[] => {
+    return folders
+      .filter((folder) => folder.id !== targetId)
+      .map((folder) => ({
+        ...folder,
+        subfolders: deleteFolderRecursively(folder.subfolders, targetId),
+      }));
+  };
+
+  // Folder Management Functions
+  const createFolder = () => {
+    const folderId = `folder_${Date.now()}`;
+    const newFolder: EquipmentFolder = {
+      id: folderId,
+      name: "New Folder",
+      parts: [],
+      subfolders: [],
+      parentId: selectedFolderId || undefined,
+    };
+
+    if (selectedFolderId) {
+      // Add to current folder
+      setEquipmentFolders((prev) =>
+        updateFoldersRecursively(prev, selectedFolderId, (folder) => ({
+          ...folder,
+          subfolders: [...folder.subfolders, newFolder],
+        }))
+      );
+    } else {
+      // Add to root
+      setEquipmentFolders((prev) => [...prev, newFolder]);
+    }
+
+    setEditingFolderId(folderId);
+    setNewFolderName("New Folder");
+  };
+
+  const renameFolder = (folderId: string, newName: string) => {
+    if (!newName.trim()) return;
+
+    setEquipmentFolders((prev) =>
+      updateFoldersRecursively(prev, folderId, (folder) => ({
+        ...folder,
+        name: newName.trim(),
+      }))
+    );
+
+    setEditingFolderId(null);
+    setNewFolderName("");
+  };
+
+  const deleteFolder = (folderId: string) => {
+    // Find and collect all parts from deleted folder and its subfolders
+    const collectPartsFromFolder = (
+      folder: EquipmentFolder
+    ): EquipmentPart[] => {
+      let allParts = [...folder.parts];
+      folder.subfolders.forEach((subfolder) => {
+        allParts = [...allParts, ...collectPartsFromFolder(subfolder)];
+      });
+      return allParts;
+    };
+
+    const findAndCollectParts = (
+      folders: EquipmentFolder[]
+    ): EquipmentPart[] => {
+      for (const folder of folders) {
+        if (folder.id === folderId) {
+          return collectPartsFromFolder(folder);
+        }
+        const found = findAndCollectParts(folder.subfolders);
+        if (found.length > 0) return found;
+      }
+      return [];
+    };
+
+    const partsToMove = findAndCollectParts(equipmentFolders);
+
+    // Move all parts back to main parts list
+    setEquipmentParts((prev) => [
+      ...prev,
+      ...partsToMove.map((part) => ({ ...part, folderId: undefined })),
+    ]);
+
+    // Delete the folder
+    setEquipmentFolders((prev) => deleteFolderRecursively(prev, folderId));
+
+    // If we're currently in the deleted folder, go back to parent or root
+    if (selectedFolderId === folderId) {
+      if (folderPath.length > 1) {
+        const newPath = folderPath.slice(0, -1);
+        setFolderPath(newPath);
+        setSelectedFolderId(newPath[newPath.length - 1]);
+      } else {
+        setFolderPath([]);
+        setSelectedFolderId(null);
+      }
+    }
+  };
+
+  const navigateToFolder = (folderId: string) => {
+    const newPath = [...folderPath, folderId];
+    setFolderPath(newPath);
+    setSelectedFolderId(folderId);
+  };
+
+  const navigateBack = () => {
+    if (folderPath.length > 1) {
+      const newPath = folderPath.slice(0, -1);
+      setFolderPath(newPath);
+      setSelectedFolderId(newPath[newPath.length - 1]);
+    } else {
+      setFolderPath([]);
+      setSelectedFolderId(null);
+    }
+  };
+
+  const navigateToRoot = () => {
+    setFolderPath([]);
+    setSelectedFolderId(null);
+  };
+
+  const movePartToFolder = (partIndex: number, folderId: string | null) => {
+    const getCurrentParts = () => {
+      if (selectedFolderId) {
+        const currentFolder = findFolderByPath(equipmentFolders, folderPath);
+        return currentFolder?.parts || [];
+      }
+      return equipmentParts;
+    };
+
+    const currentParts = getCurrentParts();
+    const part = currentParts[partIndex];
+    if (!part) return;
+
+    if (folderId) {
+      // Move part to target folder
+      setEquipmentFolders((prev) =>
+        updateFoldersRecursively(prev, folderId, (folder) => ({
+          ...folder,
+          parts: [...folder.parts, { ...part, folderId }],
+        }))
+      );
+    } else {
+      // Move part to main list
+      setEquipmentParts((prev) => [...prev, { ...part, folderId: undefined }]);
+    }
+
+    // Remove from current location
+    if (selectedFolderId) {
+      setEquipmentFolders((prev) =>
+        updateFoldersRecursively(prev, selectedFolderId, (folder) => ({
+          ...folder,
+          parts: folder.parts.filter((_, index) => index !== partIndex),
+        }))
+      );
+    } else {
+      setEquipmentParts((prev) =>
+        prev.filter((_, index) => index !== partIndex)
+      );
+    }
+  };
+
+  const movePartFromFolder = (folderId: string, partIndex: number) => {
+    setEquipmentFolders((prev) =>
+      updateFoldersRecursively(prev, folderId, (folder) => ({
+        ...folder,
+        parts: folder.parts.filter((_, index) => index !== partIndex),
+      }))
+    );
+  };
+
   // Equipment Parts Functions
   const handleEquipmentPartsChange = (
     e: React.ChangeEvent<HTMLInputElement>
@@ -403,36 +614,106 @@ const AddEquipmentModal = ({
       file: null,
       preview: null,
       isExisting: false,
+      folderId: selectedFolderId || undefined,
     };
-    setEquipmentParts((prev) => [...prev, newPart]);
+
+    if (selectedFolderId) {
+      // Add to current folder
+      setEquipmentFolders((prev) =>
+        updateFoldersRecursively(prev, selectedFolderId, (folder) => ({
+          ...folder,
+          parts: [...folder.parts, newPart],
+        }))
+      );
+    } else {
+      // Add to main parts list
+      setEquipmentParts((prev) => [...prev, newPart]);
+    }
   };
 
-  const removeEquipmentPart = (index: number) => {
-    setEquipmentParts((prev) => {
-      const newParts = [...prev];
-      // Clean up object URL if it exists
-      if (newParts[index].preview && !newParts[index].isExisting) {
-        URL.revokeObjectURL(newParts[index].preview!);
-      }
-      newParts.splice(index, 1);
-      return newParts;
-    });
+  const removeEquipmentPart = (index: number, folderId?: string) => {
+    if (folderId) {
+      // Remove from folder
+      setEquipmentFolders((prev) =>
+        prev.map((folder) =>
+          folder.id === folderId
+            ? {
+                ...folder,
+                parts: folder.parts.filter((part, i) => {
+                  if (i === index) {
+                    // Clean up object URL if it exists
+                    if (part.preview && !part.isExisting) {
+                      URL.revokeObjectURL(part.preview);
+                    }
+                    return false;
+                  }
+                  return true;
+                }),
+              }
+            : folder
+        )
+      );
+    } else {
+      // Remove from main parts list
+      setEquipmentParts((prev) => {
+        const newParts = [...prev];
+        // Clean up object URL if it exists
+        if (newParts[index].preview && !newParts[index].isExisting) {
+          URL.revokeObjectURL(newParts[index].preview!);
+        }
+        newParts.splice(index, 1);
+        return newParts;
+      });
+    }
   };
 
-  const updateEquipmentPart = (index: number, file: File) => {
-    setEquipmentParts((prev) => {
-      const newParts = [...prev];
-      // Clean up old object URL if it exists
-      if (newParts[index].preview && !newParts[index].isExisting) {
-        URL.revokeObjectURL(newParts[index].preview!);
-      }
-      newParts[index] = {
-        file,
-        preview: URL.createObjectURL(file),
-        isExisting: false,
-      };
-      return newParts;
-    });
+  const updateEquipmentPart = (
+    index: number,
+    file: File,
+    folderId?: string
+  ) => {
+    if (folderId) {
+      // Update part in folder
+      setEquipmentFolders((prev) =>
+        prev.map((folder) =>
+          folder.id === folderId
+            ? {
+                ...folder,
+                parts: folder.parts.map((part, i) => {
+                  if (i === index) {
+                    // Clean up old object URL if it exists
+                    if (part.preview && !part.isExisting) {
+                      URL.revokeObjectURL(part.preview);
+                    }
+                    return {
+                      file,
+                      preview: URL.createObjectURL(file),
+                      isExisting: false,
+                      folderId,
+                    };
+                  }
+                  return part;
+                }),
+              }
+            : folder
+        )
+      );
+    } else {
+      // Update part in main list
+      setEquipmentParts((prev) => {
+        const newParts = [...prev];
+        // Clean up old object URL if it exists
+        if (newParts[index].preview && !newParts[index].isExisting) {
+          URL.revokeObjectURL(newParts[index].preview!);
+        }
+        newParts[index] = {
+          file,
+          preview: URL.createObjectURL(file),
+          isExisting: false,
+        };
+        return newParts;
+      });
+    }
   };
 
   // Regular file handling functions
@@ -721,14 +1002,38 @@ const AddEquipmentModal = ({
         submitFormData.append("pgpcInspection", pgpcInspectionFile);
       }
 
-      // Add equipment parts
-      equipmentParts.forEach((part, index) => {
+      // Add equipment parts from main list
+      let partIndex = 0;
+      equipmentParts.forEach((part) => {
         if (part.file) {
-          submitFormData.append(`equipmentPart_${index}`, part.file);
+          submitFormData.append(`equipmentPart_${partIndex}`, part.file);
+          submitFormData.append(`equipmentPartFolder_${partIndex}`, "main");
         } else if (part.isExisting && part.existingUrl) {
           // For existing parts, send a flag to keep them
-          submitFormData.append(`keepExistingPart_${index}`, "true");
+          submitFormData.append(`keepExistingPart_${partIndex}`, "true");
+          submitFormData.append(`equipmentPartFolder_${partIndex}`, "main");
         }
+        partIndex++;
+      });
+
+      // Add equipment parts from folders
+      equipmentFolders.forEach((folder) => {
+        folder.parts.forEach((part) => {
+          if (part.file) {
+            submitFormData.append(`equipmentPart_${partIndex}`, part.file);
+            submitFormData.append(
+              `equipmentPartFolder_${partIndex}`,
+              folder.name
+            );
+          } else if (part.isExisting && part.existingUrl) {
+            submitFormData.append(`keepExistingPart_${partIndex}`, "true");
+            submitFormData.append(
+              `equipmentPartFolder_${partIndex}`,
+              folder.name
+            );
+          }
+          partIndex++;
+        });
       });
 
       // Add keep existing file flags for edit mode
@@ -812,6 +1117,23 @@ const AddEquipmentModal = ({
         }
       });
       setEquipmentParts([]);
+
+      // Reset equipment folders recursively
+      const cleanupFolder = (folder: EquipmentFolder) => {
+        folder.parts.forEach((part) => {
+          if (part.preview && !part.isExisting) {
+            URL.revokeObjectURL(part.preview);
+          }
+        });
+        folder.subfolders.forEach(cleanupFolder);
+      };
+
+      equipmentFolders.forEach(cleanupFolder);
+      setEquipmentFolders([]);
+      setSelectedFolderId(null);
+      setEditingFolderId(null);
+      setNewFolderName("");
+      setFolderPath([]);
 
       setIsOpen(false);
       onEquipmentAdded();
@@ -1548,129 +1870,12 @@ const AddEquipmentModal = ({
           </div>
 
           {/* Equipment Parts Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-base font-medium">
-                <div className="flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-blue-500" />
-                  Equipment Parts
-                </div>
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleEquipmentPartsChange}
-                  className="hidden"
-                  id="batch-parts-upload"
-                />
-                <Label htmlFor="batch-parts-upload" className="cursor-pointer">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    asChild
-                  >
-                    <span>
-                      <Upload className="h-3 w-3 mr-1" />
-                      Batch Upload
-                    </span>
-                  </Button>
-                </Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addEquipmentPart}
-                  className="text-xs"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Part
-                </Button>
-              </div>
-            </div>
-
-            {equipmentParts.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {equipmentParts.map((part, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Part {index + 1}</Label>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => removeEquipmentPart(index)}
-                        className="h-6 w-6 p-0"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          updateEquipmentPart(index, file);
-                        }
-                      }}
-                      className="cursor-pointer text-xs"
-                    />
-
-                    {part.preview && (
-                      <div className="relative">
-                        <img
-                          src={part.preview}
-                          alt={`Equipment part ${index + 1}`}
-                          className="w-full h-24 object-cover rounded border"
-                        />
-                        {part.isExisting && (
-                          <div className="absolute bottom-1 left-1">
-                            <span className="bg-blue-600 text-white text-xs px-1 py-0.5 rounded">
-                              Current
-                            </span>
-                          </div>
-                        )}
-                        {!part.isExisting && part.file && (
-                          <div className="absolute bottom-1 left-1">
-                            <span className="bg-green-600 text-white text-xs px-1 py-0.5 rounded">
-                              New
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {!part.preview && (
-                      <div className="border-2 border-dashed border-gray-300 rounded p-4 text-center">
-                        <ImageIcon className="mx-auto h-6 w-6 text-gray-400 mb-1" />
-                        <p className="text-xs text-gray-500">
-                          Upload part image
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {equipmentParts.length === 0 && (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <Settings className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                <p className="text-sm text-gray-500 mb-2">
-                  No equipment parts added yet
-                </p>
-                <p className="text-xs text-gray-400">
-                  Use "Batch Upload" to add multiple images at once, or "Add
-                  Part" to add them one by one
-                </p>
-              </div>
-            )}
-          </div>
+          <EquipmentPartsManager
+            equipmentParts={equipmentParts}
+            setEquipmentParts={setEquipmentParts}
+            equipmentFolders={equipmentFolders}
+            setEquipmentFolders={setEquipmentFolders}
+          />
 
           {/* Remarks */}
           <div className="space-y-2">
