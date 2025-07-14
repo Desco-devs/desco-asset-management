@@ -35,17 +35,36 @@ const deleteFileFromSupabase = async (fileUrl: string, tag: string): Promise<voi
   if (error) throw error
 }
 
-// Upload a file to Supabase storage
+// Upload a file to Supabase storage with human-readable paths
 const uploadFileToSupabase = async (
   file: File,
   projectId: string,
   equipmentId: string,
-  prefix: string
+  prefix: string,
+  projectName?: string,
+  clientName?: string,
+  brand?: string,
+  model?: string,
+  type?: string
 ): Promise<{ field: string; url: string }> => {
   const timestamp = Date.now()
   const ext = file.name.split('.').pop()
   const filename = `${prefix}_${timestamp}.${ext}`
-  const filepath = `${projectId}/${equipmentId}/${filename}`
+  
+  // Create human-readable folder structure
+  const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_')
+  
+  let humanReadablePath = ''
+  if (projectName && clientName && brand && model && type) {
+    const readableProject = sanitizeForPath(`${projectName}_${clientName}`)
+    const readableEquipment = sanitizeForPath(`${brand}_${model}_${type}`)
+    humanReadablePath = `${readableProject}/${readableEquipment}`
+  } else {
+    // Fallback to UUID structure
+    humanReadablePath = `${projectId}/${equipmentId}`
+  }
+  
+  const filepath = `${humanReadablePath}/${filename}`
   const buffer = Buffer.from(await file.arrayBuffer())
 
   const { data: uploadData, error: uploadErr } = await supabase
@@ -65,17 +84,39 @@ const uploadFileToSupabase = async (
   return { field: getFieldName(prefix), url: urlData.publicUrl }
 }
 
-// Upload equipment part with numbered prefix
+// Upload equipment part with numbered prefix and folder support
 const uploadEquipmentPart = async (
   file: File,
   projectId: string,
   equipmentId: string,
-  partNumber: number
+  partNumber: number,
+  folderPath: string = "main",
+  projectName?: string,
+  clientName?: string,
+  brand?: string,
+  model?: string,
+  type?: string
 ): Promise<string> => {
   const timestamp = Date.now()
   const ext = file.name.split('.').pop()
   const filename = `${partNumber}_${file.name.replace(/\.[^/.]+$/, "")}_${timestamp}.${ext}`
-  const filepath = `${projectId}/${equipmentId}/${filename}`
+  
+  // Create human-readable folder structure
+  const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_')
+  
+  let humanReadablePath = ''
+  if (projectName && clientName && brand && model && type) {
+    const readableProject = sanitizeForPath(`${projectName}_${clientName}`)
+    const readableEquipment = sanitizeForPath(`${brand}_${model}_${type}`)
+    humanReadablePath = `${readableProject}/${readableEquipment}`
+  } else {
+    // Fallback to UUID structure
+    humanReadablePath = `${projectId}/${equipmentId}`
+  }
+  
+  const sanitizedFolderPath = folderPath.replace(/[^a-zA-Z0-9_\-\/]/g, '_')
+  const filepath = `${humanReadablePath}/${sanitizedFolderPath}/${filename}`
+  
   const buffer = Buffer.from(await file.arrayBuffer())
 
   const { data: uploadData, error: uploadErr } = await supabase
@@ -93,6 +134,73 @@ const uploadEquipmentPart = async (
     .getPublicUrl(uploadData.path)
 
   return urlData.publicUrl
+}
+
+// Function to move file in Supabase storage
+const moveFileInSupabase = async (
+  oldUrl: string,
+  projectId: string,
+  equipmentId: string,
+  newFolderPath: string,
+  partNumber: number,
+  originalFilename: string
+): Promise<string> => {
+  try {
+    // Extract the old file path from URL
+    const urlParts = oldUrl.split('/storage/v1/object/public/equipments/')
+    if (urlParts.length !== 2) {
+      throw new Error('Invalid file URL format')
+    }
+    const oldFilePath = urlParts[1]
+
+    // Download the file
+    const { data: fileData, error: downloadError } = await supabase
+      .storage
+      .from('equipments')
+      .download(oldFilePath)
+
+    if (downloadError || !fileData) {
+      throw new Error(`Failed to download file: ${downloadError?.message}`)
+    }
+
+    // Create new file path
+    const timestamp = Date.now()
+    const ext = originalFilename.split('.').pop()
+    const filename = `${partNumber}_${originalFilename.replace(/\.[^/.]+$/, "")}_${timestamp}.${ext}`
+    const sanitizedFolderPath = newFolderPath.replace(/[^a-zA-Z0-9_\-\/]/g, '_')
+    const newFilePath = `${projectId}/${equipmentId}/${sanitizedFolderPath}/${filename}`
+
+    // Upload to new location
+    const { data: uploadData, error: uploadError } = await supabase
+      .storage
+      .from('equipments')
+      .upload(newFilePath, fileData, { cacheControl: '3600', upsert: false })
+
+    if (uploadError || !uploadData) {
+      throw new Error(`Failed to upload to new location: ${uploadError?.message}`)
+    }
+
+    // Delete old file
+    const { error: deleteError } = await supabase
+      .storage
+      .from('equipments')
+      .remove([oldFilePath])
+
+    if (deleteError) {
+      console.warn(`Warning: Failed to delete old file: ${deleteError.message}`)
+    }
+
+    // Get new public URL
+    const { data: urlData } = supabase
+      .storage
+      .from('equipments')
+      .getPublicUrl(uploadData.path)
+
+    return urlData.publicUrl
+  } catch (error) {
+    console.error('Error moving file:', error)
+    throw error
+  }
 }
 
 // Map file-prefix to Prisma field name
@@ -134,6 +242,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    // Fetch project and client info for human-readable paths
+    const projectInfo = await prisma.project.findUnique({
+      where: { uid: projectId },
+      include: {
+        client: {
+          include: {
+            location: true
+          }
+        }
+      }
+    })
+
+    if (!projectInfo) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
+    const projectName = projectInfo.name
+    const clientName = projectInfo.client.name
+
     // 1) create record without files
     const createData: any = {
       brand,
@@ -167,15 +294,19 @@ export async function POST(request: Request) {
       { file: formData.get('pgpcInspection') as File | null, prefix: 'pgpc_inspection' },
     ]
       .filter(f => f.file && f.file.size > 0)
-      .map(f => uploadFileToSupabase(f.file!, projectId, equipment.uid, f.prefix))
+      .map(f => uploadFileToSupabase(f.file!, projectId, equipment.uid, f.prefix, projectName, clientName, brand, model, type))
 
-    // 3) handle equipment parts
+    // 3) handle equipment parts with folder structure
     const partFiles: File[] = []
+    const partFolders: string[] = []
     let partIndex = 0
     while (true) {
       const partFile = formData.get(`equipmentPart_${partIndex}`) as File | null
       if (!partFile || partFile.size === 0) break
+      
+      const folderPath = formData.get(`equipmentPartFolder_${partIndex}`) as string || "main"
       partFiles.push(partFile)
+      partFolders.push(folderPath)
       partIndex++
     }
 
@@ -192,12 +323,23 @@ export async function POST(request: Request) {
       }
     }
 
-    // Upload equipment parts
+    // Upload equipment parts with folder structure
     if (partFiles.length > 0) {
       try {
         const partUrls: string[] = []
         for (let i = 0; i < partFiles.length; i++) {
-          const partUrl = await uploadEquipmentPart(partFiles[i], projectId, equipment.uid, i + 1)
+          const partUrl = await uploadEquipmentPart(
+            partFiles[i], 
+            projectId, 
+            equipment.uid, 
+            i + 1, 
+            partFolders[i],
+            projectName,
+            clientName,
+            brand,
+            model,
+            type
+          )
           partUrls.push(partUrl)
         }
         updateData.equipmentParts = partUrls
@@ -335,7 +477,7 @@ export async function PUT(request: Request) {
       }
     }
 
-    // Handle equipment parts updates
+    // Handle equipment parts updates with folder structure
     const currentParts = existing.equipmentParts || []
     const newParts: string[] = [...currentParts] // Start with existing parts
 
@@ -344,8 +486,10 @@ export async function PUT(request: Request) {
     while (true) {
       const newPartFile = formData.get(`equipmentPart_${partIndex}`) as File | null
       const keepExisting = formData.get(`keepExistingPart_${partIndex}`) as string
+      const folderPath = formData.get(`equipmentPartFolder_${partIndex}`) as string || "main"
+      const moveFile = formData.get(`moveExistingPart_${partIndex}`) as string
 
-      if (!newPartFile && keepExisting !== 'true' && partIndex >= currentParts.length) {
+      if (!newPartFile && keepExisting !== 'true' && moveFile !== 'true' && partIndex >= currentParts.length) {
         // No more parts to process
         break
       }
@@ -357,9 +501,32 @@ export async function PUT(request: Request) {
           await deleteFileFromSupabase(currentParts[partIndex], `part ${partIndex + 1}`)
         }
 
-        // Upload new part
-        const newPartUrl = await uploadEquipmentPart(newPartFile, projectId, equipmentId, partIndex + 1)
+        // Upload new part with folder structure
+        const newPartUrl = await uploadEquipmentPart(
+          newPartFile, 
+          projectId, 
+          equipmentId, 
+          partIndex + 1, 
+          folderPath
+        )
         newParts[partIndex] = newPartUrl
+      } else if (moveFile === 'true' && partIndex < currentParts.length) {
+        // Move existing file to different folder
+        try {
+          const originalFilename = currentParts[partIndex].split('/').pop()?.split('_').slice(1, -1).join('_') || 'file'
+          const movedUrl = await moveFileInSupabase(
+            currentParts[partIndex],
+            projectId,
+            equipmentId,
+            folderPath,
+            partIndex + 1,
+            originalFilename
+          )
+          newParts[partIndex] = movedUrl
+        } catch (error) {
+          console.error(`Failed to move file at index ${partIndex}:`, error)
+          // Keep the original URL if move fails
+        }
       } else if (keepExisting !== 'true' && partIndex < currentParts.length) {
         // Remove existing part
         await deleteFileFromSupabase(currentParts[partIndex], `part ${partIndex + 1}`)
