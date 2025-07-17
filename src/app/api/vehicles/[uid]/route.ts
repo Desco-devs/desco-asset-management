@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient, Status as VehicleStatus } from '@prisma/client'
-import { createServiceRoleClient } from '@/lib/supabase'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 
 const prisma = new PrismaClient()
 const supabase = createServiceRoleClient()

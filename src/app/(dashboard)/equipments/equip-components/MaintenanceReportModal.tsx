@@ -105,7 +105,7 @@ const MaintenanceReportModal = ({
     equipmentId: equipment?.uid || editReport?.equipmentId || "",
     locationId:
       editReport?.locationId || equipment?.project.client.location.uid || "",
-    reportedBy: editReport?.reportedBy || user?.fullname || "",
+    reportedBy: editReport?.reportedBy || user?.full_name || "",
     repairedBy: editReport?.repairedBy || "",
     issueDescription: editReport?.issueDescription || "",
     remarks: editReport?.remarks || "",
@@ -146,7 +146,7 @@ const MaintenanceReportModal = ({
           editReport?.locationId ||
           equipment?.project.client.location.uid ||
           "",
-        reportedBy: editReport?.reportedBy || user?.fullname || "",
+        reportedBy: editReport?.reportedBy || user?.full_name || "",
         repairedBy: editReport?.repairedBy || "",
         issueDescription: editReport?.issueDescription || "",
         remarks: editReport?.remarks || "",

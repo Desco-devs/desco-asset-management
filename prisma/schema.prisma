@@ -8,157 +8,165 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-enum Permission {
-  VIEW
-  DELETE
-  UPDATE
-  CREATE
+enum Role {
+  SUPERADMIN
+  ADMIN
+  VIEWER
 }
 
-enum userStatus {
+enum user_status {
   ACTIVE
   INACTIVE
 }
 
-enum Status {
+enum status {
   OPERATIONAL
   NON_OPERATIONAL
 }
 
-model User {
-  uid         String       @id @default(uuid())
-  username    String       @unique
-  password    String
-  fullname    String
-  phone       String?
-  userProfile String?
-  permissions Permission[] @default([]) // <-- enum array type, enforced by Prisma + PG
-  userStatus  userStatus   @default(ACTIVE)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+model user {
+  id            String       @id // Same as auth.users.id from Supabase
+  username      String       @unique
+  full_name     String
+  phone         String?
+  user_profile  String?
+  role          Role         @default(VIEWER)
+  user_status   user_status  @default(ACTIVE)
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  @@map("users")
 }
 
-model Location {
-  uid                        String                       @id @default(uuid())
-  address                    String
-  clients                    Client[]
-  createdAt                  DateTime                     @default(now())
-  updatedAt                  DateTime                     @updatedAt
-  MaintenanceEquipmentReport MaintenanceEquipmentReport[]
+model location {
+  id                                String                        @id @default(uuid())
+  address                           String
+  clients                           client[]
+  created_at                        DateTime                      @default(now())
+  updated_at                        DateTime                      @updatedAt
+  maintenance_equipment_reports     maintenance_equipment_report[]
+
+  @@map("locations")
 }
 
-model Client {
-  uid        String    @id @default(uuid())
+model client {
+  id          String    @id @default(uuid())
+  name        String
+  location_id String
+  location    location  @relation(fields: [location_id], references: [id])
+  projects    project[]
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  @@map("clients")
+}
+
+model project {
+  id         String      @id @default(uuid())
   name       String
-  locationId String
-  location   Location  @relation(fields: [locationId], references: [uid])
-  projects   Project[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  client_id  String
+  client     client      @relation(fields: [client_id], references: [id])
+  equipments equipment[]
+  vehicles   vehicle[]
+  created_at DateTime    @default(now())
+  updated_at DateTime    @updatedAt
+
+  @@map("projects")
 }
 
-model Project {
-  uid  String @id @default(uuid())
-  name String
+model equipment {
+  id                            String                        @id @default(uuid())
+  brand                         String
+  model                         String
+  type                          String
+  insurance_expiration_date     DateTime?                     @default(now())
+  before                        Int? // in months
+  status                        status
+  remarks                       String?
+  owner                         String
+  image_url                     String?
+  inspection_date               DateTime?
+  project_id                    String
+  plate_number                  String?
+  original_receipt_url          String?
+  equipment_registration_url    String?
+  thirdparty_inspection_image   String?
+  pgpc_inspection_image         String?
+  equipment_parts               String[]
+  project                       project                       @relation(fields: [project_id], references: [id])
+  created_at                    DateTime                      @default(now())
+  updated_at                    DateTime                      @updatedAt
+  maintenance_reports           maintenance_equipment_report[]
 
-  clientId String
-  client   Client @relation(fields: [clientId], references: [uid])
-
-  equipments Equipment[]
-  vehicles   Vehicle[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@map("equipment")
 }
 
-model Equipment {
-  uid                       String                       @id @default(uuid())
-  brand                     String
-  model                     String
-  type                      String
-  insuranceExpirationDate   DateTime?                    @default(now())
-  before                    Int? // in months
-  status                    Status
-  remarks                   String?
-  owner                     String
-  image_url                 String?
-  inspectionDate            DateTime?
-  projectId                 String
-  plateNumber               String?
-  originalReceiptUrl        String?
-  equipmentRegistrationUrl  String?
-  thirdpartyInspectionImage String?
-  pgpcInspectionImage       String?
-  equipmentParts            String[]
-  project                   Project                      @relation(fields: [projectId], references: [uid])
-  createdAt                 DateTime                     @default(now())
-  updatedAt                 DateTime                     @updatedAt
-  MaintenanceReport         MaintenanceEquipmentReport[]
+model vehicle {
+  id                      String   @id @default(uuid())
+  brand                   String
+  model                   String
+  type                    String
+  plate_number            String
+  inspection_date         DateTime
+  before                  Int // in months
+  expiry_date             DateTime
+  status                  status
+  remarks                 String?
+  owner                   String
+  front_img_url           String?
+  back_img_url            String?
+  side1_img_url           String?
+  side2_img_url           String?
+  original_receipt_url    String? //image man ini para sa OR
+  car_registration_url    String? //image man ini para sa CR
+  pgpc_inspection_image   String? //same with the equipments igwa man pgpc
+  project_id              String
+  project                 project  @relation(fields: [project_id], references: [id])
+  created_at              DateTime @default(now())
+  updated_at              DateTime @updatedAt
+
+  @@map("vehicles")
 }
 
-model Vehicle {
-  uid                 String   @id @default(uuid())
-  brand               String
-  model               String
-  type                String
-  plateNumber         String
-  inspectionDate      DateTime
-  before              Int // in months
-  expiryDate          DateTime
-  status              Status
-  remarks             String?
-  owner               String
-  frontImgUrl         String?
-  backImgUrl          String?
-  side1ImgUrl         String?
-  side2ImgUrl         String?
-  originalReceiptUrl  String? //image man ini para sa OR
-  carRegistrationUrl  String? //image man ini para sa CR
-  pgpcInspectionImage String? //same with the equipments igwa man pgpc
-  projectId           String
-  project             Project  @relation(fields: [projectId], references: [uid])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model MaintenanceEquipmentReport {
-  uid               String          @id @default(uuid())
-  equipmentId       String
-  equipment         Equipment       @relation(fields: [equipmentId], references: [uid])
-  locationId        String
-  location          Location        @relation(fields: [locationId], references: [uid])
+model maintenance_equipment_report {
+  id                  String           @id @default(uuid())
+  equipment_id        String
+  equipment           equipment        @relation(fields: [equipment_id], references: [id])
+  location_id         String
+  location            location         @relation(fields: [location_id], references: [id])
   //reported and repaired by
-  reportedBy        String?
-  repairedBy        String?
+  reported_by         String?
+  repaired_by         String?
   //issue details
-  issueDescription  String
-  remarks           String?
-  inspectionDetails String?
-  actionTaken       String?
+  issue_description   String
+  remarks             String?
+  inspection_details  String?
+  action_taken        String?
   //parts
-  partsReplaced     String[]
-  priority          ReportPriority?
+  parts_replaced      String[]
+  priority            report_priority?
   //status of the report
-  status            ReportStatus?
-  downtimeHours     String?
+  status              report_status?
+  downtime_hours      String?
   //dates
-  dateRepaired      DateTime?
-  dateReported      DateTime        @default(now())
+  date_repaired       DateTime?
+  date_reported       DateTime         @default(now())
   //attachment URLs
-  attachmentUrls    String[]
+  attachment_urls     String[]
   //datecreated and updated
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  created_at          DateTime         @default(now())
+  updated_at          DateTime         @updatedAt
+
+  @@map("maintenance_equipment_reports")
 }
 
-enum ReportPriority {
+enum report_priority {
   LOW
   MEDIUM
   HIGH
 }
 
-enum ReportStatus {
+enum report_status {
   REPORTED
   IN_PROGRESS
   COMPLETED

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/app/context/AuthContext";
-import { login } from "@/app/service/auth/authentication";
 import {
   Card,
   CardContent,
@@ -25,9 +24,9 @@ interface SigninProps {
 
 const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
   const router = useRouter();
-  const { setUser } = useAuth();
+  const { signIn } = useAuth();
   const [formData, setFormData] = useState({
-    username: "",
+    email: "",
     password: "",
   });
   const [loading, setLoading] = useState(false);
@@ -56,19 +55,17 @@ const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
     setLoading(true);
 
     try {
-      const user = await login({
-        username: formData.username,
-        password: formData.password,
-      });
-
-      // Set user in context
-      setUser(user);
+      await signIn(formData.email, formData.password);
 
       // Show success message
       toast.success("Login successful!");
 
+      // Get redirect URL from query params or default to /home
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectTo = urlParams.get('redirectTo') || '/home';
+      
       // Immediate redirect without delay
-      router.replace("/home");
+      router.replace(redirectTo);
     } catch (err: any) {
       toast.error(err.message || "Login failed");
     } finally {
@@ -95,14 +92,14 @@ const SigninWrapper = ({ onToggle, onForgotPassword }: SigninProps) => {
         <CardContent className="text-accent-foreground dark:text-accent">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username" className="ml-1">
-                Username
+              <Label htmlFor="email" className="ml-1">
+                Email
               </Label>
               <Input
-                id="username"
-                type="text"
-                placeholder="Enter your username"
-                value={formData.username}
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={formData.email}
                 onChange={handleChange}
                 required
                 className="border-chart-1 focus-visible:border-chart-1 focus-visible:ring-chart-1/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"

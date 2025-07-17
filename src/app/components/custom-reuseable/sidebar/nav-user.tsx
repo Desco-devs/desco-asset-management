@@ -39,19 +39,14 @@ export function NavUser({
   };
 }) {
   const { isMobile } = useSidebar();
-  const { user, loading, clearUser } = useAuth();
+  const { user, supabaseUser, signOut } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
     try {
-      const res = await fetch("/api/authentication/logout", { method: "POST" });
-      if (res.ok) {
-        clearUser();
-        toast.success("Logout successful!");
-      } else {
-        toast.error("Logout failed");
-      }
+      await signOut();
+      toast.success("Logout successful!");
     } catch (error) {
       console.error(error);
       toast.error("Logout error");

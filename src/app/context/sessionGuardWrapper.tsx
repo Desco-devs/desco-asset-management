@@ -6,7 +6,7 @@ import { useAuth } from "@/app/context/AuthContext";
 import GuradLoader from "../components/custom-reuseable/loader";
 
 export function SessionGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, supabaseUser, loading } = useAuth();
   const router = useRouter();
   const [showLoader, setShowLoader] = useState(true);
 
@@ -20,17 +20,17 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Redirect to login or home page if user is not logged in or status is inactive
-    if (!loading && (!user || user.userStatus === "INACTIVE")) {
-      router.replace("/"); // Redirect to login or home page
+    // Redirect to login if no Supabase user or user status is inactive
+    if (!loading && (!supabaseUser || !user || user.user_status === "INACTIVE")) {
+      router.replace("/login"); // Redirect to login page
     }
-  }, [loading, user, router]);
+  }, [loading, user, supabaseUser, router]);
 
   if (showLoader || loading) {
     return <GuradLoader />; // Show the loader for 2 seconds or while loading
   }
 
-  if (!user) {
+  if (!supabaseUser || !user) {
     return null; // Prevent flicker before redirect
   }
 

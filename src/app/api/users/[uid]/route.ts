@@ -1,21 +1,53 @@
-import { PrismaClient, Permission, userStatus as UserStatusEnum } from '@prisma/client'
+import { PrismaClient, Permission, user_status as UserStatusEnum } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcrypt'
 
-// Type for userStatus values
+// Type for user_status values
 type UserStatus = keyof typeof UserStatusEnum
 
 // Input type for update
 interface UpdateUserBody {
   username?: string
-  password?: string
-  fullname?: string
+  full_name?: string
   phone?: string | null
   permissions?: Permission[]
-  userStatus?: UserStatus
+  user_status?: UserStatus
 }
 
 const prisma = new PrismaClient()
+
+// GET: Retrieve user by ID
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ uid: string }> }
+) {
+  const { uid } = await context.params
+  
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: uid },
+      select: {
+        id: true,
+        username: true,
+        full_name: true,
+        phone: true,
+        user_profile: true,
+        permissions: true,
+        user_status: true,
+        created_at: true,
+        updated_at: true,
+      },
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    return NextResponse.json(user)
+  } catch (error) {
+    console.error('Error fetching user:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
 
 export async function PUT(
   request: NextRequest,
@@ -25,17 +57,14 @@ export async function PUT(
 
   try {
     const body = (await request.json()) as UpdateUserBody
-    const { username, password, fullname, phone, permissions, userStatus } = body
+    const { username, full_name, phone, permissions, user_status } = body
 
     // Validate input types
     if (username && typeof username !== 'string') {
       return NextResponse.json({ error: 'Invalid username' }, { status: 400 })
     }
-    if (password && typeof password !== 'string') {
-      return NextResponse.json({ error: 'Invalid password' }, { status: 400 })
-    }
-    if (fullname && typeof fullname !== 'string') {
-      return NextResponse.json({ error: 'Invalid fullname' }, { status: 400 })
+    if (full_name && typeof full_name !== 'string') {
+      return NextResponse.json({ error: 'Invalid full_name' }, { status: 400 })
     }
     if (phone && typeof phone !== 'string') {
       return NextResponse.json({ error: 'Invalid phone' }, { status: 400 })
@@ -44,8 +73,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid permissions' }, { status: 400 })
     }
     if (
-      userStatus &&
-      !Object.values(UserStatusEnum).includes(userStatus as UserStatus)
+      user_status &&
+      !Object.values(UserStatusEnum).includes(user_status as UserStatus)
     ) {
       return NextResponse.json({ error: 'Invalid user status' }, { status: 400 })
     }
@@ -53,24 +82,23 @@ export async function PUT(
     const updateData: UpdateUserBody = {}
 
     if (username) updateData.username = username
-    if (password) updateData.password = await bcrypt.hash(password, 10)
-    if (fullname) updateData.fullname = fullname
+    if (full_name) updateData.full_name = full_name
     if (phone !== undefined) updateData.phone = phone
     if (permissions) updateData.permissions = permissions
-    if (userStatus) updateData.userStatus = userStatus
+    if (user_status) updateData.user_status = user_status
 
     const user = await prisma.user.update({
-      where: { uid },
+      where: { id: uid },
       data: updateData,
       select: {
-        uid: true,
+        id: true,
         username: true,
-        fullname: true,
+        full_name: true,
         phone: true,
         permissions: true,
-        userStatus: true,
-        createdAt: true,
-        updatedAt: true,
+        user_status: true,
+        created_at: true,
+        updated_at: true,
       },
     })
 
@@ -95,7 +123,7 @@ export async function DELETE(
 
   try {
     await prisma.user.delete({
-      where: { uid },
+      where: { id: uid },
     })
 
     return NextResponse.json({ message: 'User deleted successfully' })

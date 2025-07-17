@@ -7,65 +7,111 @@ import React, {
   ReactNode,
   useEffect,
 } from "react";
-import { userStatus, Permission } from "@prisma/client";
+import { User as SupabaseUser } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase";
+import { user_status, Permission } from "@prisma/client";
+
 export interface User {
-  uid: string;
+  id: string;
   username: string;
-  fullname: string;
+  full_name: string;
   phone: string | null;
-  userProfile: string | null;
+  user_profile: string | null;
   permissions: Permission[];
-  userStatus: userStatus;
-  createdAt: string;
-  updatedAt: string;
-  iat: number;
-  exp: number;
+  user_status: user_status;
+  created_at: string;
+  updated_at: string;
+  auth_user?: SupabaseUser;
 }
 
 interface AuthContextType {
   user: User | null;
+  supabaseUser: SupabaseUser | null;
   setUser: (user: User | null) => void;
   clearUser: () => void;
   loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const supabase = createClient();
 
   useEffect(() => {
-    async function fetchSession() {
-      try {
-        const res = await fetch("/api/session", { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
-          setUserState(data.user);
-        } else if (res.status === 401) {
-          // User not authenticated - this is expected, don't log as error
-          setUserState(null);
-        } else {
-          // Other errors (500, etc.)
-          console.error("Session fetch failed:", res.status);
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setSupabaseUser(session.user);
+        await fetchUserProfile(session.user.id);
+      }
+      setLoading(false);
+    };
+
+    getInitialSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          setSupabaseUser(session.user);
+          await fetchUserProfile(session.user.id);
+        } else if (event === 'SIGNED_OUT') {
+          setSupabaseUser(null);
           setUserState(null);
         }
-      } catch (error) {
-        // Network errors, etc.
-        console.error("Session fetch error:", error);
-        setUserState(null);
-      } finally {
-        setLoading(false);
       }
-    }
-    fetchSession();
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/users/${userId}`);
+      if (response.ok) {
+        const userData = await response.json();
+        setUserState(userData);
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+    }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+  };
+
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+  };
+
   const setUser = (u: User | null) => setUserState(u);
-  const clearUser = () => setUserState(null);
+  const clearUser = () => {
+    setUserState(null);
+    setSupabaseUser(null);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, clearUser, loading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      supabaseUser, 
+      setUser, 
+      clearUser, 
+      loading, 
+      signIn, 
+      signOut 
+    }}>
       {children}
     </AuthContext.Provider>
   );
