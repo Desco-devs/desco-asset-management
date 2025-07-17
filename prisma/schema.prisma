@@ -25,7 +25,7 @@ enum status {
 }
 
 model user {
-  id            String       @id // Same as auth.users.id from Supabase
+  id            String       @id @db.Uuid // Same as auth.users.id from Supabase
   username      String       @unique
   full_name     String
   phone         String?
@@ -39,7 +39,7 @@ model user {
 }
 
 model location {
-  id                                String                        @id @default(uuid())
+  id                                String                        @id @default(uuid()) @db.Uuid
   address                           String
   clients                           client[]
   created_at                        DateTime                      @default(now())
@@ -50,9 +50,9 @@ model location {
 }
 
 model client {
-  id          String    @id @default(uuid())
+  id          String    @id @default(uuid()) @db.Uuid
   name        String
-  location_id String
+  location_id String    @db.Uuid
   location    location  @relation(fields: [location_id], references: [id])
   projects    project[]
   created_at  DateTime  @default(now())
@@ -62,9 +62,9 @@ model client {
 }
 
 model project {
-  id         String      @id @default(uuid())
+  id         String      @id @default(uuid()) @db.Uuid
   name       String
-  client_id  String
+  client_id  String      @db.Uuid
   client     client      @relation(fields: [client_id], references: [id])
   equipments equipment[]
   vehicles   vehicle[]
@@ -75,7 +75,7 @@ model project {
 }
 
 model equipment {
-  id                            String                        @id @default(uuid())
+  id                            String                        @id @default(uuid()) @db.Uuid
   brand                         String
   model                         String
   type                          String
@@ -86,7 +86,7 @@ model equipment {
   owner                         String
   image_url                     String?
   inspection_date               DateTime?
-  project_id                    String
+  project_id                    String                        @db.Uuid
   plate_number                  String?
   original_receipt_url          String?
   equipment_registration_url    String?
@@ -102,7 +102,7 @@ model equipment {
 }
 
 model vehicle {
-  id                      String   @id @default(uuid())
+  id                      String   @id @default(uuid()) @db.Uuid
   brand                   String
   model                   String
   type                    String
@@ -120,7 +120,7 @@ model vehicle {
   original_receipt_url    String? //image man ini para sa OR
   car_registration_url    String? //image man ini para sa CR
   pgpc_inspection_image   String? //same with the equipments igwa man pgpc
-  project_id              String
+  project_id              String   @db.Uuid
   project                 project  @relation(fields: [project_id], references: [id])
   created_at              DateTime @default(now())
   updated_at              DateTime @updatedAt
@@ -129,10 +129,10 @@ model vehicle {
 }
 
 model maintenance_equipment_report {
-  id                  String           @id @default(uuid())
-  equipment_id        String
+  id                  String           @id @default(uuid()) @db.Uuid
+  equipment_id        String           @db.Uuid
   equipment           equipment        @relation(fields: [equipment_id], references: [id])
-  location_id         String
+  location_id         String           @db.Uuid
   location            location         @relation(fields: [location_id], references: [id])
   //reported and repaired by
   reported_by         String?

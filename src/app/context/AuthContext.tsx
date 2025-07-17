@@ -7,32 +7,8 @@ import React, {
   ReactNode,
   useEffect,
 } from "react";
-import { User as SupabaseUser } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
-import { user_status, Permission } from "@prisma/client";
-
-export interface User {
-  id: string;
-  username: string;
-  full_name: string;
-  phone: string | null;
-  user_profile: string | null;
-  permissions: Permission[];
-  user_status: user_status;
-  created_at: string;
-  updated_at: string;
-  auth_user?: SupabaseUser;
-}
-
-interface AuthContextType {
-  user: User | null;
-  supabaseUser: SupabaseUser | null;
-  setUser: (user: User | null) => void;
-  clearUser: () => void;
-  loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-}
+import { User, AuthContextType } from "@/types/auth";
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 

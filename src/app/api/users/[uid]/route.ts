@@ -1,4 +1,4 @@
-import { PrismaClient, Permission, user_status as UserStatusEnum } from '@prisma/client'
+import { PrismaClient, Role, user_status as UserStatusEnum } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Type for user_status values
@@ -9,7 +9,7 @@ interface UpdateUserBody {
   username?: string
   full_name?: string
   phone?: string | null
-  permissions?: Permission[]
+  role?: Role
   user_status?: UserStatus
 }
 
@@ -31,7 +31,7 @@ export async function GET(
         full_name: true,
         phone: true,
         user_profile: true,
-        permissions: true,
+        role: true,
         user_status: true,
         created_at: true,
         updated_at: true,
@@ -57,7 +57,7 @@ export async function PUT(
 
   try {
     const body = (await request.json()) as UpdateUserBody
-    const { username, full_name, phone, permissions, user_status } = body
+    const { username, full_name, phone, role, user_status } = body
 
     // Validate input types
     if (username && typeof username !== 'string') {
@@ -69,8 +69,8 @@ export async function PUT(
     if (phone && typeof phone !== 'string') {
       return NextResponse.json({ error: 'Invalid phone' }, { status: 400 })
     }
-    if (permissions && !Array.isArray(permissions)) {
-      return NextResponse.json({ error: 'Invalid permissions' }, { status: 400 })
+    if (role && !Object.values(Role).includes(role)) {
+      return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
     }
     if (
       user_status &&
@@ -84,7 +84,7 @@ export async function PUT(
     if (username) updateData.username = username
     if (full_name) updateData.full_name = full_name
     if (phone !== undefined) updateData.phone = phone
-    if (permissions) updateData.permissions = permissions
+    if (role) updateData.role = role
     if (user_status) updateData.user_status = user_status
 
     const user = await prisma.user.update({
@@ -95,7 +95,7 @@ export async function PUT(
         username: true,
         full_name: true,
         phone: true,
-        permissions: true,
+        role: true,
         user_status: true,
         created_at: true,
         updated_at: true,

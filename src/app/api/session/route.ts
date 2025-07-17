@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
         full_name: true,
         phone: true,
         user_profile: true,
-        permissions: true,
+        role: true,
         user_status: true,
         created_at: true,
         updated_at: true,

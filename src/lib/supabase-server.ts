@@ -5,7 +5,7 @@ import { Database } from '@/types/database.types'
 // Server-side supabase client for API routes and server components
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies()
-  
+
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -23,6 +23,7 @@ export async function createServerSupabaseClient() {
             // The `setAll` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
             // user sessions.
+
           }
         },
       },
@@ -38,12 +39,15 @@ export function createMiddlewareClient(request: Request) {
     {
       cookies: {
         getAll() {
-          return request.headers.get('cookie')
-            ?.split('; ')
+          const cookieHeader = request.headers.get('cookie')
+          if (!cookieHeader) return []
+
+          return cookieHeader
+            .split('; ')
             .map(cookie => {
-              const [name, value] = cookie.split('=')
-              return { name, value }
-            }) || []
+              const [name, ...rest] = cookie.split('=')
+              return { name, value: rest.join('=') }
+            })
         },
         setAll() {
           // Middleware can't set cookies directly
