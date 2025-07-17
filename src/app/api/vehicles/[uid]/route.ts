@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient, Status as VehicleStatus } from '@prisma/client'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase'
 
 const prisma = new PrismaClient()
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: { persistSession: false }
-  }
-)
+const supabase = createServiceRoleClient()
 
 // GET: Retrieve a single vehicle by UID
 export async function GET(

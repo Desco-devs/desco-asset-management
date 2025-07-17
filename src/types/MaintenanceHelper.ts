@@ -1,14 +1,10 @@
 
 import { NextResponse } from 'next/server'
 import { PrismaClient, ReportStatus, ReportPriority } from '@prisma/client'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase'
 
 const prisma = new PrismaClient()
-const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-)
+const supabase = createServiceRoleClient()
 
 
 // Helper to extract storage path from a Supabase URL
