@@ -69,6 +69,7 @@ export default function EquipmentClientViewer({
     totalCount: totalEquipmentCount,
     itemsPerPage: 12,
     apiEndpoint: "/api/equipments/paginated",
+    externalData: filteredEquipment,
   });
 
   // Get projects filtered by selected client and location

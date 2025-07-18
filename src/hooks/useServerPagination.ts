@@ -5,6 +5,7 @@ export interface UseServerPaginationProps {
   totalCount: number;
   itemsPerPage?: number;
   apiEndpoint: string;
+  externalData?: any[];
 }
 
 export interface UseServerPaginationReturn<T> {
@@ -27,6 +28,7 @@ export function useServerPagination<T>({
   totalCount,
   itemsPerPage = 12,
   apiEndpoint,
+  externalData,
 }: UseServerPaginationProps): UseServerPaginationReturn<T> {
   const [data, setData] = useState<T[]>(initialData);
   const [loading, setLoading] = useState(false);
@@ -84,6 +86,16 @@ export function useServerPagination<T>({
   const refreshData = useCallback(() => {
     fetchPage(currentPage);
   }, [currentPage, fetchPage]);
+
+  // Update data when external data changes (for real-time updates)
+  useEffect(() => {
+    if (externalData && currentPage === 1) {
+      // If we're on the first page and have external data, use it
+      const paginatedData = externalData.slice(0, itemsPerPage);
+      setData(paginatedData);
+      setCache(prev => new Map(prev).set(1, paginatedData));
+    }
+  }, [externalData, currentPage, itemsPerPage]);
 
   // Reset to first page when total count changes
   useEffect(() => {

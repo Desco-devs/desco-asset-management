@@ -63,6 +63,7 @@ export default function VehicleClientViewer({
     totalCount: totalVehicleCount,
     itemsPerPage: 12,
     apiEndpoint: "/api/vehicles/paginated",
+    externalData: filteredVehicles,
   });
 
   // Get projects filtered by selected client and location

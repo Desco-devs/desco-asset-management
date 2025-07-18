@@ -59,6 +59,12 @@ const AssetsClientViewer = ({
               duration: 5000,
             });
 
+            // Find the actual project from the existing projects data
+            const project = initialProjects.find(p => p.uid === payload.new.project_id);
+            
+            // Find the client with location data
+            const client = project ? initialClients.find(c => c.uid === project.client.uid) : null;
+            
             // Create equipment object with realtime data
             const newEquipment: Equipment = {
               uid: equipmentId,
@@ -83,15 +89,26 @@ const AssetsClientViewer = ({
                 payload.new.thirdparty_inspection_image || undefined,
               pgpcInspectionImage:
                 payload.new.pgpc_inspection_image || undefined,
-              project: {
-                uid: "temp-project-id",
-                name: "Test Project",
+              project: project && client ? {
+                uid: project.uid,
+                name: project.name,
                 client: {
-                  uid: "temp-client-id",
-                  name: "Test Client",
+                  uid: client.uid,
+                  name: client.name,
                   location: {
-                    uid: "temp-location-id",
-                    address: "Test Location",
+                    uid: client.location.uid,
+                    address: client.location.address,
+                  },
+                },
+              } : {
+                uid: "unknown-project-id",
+                name: "Unknown Project",
+                client: {
+                  uid: "unknown-client-id",
+                  name: "Unknown Client",
+                  location: {
+                    uid: "unknown-location-id",
+                    address: "Unknown Location",
                   },
                 },
               },
@@ -180,6 +197,12 @@ const AssetsClientViewer = ({
               duration: 5000,
             });
 
+            // Find the actual project from the existing projects data
+            const project = initialProjects.find(p => p.uid === payload.new.project_id);
+            
+            // Find the client with location data
+            const client = project ? initialClients.find(c => c.uid === project.client.uid) : null;
+            
             // Create vehicle object with realtime data
             const newVehicle: Vehicle = {
               uid: vehicleId,
@@ -203,15 +226,26 @@ const AssetsClientViewer = ({
               side2ImgUrl: payload.new.side2_img_url || undefined,
               originalReceiptUrl: payload.new.original_receipt_url || undefined,
               carRegistrationUrl: payload.new.car_registration_url || undefined,
-              project: {
-                uid: "temp-project-id",
-                name: "Test Project",
+              project: project && client ? {
+                uid: project.uid,
+                name: project.name,
                 client: {
-                  uid: "temp-client-id",
-                  name: "Test Client",
+                  uid: client.uid,
+                  name: client.name,
                   location: {
-                    uid: "temp-location-id",
-                    address: "Test Location",
+                    uid: client.location.uid,
+                    address: client.location.address,
+                  },
+                },
+              } : {
+                uid: "unknown-project-id",
+                name: "Unknown Project",
+                client: {
+                  uid: "unknown-client-id",
+                  name: "Unknown Client",
+                  location: {
+                    uid: "unknown-location-id",
+                    address: "Unknown Location",
                   },
                 },
               },
