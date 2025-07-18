@@ -20,6 +20,8 @@ const AssetsClientViewer = ({
   initialClients,
   initialLocations,
   initialProjects,
+  totalEquipmentCount,
+  totalVehicleCount,
 }: AssetsClientViewerProps) => {
   const [viewMode, setViewMode] = useState<"equipment" | "vehicles">(
     "equipment"
@@ -42,38 +44,45 @@ const AssetsClientViewer = ({
   useEffect(() => {
     // Subscribe to equipment table changes
     const equipmentChannel = supabase
-      .channel('equipment-realtime-channel')
+      .channel("equipment-realtime-channel")
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'equipment' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "equipment" },
         (payload) => {
           if (payload.eventType === "INSERT") {
             const brand = payload.new.brand || "Unknown Brand";
             const model = payload.new.model || "Unknown Model";
             const equipmentId = payload.new.id;
-            
+
             toast.success(`New Equipment Added`, {
               description: `${brand} ${model} has been successfully added to the system`,
               duration: 5000,
             });
-            
+
             // Create equipment object with realtime data
             const newEquipment: Equipment = {
               uid: equipmentId,
               brand: brand,
               model: model,
               type: payload.new.type || "Unknown Type",
-              insuranceExpirationDate: payload.new.insurance_expiration_date ? new Date(payload.new.insurance_expiration_date).toISOString() : "",
+              insuranceExpirationDate: payload.new.insurance_expiration_date
+                ? new Date(payload.new.insurance_expiration_date).toISOString()
+                : "",
               status: payload.new.status || "OPERATIONAL",
               remarks: payload.new.remarks || undefined,
               owner: payload.new.owner || "Unknown Owner",
               image_url: payload.new.image_url || undefined,
-              inspectionDate: payload.new.inspection_date ? new Date(payload.new.inspection_date).toISOString() : undefined,
+              inspectionDate: payload.new.inspection_date
+                ? new Date(payload.new.inspection_date).toISOString()
+                : undefined,
               plateNumber: payload.new.plate_number || undefined,
               originalReceiptUrl: payload.new.original_receipt_url || undefined,
-              equipmentRegistrationUrl: payload.new.equipment_registration_url || undefined,
-              thirdpartyInspectionImage: payload.new.thirdparty_inspection_image || undefined,
-              pgpcInspectionImage: payload.new.pgpc_inspection_image || undefined,
+              equipmentRegistrationUrl:
+                payload.new.equipment_registration_url || undefined,
+              thirdpartyInspectionImage:
+                payload.new.thirdparty_inspection_image || undefined,
+              pgpcInspectionImage:
+                payload.new.pgpc_inspection_image || undefined,
               project: {
                 uid: "temp-project-id",
                 name: "Test Project",
@@ -87,7 +96,7 @@ const AssetsClientViewer = ({
                 },
               },
             };
-            
+
             setEquipment((prev) => [newEquipment, ...prev]);
             setNewItemIds((prev) => new Set([...prev, equipmentId]));
           } else if (payload.eventType === "UPDATE") {
@@ -99,18 +108,23 @@ const AssetsClientViewer = ({
                     brand: payload.new.brand || item.brand,
                     model: payload.new.model || item.model,
                     type: payload.new.type || item.type,
-                    insuranceExpirationDate:
-                      payload.new.insurance_expiration_date ? new Date(payload.new.insurance_expiration_date).toISOString() :
-                      item.insuranceExpirationDate,
+                    insuranceExpirationDate: payload.new
+                      .insurance_expiration_date
+                      ? new Date(
+                          payload.new.insurance_expiration_date
+                        ).toISOString()
+                      : item.insuranceExpirationDate,
                     status: payload.new.status || item.status,
                     remarks: payload.new.remarks || item.remarks,
                     owner: payload.new.owner || item.owner,
                     image_url: payload.new.image_url || item.image_url,
-                    inspectionDate:
-                      payload.new.inspection_date ? new Date(payload.new.inspection_date).toISOString() : item.inspectionDate,
+                    inspectionDate: payload.new.inspection_date
+                      ? new Date(payload.new.inspection_date).toISOString()
+                      : item.inspectionDate,
                     plateNumber: payload.new.plate_number || item.plateNumber,
                     originalReceiptUrl:
-                      payload.new.original_receipt_url || item.originalReceiptUrl,
+                      payload.new.original_receipt_url ||
+                      item.originalReceiptUrl,
                     equipmentRegistrationUrl:
                       payload.new.equipment_registration_url ||
                       item.equipmentRegistrationUrl,
@@ -126,13 +140,10 @@ const AssetsClientViewer = ({
               })
             );
 
-            toast.info(
-              `Equipment Updated`,
-              {
-                description: `${payload.new.brand} ${payload.new.model} information has been updated`,
-                duration: 3000,
-              }
-            );
+            toast.info(`Equipment Updated`, {
+              description: `${payload.new.brand} ${payload.new.model} information has been updated`,
+              duration: 3000,
+            });
           } else if (payload.eventType === "DELETE") {
             setEquipment((prev) =>
               prev.filter((item) => item.uid !== payload.old.id)
@@ -143,7 +154,8 @@ const AssetsClientViewer = ({
               return newSet;
             });
             toast.error("Equipment Removed", {
-              description: "Equipment has been successfully removed from the system",
+              description:
+                "Equipment has been successfully removed from the system",
               duration: 3000,
             });
           }
@@ -162,12 +174,12 @@ const AssetsClientViewer = ({
             const brand = payload.new.brand || "Unknown Brand";
             const model = payload.new.model || "Unknown Model";
             const vehicleId = payload.new.id;
-            
+
             toast.success(`New Vehicle Added`, {
               description: `${brand} ${model} has been successfully added to the system`,
               duration: 5000,
             });
-            
+
             // Create vehicle object with realtime data
             const newVehicle: Vehicle = {
               uid: vehicleId,
@@ -175,9 +187,13 @@ const AssetsClientViewer = ({
               model: model,
               type: payload.new.type || "Unknown Type",
               plateNumber: payload.new.plate_number || "",
-              inspectionDate: payload.new.inspection_date ? new Date(payload.new.inspection_date).toISOString() : "",
+              inspectionDate: payload.new.inspection_date
+                ? new Date(payload.new.inspection_date).toISOString()
+                : "",
               before: payload.new.before || 0,
-              expiryDate: payload.new.expiry_date ? new Date(payload.new.expiry_date).toISOString() : "",
+              expiryDate: payload.new.expiry_date
+                ? new Date(payload.new.expiry_date).toISOString()
+                : "",
               status: payload.new.status || "OPERATIONAL",
               remarks: payload.new.remarks || undefined,
               owner: payload.new.owner || "Unknown Owner",
@@ -200,7 +216,7 @@ const AssetsClientViewer = ({
                 },
               },
             };
-            
+
             setVehicles((prev) => [newVehicle, ...prev]);
             setNewItemIds((prev) => new Set([...prev, vehicleId]));
           } else if (payload.eventType === "UPDATE") {
@@ -213,10 +229,13 @@ const AssetsClientViewer = ({
                     model: payload.new.model || item.model,
                     type: payload.new.type || item.type,
                     plateNumber: payload.new.plate_number || item.plateNumber,
-                    inspectionDate:
-                      payload.new.inspection_date ? new Date(payload.new.inspection_date).toISOString() : item.inspectionDate,
+                    inspectionDate: payload.new.inspection_date
+                      ? new Date(payload.new.inspection_date).toISOString()
+                      : item.inspectionDate,
                     before: payload.new.before || item.before,
-                    expiryDate: payload.new.expiry_date ? new Date(payload.new.expiry_date).toISOString() : item.expiryDate,
+                    expiryDate: payload.new.expiry_date
+                      ? new Date(payload.new.expiry_date).toISOString()
+                      : item.expiryDate,
                     status: payload.new.status || item.status,
                     remarks: payload.new.remarks || item.remarks,
                     owner: payload.new.owner || item.owner,
@@ -225,22 +244,21 @@ const AssetsClientViewer = ({
                     side1ImgUrl: payload.new.side1_img_url || item.side1ImgUrl,
                     side2ImgUrl: payload.new.side2_img_url || item.side2ImgUrl,
                     originalReceiptUrl:
-                      payload.new.original_receipt_url || item.originalReceiptUrl,
+                      payload.new.original_receipt_url ||
+                      item.originalReceiptUrl,
                     carRegistrationUrl:
-                      payload.new.car_registration_url || item.carRegistrationUrl,
+                      payload.new.car_registration_url ||
+                      item.carRegistrationUrl,
                   };
                 }
                 return item;
               })
             );
 
-            toast.info(
-              `Vehicle Updated`,
-              {
-                description: `${payload.new.brand} ${payload.new.model} information has been updated`,
-                duration: 3000,
-              }
-            );
+            toast.info(`Vehicle Updated`, {
+              description: `${payload.new.brand} ${payload.new.model} information has been updated`,
+              duration: 3000,
+            });
           } else if (payload.eventType === "DELETE") {
             setVehicles((prev) =>
               prev.filter((item) => item.uid !== payload.old.id)
@@ -251,7 +269,8 @@ const AssetsClientViewer = ({
               return newSet;
             });
             toast.error("Vehicle Removed", {
-              description: "Vehicle has been successfully removed from the system",
+              description:
+                "Vehicle has been successfully removed from the system",
               duration: 3000,
             });
           }
@@ -314,6 +333,7 @@ const AssetsClientViewer = ({
           locations={initialLocations}
           projects={initialProjects}
           newItemIds={newItemIds}
+          totalEquipmentCount={totalEquipmentCount}
         />
       ) : (
         <VehicleClientViewer
@@ -322,6 +342,7 @@ const AssetsClientViewer = ({
           locations={initialLocations}
           projects={initialProjects}
           newItemIds={newItemIds}
+          totalVehicleCount={totalVehicleCount}
         />
       )}
     </div>

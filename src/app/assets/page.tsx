@@ -24,6 +24,8 @@ const AssetsPage = async () => {
       clientsData,
       locationsData,
       projectsData,
+      totalEquipmentCount,
+      totalVehicleCount,
     ] = await Promise.all([
       prisma.equipment.findMany({
         include: {
@@ -40,6 +42,7 @@ const AssetsPage = async () => {
         orderBy: {
           created_at: "desc",
         },
+        take: 12,
       }),
       prisma.vehicle.findMany({
         include: {
@@ -56,6 +59,7 @@ const AssetsPage = async () => {
         orderBy: {
           created_at: "desc",
         },
+        take: 12,
       }),
       prisma.client.findMany({
         include: {
@@ -78,6 +82,8 @@ const AssetsPage = async () => {
           created_at: "desc",
         },
       }),
+      prisma.equipment.count(),
+      prisma.vehicle.count(),
     ]);
 
     // Data fetched successfully from database
@@ -181,6 +187,8 @@ const AssetsPage = async () => {
             initialClients={serializedClients}
             initialLocations={serializedLocations}
             initialProjects={serializedProjects}
+            totalEquipmentCount={totalEquipmentCount}
+            totalVehicleCount={totalVehicleCount}
           />
         </div>
       </>

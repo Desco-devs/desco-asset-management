@@ -109,4 +109,6 @@ export interface AssetsClientViewerProps {
   initialClients: Client[];
   initialLocations: Location[];
   initialProjects: Project[];
+  totalEquipmentCount: number;
+  totalVehicleCount: number;
 }
