@@ -54,7 +54,7 @@
     "jsonwebtoken": "^9.0.2",
     "lucide": "^0.511.0",
     "lucide-react": "^0.511.0",
-    "next": "^15.3.2",
+    "next": "^15.3.3",
     "next-themes": "^0.4.6",
     "nuqs": "^2.4.3",
     "philippine-location-json-for-geer": "^1.1.11",
