@@ -4,6 +4,7 @@ import { ModeToggle } from "@/app/components/custom-reusable/darkmode-toggle/The
 import { useAuth } from "@/app/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Loader2, LogOut } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -33,15 +34,19 @@ export default function AssetsHeader() {
       <div className="w-full flex flex-row items-center justify-between md:px-8 px-4 md:h-[12dvh] h-[10dvh]">
         {/* Logo */}
         <div className="flex items-center">
-          <img
+          <Image
             className="rounded-md dark:hidden block md:w-14 md:h-14 w-12 h-12"
             src="/images/logo/logo4.svg"
             alt="Desco Logo"
+            width={56}
+            height={56}
           />
-          <img
+          <Image
             className="rounded-md dark:block hidden md:w-14 md:h-14 w-12 h-12"
             src="/images/logo/logo2.svg"
             alt="Desco Logo"
+            width={56}
+            height={56}
           />
         </div>
 

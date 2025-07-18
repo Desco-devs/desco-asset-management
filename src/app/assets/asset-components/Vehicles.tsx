@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Car, FileText, Search, X } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { Vehicle, Client, Location, Project } from "@/types/assets";
 
@@ -392,11 +393,12 @@ export default function VehicleViewer() {
 
             <CardContent className="space-y-3">
               {vehicle.frontImgUrl ? (
-                <div className="aspect-video rounded-md overflow-hidden bg-white">
-                  <img
+                <div className="aspect-video rounded-md overflow-hidden bg-white relative">
+                  <Image
                     src={vehicle.frontImgUrl}
                     alt={`${vehicle.brand} ${vehicle.model} - Front`}
-                    className="w-full h-full object-contain object-center"
+                    fill
+                    className="object-contain object-center"
                   />
                 </div>
               ) : (

@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Car, FileText } from "lucide-react";
+import Image from "next/image";
 import { isExpiringSoon, isExpired } from "../utils/dateUtils";
 import type { Vehicle } from "@/types/assets";
 
@@ -108,11 +109,12 @@ export default function VehicleCard({
 
       <CardContent className="space-y-3">
         {getDisplayImage(vehicle) ? (
-          <div className="aspect-video rounded-md overflow-hidden bg-white">
-            <img
+          <div className="aspect-video rounded-md overflow-hidden bg-white relative">
+            <Image
               src={getDisplayImage(vehicle)!}
               alt={`${vehicle.brand} ${vehicle.model}`}
-              className="w-full h-full object-contain object-center"
+              fill
+              className="object-contain object-center"
             />
           </div>
         ) : (

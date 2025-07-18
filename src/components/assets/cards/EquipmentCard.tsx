@@ -17,6 +17,7 @@ import {
   Settings,
   Shield,
 } from "lucide-react";
+import Image from "next/image";
 import { isExpiringSoon, isExpired } from "../utils/dateUtils";
 import type { Equipment } from "@/types/assets";
 
@@ -162,11 +163,12 @@ export default function EquipmentCard({
 
       <CardContent className="space-y-3">
         {equipment.image_url ? (
-          <div className="aspect-video rounded-md overflow-hidden bg-white">
-            <img
+          <div className="aspect-video rounded-md overflow-hidden bg-white relative">
+            <Image
               src={equipment.image_url}
               alt={`${equipment.brand} ${equipment.model}`}
-              className="w-full h-full object-contain object-center"
+              fill
+              className="object-contain object-center"
             />
           </div>
         ) : (

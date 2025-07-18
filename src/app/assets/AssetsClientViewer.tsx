@@ -163,8 +163,8 @@ const AssetsClientViewer = ({
             const model = payload.new.model || "Unknown Model";
             const vehicleId = payload.new.id;
             
-            toast.success(`New vehicle detected: ${brand} ${model}`, {
-              description: "Real-time data received!",
+            toast.success(`New Vehicle Added`, {
+              description: `${brand} ${model} has been successfully added to the system`,
               duration: 5000,
             });
             
@@ -235,9 +235,9 @@ const AssetsClientViewer = ({
             );
 
             toast.info(
-              `Vehicle updated: ${payload.new.brand} ${payload.new.model}`,
+              `Vehicle Updated`,
               {
-                description: "Vehicle information has been updated",
+                description: `${payload.new.brand} ${payload.new.model} information has been updated`,
                 duration: 3000,
               }
             );
@@ -250,8 +250,8 @@ const AssetsClientViewer = ({
               newSet.delete(payload.old.id);
               return newSet;
             });
-            toast.error("Vehicle deleted", {
-              description: "Vehicle has been removed",
+            toast.error("Vehicle Removed", {
+              description: "Vehicle has been successfully removed from the system",
               duration: 3000,
             });
           }
