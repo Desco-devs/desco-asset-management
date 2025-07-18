@@ -7,32 +7,29 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
   'SUPERADMIN': 3,
 }
 
-// Route access configuration based on RLS policies
-export const ROUTE_ACCESS_CONFIG: RouteAccess[] = [
-  // Dashboard routes - all authenticated users can access
-  { path: '/home', requiredRole: 'VIEWER', allowedRoles: ['VIEWER', 'ADMIN', 'SUPERADMIN'] },
-  
-  // User management - only SUPERADMIN can fully manage users
-  { path: '/users', requiredRole: 'VIEWER', allowedRoles: ['VIEWER', 'ADMIN', 'SUPERADMIN'] },
-  
-  // Equipment management - only ADMIN+ can access (create/update operations)
-  { path: '/equipments', requiredRole: 'ADMIN', allowedRoles: ['ADMIN', 'SUPERADMIN'] },
-  
-  // Other resource management - ADMIN+ can create/update, VIEWER can view
-  { path: '/locations', requiredRole: 'VIEWER', allowedRoles: ['VIEWER', 'ADMIN', 'SUPERADMIN'] },
-  { path: '/projects', requiredRole: 'VIEWER', allowedRoles: ['VIEWER', 'ADMIN', 'SUPERADMIN'] },
-  { path: '/vehicles', requiredRole: 'VIEWER', allowedRoles: ['VIEWER', 'ADMIN', 'SUPERADMIN'] },
-  { path: '/assets', requiredRole: 'VIEWER', allowedRoles: ['VIEWER', 'ADMIN', 'SUPERADMIN'] },
-  
-  // API routes - handled by RLS policies at database level
-  { path: '/api', requiredRole: 'VIEWER', allowedRoles: ['VIEWER', 'ADMIN', 'SUPERADMIN'] }
+// Dashboard routes that require authentication (any authenticated user can access /assets)
+export const DASHBOARD_PROTECTED_ROUTES = [
+  '/home',
+  '/users', 
+  '/equipments',
+  '/vehicles',
+  '/locations',
+  '/projects'
 ]
 
 // Paths that should skip middleware to prevent redirect loops
 export const SKIP_MIDDLEWARE_PATHS = [
   '/login',
   '/unauthorized', 
-  '/api/auth'
+  '/api/auth',
+  '/api/session' // Allow session API calls from middleware
+]
+
+// Public routes that don't require authentication
+export const PUBLIC_ROUTES = [
+  '/landing-page',
+  '/login',
+  '/unauthorized'
 ]
 
 // Role display names for UI
@@ -52,6 +49,9 @@ export const ROLE_COLORS: Record<UserRole, string> = {
 // Default redirect paths based on role
 export const DEFAULT_REDIRECT_PATHS: Record<UserRole, string> = {
   'VIEWER': '/assets',
-  'ADMIN': '/home',
+  'ADMIN': '/home', 
   'SUPERADMIN': '/home',
 }
+
+// Fallback redirect for when role is unknown
+export const DEFAULT_AUTHENTICATED_REDIRECT = '/assets'

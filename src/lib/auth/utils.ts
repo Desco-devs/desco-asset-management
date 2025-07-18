@@ -125,7 +125,7 @@ export function getRoleColor(role: UserRole): string {
  * Get default redirect path for a user role
  */
 export function getDefaultRedirectPath(role: UserRole): string {
-  return DEFAULT_REDIRECT_PATHS[role] || '/home'
+  return DEFAULT_REDIRECT_PATHS[role] || '/assets'
 }
 
 /**
