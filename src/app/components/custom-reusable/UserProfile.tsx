@@ -27,7 +27,7 @@ import {
 import { color } from "@/lib/color";
 
 export default function UserProfile() {
-  const { user, clearUser } = useAuth();
+  const { user, signOut } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
 
   // Generate initials from fullname, fallback to 'U' if no name
@@ -42,13 +42,8 @@ export default function UserProfile() {
   async function handleLogout() {
     setLoggingOut(true);
     try {
-      const res = await fetch("/api/authentication/logout", { method: "POST" });
-      if (res.ok) {
-        clearUser();
-        toast.success("Logout successful!");
-      } else {
-        toast.error("Logout failed");
-      }
+      await signOut();
+      toast.success("Logout successful!");
     } catch (error) {
       console.error(error);
       toast.error("Logout error");

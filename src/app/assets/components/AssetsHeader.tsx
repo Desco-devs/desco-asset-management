@@ -1,22 +1,31 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/context/AuthContext";
 import { ModeToggle } from "@/app/components/custom-reusable/darkmode-toggle/ThemeButton";
+import { toast } from "sonner";
+import { useState } from "react";
 
 export default function AssetsHeader() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { signOut } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
     try {
-      await logout();
+      toast.loading("Logging out...", { id: "logout" });
+      await signOut();
+      toast.success("Logged out successfully!", { id: "logout" });
       router.push("/login");
     } catch (error) {
       console.error("Logout failed:", error);
+      toast.error("Failed to logout. Please try again.", { id: "logout" });
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -44,10 +53,17 @@ export default function AssetsHeader() {
             variant="outline" 
             size="sm"
             onClick={handleLogout}
+            disabled={isLoggingOut}
             className="flex items-center gap-2 md:h-10 h-9 md:px-4 px-2 font-medium md:text-sm text-xs"
           >
-            <LogOut className="md:h-4 md:w-4 h-4 w-4" />
-            <span className="md:block hidden">Logout</span>
+            {isLoggingOut ? (
+              <Loader2 className="md:h-4 md:w-4 h-4 w-4 animate-spin" />
+            ) : (
+              <LogOut className="md:h-4 md:w-4 h-4 w-4" />
+            )}
+            <span className="md:block hidden">
+              {isLoggingOut ? "Logging out..." : "Logout"}
+            </span>
           </Button>
         </div>
       </div>
