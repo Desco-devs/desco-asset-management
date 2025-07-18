@@ -54,9 +54,9 @@ const AssetsClientViewer = ({
             const model = payload.new.model || "Unknown Model";
             const equipmentId = payload.new.id;
 
-            toast.success(`New Equipment Added`, {
-              description: `${brand} ${model} has been successfully added to the system`,
-              duration: 5000,
+            toast.success(`Admin Added New Equipment`, {
+              description: `${brand} ${model} has been added to the system by an admin`,
+              duration: 6000,
             });
 
             // Find the actual project from the existing projects data
@@ -157,9 +157,9 @@ const AssetsClientViewer = ({
               })
             );
 
-            toast.info(`Equipment Updated`, {
-              description: `${payload.new.brand} ${payload.new.model} information has been updated`,
-              duration: 3000,
+            toast.info(`Admin Updated Equipment`, {
+              description: `${payload.new.brand} ${payload.new.model} information has been updated by an admin`,
+              duration: 6000,
             });
           } else if (payload.eventType === "DELETE") {
             setEquipment((prev) =>
@@ -170,10 +170,10 @@ const AssetsClientViewer = ({
               newSet.delete(payload.old.id);
               return newSet;
             });
-            toast.error("Equipment Removed", {
+            toast.error("Admin Removed Equipment", {
               description:
-                "Equipment has been successfully removed from the system",
-              duration: 3000,
+                `${payload.old.brand} ${payload.old.model} has been successfully removed from the system by an admin`,
+              duration: 6000,
             });
           }
         }
@@ -192,9 +192,9 @@ const AssetsClientViewer = ({
             const model = payload.new.model || "Unknown Model";
             const vehicleId = payload.new.id;
 
-            toast.success(`New Vehicle Added`, {
-              description: `${brand} ${model} has been successfully added to the system`,
-              duration: 5000,
+            toast.success(`Admin Added New Vehicle`, {
+              description: `${brand} ${model} has been added to the system by an admin`,
+              duration: 6000,
             });
 
             // Find the actual project from the existing projects data
@@ -289,9 +289,9 @@ const AssetsClientViewer = ({
               })
             );
 
-            toast.info(`Vehicle Updated`, {
-              description: `${payload.new.brand} ${payload.new.model} information has been updated`,
-              duration: 3000,
+            toast.info(`Admin Updated Vehicle`, {
+              description: `${payload.new.brand} ${payload.new.model} information has been updated by an admin`,
+              duration: 6000,
             });
           } else if (payload.eventType === "DELETE") {
             setVehicles((prev) =>
@@ -302,10 +302,10 @@ const AssetsClientViewer = ({
               newSet.delete(payload.old.id);
               return newSet;
             });
-            toast.error("Vehicle Removed", {
+            toast.error("Admin Removed Vehicle", {
               description:
-                "Vehicle has been successfully removed from the system",
-              duration: 3000,
+                `${payload.old.brand} ${payload.old.model} has been successfully removed from the system by an admin`,
+              duration: 6000,
             });
           }
         }
