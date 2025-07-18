@@ -149,10 +149,10 @@ export default function EquipmentsPage() {
           <TooltipTrigger asChild>
             <span className="cursor-pointer underline">{equipment.model}</span>
           </TooltipTrigger>
-          {equipment.image_url ? (
+          {equipment.imageUrl ? (
             <TooltipContent className="p-0">
               <img
-                src={equipment.image_url}
+                src={equipment.imageUrl}
                 alt={`${equipment.model} image`}
                 className="max-w-xs max-h-48 rounded-md"
                 draggable={false}
@@ -173,8 +173,8 @@ export default function EquipmentsPage() {
       key: "expirationDate",
       title: "Expiration",
       render: (_value, equipment) => {
-        if (!equipment.insurance_expiration_date) return "-";
-        const expDate = new Date(equipment.insurance_expiration_date);
+        if (!equipment.insuranceExpirationDate) return "-";
+        const expDate = new Date(equipment.insuranceExpirationDate);
         const diffMs = expDate.getTime() - now.getTime();
         const daysLeft = diffMs / (1000 * 60 * 60 * 24);
         const colorClass = getColorByDaysLeft(daysLeft, 5);
@@ -211,8 +211,8 @@ export default function EquipmentsPage() {
       key: "inspectionDate",
       title: "Inspection Date",
       render: (_value, equipment) => {
-        if (!equipment.inspection_date) return "-";
-        const inspDate = new Date(equipment.inspection_date);
+        if (!equipment.inspectionDate) return "-";
+        const inspDate = new Date(equipment.inspectionDate);
         const diffMs = inspDate.getTime() - now.getTime();
         const daysLeft = diffMs / (1000 * 60 * 60 * 24);
         const colorClass = getColorByDaysLeft(daysLeft, 5);

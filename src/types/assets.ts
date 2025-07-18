@@ -102,3 +102,11 @@ export interface FilterProps {
   resultsCount: number;
   totalCount: number;
 }
+
+export interface AssetsClientViewerProps {
+  initialEquipment: Equipment[];
+  initialVehicles: Vehicle[];
+  initialClients: Client[];
+  initialLocations: Location[];
+  initialProjects: Project[];
+}

@@ -1,13 +1,12 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { LogOut, Loader2 } from "lucide-react";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/app/context/AuthContext";
 import { ModeToggle } from "@/app/components/custom-reusable/darkmode-toggle/ThemeButton";
-import { toast } from "sonner";
+import { useAuth } from "@/app/context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Loader2, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export default function AssetsHeader() {
   const router = useRouter();
@@ -49,8 +48,8 @@ export default function AssetsHeader() {
         {/* Theme Toggle and Logout - Responsive */}
         <div className="flex items-center md:gap-4 gap-2">
           <ModeToggle />
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={handleLogout}
             disabled={isLoggingOut}

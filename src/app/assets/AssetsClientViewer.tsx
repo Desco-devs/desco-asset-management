@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import {
   Select,
   SelectContent,
@@ -9,102 +8,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase";
+import { AssetsClientViewerProps, Equipment, Vehicle } from "@/types/assets";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import EquipmentClientViewer from "./asset-components/EquipmentsClient";
 import VehicleClientViewer from "./asset-components/VehiclesClient";
-
-interface Equipment {
-  uid: string;
-  brand: string;
-  model: string;
-  type: string;
-  insuranceExpirationDate: string;
-  status: "OPERATIONAL" | "NON_OPERATIONAL";
-  remarks?: string;
-  owner: string;
-  image_url?: string;
-  inspectionDate?: string;
-  plateNumber?: string;
-  originalReceiptUrl?: string;
-  equipmentRegistrationUrl?: string;
-  thirdpartyInspectionImage?: string;
-  pgpcInspectionImage?: string;
-  project: {
-    uid: string;
-    name: string;
-    client: {
-      uid: string;
-      name: string;
-      location: {
-        uid: string;
-        address: string;
-      };
-    };
-  };
-}
-
-interface Vehicle {
-  uid: string;
-  brand: string;
-  model: string;
-  type: string;
-  plateNumber: string;
-  inspectionDate: string;
-  before: number;
-  expiryDate: string;
-  status: "OPERATIONAL" | "NON_OPERATIONAL";
-  remarks?: string;
-  owner: string;
-  frontImgUrl?: string;
-  backImgUrl?: string;
-  side1ImgUrl?: string;
-  side2ImgUrl?: string;
-  originalReceiptUrl?: string;
-  carRegistrationUrl?: string;
-  project: {
-    uid: string;
-    name: string;
-    client: {
-      uid: string;
-      name: string;
-      location: {
-        uid: string;
-        address: string;
-      };
-    };
-  };
-}
-
-interface Client {
-  uid: string;
-  name: string;
-  location: {
-    uid: string;
-    address: string;
-  };
-}
-
-interface Location {
-  uid: string;
-  address: string;
-}
-
-interface Project {
-  uid: string;
-  name: string;
-  client: {
-    uid: string;
-    name: string;
-  };
-}
-
-interface AssetsClientViewerProps {
-  initialEquipment: Equipment[];
-  initialVehicles: Vehicle[];
-  initialClients: Client[];
-  initialLocations: Location[];
-  initialProjects: Project[];
-}
 
 const AssetsClientViewer = ({
   initialEquipment,
@@ -113,7 +21,9 @@ const AssetsClientViewer = ({
   initialLocations,
   initialProjects,
 }: AssetsClientViewerProps) => {
-  const [viewMode, setViewMode] = useState<"equipment" | "vehicles">("equipment");
+  const [viewMode, setViewMode] = useState<"equipment" | "vehicles">(
+    "equipment"
+  );
   const [loading, setLoading] = useState(true);
   const [equipment, setEquipment] = useState<Equipment[]>(initialEquipment);
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
@@ -130,117 +40,151 @@ const AssetsClientViewer = ({
   useEffect(() => {
     // Subscribe to equipment table changes
     const equipmentChannel = supabase
-      .channel('realtime-equipment')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'equipment' }, 
+      .channel("realtime-equipment")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "equipment" },
         async (payload) => {
-          console.log('Equipment change received:', payload);
-          
-          if (payload.eventType === 'INSERT') {
+          console.log("Equipment change received:", payload);
+
+          if (payload.eventType === "INSERT") {
             // For INSERT, create a basic equipment object and add it to the list
             const newEquipment: Equipment = {
               uid: payload.new.uid,
-              brand: payload.new.brand || 'Unknown',
-              model: payload.new.model || 'Unknown',
-              type: payload.new.type || 'Unknown',
-              insuranceExpirationDate: payload.new.insuranceExpirationDate || '',
-              status: payload.new.status || 'OPERATIONAL',
+              brand: payload.new.brand || "Unknown",
+              model: payload.new.model || "Unknown",
+              type: payload.new.type || "Unknown",
+              insuranceExpirationDate:
+                payload.new.insuranceExpirationDate || "",
+              status: payload.new.status || "OPERATIONAL",
               remarks: payload.new.remarks || undefined,
-              owner: payload.new.owner || 'Unknown',
+              owner: payload.new.owner || "Unknown",
               image_url: payload.new.image_url || undefined,
               inspectionDate: payload.new.inspectionDate || undefined,
               plateNumber: payload.new.plateNumber || undefined,
               originalReceiptUrl: payload.new.originalReceiptUrl || undefined,
-              equipmentRegistrationUrl: payload.new.equipmentRegistrationUrl || undefined,
-              thirdpartyInspectionImage: payload.new.thirdpartyInspectionImage || undefined,
+              equipmentRegistrationUrl:
+                payload.new.equipmentRegistrationUrl || undefined,
+              thirdpartyInspectionImage:
+                payload.new.thirdpartyInspectionImage || undefined,
               pgpcInspectionImage: payload.new.pgpcInspectionImage || undefined,
               project: {
-                uid: 'temp',
-                name: 'Loading...',
+                uid: "temp",
+                name: "Loading...",
                 client: {
-                  uid: 'temp',
-                  name: 'Loading...',
+                  uid: "temp",
+                  name: "Loading...",
                   location: {
-                    uid: 'temp',
-                    address: 'Loading...'
-                  }
-                }
-              }
+                    uid: "temp",
+                    address: "Loading...",
+                  },
+                },
+              },
             };
-            
-            setEquipment(prev => [newEquipment, ...prev]);
-            setNewItemIds(prev => new Set([...prev, newEquipment.uid]));
-            
-            toast.success(`New equipment added: ${newEquipment.brand} ${newEquipment.model}`, {
-              description: `${newEquipment.type} - Loading project information...`,
-              duration: 5000,
-            });
+
+            setEquipment((prev) => [newEquipment, ...prev]);
+            setNewItemIds((prev) => new Set([...prev, newEquipment.uid]));
+
+            toast.success(
+              `New equipment added: ${newEquipment.brand} ${newEquipment.model}`,
+              {
+                description: `${newEquipment.type} - Loading project information...`,
+                duration: 5000,
+              }
+            );
 
             // Fetch complete data in the background and update
             try {
-              const response = await fetch(`/api/equipments/${payload.new.uid}`);
+              const response = await fetch(
+                `/api/equipments/${payload.new.uid}`
+              );
               if (response.ok) {
                 const completeEquipment = await response.json();
-                setEquipment(prev => 
-                  prev.map(item => item.uid === completeEquipment.uid ? completeEquipment : item)
+                setEquipment((prev) =>
+                  prev.map((item) =>
+                    item.uid === completeEquipment.uid
+                      ? completeEquipment
+                      : item
+                  )
                 );
               }
             } catch (error) {
-              console.error('Error fetching complete equipment data:', error);
+              console.error("Error fetching complete equipment data:", error);
             }
-          } else if (payload.eventType === 'UPDATE') {
+          } else if (payload.eventType === "UPDATE") {
             // For UPDATE, update the basic fields immediately
-            setEquipment(prev => 
-              prev.map(item => {
+            setEquipment((prev) =>
+              prev.map((item) => {
                 if (item.uid === payload.new.uid) {
                   return {
                     ...item,
                     brand: payload.new.brand || item.brand,
                     model: payload.new.model || item.model,
                     type: payload.new.type || item.type,
-                    insuranceExpirationDate: payload.new.insuranceExpirationDate || item.insuranceExpirationDate,
+                    insuranceExpirationDate:
+                      payload.new.insuranceExpirationDate ||
+                      item.insuranceExpirationDate,
                     status: payload.new.status || item.status,
                     remarks: payload.new.remarks || item.remarks,
                     owner: payload.new.owner || item.owner,
                     image_url: payload.new.image_url || item.image_url,
-                    inspectionDate: payload.new.inspectionDate || item.inspectionDate,
+                    inspectionDate:
+                      payload.new.inspectionDate || item.inspectionDate,
                     plateNumber: payload.new.plateNumber || item.plateNumber,
-                    originalReceiptUrl: payload.new.originalReceiptUrl || item.originalReceiptUrl,
-                    equipmentRegistrationUrl: payload.new.equipmentRegistrationUrl || item.equipmentRegistrationUrl,
-                    thirdpartyInspectionImage: payload.new.thirdpartyInspectionImage || item.thirdpartyInspectionImage,
-                    pgpcInspectionImage: payload.new.pgpcInspectionImage || item.pgpcInspectionImage,
+                    originalReceiptUrl:
+                      payload.new.originalReceiptUrl || item.originalReceiptUrl,
+                    equipmentRegistrationUrl:
+                      payload.new.equipmentRegistrationUrl ||
+                      item.equipmentRegistrationUrl,
+                    thirdpartyInspectionImage:
+                      payload.new.thirdpartyInspectionImage ||
+                      item.thirdpartyInspectionImage,
+                    pgpcInspectionImage:
+                      payload.new.pgpcInspectionImage ||
+                      item.pgpcInspectionImage,
                   };
                 }
                 return item;
               })
             );
-            
-            toast.info(`Equipment updated: ${payload.new.brand} ${payload.new.model}`, {
-              description: 'Equipment information has been updated',
-              duration: 3000,
-            });
+
+            toast.info(
+              `Equipment updated: ${payload.new.brand} ${payload.new.model}`,
+              {
+                description: "Equipment information has been updated",
+                duration: 3000,
+              }
+            );
 
             // Fetch complete data in the background and update if needed
             try {
-              const response = await fetch(`/api/equipments/${payload.new.uid}`);
+              const response = await fetch(
+                `/api/equipments/${payload.new.uid}`
+              );
               if (response.ok) {
                 const completeEquipment = await response.json();
-                setEquipment(prev => 
-                  prev.map(item => item.uid === completeEquipment.uid ? completeEquipment : item)
+                setEquipment((prev) =>
+                  prev.map((item) =>
+                    item.uid === completeEquipment.uid
+                      ? completeEquipment
+                      : item
+                  )
                 );
               }
             } catch (error) {
-              console.error('Error fetching complete equipment data:', error);
+              console.error("Error fetching complete equipment data:", error);
             }
-          } else if (payload.eventType === 'DELETE') {
-            setEquipment(prev => prev.filter(item => item.uid !== payload.old.uid));
-            setNewItemIds(prev => {
+          } else if (payload.eventType === "DELETE") {
+            setEquipment((prev) =>
+              prev.filter((item) => item.uid !== payload.old.uid)
+            );
+            setNewItemIds((prev) => {
               const newSet = new Set(prev);
               newSet.delete(payload.old.uid);
               return newSet;
             });
-            toast.error('Equipment deleted', {
-              description: 'Equipment has been removed',
+            toast.error("Equipment deleted", {
+              description: "Equipment has been removed",
               duration: 3000,
             });
           }
@@ -250,26 +194,27 @@ const AssetsClientViewer = ({
 
     // Subscribe to vehicle table changes
     const vehicleChannel = supabase
-      .channel('realtime-vehicles')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'vehicle' }, 
+      .channel("realtime-vehicles")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "vehicle" },
         async (payload) => {
-          console.log('Vehicle change received:', payload);
-          
-          if (payload.eventType === 'INSERT') {
+          console.log("Vehicle change received:", payload);
+
+          if (payload.eventType === "INSERT") {
             // For INSERT, create a basic vehicle object and add it to the list
             const newVehicle: Vehicle = {
               uid: payload.new.uid,
-              brand: payload.new.brand || 'Unknown',
-              model: payload.new.model || 'Unknown',
-              type: payload.new.type || 'Unknown',
-              plateNumber: payload.new.plateNumber || 'Unknown',
-              inspectionDate: payload.new.inspectionDate || '',
+              brand: payload.new.brand || "Unknown",
+              model: payload.new.model || "Unknown",
+              type: payload.new.type || "Unknown",
+              plateNumber: payload.new.plateNumber || "Unknown",
+              inspectionDate: payload.new.inspectionDate || "",
               before: payload.new.before || 0,
-              expiryDate: payload.new.expiryDate || '',
-              status: payload.new.status || 'OPERATIONAL',
+              expiryDate: payload.new.expiryDate || "",
+              status: payload.new.status || "OPERATIONAL",
               remarks: payload.new.remarks || undefined,
-              owner: payload.new.owner || 'Unknown',
+              owner: payload.new.owner || "Unknown",
               frontImgUrl: payload.new.frontImgUrl || undefined,
               backImgUrl: payload.new.backImgUrl || undefined,
               side1ImgUrl: payload.new.side1ImgUrl || undefined,
@@ -277,43 +222,48 @@ const AssetsClientViewer = ({
               originalReceiptUrl: payload.new.originalReceiptUrl || undefined,
               carRegistrationUrl: payload.new.carRegistrationUrl || undefined,
               project: {
-                uid: 'temp',
-                name: 'Loading...',
+                uid: "temp",
+                name: "Loading...",
                 client: {
-                  uid: 'temp',
-                  name: 'Loading...',
+                  uid: "temp",
+                  name: "Loading...",
                   location: {
-                    uid: 'temp',
-                    address: 'Loading...'
-                  }
-                }
-              }
+                    uid: "temp",
+                    address: "Loading...",
+                  },
+                },
+              },
             };
-            
-            setVehicles(prev => [newVehicle, ...prev]);
-            setNewItemIds(prev => new Set([...prev, newVehicle.uid]));
-            
-            toast.success(`New vehicle added: ${newVehicle.brand} ${newVehicle.model}`, {
-              description: `${newVehicle.type} - ${newVehicle.plateNumber} - Loading project information...`,
-              duration: 5000,
-            });
+
+            setVehicles((prev) => [newVehicle, ...prev]);
+            setNewItemIds((prev) => new Set([...prev, newVehicle.uid]));
+
+            toast.success(
+              `New vehicle added: ${newVehicle.brand} ${newVehicle.model}`,
+              {
+                description: `${newVehicle.type} - ${newVehicle.plateNumber} - Loading project information...`,
+                duration: 5000,
+              }
+            );
 
             // Fetch complete data in the background and update
             try {
               const response = await fetch(`/api/vehicles/${payload.new.uid}`);
               if (response.ok) {
                 const completeVehicle = await response.json();
-                setVehicles(prev => 
-                  prev.map(item => item.uid === completeVehicle.uid ? completeVehicle : item)
+                setVehicles((prev) =>
+                  prev.map((item) =>
+                    item.uid === completeVehicle.uid ? completeVehicle : item
+                  )
                 );
               }
             } catch (error) {
-              console.error('Error fetching complete vehicle data:', error);
+              console.error("Error fetching complete vehicle data:", error);
             }
-          } else if (payload.eventType === 'UPDATE') {
+          } else if (payload.eventType === "UPDATE") {
             // For UPDATE, update the basic fields immediately
-            setVehicles(prev => 
-              prev.map(item => {
+            setVehicles((prev) =>
+              prev.map((item) => {
                 if (item.uid === payload.new.uid) {
                   return {
                     ...item,
@@ -321,7 +271,8 @@ const AssetsClientViewer = ({
                     model: payload.new.model || item.model,
                     type: payload.new.type || item.type,
                     plateNumber: payload.new.plateNumber || item.plateNumber,
-                    inspectionDate: payload.new.inspectionDate || item.inspectionDate,
+                    inspectionDate:
+                      payload.new.inspectionDate || item.inspectionDate,
                     before: payload.new.before || item.before,
                     expiryDate: payload.new.expiryDate || item.expiryDate,
                     status: payload.new.status || item.status,
@@ -331,40 +282,49 @@ const AssetsClientViewer = ({
                     backImgUrl: payload.new.backImgUrl || item.backImgUrl,
                     side1ImgUrl: payload.new.side1ImgUrl || item.side1ImgUrl,
                     side2ImgUrl: payload.new.side2ImgUrl || item.side2ImgUrl,
-                    originalReceiptUrl: payload.new.originalReceiptUrl || item.originalReceiptUrl,
-                    carRegistrationUrl: payload.new.carRegistrationUrl || item.carRegistrationUrl,
+                    originalReceiptUrl:
+                      payload.new.originalReceiptUrl || item.originalReceiptUrl,
+                    carRegistrationUrl:
+                      payload.new.carRegistrationUrl || item.carRegistrationUrl,
                   };
                 }
                 return item;
               })
             );
-            
-            toast.info(`Vehicle updated: ${payload.new.brand} ${payload.new.model}`, {
-              description: 'Vehicle information has been updated',
-              duration: 3000,
-            });
+
+            toast.info(
+              `Vehicle updated: ${payload.new.brand} ${payload.new.model}`,
+              {
+                description: "Vehicle information has been updated",
+                duration: 3000,
+              }
+            );
 
             // Fetch complete data in the background and update if needed
             try {
               const response = await fetch(`/api/vehicles/${payload.new.uid}`);
               if (response.ok) {
                 const completeVehicle = await response.json();
-                setVehicles(prev => 
-                  prev.map(item => item.uid === completeVehicle.uid ? completeVehicle : item)
+                setVehicles((prev) =>
+                  prev.map((item) =>
+                    item.uid === completeVehicle.uid ? completeVehicle : item
+                  )
                 );
               }
             } catch (error) {
-              console.error('Error fetching complete vehicle data:', error);
+              console.error("Error fetching complete vehicle data:", error);
             }
-          } else if (payload.eventType === 'DELETE') {
-            setVehicles(prev => prev.filter(item => item.uid !== payload.old.uid));
-            setNewItemIds(prev => {
+          } else if (payload.eventType === "DELETE") {
+            setVehicles((prev) =>
+              prev.filter((item) => item.uid !== payload.old.uid)
+            );
+            setNewItemIds((prev) => {
               const newSet = new Set(prev);
               newSet.delete(payload.old.uid);
               return newSet;
             });
-            toast.error('Vehicle deleted', {
-              description: 'Vehicle has been removed',
+            toast.error("Vehicle deleted", {
+              description: "Vehicle has been removed",
               duration: 3000,
             });
           }
