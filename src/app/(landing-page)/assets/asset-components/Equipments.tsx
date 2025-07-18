@@ -124,12 +124,16 @@ export default function EquipmentViewer() {
             fetch("/api/projects/getall").then((res) => res.json()),
           ]);
 
-        setEquipments(equipmentsData);
-        setClients(clientsData);
-        setLocations(locationsData);
-        setProjects(projectsData);
+        setEquipments(Array.isArray(equipmentsData) ? equipmentsData : []);
+        setClients(Array.isArray(clientsData) ? clientsData : []);
+        setLocations(Array.isArray(locationsData) ? locationsData : []);
+        setProjects(Array.isArray(projectsData) ? projectsData : []);
       } catch (error) {
         console.error("Error fetching data:", error);
+        setEquipments([]);
+        setClients([]);
+        setLocations([]);
+        setProjects([]);
       } finally {
         setLoading(false);
       }
@@ -140,6 +144,7 @@ export default function EquipmentViewer() {
 
   // Filter equipments based on selected filters and search query
   const filteredEquipments = useMemo(() => {
+    if (!Array.isArray(equipments)) return [];
     return equipments.filter((equipment) => {
       const matchesClient =
         selectedClient === "all" ||

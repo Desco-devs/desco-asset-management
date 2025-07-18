@@ -19,7 +19,7 @@ export const GET = withResourcePermission('maintenance_reports', 'view', async (
         const limit = searchParams.get('limit')
         const offset = searchParams.get('offset')
 
-        if (reportId) {
+        if (reportId && reportId !== 'undefined') {
             // Get single report
             const report = await prisma.maintenance_equipment_report.findUnique({
                 where: { id: reportId },
@@ -56,8 +56,8 @@ export const GET = withResourcePermission('maintenance_reports', 'view', async (
         // Get multiple reports with filters
         const where: any = {}
 
-        if (equipmentId) where.equipment_id = equipmentId
-        if (locationId) where.location_id = locationId
+        if (equipmentId && equipmentId !== 'undefined') where.equipment_id = equipmentId
+        if (locationId && locationId !== 'undefined') where.location_id = locationId
         if (status) where.status = status
         if (priority) where.priority = priority
 

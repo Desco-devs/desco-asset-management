@@ -275,7 +275,7 @@ export default function VehicleViewer() {
                 <SelectValue placeholder="All Clients" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Clients</SelectItem>
+                <SelectItem key="all-clients" value="all">All Clients</SelectItem>
                 {clients.map((client) => (
                   <SelectItem key={client.uid} value={client.uid}>
                     {client.name}
@@ -298,7 +298,7 @@ export default function VehicleViewer() {
                 <SelectValue placeholder="All Locations" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
+                <SelectItem key="all-locations" value="all">All Locations</SelectItem>
                 {locations.map((location) => (
                   <SelectItem key={location.uid} value={location.uid}>
                     {location.address}
@@ -318,7 +318,7 @@ export default function VehicleViewer() {
                 <SelectValue placeholder="All Projects" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Projects</SelectItem>
+                <SelectItem key="all-projects" value="all">All Projects</SelectItem>
                 {availableProjects.map((project) => (
                   <SelectItem key={project.uid} value={project.uid}>
                     {project.name}
@@ -338,9 +338,9 @@ export default function VehicleViewer() {
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="OPERATIONAL">Operational</SelectItem>
-                <SelectItem value="NON_OPERATIONAL">Non-Operational</SelectItem>
+                <SelectItem key="all-status" value="all">All Status</SelectItem>
+                <SelectItem key="operational" value="OPERATIONAL">Operational</SelectItem>
+                <SelectItem key="non-operational" value="NON_OPERATIONAL">Non-Operational</SelectItem>
               </SelectContent>
             </Select>
           </div>
