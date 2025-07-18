@@ -1,8 +1,8 @@
 "use client";
 
-import EquipmentModal from "@/app/(dashboard)/equipments/equipment-components/EquipmentModal";
-import { MaintenanceReport } from "@/app/(dashboard)/equipments/equipment-components/MaintenanceReportModal";
-import ViewReportsModal from "@/app/(dashboard)/equipments/equipment-components/ViewReportsModal";
+import EquipmentModal from "@/app/(admin-dashboard)/equipments/equipment-components/EquipmentModal";
+import { MaintenanceReport } from "@/app/(admin-dashboard)/equipments/equipment-components/MaintenanceReportModal";
+import ViewReportsModal from "@/app/(admin-dashboard)/equipments/equipment-components/ViewReportsModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

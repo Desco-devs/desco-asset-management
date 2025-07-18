@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
-import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
-import { Label, Pie, PieChart, Cell } from "recharts";
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { Label, Pie, PieChart } from "recharts";
 import {
   Card,
   CardContent,
@@ -17,7 +17,6 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 
-// Define chart configuration
 const chartConfig = {
   value: {
     label: "Count",
@@ -32,71 +31,35 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function VehiclesAndEquipmentsComponent() {
+export function EquipmentsCount() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [data, setData] = React.useState<any>(null);
+  const [equipmentData, setEquipmentData] = React.useState<{
+    OPERATIONAL: number;
+    NON_OPERATIONAL: number;
+  } | null>(null);
 
   React.useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch("/api/vehicles/count");
+        const equipmentResponse = await fetch("/api/equipments/count");
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch status counts");
+        if (!equipmentResponse.ok) {
+          throw new Error("Failed to fetch equipment counts");
         }
 
-        const result = await response.json();
+        const equipmentResult = await equipmentResponse.json();
 
-        // Process the data into the format needed for the chart
-        const chartData = [
-          {
-            name: "operational",
-            value:
-              (result.vehicles.OPERATIONAL || 0) +
-              (result.equipments.OPERATIONAL || 0),
-            fill: "oklch(0.62 0.18 145.0)", // Green in OKLCH format
-          },
-          {
-            name: "non_operational",
-            value:
-              (result.vehicles.NON_OPERATIONAL || 0) +
-              (result.equipments.NON_OPERATIONAL || 0),
-            fill: "oklch(0.65 0.18 25.0)", // Red in OKLCH format
-          },
-        ];
-
-        // Calculate totals
-        const totalVehicles =
-          (result.vehicles.OPERATIONAL || 0) +
-          (result.vehicles.NON_OPERATIONAL || 0);
-        const totalEquipment =
-          (result.equipments.OPERATIONAL || 0) +
-          (result.equipments.NON_OPERATIONAL || 0);
-
-        setData({
-          chartData,
-          stats: {
-            totalVehicles,
-            totalEquipment,
-            operational:
-              (result.vehicles.OPERATIONAL || 0) +
-              (result.equipments.OPERATIONAL || 0),
-            nonOperational:
-              (result.vehicles.NON_OPERATIONAL || 0) +
-              (result.equipments.NON_OPERATIONAL || 0),
-            vehiclesOperational: result.vehicles.OPERATIONAL || 0,
-            vehiclesNonOperational: result.vehicles.NON_OPERATIONAL || 0,
-            equipmentOperational: result.equipments.OPERATIONAL || 0,
-            equipmentNonOperational: result.equipments.NON_OPERATIONAL || 0,
-          },
+        setEquipmentData({
+          OPERATIONAL: equipmentResult.OPERATIONAL || 0,
+          NON_OPERATIONAL: equipmentResult.NON_OPERATIONAL || 0,
         });
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "An unknown error occurred"
         );
-        console.error("Error fetching status counts:", err);
+        console.error("Error fetching equipment counts:", err);
       } finally {
         setIsLoading(false);
       }
@@ -105,44 +68,54 @@ export function VehiclesAndEquipmentsComponent() {
     fetchData();
   }, []);
 
-  // Calculate total assets
-  const totalAssets = React.useMemo(() => {
-    if (!data) return 0;
-    return data.stats.operational + data.stats.nonOperational;
-  }, [data]);
+  const totalEquipment = equipmentData
+    ? equipmentData.OPERATIONAL + equipmentData.NON_OPERATIONAL
+    : 0;
+  const equipmentOperationalPercentage =
+    totalEquipment > 0
+      ? ((equipmentData?.OPERATIONAL || 0) / totalEquipment) * 100
+      : 0;
 
-  // Calculate operational percentage
-  const operationalPercentage = React.useMemo(() => {
-    if (!data || totalAssets === 0) return 0;
-    return (data.stats.operational / totalAssets) * 100;
-  }, [data, totalAssets]);
+  const equipmentChartData = equipmentData
+    ? [
+        {
+          name: "operational",
+          value: equipmentData.OPERATIONAL,
+          fill: "oklch(0.62 0.18 145.0)",
+        },
+        {
+          name: "non_operational",
+          value: equipmentData.NON_OPERATIONAL,
+          fill: "oklch(0.65 0.18 25.0)",
+        },
+      ]
+    : [];
 
-  // Check if operational percentage is trending up (above 75%)
-  const isTrendingUp = operationalPercentage > 75;
+  const isEquipmentTrendingUp = equipmentOperationalPercentage > 75;
 
   if (isLoading) {
     return (
       <Card className="flex flex-col">
         <CardHeader className="items-center pb-0">
-          <CardTitle>Asset Status</CardTitle>
+          <CardTitle>Equipment Status</CardTitle>
           <CardDescription>Loading data...</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center flex-1 pb-0 pt-8">
-          <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
+          <div className="animate-pulse">Loading...</div>
         </CardContent>
       </Card>
     );
   }
 
-  if (error || !data) {
+  if (error || !equipmentData) {
     return (
       <Card className="flex flex-col">
         <CardHeader className="items-center pb-0">
-          <CardTitle>Asset Status</CardTitle>
+          <CardTitle>Equipment Status</CardTitle>
           <CardDescription>Error loading data</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center flex-1 pb-0 text-destructive">
-          {error || "Failed to load asset data"}
+          {error || "Failed to load equipment data"}
         </CardContent>
       </Card>
     );
@@ -151,7 +124,7 @@ export function VehiclesAndEquipmentsComponent() {
   return (
     <Card className="flex flex-col">
       <CardHeader className="items-center pb-0">
-        <CardTitle>Asset Status Overview</CardTitle>
+        <CardTitle>Equipment Status</CardTitle>
         <CardDescription>Operational vs Non-Operational</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
@@ -165,16 +138,12 @@ export function VehiclesAndEquipmentsComponent() {
               content={<ChartTooltipContent hideLabel />}
             />
             <Pie
-              data={data.chartData}
+              data={equipmentChartData}
               dataKey="value"
               nameKey="name"
               innerRadius={60}
               strokeWidth={5}
             >
-              {/* Add explicit cells to control colors */}
-              {data.chartData.map((entry: any, index: number) => (
-                <Cell key={`cell-${index}`} fill={entry.fill} />
-              ))}
               <Label
                 content={({ viewBox }) => {
                   if (viewBox && "cx" in viewBox && "cy" in viewBox) {
@@ -190,14 +159,14 @@ export function VehiclesAndEquipmentsComponent() {
                           y={viewBox.cy}
                           className="fill-foreground text-3xl font-bold"
                         >
-                          {totalAssets.toLocaleString()}
+                          {totalEquipment.toLocaleString()}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
                           y={(viewBox.cy || 0) + 24}
                           className="fill-muted-foreground"
                         >
-                          Total Assets
+                          Equipment
                         </tspan>
                       </text>
                     );
@@ -210,21 +179,21 @@ export function VehiclesAndEquipmentsComponent() {
       </CardContent>
       <CardFooter className="flex-col gap-2 text-sm">
         <div className="flex items-center gap-2 font-medium leading-none">
-          {isTrendingUp ? (
+          {isEquipmentTrendingUp ? (
             <>
-              {operationalPercentage.toFixed(1)}% operational assets{" "}
+              {equipmentOperationalPercentage.toFixed(1)}% operational{" "}
               <TrendingUp className="h-4 w-4 text-green-500" />
             </>
           ) : (
             <>
-              {operationalPercentage.toFixed(1)}% operational assets{" "}
+              {equipmentOperationalPercentage.toFixed(1)}% operational{" "}
               <TrendingDown className="h-4 w-4 text-red-500" />
             </>
           )}
         </div>
         <div className="leading-none text-muted-foreground">
-          Vehicles: {data.stats.totalVehicles} | Equipment:{" "}
-          {data.stats.totalEquipment}
+          Operational: {equipmentData.OPERATIONAL} | Non-Operational:{" "}
+          {equipmentData.NON_OPERATIONAL}
         </div>
       </CardFooter>
     </Card>

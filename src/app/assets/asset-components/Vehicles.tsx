@@ -1,6 +1,6 @@
 "use client";
 
-import VehicleModal from "@/app/(dashboard)/vehicles/vehicles-components/VehicleModal";
+import VehicleModal from "@/app/(admin-dashboard)/vehicles/vehicles-components/VehicleModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
-import { TrendingUp, TrendingDown } from "lucide-react";
-import { Label, Pie, PieChart } from "recharts";
+import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
+import { Pie, PieChart, Cell, Label } from "recharts";
 import {
   Card,
   CardContent,
@@ -31,10 +31,10 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function EquipmentStatusChart() {
+export function VehiclesCount() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [equipmentData, setEquipmentData] = React.useState<{
+  const [vehicleData, setVehicleData] = React.useState<{
     OPERATIONAL: number;
     NON_OPERATIONAL: number;
   } | null>(null);
@@ -43,23 +43,23 @@ export function EquipmentStatusChart() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const equipmentResponse = await fetch("/api/equipments/count");
+        const response = await fetch("/api/vehicles/count");
 
-        if (!equipmentResponse.ok) {
-          throw new Error("Failed to fetch equipment counts");
+        if (!response.ok) {
+          throw new Error("Failed to fetch vehicle counts");
         }
 
-        const equipmentResult = await equipmentResponse.json();
+        const result = await response.json();
 
-        setEquipmentData({
-          OPERATIONAL: equipmentResult.OPERATIONAL || 0,
-          NON_OPERATIONAL: equipmentResult.NON_OPERATIONAL || 0,
+        setVehicleData({
+          OPERATIONAL: result.OPERATIONAL || 0,
+          NON_OPERATIONAL: result.NON_OPERATIONAL || 0,
         });
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "An unknown error occurred"
         );
-        console.error("Error fetching equipment counts:", err);
+        console.error("Error fetching vehicle counts:", err);
       } finally {
         setIsLoading(false);
       }
@@ -68,57 +68,54 @@ export function EquipmentStatusChart() {
     fetchData();
   }, []);
 
-  // Calculate totals and percentages
-  const totalEquipment = equipmentData
-    ? equipmentData.OPERATIONAL + equipmentData.NON_OPERATIONAL
+  const totalVehicles = vehicleData
+    ? vehicleData.OPERATIONAL + vehicleData.NON_OPERATIONAL
     : 0;
-  const equipmentOperationalPercentage =
-    totalEquipment > 0
-      ? ((equipmentData?.OPERATIONAL || 0) / totalEquipment) * 100
+  const vehicleOperationalPercentage =
+    totalVehicles > 0
+      ? ((vehicleData?.OPERATIONAL || 0) / totalVehicles) * 100
       : 0;
 
-  // Prepare chart data
-  const equipmentChartData = equipmentData
+  const vehicleChartData = vehicleData
     ? [
         {
           name: "operational",
-          value: equipmentData.OPERATIONAL,
-          fill: "oklch(0.62 0.18 145.0)", // Green in OKLCH format
+          value: vehicleData.OPERATIONAL,
+          fill: "oklch(0.62 0.18 145.0)",
         },
         {
           name: "non_operational",
-          value: equipmentData.NON_OPERATIONAL,
-          fill: "oklch(0.65 0.18 25.0)", // Red in OKLCH format
+          value: vehicleData.NON_OPERATIONAL,
+          fill: "oklch(0.65 0.18 25.0)",
         },
       ]
     : [];
 
-  // Check if operational percentage is trending up
-  const isEquipmentTrendingUp = equipmentOperationalPercentage > 75;
+  const isVehicleTrendingUp = vehicleOperationalPercentage > 75;
 
   if (isLoading) {
     return (
       <Card className="flex flex-col">
         <CardHeader className="items-center pb-0">
-          <CardTitle>Equipment Status</CardTitle>
+          <CardTitle>Vehicle Status</CardTitle>
           <CardDescription>Loading data...</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center flex-1 pb-0 pt-8">
-          <div className="animate-pulse">Loading...</div>
+          <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
     );
   }
 
-  if (error || !equipmentData) {
+  if (error || !vehicleData) {
     return (
       <Card className="flex flex-col">
         <CardHeader className="items-center pb-0">
-          <CardTitle>Equipment Status</CardTitle>
+          <CardTitle>Vehicle Status</CardTitle>
           <CardDescription>Error loading data</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center flex-1 pb-0 text-destructive">
-          {error || "Failed to load equipment data"}
+          {error || "Failed to load vehicle data"}
         </CardContent>
       </Card>
     );
@@ -127,7 +124,7 @@ export function EquipmentStatusChart() {
   return (
     <Card className="flex flex-col">
       <CardHeader className="items-center pb-0">
-        <CardTitle>Equipment Status</CardTitle>
+        <CardTitle>Vehicle Status</CardTitle>
         <CardDescription>Operational vs Non-Operational</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
@@ -141,12 +138,15 @@ export function EquipmentStatusChart() {
               content={<ChartTooltipContent hideLabel />}
             />
             <Pie
-              data={equipmentChartData}
+              data={vehicleChartData}
               dataKey="value"
               nameKey="name"
               innerRadius={60}
               strokeWidth={5}
             >
+              {vehicleChartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.fill} />
+              ))}
               <Label
                 content={({ viewBox }) => {
                   if (viewBox && "cx" in viewBox && "cy" in viewBox) {
@@ -162,14 +162,14 @@ export function EquipmentStatusChart() {
                           y={viewBox.cy}
                           className="fill-foreground text-3xl font-bold"
                         >
-                          {totalEquipment.toLocaleString()}
+                          {totalVehicles.toLocaleString()}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
                           y={(viewBox.cy || 0) + 24}
                           className="fill-muted-foreground"
                         >
-                          Equipment
+                          Vehicles
                         </tspan>
                       </text>
                     );
@@ -182,21 +182,21 @@ export function EquipmentStatusChart() {
       </CardContent>
       <CardFooter className="flex-col gap-2 text-sm">
         <div className="flex items-center gap-2 font-medium leading-none">
-          {isEquipmentTrendingUp ? (
+          {isVehicleTrendingUp ? (
             <>
-              {equipmentOperationalPercentage.toFixed(1)}% operational{" "}
+              {vehicleOperationalPercentage.toFixed(1)}% operational{" "}
               <TrendingUp className="h-4 w-4 text-green-500" />
             </>
           ) : (
             <>
-              {equipmentOperationalPercentage.toFixed(1)}% operational{" "}
+              {vehicleOperationalPercentage.toFixed(1)}% operational{" "}
               <TrendingDown className="h-4 w-4 text-red-500" />
             </>
           )}
         </div>
         <div className="leading-none text-muted-foreground">
-          Operational: {equipmentData.OPERATIONAL} | Non-Operational:{" "}
-          {equipmentData.NON_OPERATIONAL}
+          Operational: {vehicleData.OPERATIONAL} | Non-Operational:{" "}
+          {vehicleData.NON_OPERATIONAL}
         </div>
       </CardFooter>
     </Card>

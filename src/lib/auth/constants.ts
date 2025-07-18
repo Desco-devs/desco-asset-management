@@ -9,7 +9,7 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
 
 // Dashboard routes that require authentication (any authenticated user can access /assets)
 export const DASHBOARD_PROTECTED_ROUTES = [
-  '/home',
+  '/dashboard',
   '/users', 
   '/equipments',
   '/vehicles',
@@ -49,8 +49,8 @@ export const ROLE_COLORS: Record<UserRole, string> = {
 // Default redirect paths based on role
 export const DEFAULT_REDIRECT_PATHS: Record<UserRole, string> = {
   'VIEWER': '/assets',
-  'ADMIN': '/home', 
-  'SUPERADMIN': '/home',
+  'ADMIN': '/dashboard', 
+  'SUPERADMIN': '/dashboard',
 }
 
 // Fallback redirect for when role is unknown

@@ -1,6 +1,6 @@
 "use client";
 
-import EquipmentModal from "@/app/(dashboard)/equipments/equipment-components/EquipmentModal";
+import EquipmentModal from "@/app/(admin-dashboard)/equipments/equipment-components/EquipmentModal";
 import EquipmentCard from "@/components/assets/cards/EquipmentCard";
 import EquipmentCardSkeleton from "@/components/assets/cards/EquipmentCardSkeleton";
 import SharedFilters from "@/components/assets/filters/SharedFilters";

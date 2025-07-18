@@ -1,6 +1,6 @@
 "use client";
 
-import VehicleModal from "@/app/(dashboard)/vehicles/vehicles-components/VehicleModal";
+import VehicleModal from "@/app/(admin-dashboard)/vehicles/vehicles-components/VehicleModal";
 import VehicleCard from "@/components/assets/cards/VehicleCard";
 import VehicleCardSkeleton from "@/components/assets/cards/VehicleCardSkeleton";
 import SharedFilters from "@/components/assets/filters/SharedFilters";
