@@ -20,61 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Car, FileText, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-
-interface Vehicle {
-  uid: string;
-  brand: string;
-  model: string;
-  type: string;
-  plateNumber: string;
-  inspectionDate: string;
-  before: number;
-  expiryDate: string;
-  status: "OPERATIONAL" | "NON_OPERATIONAL";
-  remarks?: string;
-  owner: string;
-  frontImgUrl?: string;
-  backImgUrl?: string;
-  side1ImgUrl?: string;
-  side2ImgUrl?: string;
-  originalReceiptUrl?: string;
-  carRegistrationUrl?: string;
-  project: {
-    uid: string;
-    name: string;
-    client: {
-      uid: string;
-      name: string;
-      location: {
-        uid: string;
-        address: string;
-      };
-    };
-  };
-}
-
-interface Client {
-  uid: string;
-  name: string;
-  location: {
-    uid: string;
-    address: string;
-  };
-}
-
-interface Location {
-  uid: string;
-  address: string;
-}
-
-interface Project {
-  uid: string;
-  name: string;
-  client: {
-    uid: string;
-    name: string;
-  };
-}
+import { Vehicle, Client, Location, Project } from "@/types/assets";
 
 export default function VehicleViewer() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);

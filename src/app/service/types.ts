@@ -30,8 +30,8 @@ export interface LocationDB {
 export interface Location {
   uid: string;
   address: string;
-  createdAt: string;
-  updatedAt: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /**
@@ -119,11 +119,25 @@ export interface Equipment {
   status: Status;
   remarks?: string | null;
   owner: string;
-  imageUrl?: string | null;
+  image_url?: string | null;
   inspectionDate?: string | null;
-  projectId: string;
-  createdAt: string;
-  updatedAt: string;
+  plateNumber?: string;
+  originalReceiptUrl?: string;
+  equipmentRegistrationUrl?: string;
+  thirdpartyInspectionImage?: string;
+  pgpcInspectionImage?: string;
+  project: {
+    uid: string;
+    name: string;
+    client: {
+      uid: string;
+      name: string;
+      location: {
+        uid: string;
+        address: string;
+      };
+    };
+  };
 }
 
 /**
@@ -169,7 +183,18 @@ export interface Vehicle {
   backImgUrl?: string | null;
   side1ImgUrl?: string | null;
   side2ImgUrl?: string | null;
-  projectId: string;
-  createdAt: string;
-  updatedAt: string;
+  originalReceiptUrl?: string;
+  carRegistrationUrl?: string;
+  project: {
+    uid: string;
+    name: string;
+    client: {
+      uid: string;
+      name: string;
+      location: {
+        uid: string;
+        address: string;
+      };
+    };
+  };
 }

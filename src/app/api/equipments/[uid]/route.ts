@@ -1,11 +1,76 @@
 // File: app/api/equipments/[uid]/route.ts
 
 import { NextResponse } from 'next/server'
-import { PrismaClient, status as EquipmentStatus } from '@prisma/client'
+import { status as EquipmentStatus } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 
-const prisma = new PrismaClient()
 const supabase = createServiceRoleClient()
+
+export async function GET(
+  request: Request,
+  context: { params: Promise<{ uid: string }> }
+) {
+  try {
+    const { uid } = await context.params
+
+    const equipment = await prisma.equipment.findUnique({
+      where: { id: uid },
+      include: {
+        project: {
+          include: {
+            client: {
+              include: {
+                location: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!equipment) {
+      return NextResponse.json({ error: 'Equipment not found' }, { status: 404 })
+    }
+
+    // Transform to match the expected interface format
+    const transformedEquipment = {
+      uid: equipment.id,
+      brand: equipment.brand,
+      model: equipment.model,
+      type: equipment.type,
+      insuranceExpirationDate: equipment.insurance_expiration_date?.toISOString() || "",
+      status: equipment.status,
+      remarks: equipment.remarks || undefined,
+      owner: equipment.owner,
+      image_url: equipment.image_url || undefined,
+      inspectionDate: equipment.inspection_date?.toISOString() || undefined,
+      plateNumber: equipment.plate_number || undefined,
+      originalReceiptUrl: equipment.original_receipt_url || undefined,
+      equipmentRegistrationUrl: equipment.equipment_registration_url || undefined,
+      thirdpartyInspectionImage: equipment.thirdparty_inspection_image || undefined,
+      pgpcInspectionImage: equipment.pgpc_inspection_image || undefined,
+      project: {
+        uid: equipment.project.id,
+        name: equipment.project.name,
+        client: {
+          uid: equipment.project.client.id,
+          name: equipment.project.client.name,
+          location: {
+            uid: equipment.project.client.location.id,
+            address: equipment.project.client.location.address,
+          },
+        },
+      },
+    }
+
+    return NextResponse.json(transformedEquipment)
+  } catch (err) {
+    const { uid } = await context.params
+    console.error(`GET /api/equipments/${uid} error:`, err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
 
 export async function DELETE(
   request: Request,

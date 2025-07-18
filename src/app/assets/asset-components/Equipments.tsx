@@ -31,59 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-
-interface Equipment {
-  uid: string;
-  brand: string;
-  model: string;
-  type: string;
-  insuranceExpirationDate: string;
-  status: "OPERATIONAL" | "NON_OPERATIONAL";
-  remarks?: string;
-  owner: string;
-  image_url?: string;
-  inspectionDate?: string;
-  plateNumber?: string;
-  originalReceiptUrl?: string;
-  equipmentRegistrationUrl?: string;
-  thirdpartyInspectionImage?: string;
-  pgpcInspectionImage?: string;
-  project: {
-    uid: string;
-    name: string;
-    client: {
-      uid: string;
-      name: string;
-      location: {
-        uid: string;
-        address: string;
-      };
-    };
-  };
-}
-
-interface Client {
-  uid: string;
-  name: string;
-  location: {
-    uid: string;
-    address: string;
-  };
-}
-
-interface Location {
-  uid: string;
-  address: string;
-}
-
-interface Project {
-  uid: string;
-  name: string;
-  client: {
-    uid: string;
-    name: string;
-  };
-}
+import { Equipment, Client, Location, Project } from "@/types/assets";
 
 export default function EquipmentViewer() {
   const [equipments, setEquipments] = useState<Equipment[]>([]);

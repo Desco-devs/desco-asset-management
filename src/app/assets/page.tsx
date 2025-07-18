@@ -80,6 +80,8 @@ const AssetsPage = async () => {
       }),
     ]);
 
+    // Data fetched successfully from database
+
     // Serialize the data (convert dates to strings)
     const serializedEquipment: Equipment[] = equipmentData.map((item) => ({
       uid: item.id,
