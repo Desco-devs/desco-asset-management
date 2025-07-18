@@ -53,7 +53,7 @@ const AboutUsTabs = () => {
                 </p>
 
                 <p className="text-muted-foreground leading-relaxed">
-                  We have shortened our response time to meet clients'
+                  We have shortened our response time to meet clients&apos;
                   requirements through our partnerships with reputable suppliers
                   of raw materials abroad.
                 </p>
@@ -113,7 +113,7 @@ const AboutUsTabs = () => {
                 </p>
                 <p className="text-muted-foreground leading-relaxed">
                   We safeguard all our stakeholders’ welfare as well as that of
-                  mother earth. We <strong>Serve</strong> our clients'
+                  mother earth. We <strong>Serve</strong> our clients&apos;
                   requirements with utmost consideration for health, safety and
                   the environment.
                 </p>
@@ -150,7 +150,7 @@ const AboutUsTabs = () => {
                   value-added products and services in the Energy Sector.
                 </p>
                 <p className="text-muted-foreground leading-relaxed">
-                  This vision underscores DESCO's commitment to delivering
+                  This vision underscores DESCO&apos;s commitment to delivering
                   comprehensive and innovative solutions within the energy
                   industry. By focusing on integration and value addition, DESCO
                   aims to meet the evolving needs of its clients, ensuring
