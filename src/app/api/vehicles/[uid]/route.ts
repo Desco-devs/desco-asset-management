@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, Status as VehicleStatus } from '@prisma/client'
+import { PrismaClient, status as VehicleStatus } from '@prisma/client'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 
 const prisma = new PrismaClient()
@@ -14,7 +14,7 @@ export async function GET(
     const { uid } = await context.params
 
     const vehicle = await prisma.vehicle.findUnique({
-      where: { uid },
+      where: { id: uid },
       include: { project: true },
     })
 
@@ -57,7 +57,7 @@ export async function PATCH(
     const side2Img = formData.get('side2Img') as File | null
 
     const existing = await prisma.vehicle.findUnique({
-      where: { uid },
+      where: { id: uid },
     })
     if (!existing) {
       return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 })
@@ -68,10 +68,10 @@ export async function PATCH(
       brand,
       model,
       type,
-      plateNumber,
-      inspectionDate: new Date(inspectionDate),
+      plate_number: plateNumber,
+      inspection_date: new Date(inspectionDate),
       before: parseInt(before),
-      expiryDate: new Date(expiryDate),
+      expiry_date: new Date(expiryDate),
       status,
       remarks,
       owner,
@@ -79,16 +79,16 @@ export async function PATCH(
 
     // Update vehicle fields first (without images)
     await prisma.vehicle.update({
-      where: { uid },
+      where: { id: uid },
       data: updateData,
     })
 
     // Handle image uploads
     const imageFields: { formKey: string; urlKey: string; side: string }[] = [
-      { formKey: 'frontImg', urlKey: 'frontImgUrl', side: 'front' },
-      { formKey: 'backImg', urlKey: 'backImgUrl', side: 'back' },
-      { formKey: 'side1Img', urlKey: 'side1ImgUrl', side: 'side1' },
-      { formKey: 'side2Img', urlKey: 'side2ImgUrl', side: 'side2' },
+      { formKey: 'frontImg', urlKey: 'front_img_url', side: 'front' },
+      { formKey: 'backImg', urlKey: 'back_img_url', side: 'back' },
+      { formKey: 'side1Img', urlKey: 'side1_img_url', side: 'side1' },
+      { formKey: 'side2Img', urlKey: 'side2_img_url', side: 'side2' },
     ]
 
     for (const { formKey, urlKey, side } of imageFields) {
@@ -107,7 +107,7 @@ export async function PATCH(
         const timestamp = Date.now()
         const fileName = `${timestamp}_${file.name}`
         // Include vehicleId folder in path
-        const filePath = `vehicles/${existing.projectId}/${existing.uid}/${side}/${fileName}`
+        const filePath = `vehicles/${existing.project_id}/${existing.id}/${side}/${fileName}`
         const buffer = Buffer.from(await file.arrayBuffer())
 
         const { error: uploadError } = await supabase
@@ -132,14 +132,14 @@ export async function PATCH(
 
         // Update vehicle record for this image url
         await prisma.vehicle.update({
-          where: { uid },
+          where: { id: uid },
           data: { [urlKey]: urlData.publicUrl },
         })
       }
     }
 
     const updated = await prisma.vehicle.findUnique({
-      where: { uid },
+      where: { id: uid },
       include: { project: true },
     })
 
@@ -163,7 +163,7 @@ export async function DELETE(
     const { uid } = await context.params
 
     const vehicle = await prisma.vehicle.findUnique({
-      where: { uid },
+      where: { id: uid },
     })
     if (!vehicle) {
       return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 })
@@ -171,10 +171,10 @@ export async function DELETE(
 
     // Collect image paths to delete
     const imageUrls = [
-      vehicle.frontImgUrl,
-      vehicle.backImgUrl,
-      vehicle.side1ImgUrl,
-      vehicle.side2ImgUrl,
+      vehicle.front_img_url,
+      vehicle.back_img_url,
+      vehicle.side1_img_url,
+      vehicle.side2_img_url,
     ]
     const pathsToDelete: string[] = []
 
@@ -191,7 +191,7 @@ export async function DELETE(
       await supabase.storage.from('vehicles').remove(pathsToDelete)
     }
 
-    await prisma.vehicle.delete({ where: { uid } })
+    await prisma.vehicle.delete({ where: { id: uid } })
 
     return NextResponse.json({ message: 'Deleted successfully' }, { status: 200 })
   } catch (err) {

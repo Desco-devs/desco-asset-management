@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
         // Verify that the project exists
         const project = await prisma.project.findUnique({
-            where: { uid: projectId }
+            where: { id: projectId }
         });
 
         if (!project) {
@@ -51,8 +51,8 @@ export async function POST(request: NextRequest) {
                 remarks,
                 owner,
                 image_url,
-                inspectionDate: inspectionDate ? new Date(inspectionDate) : null,
-                projectId,
+                inspection_date: inspectionDate ? new Date(inspectionDate) : null,
+                project_id: projectId,
             },
             include: {
                 project: {

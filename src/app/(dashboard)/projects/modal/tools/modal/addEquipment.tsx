@@ -29,7 +29,7 @@ import {
 import { toast } from "sonner";
 import { Loader2, ImageIcon } from "lucide-react";
 import { createEquipment } from "@/app/service/equipments/equipment";
-import ImagePreviewModal from "@/app/components/custom-reuseable/modal/previewImage";
+import ImagePreviewModal from "@/app/components/custom-reusable/modal/PreviewImage";
 
 interface AddEquipmentModalProps {
   isOpen: boolean;

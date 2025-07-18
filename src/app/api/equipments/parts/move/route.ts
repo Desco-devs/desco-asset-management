@@ -84,7 +84,7 @@ export async function POST(request: Request) {
 
     // Get equipment details
     const equipment = await prisma.equipment.findUnique({
-      where: { uid: equipmentId },
+      where: { id: equipmentId },
       include: { project: true }
     })
 
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     // Move the file
     const newUrl = await moveFileInSupabase(
       partUrl,
-      equipment.project.uid,
+      equipment.project.id,
       equipmentId,
       newFolderPath,
       partIndex + 1,
@@ -103,13 +103,13 @@ export async function POST(request: Request) {
     )
 
     // Update the equipment parts array
-    const currentParts = equipment.equipmentParts || []
+    const currentParts = equipment.equipment_parts || []
     const newParts = [...currentParts]
     newParts[partIndex] = newUrl
 
     await prisma.equipment.update({
-      where: { uid: equipmentId },
-      data: { equipmentParts: newParts }
+      where: { id: equipmentId },
+      data: { equipment_parts: newParts }
     })
 
     return NextResponse.json({ success: true, newUrl })

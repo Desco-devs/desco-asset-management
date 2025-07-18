@@ -23,7 +23,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { User, Lock, Phone, Shield, Settings } from "lucide-react";
 
-const PERMISSIONS = ["VIEW", "CREATE", "UPDATE", "DELETE"] as const;
+const ROLES = ["VIEWER", "ADMIN", "SUPERADMIN"] as const;
 
 interface AddUserModalProps {
   isOpen: boolean;
@@ -33,7 +33,7 @@ interface AddUserModalProps {
     password: string;
     fullname: string;
     phone?: string | null;
-    permissions: string[];
+    role: string;
     userStatus: string;
   }) => Promise<void>;
   creating: boolean;
@@ -49,7 +49,7 @@ export default function AddUserModal({
   const [password, setPassword] = useState("");
   const [fullname, setFullname] = useState("");
   const [phone, setPhone] = useState("");
-  const [permissions, setPermissions] = useState<string[]>([]);
+  const [role, setRole] = useState<string>("VIEWER");
   const [userStatus, setUserStatus] = useState("ACTIVE");
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function AddUserModal({
       setPassword("");
       setFullname("");
       setPhone("");
-      setPermissions([]);
+      setRole("VIEWER");
       setUserStatus("ACTIVE");
     }
   }, [isOpen]);
@@ -73,15 +73,13 @@ export default function AddUserModal({
       password,
       fullname: fullname.trim(),
       phone: phone.trim() || null,
-      permissions,
+      role,
       userStatus,
     });
   }
 
-  function togglePermission(perm: string) {
-    setPermissions((prev) =>
-      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]
-    );
+  function handleRoleChange(newRole: string) {
+    setRole(newRole);
   }
 
   return (
@@ -171,34 +169,41 @@ export default function AddUserModal({
 
           <Separator />
 
-          {/* Permissions Section */}
+          {/* Role Section */}
           <div className="space-y-3">
             <Label className="text-sm font-medium flex items-center gap-2">
               <Shield className="h-4 w-4" />
-              Permissions
+              Role
             </Label>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="grid grid-cols-2 gap-3">
-                  {PERMISSIONS.map((perm) => (
-                    <div key={perm} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`perm-${perm}`}
-                        checked={permissions.includes(perm)}
-                        onCheckedChange={() => togglePermission(perm)}
-                        disabled={creating}
-                      />
-                      <Label
-                        htmlFor={`perm-${perm}`}
-                        className="text-sm cursor-pointer font-normal"
-                      >
-                        {perm}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <Select
+              disabled={creating}
+              value={role}
+              onValueChange={handleRoleChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select user role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="VIEWER">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-blue-500" />
+                    Viewer
+                  </div>
+                </SelectItem>
+                <SelectItem value="ADMIN">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-yellow-500" />
+                    Admin
+                  </div>
+                </SelectItem>
+                <SelectItem value="SUPERADMIN">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-red-500" />
+                    Super Admin
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Status Section */}

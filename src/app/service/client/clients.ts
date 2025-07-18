@@ -1,10 +1,10 @@
 // Update your client-side API functions to include proper sorting
 // This would go in your @/app/service/client/clients.ts file
 
-import type { Location } from "@prisma/client";
+import type { location } from "@prisma/client";
 
 // Update the fetchLocations function to ensure proper ordering
-export async function fetchLocations(): Promise<Location[]> {
+export async function fetchLocations(): Promise<location[]> {
   try {
     const response = await fetch("/api/locations", {
       method: "GET",
@@ -23,8 +23,8 @@ export async function fetchLocations(): Promise<Location[]> {
     const data = await response.json();
     // Ensure the data is sorted by creation date DESC (newest first)
     return data.sort(
-      (a: Location, b: Location) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a: location, b: location) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   } catch (error) {
     console.error("Error fetching locations:", error);

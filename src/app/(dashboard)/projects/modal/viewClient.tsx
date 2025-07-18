@@ -19,7 +19,7 @@ import {
   updateClient,
   deleteClient,
 } from "@/app/service/client/clientService";
-import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
+import AlertModal from "@/app/components/custom-reusable/modal/AlertModal";
 import ProjectsModal from "./viewProjects";
 import { color } from "@/lib/color";
 

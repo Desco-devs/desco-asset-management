@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Download, AlertTriangle, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
-import EquipmentCards from "./equip-components/Equipments";
+import EquipmentCards from "./equipment-components/Equipments";
 
 // API functions
 async function getEquipments() {

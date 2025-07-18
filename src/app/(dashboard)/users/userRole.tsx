@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
-import DataTable, { Column } from "@/app/components/custom-reuseable/table/ReusableTable"
-import AlertModal from "@/app/components/custom-reuseable/modal/alertModal"
+import DataTable, { Column } from "@/app/components/custom-reusable/table/ReusableTable"
+import AlertModal from "@/app/components/custom-reusable/modal/AlertModal"
 
 import {
   DropdownMenu,
@@ -18,7 +18,7 @@ import {
 import { MoreHorizontal } from "lucide-react"
 
 import { useAuth } from "@/app/context/AuthContext"
-import { User } from "@/app/service/types"
+import { User } from "@/types/auth"
 import { createUser, deleteUser, getUsers, updateUser } from "@/app/service/user/user-service"
 import { Button } from "@/components/ui/button"
 import EditUserModal from "./modal/editUser"
@@ -50,10 +50,10 @@ export default function UsersPage() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
 
   // Permissions
-  const canCreate = currentUser?.permissions.includes("CREATE") ?? false
-  const canUpdate = currentUser?.permissions.includes("UPDATE") ?? false
-  const canDelete = currentUser?.permissions.includes("DELETE") ?? false
-  const canView = currentUser?.permissions.includes("VIEW") ?? false
+  const canCreate = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPERADMIN'
+  const canUpdate = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPERADMIN'
+  const canDelete = currentUser?.role === 'SUPERADMIN'
+  const canView = currentUser?.role === 'VIEWER' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPERADMIN'
 
   useEffect(() => {
     fetchUsers()
@@ -76,7 +76,7 @@ export default function UsersPage() {
     password: string
     fullname: string
     phone?: string | null
-    permissions: string[]
+    role: string
     userStatus: string
   }) {
     try {
@@ -94,7 +94,7 @@ export default function UsersPage() {
     try {
       const updated = await updateUser(uid, data)
       setUsers((prev) =>
-        prev.map((u) => (u.uid === uid ? { ...u, ...updated } : u))
+        prev.map((u) => (u.id === uid ? { ...u, ...updated } : u))
       )
       toast.success("User updated successfully")
       setEditModalOpen(false)
@@ -114,8 +114,8 @@ export default function UsersPage() {
   async function handleDelete() {
     if (!userToDelete) return
     try {
-      await deleteUser(userToDelete.uid!)
-      setUsers((prev) => prev.filter((u) => u.uid !== userToDelete.uid))
+      await deleteUser(userToDelete.id!)
+      setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id))
       toast.success("User deleted successfully")
     } catch (err: any) {
       toast.error(err.message || "Failed to delete user")
@@ -127,35 +127,27 @@ export default function UsersPage() {
 
   const columns: Column<User>[] = [
     { key: "username", title: "Username", render: (_v, u) => u.username },
-    { key: "fullname", title: "Fullname", render: (_v, u) => u.fullname },
+    { key: "full_name", title: "Fullname", render: (_v, u) => u.full_name },
     { key: "phone", title: "Phone", render: (_v, u) => u.phone || "-" },
     {
-      key: "permissions",
-      title: "Permissions",
+      key: "role",
+      title: "Role",
       render: (_v, u) => {
-        const count = (u.permissions || []).length
-        const permList = (u.permissions || []).join(", ")
+        const roleColors = {
+          VIEWER: "bg-blue-500",
+          ADMIN: "bg-yellow-500",
+          SUPERADMIN: "bg-red-500",
+        }
+        const roleColor = roleColors[u.role as keyof typeof roleColors] || "bg-gray-500"
         return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className="cursor-default underline decoration-dotted"
-                  tabIndex={0}
-                  aria-label={`Permissions: ${permList || "No permissions"}`}
-                >
-                  {count}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" align="center" className="max-w-xs whitespace-normal">
-                {permList || "(no permissions)"}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <div className="flex items-center gap-2">
+            <div className={`h-2 w-2 rounded-full ${roleColor}`} />
+            {u.role || "VIEWER"}
+          </div>
         )
       },
     },
-    { key: "userStatus", title: "Status", render: (_v, u) => u.userStatus },
+    { key: "user_status", title: "Status", render: (_v, u) => u.user_status },
     {
       key: "actions",
       title: "Actions",

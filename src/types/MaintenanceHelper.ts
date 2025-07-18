@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server'
-import { PrismaClient, ReportStatus, ReportPriority } from '@prisma/client'
+import { PrismaClient, report_status, report_priority } from '@prisma/client'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 
 const prisma = new PrismaClient()

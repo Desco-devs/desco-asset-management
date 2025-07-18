@@ -12,7 +12,7 @@ export async function GET(
 
   try {
     const client = await prisma.client.findUnique({
-      where: { uid },
+      where: { id: uid },
       include: {location: true, projects: true, },
     })
     if (!client) {
@@ -42,8 +42,8 @@ export async function PUT(
 
   try {
     const updated = await prisma.client.update({
-      where: { uid },
-      data: { name, locationId },
+      where: { id: uid },
+      data: { name, location_id: locationId },
       include: { location: true },
     })
     return NextResponse.json(updated)
@@ -61,7 +61,7 @@ export async function DELETE(
   const { uid } = await params
 
   try {
-    const deleted = await prisma.client.delete({ where: { uid } })
+    const deleted = await prisma.client.delete({ where: { id: uid } })
     return NextResponse.json(deleted)
   } catch (err) {
     console.error('DELETE /client/[uid] error:', err)

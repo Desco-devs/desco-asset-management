@@ -1,7 +1,7 @@
 // File: app/api/maintenance-reports/create/route.ts
 
 import { NextResponse } from 'next/server'
-import { PrismaClient, ReportStatus, ReportPriority } from '@prisma/client'
+import { PrismaClient, report_status, report_priority } from '@prisma/client'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 
 // Initialize Prisma client
@@ -54,8 +54,8 @@ export async function POST(request: Request) {
         const remarks = formData.get('remarks') as string
         const inspectionDetails = formData.get('inspectionDetails') as string
         const actionTaken = formData.get('actionTaken') as string
-        const priority = (formData.get('priority') as keyof typeof ReportPriority) || 'MEDIUM'
-        const status = (formData.get('status') as keyof typeof ReportStatus) || 'REPORTED'
+        const priority = (formData.get('priority') as keyof typeof report_priority) || 'MEDIUM'
+        const status = (formData.get('status') as keyof typeof report_status) || 'REPORTED'
         const downtimeHours = formData.get('downtimeHours') as string
 
         // Handle date - ONLY include if it has a value
@@ -84,13 +84,13 @@ export async function POST(request: Request) {
 
         // Verify equipment and location exist
         console.log('Verifying equipment exists...')
-        const equipment = await prisma.equipment.findUnique({ where: { uid: equipmentId } })
+        const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId } })
         if (!equipment) {
             return NextResponse.json({ error: 'Equipment not found' }, { status: 404 })
         }
 
         console.log('Verifying location exists...')
-        const location = await prisma.location.findUnique({ where: { uid: locationId } })
+        const location = await prisma.location.findUnique({ where: { id: locationId } })
         if (!location) {
             return NextResponse.json({ error: 'Location not found' }, { status: 404 })
         }
@@ -144,11 +144,11 @@ export async function POST(request: Request) {
         console.log('Creating maintenance report with data:', createData)
 
         // Create the maintenance report
-        const report = await prisma.maintenanceEquipmentReport.create({
+        const report = await prisma.maintenance_equipment_report.create({
             data: createData
         })
 
-        console.log('Report created successfully:', report.uid)
+        console.log('Report created successfully:', report.id)
 
         // Handle attachment uploads (optional)
         const attachmentFiles: File[] = []
@@ -169,16 +169,16 @@ export async function POST(request: Request) {
                     const attachmentUrl = await uploadFileToSupabase(
                         attachmentFiles[i],
                         equipmentId,
-                        report.uid,
+                        report.id,
                         i + 1
                     )
                     attachmentUrls.push(attachmentUrl)
                 }
 
                 // Update report with attachment URLs
-                await prisma.maintenanceEquipmentReport.update({
-                    where: { uid: report.uid },
-                    data: { attachmentUrls }
+                await prisma.maintenance_equipment_report.update({
+                    where: { id: report.id },
+                    data: { attachment_urls: attachmentUrls }
                 })
                 console.log('Attachments uploaded successfully')
             } catch (uploadError) {
@@ -189,8 +189,8 @@ export async function POST(request: Request) {
 
         // Fetch the complete report with relations
         console.log('Fetching complete report...')
-        const result = await prisma.maintenanceEquipmentReport.findUnique({
-            where: { uid: report.uid },
+        const result = await prisma.maintenance_equipment_report.findUnique({
+            where: { id: report.id },
             include: {
                 equipment: {
                     include: {

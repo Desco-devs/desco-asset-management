@@ -1,6 +1,7 @@
-import { PrismaClient, Permission } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcrypt'
+import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth'
 
 // Manually define user status enum as in your Prisma schema
 enum UserStatusEnum {
@@ -14,91 +15,60 @@ interface CreateUserBody {
   password: string
   fullname: string
   phone?: string
-  permissions?: Permission[]
+  // permissions?: Permission[] // Removed since we're using role-based system
   userStatus?: keyof typeof UserStatusEnum | string
 }
 
 const prisma = new PrismaClient()
 
-// GET: View all users
-export async function GET(request: NextRequest) {
+// GET: View all users with proper role-based access control
+export const GET = withResourcePermission('users', 'view', async (request: NextRequest, user: AuthenticatedUser) => {
   try {
-    const users = await prisma.user.findMany({
-      select: {
-        uid: true,
-        username: true,
-        fullname: true,
-        phone: true,
-        permissions: true,
-        userStatus: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    })
+    const { searchParams } = new URL(request.url)
+    const limit = searchParams.get('limit')
+    const offset = searchParams.get('offset')
 
-    return NextResponse.json(users)
+    const queryOptions: any = {
+      select: {
+        id: true,
+        username: true,
+        full_name: true,
+        phone: true,
+        role: true,
+        user_status: true,
+        created_at: true,
+        updated_at: true,
+      },
+      orderBy: {
+        created_at: 'desc'
+      }
+    }
+
+    if (limit) {
+      queryOptions.take = parseInt(limit, 10)
+    }
+    if (offset) {
+      queryOptions.skip = parseInt(offset, 10)
+    }
+
+    const users = await prisma.user.findMany(queryOptions)
+    const total = await prisma.user.count()
+
+    return NextResponse.json({
+      data: users,
+      total,
+      user_role: user.role,
+      permissions: {
+        can_create: user.role === 'SUPERADMIN',
+        can_update: user.role === 'SUPERADMIN',
+        can_delete: user.role === 'SUPERADMIN'
+      }
+    })
   } catch (error: any) {
     console.error('Error fetching users:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+})
 
-// POST: Create a new user
-export async function POST(request: NextRequest) {
-  try {
-    const body = (await request.json()) as CreateUserBody
-    const { username, password, fullname, phone, permissions, userStatus } = body
-
-    // Input validation
-    if (!username || typeof username !== 'string') {
-      return NextResponse.json({ error: 'Username is required and must be a string' }, { status: 400 })
-    }
-    if (!password || typeof password !== 'string') {
-      return NextResponse.json({ error: 'Password is required and must be a string' }, { status: 400 })
-    }
-    if (!fullname || typeof fullname !== 'string') {
-      return NextResponse.json({ error: 'Fullname is required and must be a string' }, { status: 400 })
-    }
-    if (phone && typeof phone !== 'string') {
-      return NextResponse.json({ error: 'Phone must be a string' }, { status: 400 })
-    }
-    if (permissions && !Array.isArray(permissions)) {
-      return NextResponse.json({ error: 'Permissions must be an array' }, { status: 400 })
-    }
-    if (userStatus && !Object.values(UserStatusEnum).includes(userStatus as UserStatusEnum)) {
-      return NextResponse.json({ error: 'Invalid user status' }, { status: 400 })
-    }
-
-    // Hash password before saving
-    const hashedPassword = await bcrypt.hash(password, 10)
-
-    const user = await prisma.user.create({
-      data: {
-        username,
-        password: hashedPassword,
-        fullname,
-        phone: phone || null,
-        permissions: permissions || [],
-        userStatus: (userStatus as UserStatusEnum) || UserStatusEnum.ACTIVE,
-      },
-      select: {
-        uid: true,
-        username: true,
-        fullname: true,
-        phone: true,
-        permissions: true,
-        userStatus: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    })
-
-    return NextResponse.json(user, { status: 201 })
-  } catch (error: any) {
-    console.error('Error creating user:', error)
-    if (error.code === 'P2002') {
-      return NextResponse.json({ error: 'Username already exists' }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
+// POST: User creation is handled by Supabase Auth
+// This endpoint is removed as user creation should be done through Supabase Auth

@@ -105,9 +105,7 @@ const AddVehicleModal = ({
 }: AddVehicleModalProps) => {
   const { user } = useAuth();
 
-  const isAdmin =
-    user?.permissions.some((p) => ["CREATE", "UPDATE", "DELETE"].includes(p)) ??
-    false;
+  const isAdmin = (user?.role === 'ADMIN' || user?.role === 'SUPERADMIN') ?? false;
 
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);

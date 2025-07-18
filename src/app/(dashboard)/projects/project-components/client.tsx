@@ -69,7 +69,7 @@ import {
 
 import { toast } from "sonner";
 
-import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
+import AlertModal from "@/app/components/custom-reusable/modal/AlertModal";
 
 import AddClient from "../modal/addLocation";
 
@@ -77,10 +77,10 @@ import { useAuth } from "@/app/context/AuthContext";
 import { formatCreatedAt } from "@/lib/format";
 
 interface Location {
-  uid: string;
+  id: string;
   address: string;
-  createdAt: Date;
-  updatedAt: Date;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export default function LocationManager() {
@@ -88,10 +88,10 @@ export default function LocationManager() {
 
   const { user } = useAuth();
 
-  const canCreate = user?.permissions.includes("CREATE") ?? false;
-  const canUpdate = user?.permissions.includes("UPDATE") ?? false;
-  const canDelete = user?.permissions.includes("DELETE") ?? false;
-  const canView = user?.permissions.includes("VIEW") ?? false;
+  const canCreate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canUpdate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canDelete = user?.role === 'SUPERADMIN';
+  const canView = user?.role === 'VIEWER' || user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
 
   const [locations, setLocations] = useState<Location[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
@@ -105,7 +105,7 @@ export default function LocationManager() {
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Location | null;
     direction: "asc" | "desc" | null;
-  }>({ key: "createdAt", direction: "desc" });
+  }>({ key: "created_at", direction: "desc" });
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -134,7 +134,7 @@ export default function LocationManager() {
   const sortLocationsByDate = (data: Location[]) =>
     [...data].sort(
       (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
   const applySorting = (data: Location[]) => {
@@ -170,7 +170,7 @@ export default function LocationManager() {
     const filtered = locations.filter(
       (loc) =>
         loc.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        loc.uid.toLowerCase().includes(searchTerm.toLowerCase())
+        loc.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredLocations(applySorting(filtered));
     setCurrentPage(1);
@@ -260,7 +260,7 @@ export default function LocationManager() {
 
   // Helper function to get the display index for a location
   const getLocationDisplayIndex = (locationUid: string) => {
-    const index = filteredLocations.findIndex((loc) => loc.uid === locationUid);
+    const index = filteredLocations.findIndex((loc) => loc.id === locationUid);
     return index + 1;
   };
 
@@ -369,12 +369,12 @@ export default function LocationManager() {
                 </TableRow>
               ) : (
                 currentItems.map((loc, index) => (
-                  <TableRow key={loc.uid}>
+                  <TableRow key={loc.id}>
                     <TableCell className="font-semibold">
                       {indexOfFirst + index + 1}
                     </TableCell>
                     <TableCell>
-                      {editingId === loc.uid ? (
+                      {editingId === loc.id ? (
                         <Input
                           value={editAddress}
                           onChange={(e) => setEditAddress(e.target.value)}
@@ -388,7 +388,7 @@ export default function LocationManager() {
                     <TableCell>{formatCreatedAt(loc.createdAt)}</TableCell>
                     <TableCell>{formatCreatedAt(loc.updatedAt)}</TableCell>
                     <TableCell className="text-right">
-                      {editingId === loc.uid ? (
+                      {editingId === loc.id ? (
                         <div className="flex justify-end gap-2">
                           <Button
                             variant="outline"
@@ -403,7 +403,7 @@ export default function LocationManager() {
                           <Button
                             variant="default"
                             size="sm"
-                            onClick={() => handleUpdateLocation(loc.uid)}
+                            onClick={() => handleUpdateLocation(loc.id)}
                             disabled={!canUpdate}
                           >
                             Save
@@ -423,7 +423,7 @@ export default function LocationManager() {
                             {canUpdate && (
                               <DropdownMenuItem
                                 onClick={() => {
-                                  setEditingId(loc.uid);
+                                  setEditingId(loc.id);
                                   setEditAddress(loc.address);
                                 }}
                               >
@@ -434,7 +434,7 @@ export default function LocationManager() {
                             {canView && (
                               <DropdownMenuItem
                                 onClick={() =>
-                                  handleViewClients(loc.uid, loc.address)
+                                  handleViewClients(loc.id, loc.address)
                                 }
                               >
                                 View Clients
@@ -444,7 +444,7 @@ export default function LocationManager() {
                             {canDelete && (
                               <DropdownMenuItem
                                 className="text-red-600"
-                                onClick={() => openDeleteModal(loc.uid)}
+                                onClick={() => openDeleteModal(loc.id)}
                               >
                                 Delete
                               </DropdownMenuItem>

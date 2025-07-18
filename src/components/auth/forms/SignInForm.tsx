@@ -17,10 +17,11 @@ import {
 import { toast } from 'sonner'
 import Image from 'next/image'
 import { SignInProps, SignInFormData } from '@/types/auth'
+import { getDefaultRedirectPath } from '@/lib/auth/utils'
 
 export function SignInForm({ onToggle, onForgotPassword }: SignInProps) {
   const router = useRouter()
-  const { signIn } = useAuth()
+  const { signIn, user } = useAuth()
   const [formData, setFormData] = useState<SignInFormData>({
     email: '',
     password: '',
@@ -64,8 +65,33 @@ export function SignInForm({ onToggle, onForgotPassword }: SignInProps) {
         // If there's a specific redirect, use it
         router.replace(redirectTo)
       } else {
-        // Otherwise redirect to root and let middleware handle role-based routing
-        router.replace('/')
+        // Wait a short moment for auth state to update, then get user profile
+        setTimeout(async () => {
+          // Get current session to fetch user ID
+          const { createClient } = await import('@/lib/supabase')
+          const supabase = createClient()
+          const { data: { session } } = await supabase.auth.getSession()
+          
+          if (session?.user) {
+            try {
+              // Fetch user profile to get role
+              const response = await fetch(`/api/users/${session.user.id}`)
+              if (response.ok) {
+                const userData = await response.json()
+                const redirectPath = getDefaultRedirectPath(userData.role)
+                router.replace(redirectPath)
+              } else {
+                // Fallback to home if profile fetch fails
+                router.replace('/home')
+              }
+            } catch (error) {
+              console.error('Error fetching user profile:', error)
+              router.replace('/home')
+            }
+          } else {
+            router.replace('/')
+          }
+        }, 100) // Small delay to ensure auth state is updated
       }
     } catch (err: any) {
       toast.error(err.message || 'Login failed')

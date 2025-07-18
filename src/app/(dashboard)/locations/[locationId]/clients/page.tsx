@@ -12,7 +12,7 @@ import {
 } from "@/app/service/client/clientService";
 import DataTable, {
   Column,
-} from "@/app/components/custom-reuseable/table/ReusableTable";
+} from "@/app/components/custom-reusable/table/ReusableTable";
 
 import {
   DropdownMenu,
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
 
-import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
+import AlertModal from "@/app/components/custom-reusable/modal/AlertModal";
 import ProjectsModal from "@/app/(dashboard)/projects/modal/viewProjects";
 import { useAuth } from "@/app/context/AuthContext";
 import { AddClientModal } from "@/app/(dashboard)/projects/modal/addClient";
@@ -82,10 +82,10 @@ export default function ClientsPage() {
   }, []);
 
   // Permissions checks
-  const canCreate = user?.permissions.includes("CREATE") ?? false;
-  const canUpdate = user?.permissions.includes("UPDATE") ?? false;
-  const canDelete = user?.permissions.includes("DELETE") ?? false;
-  const canView = user?.permissions.includes("VIEW") ?? false;
+  const canCreate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canUpdate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canDelete = user?.role === 'SUPERADMIN';
+  const canView = user?.role === 'VIEWER' || user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
 
   async function handleSaveEdit(uid: string) {
     if (!editName.trim() || !locationId) return;

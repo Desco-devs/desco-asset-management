@@ -28,9 +28,9 @@ import {
   Search,
   Eye,
 } from "lucide-react";
-import EquipmentModal from "@/app/(dashboard)/equipments/equip-components/EquipmentModal";
-import ViewReportsModal from "@/app/(dashboard)/equipments/equip-components/ViewReportsModa";
-import { MaintenanceReport } from "@/app/(dashboard)/equipments/equip-components/MaintenanceReportModal";
+import EquipmentModal from "@/app/(dashboard)/equipments/equipment-components/EquipmentModal";
+import ViewReportsModal from "@/app/(dashboard)/equipments/equipment-components/ViewReportsModal";
+import { MaintenanceReport } from "@/app/(dashboard)/equipments/equipment-components/MaintenanceReportModal";
 import { Input } from "@/components/ui/input";
 
 interface Equipment {
@@ -258,7 +258,7 @@ export default function EquipmentViewer() {
     if (equipment.thirdpartyInspectionImage) {
       badges.push(
         <Badge
-          key="thirdparty"
+          key={`thirdparty-${equipment.uid}`}
           variant="outline"
           className="flex items-center gap-1 text-orange-600 border-orange-200"
         >
@@ -269,7 +269,7 @@ export default function EquipmentViewer() {
     if (equipment.pgpcInspectionImage) {
       badges.push(
         <Badge
-          key="pgpc"
+          key={`pgpc-${equipment.uid}`}
           variant="outline"
           className="flex items-center gap-1 text-teal-600 border-teal-200"
         >
@@ -369,8 +369,8 @@ export default function EquipmentViewer() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Clients</SelectItem>
-                {clients.map((client) => (
-                  <SelectItem key={client.uid} value={client.uid}>
+                {clients.map((client, index) => (
+                  <SelectItem key={client.uid || `client-${index}`} value={client.uid}>
                     {client.name}
                   </SelectItem>
                 ))}
@@ -392,8 +392,8 @@ export default function EquipmentViewer() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Locations</SelectItem>
-                {locations.map((location) => (
-                  <SelectItem key={location.uid} value={location.uid}>
+                {locations.map((location, index) => (
+                  <SelectItem key={location.uid || `location-${index}`} value={location.uid}>
                     {location.address}
                   </SelectItem>
                 ))}
@@ -412,8 +412,8 @@ export default function EquipmentViewer() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Projects</SelectItem>
-                {availableProjects.map((project) => (
-                  <SelectItem key={project.uid} value={project.uid}>
+                {availableProjects.map((project, index) => (
+                  <SelectItem key={project.uid || `project-${index}`} value={project.uid}>
                     {project.name}
                   </SelectItem>
                 ))}
@@ -487,9 +487,9 @@ export default function EquipmentViewer() {
 
       {/* Equipment Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredEquipments.map((equipment) => (
+        {filteredEquipments.map((equipment, index) => (
           <Card
-            key={equipment.uid}
+            key={equipment.uid || `equipment-${index}`}
             className="hover:shadow-lg cursor-pointer z-40 bg-chart-3/20"
             onClick={() => {
               setSelectedEquipment(equipment);

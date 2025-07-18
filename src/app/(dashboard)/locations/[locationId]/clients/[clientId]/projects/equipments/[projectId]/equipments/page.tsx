@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { getEquipmentsByProject } from "@/app/service/client/dynamicClients";
 import { deleteEquipment } from "@/app/service/equipments/equipment";
 
-import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
+import AlertModal from "@/app/components/custom-reusable/modal/AlertModal";
 import AddEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/addEquipment";
 import EditEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/editEquipment";
 
 import DataTable, {
   Column,
-} from "@/app/components/custom-reuseable/table/ReusableTable";
+} from "@/app/components/custom-reusable/table/ReusableTable";
 import type { Equipment } from "@/app/service/types";
 
 import {
@@ -61,10 +61,10 @@ export default function EquipmentsPage() {
   const { user } = useAuth();
   const [projectName, setProjectName] = useState<string | null>(null);
 
-  const canCreate = user?.permissions.includes("CREATE") ?? false;
-  const canUpdate = user?.permissions.includes("UPDATE") ?? false;
-  const canDelete = user?.permissions.includes("DELETE") ?? false;
-  const canView = user?.permissions.includes("VIEW") ?? false;
+  const canCreate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canUpdate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canDelete = user?.role === 'SUPERADMIN';
+  const canView = user?.role === 'VIEWER' || user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
 
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,8 +173,8 @@ export default function EquipmentsPage() {
       key: "expirationDate",
       title: "Expiration",
       render: (_value, equipment) => {
-        if (!equipment.expirationDate) return "-";
-        const expDate = new Date(equipment.expirationDate);
+        if (!equipment.insurance_expiration_date) return "-";
+        const expDate = new Date(equipment.insurance_expiration_date);
         const diffMs = expDate.getTime() - now.getTime();
         const daysLeft = diffMs / (1000 * 60 * 60 * 24);
         const colorClass = getColorByDaysLeft(daysLeft, 5);
@@ -211,8 +211,8 @@ export default function EquipmentsPage() {
       key: "inspectionDate",
       title: "Inspection Date",
       render: (_value, equipment) => {
-        if (!equipment.inspectionDate) return "-";
-        const inspDate = new Date(equipment.inspectionDate);
+        if (!equipment.inspection_date) return "-";
+        const inspDate = new Date(equipment.inspection_date);
         const diffMs = inspDate.getTime() - now.getTime();
         const daysLeft = diffMs / (1000 * 60 * 60 * 24);
         const colorClass = getColorByDaysLeft(daysLeft, 5);

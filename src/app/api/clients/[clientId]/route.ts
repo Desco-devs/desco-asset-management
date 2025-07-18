@@ -11,8 +11,8 @@ export async function GET(
         const { clientId } = await context.params
 
         const projects = await prisma.project.findMany({
-            where: { clientId },
-            orderBy: { createdAt: "desc" },
+            where: { client_id: clientId },
+            orderBy: { created_at: "desc" },
             include: {vehicles: true, equipments: true},
         })
         return NextResponse.json(projects)

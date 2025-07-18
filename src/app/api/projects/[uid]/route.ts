@@ -11,7 +11,7 @@ export async function GET(
   try {
     const { uid } = await context.params;    // ← await params here
     const project = await prisma.project.findUnique({
-      where: { uid },
+      where: { id: uid },
       include: { client: true, equipments: true, vehicles: true },
     });
     if (!project) {
@@ -48,10 +48,10 @@ export async function PATCH(
   try {
     const data: any = {};
     if (name)     data.name     = name.trim();
-    if (clientId) data.clientId = clientId;
+    if (clientId) data.client_id = clientId;
 
     const project = await prisma.project.update({
-      where: { uid },
+      where: { id: uid },
       data,
       include: { client: true, equipments: true, vehicles: true },
     });
@@ -71,7 +71,7 @@ export async function DELETE(
 ) {
   try {
     const { uid } = await context.params;    // ← await params here
-    await prisma.project.delete({ where: { uid } });
+    await prisma.project.delete({ where: { id: uid } });
     return NextResponse.json({ message: "Deleted successfully" });
   } catch (err) {
     console.error("DELETE /projects/[uid] error:", err);

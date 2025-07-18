@@ -7,8 +7,8 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel";
-import SigninWrapper from "@/app/components/custom-reuseable/auth-component/signin-form";
-// import ForgotWrapper from "@/app/components/custom-reuseable/auth-component/forgot-password";
+import SigninWrapper from "@/app/components/custom-reusable/auth-components/SigninForm";
+// import ForgotWrapper from "@/app/components/custom-reusable/auth-components/ForgotPassword";
 
 const carouselItems = [
   "/images/static/1.jpg",

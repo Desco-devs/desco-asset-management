@@ -1,7 +1,7 @@
 // File: app/api/equipments/[uid]/route.ts
 
 import { NextResponse } from 'next/server'
-import { PrismaClient, Status as EquipmentStatus } from '@prisma/client'
+import { PrismaClient, status as EquipmentStatus } from '@prisma/client'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 
 const prisma = new PrismaClient()
@@ -15,7 +15,7 @@ export async function DELETE(
     const { uid } = await context.params
 
     const equipment = await prisma.equipment.findUnique({
-      where: { uid }
+      where: { id: uid }
     })
     if (!equipment) {
       return NextResponse.json({ error: 'Equipment not found' }, { status: 404 })
@@ -32,7 +32,7 @@ export async function DELETE(
       }
     }
 
-    await prisma.equipment.delete({ where: { uid } })
+    await prisma.equipment.delete({ where: { id: uid } })
 
     return NextResponse.json({ message: 'Deleted successfully' })
   } catch (err) {
@@ -60,7 +60,7 @@ export async function PATCH(
     const imageFile = formData.get('image') as File | null
 
     const existing = await prisma.equipment.findUnique({
-      where: { uid }
+      where: { id: uid }
     })
     if (!existing) {
       return NextResponse.json({ error: 'Equipment not found' }, { status: 404 })
@@ -84,7 +84,7 @@ export async function PATCH(
 
     // update fields first
     await prisma.equipment.update({
-      where: { uid },
+      where: { id: uid },
       data: updateData
     })
 
@@ -104,7 +104,7 @@ export async function PATCH(
       // upload new file
       const timestamp = Date.now()
       const fileName = `${timestamp}_${imageFile.name}`
-      const filePath = `${existing.projectId}/${uid}/${fileName}`
+      const filePath = `${existing.project_id}/${uid}/${fileName}`
       const buffer = Buffer.from(await imageFile.arrayBuffer())
 
       const { data: uploadData, error: uploadError } = await supabase
@@ -126,13 +126,13 @@ export async function PATCH(
         .getPublicUrl(uploadData.path)
 
       await prisma.equipment.update({
-        where: { uid },
+        where: { id: uid },
         data: { image_url: urlData.publicUrl }
       })
     }
 
     const updated = await prisma.equipment.findUnique({
-      where: { uid }
+      where: { id: uid }
     })
     return NextResponse.json(updated)
   } catch (err) {

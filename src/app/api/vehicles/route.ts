@@ -1,53 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, Status as VehicleStatus } from '@prisma/client'
+import { PrismaClient, status as VehicleStatus } from '@prisma/client'
 import { createServiceRoleClient } from '@/lib/supabase-server'
+import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth'
 
 const prisma = new PrismaClient()
 const supabase = createServiceRoleClient()
 
-// GET: Retrieve vehicles by projectId OR all vehicles if no projectId provided
-export async function GET(request: NextRequest) {
+// GET: Retrieve vehicles with proper role-based access control
+export const GET = withResourcePermission('vehicles', 'view', async (request: NextRequest, user: AuthenticatedUser) => {
   try {
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId')
+    const limit = searchParams.get('limit')
+    const offset = searchParams.get('offset')
 
+    // Build query filters
+    const where: any = {}
     if (projectId) {
-      // Get vehicles for specific project
-      const vehicles = await prisma.vehicle.findMany({
-        where: { projectId },
-        include: {
-          project: {
-            include: {
-              client: {
-                include: {
-                  location: true
-                }
-              }
-            }
-          }
-        },
-      })
-      return NextResponse.json(vehicles, { status: 200 })
-    } else {
-      // Get all vehicles if no projectId specified
-      const vehicles = await prisma.vehicle.findMany({
-        include: {
-          project: {
-            include: {
-              client: {
-                include: {
-                  location: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      })
-      return NextResponse.json(vehicles, { status: 200 })
+      where.project_id = projectId
     }
+
+    // Apply pagination if provided
+    const queryOptions: any = {
+      where,
+      include: {
+        project: {
+          include: {
+            client: {
+              include: {
+                location: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        created_at: 'desc'
+      }
+    }
+
+    if (limit) {
+      queryOptions.take = parseInt(limit, 10)
+    }
+    if (offset) {
+      queryOptions.skip = parseInt(offset, 10)
+    }
+
+    const vehicles = await prisma.vehicle.findMany(queryOptions)
+    const total = await prisma.vehicle.count({ where })
+
+    return NextResponse.json({
+      data: vehicles,
+      total,
+      user_role: user.role,
+      permissions: {
+        can_create: user.role !== 'VIEWER',
+        can_update: user.role !== 'VIEWER',
+        can_delete: user.role === 'SUPERADMIN'
+      }
+    })
   } catch (err) {
     console.error('GET /api/vehicles error:', err)
     return NextResponse.json(
@@ -55,10 +66,10 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
 // POST: Create a new vehicle with image uploads
-export async function POST(request: NextRequest) {
+export const POST = withResourcePermission('vehicles', 'create', async (request: NextRequest, user: AuthenticatedUser) => {
   try {
     const formData = await request.formData()
     const brand = formData.get('brand') as string
@@ -108,28 +119,28 @@ export async function POST(request: NextRequest) {
         brand,
         model,
         type,
-        plateNumber,
-        inspectionDate: new Date(inspectionDate),
+        plate_number: plateNumber,
+        inspection_date: new Date(inspectionDate),
         before: parseInt(before),
-        expiryDate: new Date(expiryDate),
+        expiry_date: new Date(expiryDate),
         status,
         remarks,
         owner,
-        projectId,
+        project_id: projectId,
       },
     })
 
-    const vehicleId = vehicle.uid
+    const vehicleId = vehicle.id
 
     // Image upload info array
     const imageFields: { file: File | null; dbField: string; side: string }[] = [
-      { file: frontImg, dbField: 'frontImgUrl', side: 'front' },
-      { file: backImg, dbField: 'backImgUrl', side: 'back' },
-      { file: side1Img, dbField: 'side1ImgUrl', side: 'side1' },
-      { file: side2Img, dbField: 'side2ImgUrl', side: 'side2' },
-      { file: originalReceipt, dbField: 'originalReceiptUrl', side: 'original-receipt' },
-      { file: carRegistration, dbField: 'carRegistrationUrl', side: 'car-registration' },
-      { file: pgpcInspectionImg, dbField: 'pgpcInspectionImage', side: 'pgpc-inspection' },
+      { file: frontImg, dbField: 'front_img_url', side: 'front' },
+      { file: backImg, dbField: 'back_img_url', side: 'back' },
+      { file: side1Img, dbField: 'side1_img_url', side: 'side1' },
+      { file: side2Img, dbField: 'side2_img_url', side: 'side2' },
+      { file: originalReceipt, dbField: 'original_receipt_url', side: 'original-receipt' },
+      { file: carRegistration, dbField: 'car_registration_url', side: 'car-registration' },
+      { file: pgpcInspectionImg, dbField: 'pgpc_inspection_image', side: 'pgpc-inspection' },
     ]
 
     const updateData: Record<string, string> = {}
@@ -169,14 +180,14 @@ export async function POST(request: NextRequest) {
     // Update vehicle record with image URLs
     if (Object.keys(updateData).length > 0) {
       await prisma.vehicle.update({
-        where: { uid: vehicleId },
+        where: { id: vehicleId },
         data: updateData,
       })
     }
 
     // Return the updated vehicle record
     const updatedVehicle = await prisma.vehicle.findUnique({
-      where: { uid: vehicleId },
+      where: { id: vehicleId },
       include: {
         project: {
           include: {
@@ -198,10 +209,10 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
 
-export async function PUT(request: NextRequest) {
+export const PUT = withResourcePermission('vehicles', 'update', async (request: NextRequest, user: AuthenticatedUser) => {
   try {
     const formData = await request.formData()
     const vehicleId = formData.get('vehicleId') as string
@@ -221,49 +232,49 @@ export async function PUT(request: NextRequest) {
       {
         newFile: formData.get('frontImg') as File | null,
         keepFlag: formData.get('keepFrontImg') === 'true',
-        existingUrlKey: 'frontImgUrl',
+        existingUrlKey: 'front_img_url',
         prefix: 'front',
         displayName: 'front image'
       },
       {
         newFile: formData.get('backImg') as File | null,
         keepFlag: formData.get('keepBackImg') === 'true',
-        existingUrlKey: 'backImgUrl',
+        existingUrlKey: 'back_img_url',
         prefix: 'back',
         displayName: 'back image'
       },
       {
         newFile: formData.get('side1Img') as File | null,
         keepFlag: formData.get('keepSide1Img') === 'true',
-        existingUrlKey: 'side1ImgUrl',
+        existingUrlKey: 'side1_img_url',
         prefix: 'side1',
         displayName: 'side1 image'
       },
       {
         newFile: formData.get('side2Img') as File | null,
         keepFlag: formData.get('keepSide2Img') === 'true',
-        existingUrlKey: 'side2ImgUrl',
+        existingUrlKey: 'side2_img_url',
         prefix: 'side2',
         displayName: 'side2 image'
       },
       {
         newFile: formData.get('originalReceipt') as File | null,
         keepFlag: formData.get('keepOriginalReceipt') === 'true',
-        existingUrlKey: 'originalReceiptUrl',
+        existingUrlKey: 'original_receipt_url',
         prefix: 'original-receipt',
         displayName: 'original receipt'
       },
       {
         newFile: formData.get('carRegistration') as File | null,
         keepFlag: formData.get('keepCarRegistration') === 'true',
-        existingUrlKey: 'carRegistrationUrl',
+        existingUrlKey: 'car_registration_url',
         prefix: 'car-registration',
         displayName: 'car registration'
       },
       {
         newFile: formData.get('pgpcInspectionImg') as File | null,
         keepFlag: formData.get('keepPgpcInspectionImg') === 'true',
-        existingUrlKey: 'pgpcInspectionImage',
+        existingUrlKey: 'pgpc_inspection_image',
         prefix: 'pgpc-inspection',
         displayName: 'PGPC inspection image'
       }
@@ -273,7 +284,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const existingVehicle = await prisma.vehicle.findUnique({ where: { uid: vehicleId } })
+    const existingVehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } })
     if (!existingVehicle) {
       return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 })
     }
@@ -282,14 +293,14 @@ export async function PUT(request: NextRequest) {
       brand,
       model,
       type,
-      plateNumber,
-      inspectionDate: new Date(inspectionDate),
+      plate_number: plateNumber,
+      inspection_date: new Date(inspectionDate),
       before: parseInt(before),
-      expiryDate: new Date(expiryDate),
+      expiry_date: new Date(expiryDate),
       status,
       remarks,
       owner,
-      project: { connect: { uid: projectId } },
+      project: { connect: { id: projectId } },
     }
 
     const extractPath = (url: string) => url?.replace("https://zlavplinpqkxivkbthag.supabase.co/storage/v1/object/public/", '')
@@ -323,9 +334,9 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    const vehicle = await prisma.vehicle.update({ where: { uid: vehicleId }, data: updateData })
+    const vehicle = await prisma.vehicle.update({ where: { id: vehicleId }, data: updateData })
     const result = await prisma.vehicle.findUnique({
-      where: { uid: vehicle.uid },
+      where: { id: vehicle.id },
       include: { project: { include: { client: { include: { location: true } } } } }
     })
 
@@ -334,9 +345,9 @@ export async function PUT(request: NextRequest) {
     console.error('PUT /api/vehicles error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+})
 
-export async function DELETE(request: NextRequest) {
+export const DELETE = withResourcePermission('vehicles', 'delete', async (request: NextRequest, user: AuthenticatedUser) => {
   try {
     const { searchParams } = new URL(request.url)
     const vehicleId = searchParams.get('vehicleId')
@@ -350,7 +361,7 @@ export async function DELETE(request: NextRequest) {
 
     // Get vehicle data before deletion to access project info and image URLs
     const existingVehicle = await prisma.vehicle.findUnique({
-      where: { uid: vehicleId },
+      where: { id: vehicleId },
       include: {
         project: true // Include project to get projectId
       }
@@ -363,11 +374,11 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const projectId = existingVehicle.projectId;
+    const projectId = existingVehicle.project_id;
 
     // Delete vehicle from database first
     await prisma.vehicle.delete({
-      where: { uid: vehicleId }
+      where: { id: vehicleId }
     })
 
     // Delete all vehicle files from storage
@@ -481,13 +492,13 @@ export async function DELETE(request: NextRequest) {
       console.log('Falling back to individual file deletion...');
 
       const imageUrls = [
-        existingVehicle.frontImgUrl,
-        existingVehicle.backImgUrl,
-        existingVehicle.side1ImgUrl,
-        existingVehicle.side2ImgUrl,
-        existingVehicle.originalReceiptUrl,
-        existingVehicle.carRegistrationUrl,
-        existingVehicle.pgpcInspectionImage, // Added the new field
+        existingVehicle.front_img_url,
+        existingVehicle.back_img_url,
+        existingVehicle.side1_img_url,
+        existingVehicle.side2_img_url,
+        existingVehicle.original_receipt_url,
+        existingVehicle.car_registration_url,
+        existingVehicle.pgpc_inspection_image, // Added the new field
       ].filter((url): url is string => Boolean(url));
 
       const deletionPromises = imageUrls.map(async (imageUrl) => {
@@ -576,4 +587,4 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+})

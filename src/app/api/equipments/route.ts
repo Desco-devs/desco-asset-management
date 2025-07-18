@@ -1,8 +1,9 @@
 // File: app/api/equipments/route.ts
 
-import { NextResponse } from 'next/server'
-import { PrismaClient, Status as EquipmentStatus } from '@prisma/client'
+import { NextRequest, NextResponse } from 'next/server'
+import { PrismaClient, status as EquipmentStatus } from '@prisma/client'
 import { createServiceRoleClient } from '@/lib/supabase-server'
+import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth'
 
 const prisma = new PrismaClient()
 const supabase = createServiceRoleClient()
@@ -212,7 +213,77 @@ const getFieldName = (prefix: string): string => {
 }
 
 
-export async function POST(request: Request) {
+// GET: Retrieve all equipment with proper role-based access control
+export const GET = withResourcePermission('equipment', 'view', async (request: NextRequest, user: AuthenticatedUser) => {
+  try {
+    const { searchParams } = new URL(request.url)
+    const projectId = searchParams.get('projectId')
+    const limit = searchParams.get('limit')
+    const offset = searchParams.get('offset')
+
+    // Build query filters
+    const where: any = {}
+    if (projectId) {
+      where.project_id = projectId
+    }
+
+    // Apply pagination if provided
+    const queryOptions: any = {
+      where,
+      include: {
+        project: {
+          include: {
+            client: {
+              include: {
+                location: true
+              }
+            }
+          }
+        },
+        maintenance_reports: {
+          orderBy: {
+            date_reported: 'desc'
+          },
+          take: 5 // Only include recent reports
+        }
+      },
+      orderBy: {
+        created_at: 'desc'
+      }
+    }
+
+    if (limit) {
+      queryOptions.take = parseInt(limit, 10)
+    }
+    if (offset) {
+      queryOptions.skip = parseInt(offset, 10)
+    }
+
+    const equipment = await prisma.equipment.findMany(queryOptions)
+
+    // Get total count for pagination
+    const total = await prisma.equipment.count({ where })
+
+    return NextResponse.json({
+      data: equipment,
+      total,
+      user_role: user.role,
+      permissions: {
+        can_create: user.role !== 'VIEWER',
+        can_update: user.role !== 'VIEWER',
+        can_delete: user.role === 'SUPERADMIN'
+      }
+    })
+  } catch (error) {
+    console.error('GET /api/equipments error:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch equipment' },
+      { status: 500 }
+    )
+  }
+})
+
+export const POST = withResourcePermission('equipment', 'create', async (request: NextRequest, user: AuthenticatedUser) => {
   try {
     const formData = await request.formData()
 
@@ -240,7 +311,7 @@ export async function POST(request: Request) {
 
     // Fetch project and client info for human-readable paths
     const projectInfo = await prisma.project.findUnique({
-      where: { uid: projectId },
+      where: { id: projectId },
       include: {
         client: {
           include: {
@@ -290,7 +361,7 @@ export async function POST(request: Request) {
       { file: formData.get('pgpcInspection') as File | null, prefix: 'pgpc_inspection' },
     ]
       .filter(f => f.file && f.file.size > 0)
-      .map(f => uploadFileToSupabase(f.file!, projectId, equipment.uid, f.prefix, projectName, clientName, brand, model, type))
+      .map(f => uploadFileToSupabase(f.file!, projectId, equipment.id, f.prefix, projectName, clientName, brand, model, type))
 
     // 3) handle equipment parts with folder structure
     const partFiles: File[] = []
@@ -314,7 +385,7 @@ export async function POST(request: Request) {
         uploads.forEach(u => { updateData[u.field] = u.url })
       } catch (e) {
         console.error('Upload error:', e)
-        await prisma.equipment.delete({ where: { uid: equipment.uid } })
+        await prisma.equipment.delete({ where: { id: equipment.id } })
         return NextResponse.json({ error: 'File upload failed' }, { status: 500 })
       }
     }
@@ -327,7 +398,7 @@ export async function POST(request: Request) {
           const partUrl = await uploadEquipmentPart(
             partFiles[i], 
             projectId, 
-            equipment.uid, 
+            equipment.id, 
             i + 1, 
             partFolders[i],
             projectName,
@@ -341,18 +412,18 @@ export async function POST(request: Request) {
         updateData.equipmentParts = partUrls
       } catch (e) {
         console.error('Part upload error:', e)
-        await prisma.equipment.delete({ where: { uid: equipment.uid } })
+        await prisma.equipment.delete({ where: { id: equipment.id } })
         return NextResponse.json({ error: 'Equipment parts upload failed' }, { status: 500 })
       }
     }
 
     // Update if we have any files
     if (Object.keys(updateData).length > 0) {
-      await prisma.equipment.update({ where: { uid: equipment.uid }, data: updateData })
+      await prisma.equipment.update({ where: { id: equipment.id }, data: updateData })
     }
 
     const result = await prisma.equipment.findUnique({
-      where: { uid: equipment.uid },
+      where: { id: equipment.id },
       include: {
         project: {
           include: { client: { include: { location: true } } }
@@ -364,11 +435,11 @@ export async function POST(request: Request) {
     console.error('POST error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+})
 
 // Also replace your PUT function with this updated version:
 
-export async function PUT(request: Request) {
+export const PUT = withResourcePermission('equipment', 'update', async (request: NextRequest, user: AuthenticatedUser) => {
   try {
     const formData = await request.formData()
 
@@ -394,7 +465,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const existing = await prisma.equipment.findUnique({ where: { uid: equipmentId } })
+    const existing = await prisma.equipment.findUnique({ where: { id: equipmentId } })
     if (!existing) {
       return NextResponse.json({ error: 'Equipment not found' }, { status: 404 })
     }
@@ -432,25 +503,25 @@ export async function PUT(request: Request) {
       {
         newFile: formData.get('originalReceipt') as File | null,
         keep: formData.get('keepExistingReceipt') as string,
-        existingUrl: existing.originalReceiptUrl,
+        existingUrl: existing.original_receipt_url,
         prefix: 'receipt', field: 'originalReceiptUrl', tag: 'receipt'
       },
       {
         newFile: formData.get('equipmentRegistration') as File | null,
         keep: formData.get('keepExistingRegistration') as string,
-        existingUrl: existing.equipmentRegistrationUrl,
+        existingUrl: existing.equipment_registration_url,
         prefix: 'registration', field: 'equipmentRegistrationUrl', tag: 'registration'
       },
       {
         newFile: formData.get('thirdpartyInspection') as File | null,
         keep: formData.get('keepExistingThirdpartyInspection') as string,
-        existingUrl: existing.thirdpartyInspectionImage,
+        existingUrl: existing.thirdparty_inspection_image,
         prefix: 'thirdparty_inspection', field: 'thirdpartyInspectionImage', tag: '3rd-party inspection'
       },
       {
         newFile: formData.get('pgpcInspection') as File | null,
         keep: formData.get('keepExistingPgpcInspection') as string,
-        existingUrl: existing.pgpcInspectionImage,
+        existingUrl: existing.pgpc_inspection_image,
         prefix: 'pgpc_inspection', field: 'pgpcInspectionImage', tag: 'PGPC inspection'
       },
     ]
@@ -474,7 +545,7 @@ export async function PUT(request: Request) {
     }
 
     // Handle equipment parts updates with folder structure
-    const currentParts = existing.equipmentParts || []
+    const currentParts = existing.equipment_parts || []
     const newParts: string[] = [...currentParts] // Start with existing parts
 
     // Check for new parts or replacements
@@ -547,12 +618,12 @@ export async function PUT(request: Request) {
     }
 
     const updated = await prisma.equipment.update({
-      where: { uid: equipmentId },
+      where: { id: equipmentId },
       data: updateData,
     })
 
     const result = await prisma.equipment.findUnique({
-      where: { uid: updated.uid },
+      where: { id: updated.id },
       include: {
         project: {
           include: { client: { include: { location: true } } }
@@ -565,9 +636,9 @@ export async function PUT(request: Request) {
     console.error('PUT error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+})
 
-export async function DELETE(request: Request) {
+export const DELETE = withResourcePermission('equipment', 'delete', async (request: NextRequest, user: AuthenticatedUser) => {
   try {
     const url = new URL(request.url)
     const equipmentId = url.searchParams.get('equipmentId')
@@ -576,17 +647,17 @@ export async function DELETE(request: Request) {
     }
 
     const existing = await prisma.equipment.findUnique({
-      where: { uid: equipmentId },
+      where: { id: equipmentId },
       include: { project: true }
     })
     if (!existing) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    const projectId = existing.projectId
+    const projectId = existing.project_id
 
     // Delete equipment record first
-    await prisma.equipment.delete({ where: { uid: equipmentId } })
+    await prisma.equipment.delete({ where: { id: equipmentId } })
 
     // Delete all files in folder (including all parts)
     const folder = `${projectId}/${equipmentId}`
@@ -603,4 +674,4 @@ export async function DELETE(request: Request) {
     console.error('DELETE error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+})

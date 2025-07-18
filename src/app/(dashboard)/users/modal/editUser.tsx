@@ -22,16 +22,16 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { User, Edit, Phone, Shield, Settings } from "lucide-react";
-import { User as UserType } from "@/app/service/types";
+import { User as UserType } from "@/types/auth";
 
-const PERMISSIONS = ["VIEW", "CREATE", "UPDATE", "DELETE"] as const;
+const ROLES = ["VIEWER", "ADMIN", "SUPERADMIN"] as const;
 
 interface EditUserModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   user: Partial<UserType> | null;
   saving: boolean;
-  onSave: (uid: string, data: Partial<UserType>) => Promise<void>;
+  onSave: (id: string, data: Partial<UserType>) => Promise<void>;
 }
 
 export default function EditUserModal({
@@ -44,51 +44,49 @@ export default function EditUserModal({
   const [username, setUsername] = useState("");
   const [fullname, setFullname] = useState("");
   const [phone, setPhone] = useState("");
-  const [permissions, setPermissions] = useState<string[]>([]);
-  const [userStatus, setUserStatus] = useState("ACTIVE");
+  const [role, setRole] = useState<"VIEWER" | "ADMIN" | "SUPERADMIN">("VIEWER");
+  const [userStatus, setUserStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
 
   useEffect(() => {
     if (user) {
       setUsername(user.username || "");
-      setFullname(user.fullname || "");
+      setFullname(user.full_name || "");
       setPhone(user.phone || "");
-      setPermissions(user.permissions || []);
-      setUserStatus(user.userStatus || "ACTIVE");
+      setRole(user.role || "VIEWER");
+      setUserStatus(user.user_status || "ACTIVE");
     } else {
       setUsername("");
       setFullname("");
       setPhone("");
-      setPermissions([]);
+      setRole("VIEWER");
       setUserStatus("ACTIVE");
     }
   }, [user]);
 
   if (!user) return null;
 
-  const { uid } = user;
+  const { id } = user;
 
   async function handleSave() {
     if (!username.trim() || !fullname.trim()) {
       alert("Username and fullname are required");
       return;
     }
-    if (!uid) {
+    if (!id) {
       alert("User ID missing");
       return;
     }
-    await onSave(uid, {
+    await onSave(id, {
       username: username.trim(),
-      fullname: fullname.trim(),
+      full_name: fullname.trim(),
       phone,
-      permissions,
-      userStatus,
+      role,
+      user_status: userStatus,
     });
   }
 
-  function togglePermission(perm: string) {
-    setPermissions((prev) =>
-      prev.includes(perm) ? prev.filter((p) => p !== perm) : [...prev, perm]
-    );
+  function handleRoleChange(newRole: "VIEWER" | "ADMIN" | "SUPERADMIN") {
+    setRole(newRole);
   }
 
   return (
@@ -158,34 +156,41 @@ export default function EditUserModal({
 
           <Separator />
 
-          {/* Permissions Section */}
+          {/* Role Section */}
           <div className="space-y-3">
             <Label className="text-sm font-medium flex items-center gap-2">
               <Shield className="h-4 w-4" />
-              Permissions
+              Role
             </Label>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="grid grid-cols-2 gap-3">
-                  {PERMISSIONS.map((perm) => (
-                    <div key={perm} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`perm-${perm}`}
-                        checked={permissions.includes(perm)}
-                        onCheckedChange={() => togglePermission(perm)}
-                        disabled={saving}
-                      />
-                      <Label
-                        htmlFor={`perm-${perm}`}
-                        className="text-sm cursor-pointer font-normal"
-                      >
-                        {perm}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <Select
+              disabled={saving}
+              value={role}
+              onValueChange={(value) => handleRoleChange(value as "VIEWER" | "ADMIN" | "SUPERADMIN")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select user role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="VIEWER">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-blue-500" />
+                    Viewer
+                  </div>
+                </SelectItem>
+                <SelectItem value="ADMIN">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-yellow-500" />
+                    Admin
+                  </div>
+                </SelectItem>
+                <SelectItem value="SUPERADMIN">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-red-500" />
+                    Super Admin
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Status Section */}
@@ -200,7 +205,7 @@ export default function EditUserModal({
             <Select
               disabled={saving}
               value={userStatus}
-              onValueChange={setUserStatus}
+              onValueChange={(value) => setUserStatus(value as "ACTIVE" | "INACTIVE")}
             >
               <SelectTrigger id="userStatus">
                 <SelectValue placeholder="Select user status" />

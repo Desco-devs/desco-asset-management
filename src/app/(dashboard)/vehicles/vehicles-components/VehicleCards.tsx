@@ -95,9 +95,7 @@ const VehicleCards = ({
 }: VehicleCardsProps) => {
   const { user } = useAuth();
 
-  const isAdmin =
-    user?.permissions.some((p) => ["CREATE", "UPDATE", "DELETE"].includes(p)) ??
-    false;
+  const isAdmin = (user?.role === 'ADMIN' || user?.role === 'SUPERADMIN') ?? false;
 
   const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>(vehicles);
   const [selectedClient, setSelectedClient] = useState<string>("all");
@@ -230,7 +228,7 @@ const VehicleCards = ({
       // Show additional info if some images failed to delete
       if (result.imagesDeletionStatus?.failed > 0) {
         toast.warning(
-          `Vehicle deleted, but ${result.imagesDeletionStatus.failed} images couldn't be removed from storage`
+          `Vehicle deleted, but ${result.imagesDeletionStatus.failed} images couldn&apos;t be removed from storage`
         );
       }
 

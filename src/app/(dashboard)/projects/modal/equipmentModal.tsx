@@ -14,7 +14,7 @@ import { Calendar, RefreshCw, Trash2, Edit2 } from "lucide-react";
 import { Equipment } from "@/app/service/types";
 
 import { deleteEquipment } from "@/app/service/equipments/equipment";
-import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
+import AlertModal from "@/app/components/custom-reusable/modal/AlertModal";
 
 import {
   Tooltip,

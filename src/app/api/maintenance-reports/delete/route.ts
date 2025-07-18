@@ -1,7 +1,11 @@
 // File: app/api/maintenance-reports/delete/route.ts
 
 import { NextResponse } from 'next/server'
-import { prisma, supabase } from '@/lib/prisma'
+import { PrismaClient } from '@prisma/client'
+import { createServiceRoleClient } from '@/lib/supabase-server'
+
+const prisma = new PrismaClient()
+const supabase = createServiceRoleClient()
 
 
 export async function DELETE(request: Request) {
@@ -12,18 +16,18 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: 'reportId required' }, { status: 400 })
         }
 
-        const existing = await prisma.maintenanceEquipmentReport.findUnique({
-            where: { uid: reportId },
+        const existing = await prisma.maintenance_equipment_report.findUnique({
+            where: { id: reportId },
             include: { equipment: true }
         })
         if (!existing) {
             return NextResponse.json({ error: 'Report not found' }, { status: 404 })
         }
 
-        const equipmentId = existing.equipmentId
+        const equipmentId = existing.equipment_id
 
         // Delete report record first
-        await prisma.maintenanceEquipmentReport.delete({ where: { uid: reportId } })
+        await prisma.maintenance_equipment_report.delete({ where: { id: reportId } })
 
         // Delete all files in folder
         const folder = `${equipmentId}/${reportId}`
@@ -39,5 +43,7 @@ export async function DELETE(request: Request) {
     } catch (err) {
         console.error('DELETE error:', err)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    } finally {
+        await prisma.$disconnect()
     }
 }

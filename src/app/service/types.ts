@@ -1,13 +1,6 @@
 // File: app/service/types.ts
-import { PrismaClient, Permission, userStatus } from '@prisma/client'
+import { user_status } from '@prisma/client'
 export type Status = "OPERATIONAL" | "NON_OPERATIONAL";
-
-
-
-const prisma = new PrismaClient()
-
-
-
 
 export interface User {
   uid?: string
@@ -17,12 +10,22 @@ export interface User {
   phone?: string | null
   permissions?: string[]
   userStatus?: string
-  createdAt?: string
-  updatedAt?: string
+  created_at?: string
+  updated_at?: string
 }
 
 /**
- * Location model
+ * Location model - Server response format (snake_case)
+ */
+export interface LocationDB {
+  uid: string;
+  address: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Location model - Client format (camelCase)
  */
 export interface Location {
   uid: string;
@@ -32,7 +35,20 @@ export interface Location {
 }
 
 /**
- * Client model returned from API
+ * Client model - Server response format (snake_case)
+ */
+export interface ClientDB {
+  uid: string;
+  name: string;
+  location_id: string;
+  created_at: string;
+  updated_at: string;
+  location: LocationDB;
+  projects: ProjectDB[];
+}
+
+/**
+ * Client model - Client format (camelCase)
  */
 export interface Client {
   uid: string;
@@ -45,7 +61,21 @@ export interface Client {
 }
 
 /**
- * Project model returned from API
+ * Project model - Server response format (snake_case)
+ */
+export interface ProjectDB {
+  uid: string;
+  name: string;
+  client_id: string;
+  created_at: string;
+  updated_at: string;
+  client?: ClientDB;
+  equipments?: EquipmentDB[];
+  vehicles?: VehicleDB[];
+}
+
+/**
+ * Project model - Client format (camelCase)
  */
 export interface Project {
   uid: string;
@@ -59,26 +89,69 @@ export interface Project {
 }
 
 /**
- * Equipment model
+ * Equipment model - Server response format (snake_case)
+ */
+export interface EquipmentDB {
+  uid: string;
+  brand: string;
+  model: string;
+  type: string;
+  insurance_expiration_date: string;
+  status: Status;
+  remarks?: string | null;
+  owner: string;
+  image_url?: string | null;
+  inspection_date?: string | null;
+  project_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Equipment model - Client format (camelCase)
  */
 export interface Equipment {
   uid: string;
   brand: string;
   model: string;
   type: string;
-  expirationDate: string;        // ISO date string
+  insuranceExpirationDate: string;
   status: Status;
   remarks?: string | null;
   owner: string;
-  image_url?: string | null;
-  inspectionDate?: string | null; // ISO date string or null
+  imageUrl?: string | null;
+  inspectionDate?: string | null;
   projectId: string;
   createdAt: string;
   updatedAt: string;
 }
 
 /**
- * Vehicle model
+ * Vehicle model - Server response format (snake_case)
+ */
+export interface VehicleDB {
+  uid: string;
+  brand: string;
+  model: string;
+  type: string;
+  plate_number: string;
+  inspection_date: string;
+  before: number;
+  expiry_date: string;
+  status: Status;
+  remarks?: string | null;
+  owner: string;
+  front_img_url?: string | null;
+  back_img_url?: string | null;
+  side1_img_url?: string | null;
+  side2_img_url?: string | null;
+  project_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Vehicle model - Client format (camelCase)  
  */
 export interface Vehicle {
   uid: string;
@@ -86,9 +159,9 @@ export interface Vehicle {
   model: string;
   type: string;
   plateNumber: string;
-  inspectionDate: string;        // ISO date string
-  before: number;                // in months
-  expiryDate: string;            // ISO date string
+  inspectionDate: string;
+  before: number;
+  expiryDate: string;
   status: Status;
   remarks?: string | null;
   owner: string;

@@ -26,7 +26,7 @@ import {
   deleteProject,
   updateProject,
 } from "@/app/service/client/project"
-import AlertModal from "@/app/components/custom-reuseable/modal/alertModal"
+import AlertModal from "@/app/components/custom-reusable/modal/AlertModal"
 import EquipmentModal from "./tools/viewEquipments"
 import VehiclesModal from "./tools/viewVehicle"
 

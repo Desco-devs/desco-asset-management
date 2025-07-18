@@ -2,8 +2,8 @@
 "use client";
 
 import { useCallback, useState, type ReactNode } from "react";
-import HeaderHolder from "../components/custom-reuseable/landing-page/header/HeaderHolder";
-import SidebarLandingPage from "../components/custom-reuseable/landing-page/sidebar/Sidebar";
+import HeaderHolder from "../components/custom-reusable/landing-page/header/HeaderHolder";
+import SidebarLandingPage from "../components/custom-reusable/landing-page/sidebar/Sidebar";
 
 export default function LandingLayout({ children }: { children: ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);

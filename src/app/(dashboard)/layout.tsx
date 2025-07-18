@@ -2,8 +2,8 @@
 
 import React from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "../components/custom-reuseable/sidebar/app-sidebar";
-import Header from "../components/custom-reuseable/sidebar/header";
+import { AppSidebar } from "../components/custom-reusable/sidebar/app-sidebar";
+import Header from "../components/custom-reusable/sidebar/header";
 import { CardContent } from "@/components/ui/card";
 
 export default function DashboardLayout({

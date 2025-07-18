@@ -1,10 +1,11 @@
 // File: app/api/maintenance-reports/update/route.ts
 
 import { NextResponse } from 'next/server'
-import { ReportStatus, ReportPriority } from '@prisma/client'
+import { PrismaClient, report_status, report_priority } from '@prisma/client'
 
 import { deleteFileFromSupabase, uploadFileToSupabase } from '@/types/MaintenanceHelper'
-import { prisma } from '@/lib/prisma'
+
+const prisma = new PrismaClient()
 
 
 export async function PUT(request: Request) {
@@ -20,8 +21,8 @@ export async function PUT(request: Request) {
         const remarks = (formData.get('remarks') as string) || null
         const inspectionDetails = (formData.get('inspectionDetails') as string) || null
         const actionTaken = (formData.get('actionTaken') as string) || null
-        const priority = formData.get('priority') as keyof typeof ReportPriority
-        const status = formData.get('status') as keyof typeof ReportStatus
+        const priority = formData.get('priority') as keyof typeof report_priority
+        const status = formData.get('status') as keyof typeof report_status
         const downtimeHours = (formData.get('downtimeHours') as string) || null
 
         const dateRepairedStr = formData.get('dateRepaired') as string | null
@@ -34,8 +35,8 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
-        const existing = await prisma.maintenanceEquipmentReport.findUnique({
-            where: { uid: reportId }
+        const existing = await prisma.maintenance_equipment_report.findUnique({
+            where: { id: reportId }
         })
         if (!existing) {
             return NextResponse.json({ error: 'Report not found' }, { status: 404 })
@@ -43,28 +44,28 @@ export async function PUT(request: Request) {
 
         // Build update data
         const updateData: any = {
-            equipmentId,
-            locationId,
-            reportedBy,
-            repairedBy,
-            issueDescription,
+            equipment_id: equipmentId,
+            location_id: locationId,
+            reported_by: reportedBy,
+            repaired_by: repairedBy,
+            issue_description: issueDescription,
             remarks,
-            inspectionDetails,
-            actionTaken,
-            partsReplaced,
+            inspection_details: inspectionDetails,
+            action_taken: actionTaken,
+            parts_replaced: partsReplaced,
             priority,
             status,
-            downtimeHours
+            downtime_hours: downtimeHours
         }
 
         if (dateRepairedStr) {
-            updateData.dateRepaired = new Date(dateRepairedStr)
+            updateData.date_repaired = new Date(dateRepairedStr)
         } else {
-            updateData.dateRepaired = null
+            updateData.date_repaired = null
         }
 
         // Handle attachment updates
-        const currentAttachments = existing.attachmentUrls || []
+        const currentAttachments = existing.attachment_urls || []
         const newAttachments: string[] = [...currentAttachments]
 
         // Check for new attachments or replacements
@@ -102,15 +103,15 @@ export async function PUT(request: Request) {
             attachmentIndex++
         }
 
-        updateData.attachmentUrls = newAttachments
+        updateData.attachment_urls = newAttachments
 
-        const updated = await prisma.maintenanceEquipmentReport.update({
-            where: { uid: reportId },
+        const updated = await prisma.maintenance_equipment_report.update({
+            where: { id: reportId },
             data: updateData,
         })
 
-        const result = await prisma.maintenanceEquipmentReport.findUnique({
-            where: { uid: updated.uid },
+        const result = await prisma.maintenance_equipment_report.findUnique({
+            where: { id: updated.id },
             include: {
                 equipment: {
                     include: {
@@ -127,5 +128,7 @@ export async function PUT(request: Request) {
     } catch (err) {
         console.error('PUT error:', err)
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    } finally {
+        await prisma.$disconnect()
     }
 }

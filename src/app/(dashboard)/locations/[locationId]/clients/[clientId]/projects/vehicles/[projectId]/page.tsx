@@ -5,13 +5,13 @@ import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
-import AlertModal from "@/app/components/custom-reuseable/modal/alertModal";
+import AlertModal from "@/app/components/custom-reusable/modal/AlertModal";
 import AddVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/addVehicle";
 import EditVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/editVehicle";
 
 import DataTable, {
   Column,
-} from "@/app/components/custom-reuseable/table/ReusableTable";
+} from "@/app/components/custom-reusable/table/ReusableTable";
 import type { Vehicle } from "@/app/service/types";
 
 import {
@@ -65,10 +65,10 @@ export default function VehiclesPage() {
 
   const [projectName, setProjectName] = useState<string | null>(null);
 
-  const canCreate = user?.permissions.includes("CREATE") ?? false;
-  const canUpdate = user?.permissions.includes("UPDATE") ?? false;
-  const canDelete = user?.permissions.includes("DELETE") ?? false;
-  const canView = user?.permissions.includes("VIEW") ?? false;
+  const canCreate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canUpdate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canDelete = user?.role === 'SUPERADMIN';
+  const canView = user?.role === 'VIEWER' || user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,8 +151,8 @@ export default function VehiclesPage() {
       key: "inspectionDate",
       title: "Inspection Date",
       render: (_value, vehicle) => {
-        if (!vehicle.inspectionDate) return "-";
-        const inspDate = new Date(vehicle.inspectionDate);
+        if (!vehicle.inspection_date) return "-";
+        const inspDate = new Date(vehicle.inspection_date);
         const diffMs = inspDate.getTime() - now.getTime();
         const daysLeft = diffMs / (1000 * 60 * 60 * 24);
         const colorClass = getColorByDaysLeft(daysLeft, 5);
@@ -184,8 +184,8 @@ export default function VehiclesPage() {
       key: "expiryDate",
       title: "Expiry Date",
       render: (_value, vehicle) => {
-        if (!vehicle.expiryDate) return "-";
-        const expDate = new Date(vehicle.expiryDate);
+        if (!vehicle.expiry_date) return "-";
+        const expDate = new Date(vehicle.expiry_date);
         const diffMs = expDate.getTime() - now.getTime();
         const daysLeft = diffMs / (1000 * 60 * 60 * 24);
         const colorClass = getColorByDaysLeft(daysLeft, 5);
