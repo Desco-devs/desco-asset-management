@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Car, FileText, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 interface Vehicle {
   uid: string;
@@ -76,12 +76,21 @@ interface Project {
   };
 }
 
-export default function VehicleViewer() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+interface VehicleClientViewerProps {
+  vehicles: Vehicle[];
+  clients: Client[];
+  locations: Location[];
+  projects: Project[];
+  newItemIds: Set<string>;
+}
+
+export default function VehicleClientViewer({
+  vehicles,
+  clients,
+  locations,
+  projects,
+  newItemIds,
+}: VehicleClientViewerProps) {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -91,32 +100,6 @@ export default function VehicleViewer() {
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [vehiclesData, clientsData, locationsData, projectsData] =
-          await Promise.all([
-            fetch("/api/vehicles/getall").then((res) => res.json()),
-            fetch("/api/clients/getall").then((res) => res.json()),
-            fetch("/api/locations/getall").then((res) => res.json()),
-            fetch("/api/projects/getall").then((res) => res.json()),
-          ]);
-
-        setVehicles(vehiclesData);
-        setClients(clientsData);
-        setLocations(locationsData);
-        setProjects(projectsData);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
 
   // Filter vehicles based on selected filters and search query
   const filteredVehicles = useMemo(() => {
@@ -249,17 +232,6 @@ export default function VehicleViewer() {
     return count;
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading vehicles...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Filters Section */}
@@ -278,8 +250,11 @@ export default function VehicleViewer() {
                 <SelectItem key="all-clients" value="all">
                   All Clients
                 </SelectItem>
-                {clients.map((client) => (
-                  <SelectItem key={client.uid} value={client.uid}>
+                {clients.map((client, index) => (
+                  <SelectItem
+                    key={client.uid || `client-${index}`}
+                    value={client.uid}
+                  >
                     {client.name}
                   </SelectItem>
                 ))}
@@ -303,8 +278,11 @@ export default function VehicleViewer() {
                 <SelectItem key="all-locations" value="all">
                   All Locations
                 </SelectItem>
-                {locations.map((location) => (
-                  <SelectItem key={location.uid} value={location.uid}>
+                {locations.map((location, index) => (
+                  <SelectItem
+                    key={location.uid || `location-${index}`}
+                    value={location.uid}
+                  >
                     {location.address}
                   </SelectItem>
                 ))}
@@ -325,8 +303,11 @@ export default function VehicleViewer() {
                 <SelectItem key="all-projects" value="all">
                   All Projects
                 </SelectItem>
-                {availableProjects.map((project) => (
-                  <SelectItem key={project.uid} value={project.uid}>
+                {availableProjects.map((project, index) => (
+                  <SelectItem
+                    key={project.uid || `project-${index}`}
+                    value={project.uid}
+                  >
                     {project.name}
                   </SelectItem>
                 ))}
@@ -406,9 +387,9 @@ export default function VehicleViewer() {
 
       {/* Vehicle Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredVehicles.map((vehicle) => (
+        {filteredVehicles.map((vehicle, index) => (
           <Card
-            key={vehicle.uid}
+            key={vehicle.uid || `vehicle-${index}`}
             className="hover:shadow-lg transition-shadow cursor-pointer z-40 bg-chart-3/20"
             onClick={() => {
               setSelectedVehicle(vehicle);
@@ -429,6 +410,13 @@ export default function VehicleViewer() {
                   <Badge className={getStatusColor(vehicle.status)}>
                     {vehicle.status}
                   </Badge>
+
+                  {newItemIds.has(vehicle.uid) && (
+                    <Badge className="bg-blue-500 text-white hover:bg-blue-600 animate-pulse">
+                      NEW
+                    </Badge>
+                  )}
+
                   {getExpirationBadge(vehicle.expiryDate, vehicle.before)}
                 </div>
 

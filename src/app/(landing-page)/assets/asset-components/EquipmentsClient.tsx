@@ -85,12 +85,21 @@ interface Project {
   };
 }
 
-export default function EquipmentViewer() {
-  const [equipments, setEquipments] = useState<Equipment[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+interface EquipmentClientViewerProps {
+  equipment: Equipment[];
+  clients: Client[];
+  locations: Location[];
+  projects: Project[];
+  newItemIds: Set<string>;
+}
+
+export default function EquipmentClientViewer({
+  equipment,
+  clients,
+  locations,
+  projects,
+  newItemIds,
+}: EquipmentClientViewerProps) {
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(
     null
   );
@@ -114,73 +123,38 @@ export default function EquipmentViewer() {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [equipmentsData, clientsData, locationsData, projectsData] =
-          await Promise.all([
-            fetch("/api/equipments/getall").then((res) => res.json()),
-            fetch("/api/clients/getall").then((res) => res.json()),
-            fetch("/api/locations/getall").then((res) => res.json()),
-            fetch("/api/projects/getall").then((res) => res.json()),
-          ]);
-
-        setEquipments(Array.isArray(equipmentsData) ? equipmentsData : []);
-        setClients(Array.isArray(clientsData) ? clientsData : []);
-        setLocations(Array.isArray(locationsData) ? locationsData : []);
-        setProjects(Array.isArray(projectsData) ? projectsData : []);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        setEquipments([]);
-        setClients([]);
-        setLocations([]);
-        setProjects([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  // Filter equipments based on selected filters and search query
-  const filteredEquipments = useMemo(() => {
-    if (!Array.isArray(equipments)) return [];
-    return equipments.filter((equipment) => {
+  // Filter equipment based on selected filters and search query
+  const filteredEquipment = useMemo(() => {
+    if (!Array.isArray(equipment)) return [];
+    return equipment.filter((item) => {
       const matchesClient =
-        selectedClient === "all" ||
-        equipment.project.client.uid === selectedClient;
+        selectedClient === "all" || item.project.client.uid === selectedClient;
       const matchesLocation =
         selectedLocation === "all" ||
-        equipment.project.client.location.uid === selectedLocation;
+        item.project.client.location.uid === selectedLocation;
       const matchesProject =
-        selectedProject === "all" || equipment.project.uid === selectedProject;
+        selectedProject === "all" || item.project.uid === selectedProject;
       const matchesStatus =
-        selectedStatus === "all" || equipment.status === selectedStatus;
+        selectedStatus === "all" || item.status === selectedStatus;
 
       // Search functionality - searches through multiple fields
       const matchesSearch =
         searchQuery === "" ||
-        equipment.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        equipment.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        equipment.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        equipment.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        equipment.project.name
+        item.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.project.client.name
           .toLowerCase()
           .includes(searchQuery.toLowerCase()) ||
-        equipment.project.client.name
+        item.project.client.location.address
           .toLowerCase()
           .includes(searchQuery.toLowerCase()) ||
-        equipment.project.client.location.address
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        (equipment.plateNumber &&
-          equipment.plateNumber
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase())) ||
-        (equipment.remarks &&
-          equipment.remarks.toLowerCase().includes(searchQuery.toLowerCase()));
+        (item.plateNumber &&
+          item.plateNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (item.remarks &&
+          item.remarks.toLowerCase().includes(searchQuery.toLowerCase()));
 
       return (
         matchesClient &&
@@ -191,7 +165,7 @@ export default function EquipmentViewer() {
       );
     });
   }, [
-    equipments,
+    equipment,
     selectedClient,
     selectedLocation,
     selectedProject,
@@ -339,26 +313,15 @@ export default function EquipmentViewer() {
   // Fetch report counts for all equipment when data loads
   useEffect(() => {
     const fetchAllReportCounts = async () => {
-      for (const equipment of filteredEquipments) {
-        await fetchReportCount(equipment.uid);
+      for (const item of filteredEquipment) {
+        await fetchReportCount(item.uid);
       }
     };
 
-    if (filteredEquipments.length > 0) {
+    if (filteredEquipment.length > 0) {
       fetchAllReportCounts();
     }
-  }, [filteredEquipments]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading equipment...</p>
-        </div>
-      </div>
-    );
-  }
+  }, [filteredEquipment]);
 
   return (
     <div className="space-y-6">
@@ -484,7 +447,7 @@ export default function EquipmentViewer() {
         {/* Results count and clear filters */}
         <div className="flex items-center justify-between pt-4 border-t">
           <p className="text-sm text-muted-foreground">
-            Showing {filteredEquipments.length} of {equipments.length} equipment
+            Showing {filteredEquipment.length} of {equipment.length} equipment
             {hasActiveFilters && " (filtered)"}
           </p>
           {hasActiveFilters && (
@@ -503,12 +466,12 @@ export default function EquipmentViewer() {
 
       {/* Equipment Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredEquipments.map((equipment, index) => (
+        {filteredEquipment.map((item, index) => (
           <Card
-            key={equipment.uid || `equipment-${index}`}
+            key={item.uid || `equipment-${index}`}
             className="hover:shadow-lg cursor-pointer z-40 bg-chart-3/20"
             onClick={() => {
-              setSelectedEquipment(equipment);
+              setSelectedEquipment(item);
               setIsModalOpen(true);
             }}
           >
@@ -517,54 +480,60 @@ export default function EquipmentViewer() {
                 <CardTitle className="text-sm flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Settings className="h-5 w-5" />
-                    {equipment.brand} {equipment.model}
+                    {item.brand} {item.model}
                   </div>
                   {/* Issue Reports Button */}
-                  {reportCounts[equipment.uid] > 0 && (
+                  {reportCounts[item.uid] > 0 && (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={(e) => handleViewReports(e, equipment)}
+                      onClick={(e) => handleViewReports(e, item)}
                       className="h-6 px-2 text-xs border-red-300 text-red-600 hover:bg-red-100 hover:border-red-400"
                     >
                       <Eye className="h-3 w-3 mr-1" />
-                      {reportCounts[equipment.uid]} issue
-                      {reportCounts[equipment.uid] !== 1 ? "s" : ""}
+                      {reportCounts[item.uid]} issue
+                      {reportCounts[item.uid] !== 1 ? "s" : ""}
                     </Button>
                   )}
                 </CardTitle>
                 <CardDescription className="font-medium text-accent-foreground/70 text-xs">
-                  {equipment.type}
+                  {item.type}
                 </CardDescription>
 
                 <div className="flex flex-row flex-wrap gap-2">
-                  <Badge className={getStatusColor(equipment.status)}>
-                    {equipment.status}
+                  <Badge className={getStatusColor(item.status)}>
+                    {item.status}
                   </Badge>
 
-                  {equipment.plateNumber && (
+                  {newItemIds.has(item.uid) && (
+                    <Badge className="bg-blue-500 text-white hover:bg-blue-600 animate-pulse">
+                      NEW
+                    </Badge>
+                  )}
+
+                  {item.plateNumber && (
                     <Badge
                       variant="outline"
                       className="flex items-center gap-1"
                     >
                       <Car className="h-3 w-3" />
-                      {equipment.plateNumber}
+                      {item.plateNumber}
                     </Badge>
                   )}
 
-                  {getInspectionBadges(equipment).length > 0 && (
+                  {getInspectionBadges(item).length > 0 && (
                     <div className="flex flex-row flex-wrap gap-2">
-                      {getInspectionBadges(equipment)}
+                      {getInspectionBadges(item)}
                     </div>
                   )}
                 </div>
 
-                {getDocumentCount(equipment) > 0 && (
+                {getDocumentCount(item) > 0 && (
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <FileText className="h-3 w-3" />
                     <span>
-                      {getDocumentCount(equipment)} document
-                      {getDocumentCount(equipment) !== 1 ? "s" : ""}
+                      {getDocumentCount(item)} document
+                      {getDocumentCount(item) !== 1 ? "s" : ""}
                     </span>
                   </div>
                 )}
@@ -572,11 +541,11 @@ export default function EquipmentViewer() {
             </CardHeader>
 
             <CardContent className="space-y-3">
-              {equipment.image_url ? (
+              {item.image_url ? (
                 <div className="aspect-video rounded-md overflow-hidden bg-white">
                   <img
-                    src={equipment.image_url}
-                    alt={`${equipment.brand} ${equipment.model}`}
+                    src={item.image_url}
+                    alt={`${item.brand} ${item.model}`}
                     className="w-full h-full object-contain object-center"
                   />
                 </div>
@@ -589,48 +558,48 @@ export default function EquipmentViewer() {
               <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
                 <div className="flex justify-between">
                   <span>Owner:</span>
-                  <span className="font-medium">{equipment.owner}</span>
+                  <span className="font-medium">{item.owner}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Project:</span>
                   <span
                     className="font-medium truncate ml-2"
-                    title={equipment.project.name}
+                    title={item.project.name}
                   >
-                    {equipment.project.name}
+                    {item.project.name}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Client:</span>
                   <span
                     className="font-medium truncate ml-2"
-                    title={equipment.project.client.name}
+                    title={item.project.client.name}
                   >
-                    {equipment.project.client.name}
+                    {item.project.client.name}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Location:</span>
                   <span
                     className="font-medium truncate ml-2"
-                    title={equipment.project.client.location.address}
+                    title={item.project.client.location.address}
                   >
-                    {equipment.project.client.location.address}
+                    {item.project.client.location.address}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Expires:</span>
                   <span
                     className={`font-medium ${
-                      isExpired(equipment.insuranceExpirationDate)
+                      isExpired(item.insuranceExpirationDate)
                         ? "text-red-600"
-                        : isExpiringSoon(equipment.insuranceExpirationDate)
+                        : isExpiringSoon(item.insuranceExpirationDate)
                         ? "text-orange-600"
                         : ""
                     }`}
                   >
                     {new Date(
-                      equipment.insuranceExpirationDate
+                      item.insuranceExpirationDate
                     ).toLocaleDateString()}
                   </span>
                 </div>
@@ -640,7 +609,7 @@ export default function EquipmentViewer() {
         ))}
       </div>
 
-      {filteredEquipments.length === 0 && equipments.length > 0 && (
+      {filteredEquipment.length === 0 && equipment.length > 0 && (
         <Card className="p-8">
           <div className="text-center text-muted-foreground">
             <Settings className="h-12 w-12 mx-auto mb-4" />
@@ -654,7 +623,7 @@ export default function EquipmentViewer() {
         </Card>
       )}
 
-      {equipments.length === 0 && (
+      {equipment.length === 0 && (
         <Card className="p-8">
           <div className="text-center text-muted-foreground">
             <Settings className="h-12 w-12 mx-auto mb-4" />
