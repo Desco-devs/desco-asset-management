@@ -8,6 +8,10 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ============================================
+// ENUMS
+// ============================================
+
 enum Role {
   SUPERADMIN
   ADMIN
@@ -24,6 +28,24 @@ enum status {
   NON_OPERATIONAL
 }
 
+enum report_priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum report_status {
+  REPORTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// ============================================
+// MODELS - HIERARCHICAL ORDER
+// ============================================
+
+// Base User Model
 model user {
   id            String       @id @db.Uuid // Same as auth.users.id from Supabase
   username      String       @unique
@@ -35,45 +57,85 @@ model user {
   created_at    DateTime     @default(now())
   updated_at    DateTime     @updatedAt
 
+  // Relationships
+  created_locations    location[]  @relation("LocationCreatedBy")
+  created_clients      client[]    @relation("ClientCreatedBy")
+  created_projects     project[]   @relation("ProjectCreatedBy")
+  created_equipments   equipment[] @relation("EquipmentCreatedBy")
+  created_vehicles     vehicle[]   @relation("VehicleCreatedBy")
+  
+  // Maintenance relationships
+  reported_maintenance maintenance_equipment_report[] @relation("ReportedBy")
+  repaired_maintenance maintenance_equipment_report[] @relation("RepairedBy")
+
+  @@index([role])
+  @@index([user_status])
+  @@index([created_at])
   @@map("users")
 }
 
+// Level 1: Locations
 model location {
   id                                String                        @id @default(uuid()) @db.Uuid
   address                           String
-  clients                           client[]
+  created_by                        String?                       @db.Uuid
   created_at                        DateTime                      @default(now())
   updated_at                        DateTime                      @updatedAt
+
+  // Relationships
+  user                              user?                         @relation("LocationCreatedBy", fields: [created_by], references: [id])
+  clients                           client[]
   maintenance_equipment_reports     maintenance_equipment_report[]
 
+  @@index([created_by])
+  @@index([created_at])
   @@map("locations")
 }
 
+// Level 2: Clients (under Locations)
 model client {
   id          String    @id @default(uuid()) @db.Uuid
   name        String
   location_id String    @db.Uuid
-  location    location  @relation(fields: [location_id], references: [id])
-  projects    project[]
+  created_by  String?   @db.Uuid
   created_at  DateTime  @default(now())
   updated_at  DateTime  @updatedAt
 
+  // Relationships
+  location    location  @relation(fields: [location_id], references: [id], onDelete: Cascade)
+  user        user?     @relation("ClientCreatedBy", fields: [created_by], references: [id])
+  projects    project[]
+
+  @@index([location_id])
+  @@index([created_by])
+  @@index([name])
+  @@index([created_at])
   @@map("clients")
 }
 
+// Level 3: Projects (under Clients)
 model project {
   id         String      @id @default(uuid()) @db.Uuid
   name       String
   client_id  String      @db.Uuid
-  client     client      @relation(fields: [client_id], references: [id])
-  equipments equipment[]
-  vehicles   vehicle[]
+  created_by String?     @db.Uuid
   created_at DateTime    @default(now())
   updated_at DateTime    @updatedAt
 
+  // Relationships
+  client     client      @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  user       user?       @relation("ProjectCreatedBy", fields: [created_by], references: [id])
+  equipments equipment[]
+  vehicles   vehicle[]
+
+  @@index([client_id])
+  @@index([created_by])
+  @@index([name])
+  @@index([created_at])
   @@map("projects")
 }
 
+// Level 4: Equipment (under Projects)
 model equipment {
   id                            String                        @id @default(uuid()) @db.Uuid
   brand                         String
@@ -87,20 +149,33 @@ model equipment {
   image_url                     String?
   inspection_date               DateTime?
   project_id                    String                        @db.Uuid
+  created_by                    String?                       @db.Uuid
   plate_number                  String?
   original_receipt_url          String?
   equipment_registration_url    String?
   thirdparty_inspection_image   String?
   pgpc_inspection_image         String?
   equipment_parts               String[]
-  project                       project                       @relation(fields: [project_id], references: [id])
   created_at                    DateTime                      @default(now())
   updated_at                    DateTime                      @updatedAt
+
+  // Relationships
+  project                       project                       @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user                          user?                         @relation("EquipmentCreatedBy", fields: [created_by], references: [id])
   maintenance_reports           maintenance_equipment_report[]
 
+  @@index([project_id])
+  @@index([created_by])
+  @@index([status])
+  @@index([type])
+  @@index([brand])
+  @@index([inspection_date])
+  @@index([insurance_expiration_date])
+  @@index([created_at])
   @@map("equipment")
 }
 
+// Level 4: Vehicles (under Projects)
 model vehicle {
   id                      String   @id @default(uuid()) @db.Uuid
   brand                   String
@@ -121,22 +196,34 @@ model vehicle {
   car_registration_url    String? //image man ini para sa CR
   pgpc_inspection_image   String? //same with the equipments igwa man pgpc
   project_id              String   @db.Uuid
-  project                 project  @relation(fields: [project_id], references: [id])
+  created_by              String?  @db.Uuid
   created_at              DateTime @default(now())
   updated_at              DateTime @updatedAt
 
+  // Relationships
+  project                 project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user                    user?    @relation("VehicleCreatedBy", fields: [created_by], references: [id])
+
+  @@index([project_id])
+  @@index([created_by])
+  @@index([status])
+  @@index([type])
+  @@index([brand])
+  @@index([plate_number])
+  @@index([inspection_date])
+  @@index([expiry_date])
+  @@index([created_at])
   @@map("vehicles")
 }
 
+// Supporting Model: Maintenance Reports
 model maintenance_equipment_report {
   id                  String           @id @default(uuid()) @db.Uuid
   equipment_id        String           @db.Uuid
-  equipment           equipment        @relation(fields: [equipment_id], references: [id])
   location_id         String           @db.Uuid
-  location            location         @relation(fields: [location_id], references: [id])
-  //reported and repaired by
-  reported_by         String?
-  repaired_by         String?
+  //reported and repaired by - now references user table
+  reported_by         String?          @db.Uuid
+  repaired_by         String?          @db.Uuid
   //issue details
   issue_description   String
   remarks             String?
@@ -157,18 +244,20 @@ model maintenance_equipment_report {
   created_at          DateTime         @default(now())
   updated_at          DateTime         @updatedAt
 
+  // Relationships
+  equipment           equipment        @relation(fields: [equipment_id], references: [id], onDelete: Cascade)
+  location            location         @relation(fields: [location_id], references: [id])
+  reported_user       user?            @relation("ReportedBy", fields: [reported_by], references: [id])
+  repaired_user       user?            @relation("RepairedBy", fields: [repaired_by], references: [id])
+
+  @@index([equipment_id])
+  @@index([location_id])
+  @@index([reported_by])
+  @@index([repaired_by])
+  @@index([status])
+  @@index([priority])
+  @@index([date_reported])
+  @@index([date_repaired])
+  @@index([created_at])
   @@map("maintenance_equipment_reports")
-}
-
-enum report_priority {
-  LOW
-  MEDIUM
-  HIGH
-}
-
-enum report_status {
-  REPORTED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
 }

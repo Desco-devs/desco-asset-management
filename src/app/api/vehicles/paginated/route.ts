@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const skip = (page - 1) * limit;
 
     const [vehicles, totalCount] = await Promise.all([
-      prisma.vehicles.findMany({
+      prisma.vehicle.findMany({
         include: {
           project: {
             include: {
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
         skip,
         take: limit,
       }),
-      prisma.vehicles.count(),
+      prisma.vehicle.count(),
     ]);
 
     // Format vehicles to match the expected interface
