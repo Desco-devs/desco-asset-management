@@ -1,90 +1,13 @@
+import { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import AssetsClientViewer from "./AssetsClientViewer";
+import AssetsHeader from "./components/AssetsHeader";
+import type { Equipment, Vehicle, Client, Location, Project } from "@/types/assets";
 
-interface Equipment {
-  uid: string;
-  brand: string;
-  model: string;
-  type: string;
-  insuranceExpirationDate: string;
-  status: "OPERATIONAL" | "NON_OPERATIONAL";
-  remarks?: string;
-  owner: string;
-  image_url?: string;
-  inspectionDate?: string;
-  plateNumber?: string;
-  originalReceiptUrl?: string;
-  equipmentRegistrationUrl?: string;
-  thirdpartyInspectionImage?: string;
-  pgpcInspectionImage?: string;
-  project: {
-    uid: string;
-    name: string;
-    client: {
-      uid: string;
-      name: string;
-      location: {
-        uid: string;
-        address: string;
-      };
-    };
-  };
-}
-
-interface Vehicle {
-  uid: string;
-  brand: string;
-  model: string;
-  type: string;
-  plateNumber: string;
-  inspectionDate: string;
-  before: number;
-  expiryDate: string;
-  status: "OPERATIONAL" | "NON_OPERATIONAL";
-  remarks?: string;
-  owner: string;
-  frontImgUrl?: string;
-  backImgUrl?: string;
-  side1ImgUrl?: string;
-  side2ImgUrl?: string;
-  originalReceiptUrl?: string;
-  carRegistrationUrl?: string;
-  project: {
-    uid: string;
-    name: string;
-    client: {
-      uid: string;
-      name: string;
-      location: {
-        uid: string;
-        address: string;
-      };
-    };
-  };
-}
-
-interface Client {
-  uid: string;
-  name: string;
-  location: {
-    uid: string;
-    address: string;
-  };
-}
-
-interface Location {
-  uid: string;
-  address: string;
-}
-
-interface Project {
-  uid: string;
-  name: string;
-  client: {
-    uid: string;
-    name: string;
-  };
-}
+export const metadata: Metadata = {
+  title: "Assets Viewer | Desco",
+  description: "View and manage equipment and vehicles",
+};
 
 const AssetsPage = async () => {
   try {
@@ -232,23 +155,34 @@ const AssetsPage = async () => {
     }));
 
     return (
-      <AssetsClientViewer 
-        initialEquipment={serializedEquipment}
-        initialVehicles={serializedVehicles}
-        initialClients={serializedClients}
-        initialLocations={serializedLocations}
-        initialProjects={serializedProjects}
-      />
+      <>
+        <AssetsHeader />
+
+        {/* Main Content */}
+        <div className="container mx-auto py-6">
+          <AssetsClientViewer 
+            initialEquipment={serializedEquipment}
+            initialVehicles={serializedVehicles}
+            initialClients={serializedClients}
+            initialLocations={serializedLocations}
+            initialProjects={serializedProjects}
+          />
+        </div>
+      </>
     );
   } catch (error) {
     console.error('Error fetching assets data:', error);
     return (
-      <div className="min-h-screen w-full md:py-[10dvh] py-[15dvh] md:max-w-[80dvw] max-w-[85dvw] mx-auto">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold mb-4">Assets Viewer</h1>
-          <p className="text-muted-foreground">Error loading assets data. Please try again later.</p>
+      <>
+        <AssetsHeader />
+        
+        <div className="container mx-auto py-12">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold mb-4">Assets Viewer</h1>
+            <p className="text-muted-foreground">Error loading assets data. Please try again later.</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 };

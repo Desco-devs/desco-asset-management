@@ -80,7 +80,7 @@ export default function EquipmentCard({
 
   return (
     <Card
-      className="cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-[1.02]"
+      className="cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-[1.02] bg-card/50 backdrop-blur-sm border-border/50"
       onClick={onClick}
     >
       <CardHeader className="relative pb-2">
