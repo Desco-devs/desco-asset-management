@@ -389,8 +389,8 @@ async function main() {
         id: "7bdf7f10-061c-462e-8d6e-87d89ea9392b",
         equipment_id: "4ec24e2c-f0f0-4e9c-aa82-84ac3acbe9e5",
         location_id: "abd30557-34ef-45b2-98e9-2906651a1cc2",
-        reported_by: "NIKKO",
-        repaired_by: "MAINTENANCE TEAM",
+        reported_by: null, // Changed from string to UUID reference
+        repaired_by: null, // Changed from string to UUID reference  
         issue_description: "-",
         remarks: "-",
         inspection_details: "-",
@@ -409,8 +409,8 @@ async function main() {
         id: "87dc5fb0-b3d8-469f-8021-3becfda7b5c6",
         equipment_id: "7e6b2374-1520-441a-ab13-6cf628e6929e",
         location_id: "abd30557-34ef-45b2-98e9-2906651a1cc2",
-        reported_by: "NIKKO",
-        repaired_by: "JOMAR COLINARES & RUSSEL BAPOL",
+        reported_by: null, // Changed from string to UUID reference
+        repaired_by: null, // Changed from string to UUID reference
         issue_description: "FOR PMS",
         action_taken: "CHANGE OIL",
         parts_replaced: ["OIL FILTER", "FUEL FILTER", "WATER SEPERATOR"],
@@ -427,8 +427,8 @@ async function main() {
         id: "8f472b60-8c4b-40da-83e2-245a57a2b572",
         equipment_id: "4bfda437-e6e4-49cf-87b1-66a3a4d77115",
         location_id: "abd30557-34ef-45b2-98e9-2906651a1cc2",
-        reported_by: "NIKKO",
-        repaired_by: "JOMAR COLINARES & RUSSEL BAPOL",
+        reported_by: null, // Changed from string to UUID reference
+        repaired_by: null, // Changed from string to UUID reference
         issue_description: "FOR PMS",
         action_taken: "CHANGE OIL",
         parts_replaced: ["OIL FILTER", "FUEL FILTER", "WATER SEPERATOR"],
@@ -445,8 +445,8 @@ async function main() {
         id: "af0a2e4e-70d4-43c9-a6a6-00416f31a8ca",
         equipment_id: "08aacedf-9482-4699-951e-d31275037bac",
         location_id: "abd30557-34ef-45b2-98e9-2906651a1cc2",
-        reported_by: "NIKKO",
-        repaired_by: "MAINTENANCE TEAM",
+        reported_by: null, // Changed from string to UUID reference
+        repaired_by: null, // Changed from string to UUID reference
         issue_description: "Burn out",
         inspection_details: "Not starting",
         action_taken: "For checking",
@@ -464,8 +464,8 @@ async function main() {
         id: "b5a6831b-e867-42fd-b2e4-725504435624",
         equipment_id: "66ea7472-3587-4155-b817-f93122c3491d",
         location_id: "abd30557-34ef-45b2-98e9-2906651a1cc2",
-        reported_by: "NIKKO RIVERA",
-        repaired_by: "KUYA BUNOY",
+        reported_by: null, // Changed from string to UUID reference
+        repaired_by: null, // Changed from string to UUID reference
         issue_description: "LOW POWER",
         inspection_details: "REPLACED FUEL SENSOR",
         action_taken: "Waiting for OBD scanner",
