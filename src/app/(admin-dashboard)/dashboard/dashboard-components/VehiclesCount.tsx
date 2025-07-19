@@ -1,7 +1,8 @@
 "use client";
-import * as React from "react";
-import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { Pie, PieChart, Cell, Label } from "recharts";
+import { createClient } from "@/lib/supabase";
 import {
   Card,
   CardContent,
@@ -16,6 +17,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { toast } from "sonner";
 
 const chartConfig = {
   value: {
@@ -31,95 +33,83 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function VehiclesCount() {
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [vehicleData, setVehicleData] = React.useState<{
+interface VehiclesCountProps {
+  initialData: {
     OPERATIONAL: number;
     NON_OPERATIONAL: number;
-  } | null>(null);
+  };
+}
 
-  React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch("/api/vehicles/count");
+export function VehiclesCount({ initialData }: VehiclesCountProps) {
+  const [vehicleData, setVehicleData] = useState(initialData);
+  const supabase = createClient();
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch vehicle counts");
+  useEffect(() => {
+    // Subscribe to vehicle table changes
+    const vehicleChannel = supabase
+      .channel("vehicle-count-realtime-channel")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "vehicles" },
+        (payload) => {
+          // Update counts based on the database change
+          if (payload.eventType === "INSERT") {
+            const newVehicle = payload.new as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
+            setVehicleData((prev) => ({
+              ...prev,
+              [newVehicle.status]: prev[newVehicle.status] + 1,
+            }));
+            toast.success("New vehicle added to system");
+          } else if (payload.eventType === "UPDATE") {
+            const oldVehicle = payload.old as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
+            const newVehicle = payload.new as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
+            
+            if (oldVehicle.status !== newVehicle.status) {
+              setVehicleData((prev) => ({
+                ...prev,
+                [oldVehicle.status]: prev[oldVehicle.status] - 1,
+                [newVehicle.status]: prev[newVehicle.status] + 1,
+              }));
+              toast.info(`Vehicle status updated to ${newVehicle.status.toLowerCase()}`);
+            }
+          } else if (payload.eventType === "DELETE") {
+            const deletedVehicle = payload.old as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
+            setVehicleData((prev) => ({
+              ...prev,
+              [deletedVehicle.status]: prev[deletedVehicle.status] - 1,
+            }));
+            toast.error("Vehicle removed from system");
+          }
         }
+      )
+      .subscribe();
 
-        const result = await response.json();
-
-        setVehicleData({
-          OPERATIONAL: result.OPERATIONAL || 0,
-          NON_OPERATIONAL: result.NON_OPERATIONAL || 0,
-        });
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "An unknown error occurred"
-        );
-        console.error("Error fetching vehicle counts:", err);
-      } finally {
-        setIsLoading(false);
-      }
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(vehicleChannel);
     };
+  }, [supabase]);
 
-    fetchData();
-  }, []);
-
-  const totalVehicles = vehicleData
-    ? vehicleData.OPERATIONAL + vehicleData.NON_OPERATIONAL
-    : 0;
+  const totalVehicles = vehicleData.OPERATIONAL + vehicleData.NON_OPERATIONAL;
   const vehicleOperationalPercentage =
     totalVehicles > 0
-      ? ((vehicleData?.OPERATIONAL || 0) / totalVehicles) * 100
+      ? (vehicleData.OPERATIONAL / totalVehicles) * 100
       : 0;
 
-  const vehicleChartData = vehicleData
-    ? [
-        {
-          name: "operational",
-          value: vehicleData.OPERATIONAL,
-          fill: "oklch(0.62 0.18 145.0)",
-        },
-        {
-          name: "non_operational",
-          value: vehicleData.NON_OPERATIONAL,
-          fill: "oklch(0.65 0.18 25.0)",
-        },
-      ]
-    : [];
+  const vehicleChartData = [
+    {
+      name: "operational",
+      value: vehicleData.OPERATIONAL,
+      fill: "oklch(0.62 0.18 145.0)",
+    },
+    {
+      name: "non_operational",
+      value: vehicleData.NON_OPERATIONAL,
+      fill: "oklch(0.65 0.18 25.0)",
+    },
+  ];
 
   const isVehicleTrendingUp = vehicleOperationalPercentage > 75;
-
-  if (isLoading) {
-    return (
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-0">
-          <CardTitle>Vehicle Status</CardTitle>
-          <CardDescription>Loading data...</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center flex-1 pb-0 pt-8">
-          <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error || !vehicleData) {
-    return (
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-0">
-          <CardTitle>Vehicle Status</CardTitle>
-          <CardDescription>Error loading data</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center flex-1 pb-0 text-destructive">
-          {error || "Failed to load vehicle data"}
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className="flex flex-col">

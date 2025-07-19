@@ -1,7 +1,8 @@
 "use client";
-import * as React from "react";
+import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { Label, Pie, PieChart } from "recharts";
+import { createClient } from "@/lib/supabase";
 import {
   Card,
   CardContent,
@@ -16,6 +17,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { toast } from "sonner";
 
 const chartConfig = {
   value: {
@@ -31,95 +33,83 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function EquipmentsCount() {
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [equipmentData, setEquipmentData] = React.useState<{
+interface EquipmentsCountProps {
+  initialData: {
     OPERATIONAL: number;
     NON_OPERATIONAL: number;
-  } | null>(null);
+  };
+}
 
-  React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        const equipmentResponse = await fetch("/api/equipments/count");
+export function EquipmentsCount({ initialData }: EquipmentsCountProps) {
+  const [equipmentData, setEquipmentData] = useState(initialData);
+  const supabase = createClient();
 
-        if (!equipmentResponse.ok) {
-          throw new Error("Failed to fetch equipment counts");
+  useEffect(() => {
+    // Subscribe to equipment table changes
+    const equipmentChannel = supabase
+      .channel("equipment-count-realtime-channel")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "equipment" },
+        (payload) => {
+          // Update counts based on the database change
+          if (payload.eventType === "INSERT") {
+            const newEquipment = payload.new as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
+            setEquipmentData((prev) => ({
+              ...prev,
+              [newEquipment.status]: prev[newEquipment.status] + 1,
+            }));
+            toast.success("New equipment added to system");
+          } else if (payload.eventType === "UPDATE") {
+            const oldEquipment = payload.old as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
+            const newEquipment = payload.new as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
+            
+            if (oldEquipment.status !== newEquipment.status) {
+              setEquipmentData((prev) => ({
+                ...prev,
+                [oldEquipment.status]: prev[oldEquipment.status] - 1,
+                [newEquipment.status]: prev[newEquipment.status] + 1,
+              }));
+              toast.info(`Equipment status updated to ${newEquipment.status.toLowerCase()}`);
+            }
+          } else if (payload.eventType === "DELETE") {
+            const deletedEquipment = payload.old as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
+            setEquipmentData((prev) => ({
+              ...prev,
+              [deletedEquipment.status]: prev[deletedEquipment.status] - 1,
+            }));
+            toast.error("Equipment removed from system");
+          }
         }
+      )
+      .subscribe();
 
-        const equipmentResult = await equipmentResponse.json();
-
-        setEquipmentData({
-          OPERATIONAL: equipmentResult.OPERATIONAL || 0,
-          NON_OPERATIONAL: equipmentResult.NON_OPERATIONAL || 0,
-        });
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "An unknown error occurred"
-        );
-        console.error("Error fetching equipment counts:", err);
-      } finally {
-        setIsLoading(false);
-      }
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(equipmentChannel);
     };
+  }, [supabase]);
 
-    fetchData();
-  }, []);
-
-  const totalEquipment = equipmentData
-    ? equipmentData.OPERATIONAL + equipmentData.NON_OPERATIONAL
-    : 0;
+  const totalEquipment = equipmentData.OPERATIONAL + equipmentData.NON_OPERATIONAL;
   const equipmentOperationalPercentage =
     totalEquipment > 0
-      ? ((equipmentData?.OPERATIONAL || 0) / totalEquipment) * 100
+      ? (equipmentData.OPERATIONAL / totalEquipment) * 100
       : 0;
 
-  const equipmentChartData = equipmentData
-    ? [
-        {
-          name: "operational",
-          value: equipmentData.OPERATIONAL,
-          fill: "oklch(0.62 0.18 145.0)",
-        },
-        {
-          name: "non_operational",
-          value: equipmentData.NON_OPERATIONAL,
-          fill: "oklch(0.65 0.18 25.0)",
-        },
-      ]
-    : [];
+  const equipmentChartData = [
+    {
+      name: "operational",
+      value: equipmentData.OPERATIONAL,
+      fill: "oklch(0.62 0.18 145.0)",
+    },
+    {
+      name: "non_operational",
+      value: equipmentData.NON_OPERATIONAL,
+      fill: "oklch(0.65 0.18 25.0)",
+    },
+  ];
 
   const isEquipmentTrendingUp = equipmentOperationalPercentage > 75;
-
-  if (isLoading) {
-    return (
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-0">
-          <CardTitle>Equipment Status</CardTitle>
-          <CardDescription>Loading data...</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center flex-1 pb-0 pt-8">
-          <div className="animate-pulse">Loading...</div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error || !equipmentData) {
-    return (
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-0">
-          <CardTitle>Equipment Status</CardTitle>
-          <CardDescription>Error loading data</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center flex-1 pb-0 text-destructive">
-          {error || "Failed to load equipment data"}
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className="flex flex-col">

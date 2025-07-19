@@ -1,5 +1,4 @@
-"use client";
-
+import { prisma } from "@/lib/prisma";
 import { 
   OverviewStats, 
   VehiclesCount, 
@@ -10,42 +9,40 @@ import {
   QuickActions 
 } from "./dashboard-components";
 
-export default function Dashboard() {
-  // const { user, loading, clearUser } = useAuth();
-  // const [loggingOut, setLoggingOut] = useState(false);
+export default async function Dashboard() {
+  let equipmentData = { OPERATIONAL: 0, NON_OPERATIONAL: 0 };
+  let vehicleData = { OPERATIONAL: 0, NON_OPERATIONAL: 0 };
 
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center">
-  //       <p>Loading user data...</p>
-  //     </div>
-  //   );
-  // }
+  try {
+    // Fetch initial counts using Prisma with proper connection handling
+    const [equipmentCounts, vehicleCounts] = await Promise.all([
+      prisma.equipment.groupBy({
+        by: ['status'],
+        _count: {
+          status: true,
+        },
+      }),
+      prisma.vehicle.groupBy({
+        by: ['status'],
+        _count: {
+          status: true,
+        },
+      }),
+    ]);
 
-  // if (!user) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center">
-  //       <p>User is not authenticated.</p>
-  //     </div>
-  //   );
-  // }
-  // async function handleLogout() {
-  //   setLoggingOut(true);
-  //   try {
-  //     const res = await fetch("/api/authentication/logout", { method: "POST" });
-  //     if (res.ok) {
-  //       clearUser();
-  //       toast.success("Logout successful!");
-  //     } else {
-  //       toast.error("Logout failed");
-  //     }
-  //   } catch (error) {
-  //     console.error(error);
-  //     toast.error("Logout error");
-  //   } finally {
-  //     setLoggingOut(false);
-  //   }
-  // }
+    // Transform to expected format
+    equipmentData = {
+      OPERATIONAL: equipmentCounts.find(item => item.status === 'OPERATIONAL')?._count.status || 0,
+      NON_OPERATIONAL: equipmentCounts.find(item => item.status === 'NON_OPERATIONAL')?._count.status || 0,
+    };
+
+    vehicleData = {
+      OPERATIONAL: vehicleCounts.find(item => item.status === 'OPERATIONAL')?._count.status || 0,
+      NON_OPERATIONAL: vehicleCounts.find(item => item.status === 'NON_OPERATIONAL')?._count.status || 0,
+    };
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
+  }
 
   return (
     <div className="min-h-screen py-6 space-y-6">
@@ -71,8 +68,8 @@ export default function Dashboard() {
         <div className="lg:col-span-2 space-y-6">
           {/* Status Charts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <EquipmentsCount />
-            <VehiclesCount />
+            <EquipmentsCount initialData={equipmentData} />
+            <VehiclesCount initialData={vehicleData} />
           </div>
           
           {/* Combined Assets Overview */}
