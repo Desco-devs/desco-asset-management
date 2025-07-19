@@ -60,14 +60,14 @@ async function fetchVehiclesFromProjects(projects: any[]) {
 
   for (const project of projects) {
     try {
-      const response = await fetch(`/api/vehicles?projectId=${project.uid}`);
+      const response = await fetch(`/api/vehicles?projectId=${project.id}`);
       if (response.ok) {
         const vehicles = await response.json();
         allVehicles.push(...vehicles);
       }
     } catch (error) {
       console.error(
-        `Failed to fetch vehicles for project ${project.uid}:`,
+        `Failed to fetch vehicles for project ${project.id}:`,
         error
       );
       // Continue with other projects even if one fails

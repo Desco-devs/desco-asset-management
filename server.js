@@ -38,7 +38,7 @@ app.prepare().then(() => {
     console.log('User connected:', socket.id);
 
     // Handle user authentication and join their personal room
-    socket.on('user:authenticate', (userId) => {
+    socket.on('user:authenticate', async (userId) => {
       if (!userId) return;
       
       // Store user connection
@@ -46,16 +46,36 @@ app.prepare().then(() => {
       
       if (!userSockets.has(userId)) {
         userSockets.set(userId, new Set());
+        
+        // Update user status to online in database (only on first connection)
+        try {
+          await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/users/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              isOnline: true,
+              lastSeen: new Date().toISOString(),
+            }),
+          });
+        } catch (error) {
+          console.error('Error updating user online status:', error);
+        }
+        
+        // Send current online users to the newly authenticated user
+        const currentOnlineUsers = Array.from(userSockets.keys()).filter(id => id !== userId);
+        socket.emit('users:online_list', currentOnlineUsers);
+        
+        // Notify others that this user is online
+        socket.broadcast.emit('user:online', userId);
       }
+      
       userSockets.get(userId).add(socket.id);
       
       // Join user's personal room for receiving invitations
       socket.join(`user:${userId}`);
       
       console.log(`User ${userId} authenticated with socket ${socket.id}`);
-      
-      // Notify user is online
-      socket.broadcast.emit('user:online', userId);
     });
 
     // Handle joining specific chat rooms
@@ -113,14 +133,50 @@ app.prepare().then(() => {
       console.log(`Invitation ${invitationId} ${action} by user ${userId}`);
     });
 
-    // Handle sending messages
-    socket.on('message:send', (data) => {
-      const { roomId, message } = data;
+    // Handle sending messages - now saves to database and broadcasts
+    socket.on('message:send', async (data) => {
+      const { roomId, content, senderId, type = 'TEXT', tempId } = data;
       
-      // Broadcast message to all room members
-      io.to(`room:${roomId}`).emit('message:new', message);
-      
-      console.log(`Message sent to room ${roomId} by ${message.sender_id}`);
+      try {
+        // Save message to database
+        const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/messages/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            roomId,
+            content,
+            senderId,
+            type
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          const message = result.message;
+          
+          // Validate message before broadcasting
+          if (message && message.room_id) {
+            // Broadcast message to all room members except sender
+            socket.to(`room:${roomId}`).emit('message:new', message);
+            
+            // Send acknowledgment back to sender with real message
+            socket.emit('message:ack', { tempId, message });
+            
+            console.log(`Message saved and broadcast to room ${roomId} by ${senderId}`);
+          } else {
+            console.error('Invalid message received from API:', message);
+            socket.emit('message:error', { tempId, error: 'Invalid message format' });
+          }
+        } else {
+          // Send error back to sender
+          socket.emit('message:error', { tempId, error: 'Failed to save message' });
+        }
+      } catch (error) {
+        console.error('Error handling message:send:', error);
+        socket.emit('message:error', { tempId, error: 'Internal server error' });
+      }
     });
 
     // Handle typing indicators
@@ -135,7 +191,7 @@ app.prepare().then(() => {
     });
 
     // Handle disconnection
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       const userId = socketUsers.get(socket.id);
       
       if (userId) {
@@ -146,6 +202,22 @@ app.prepare().then(() => {
           // If user has no more connections, mark as offline
           if (userSocketSet.size === 0) {
             userSockets.delete(userId);
+            
+            // Update user status to offline in database
+            try {
+              await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/users/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId,
+                  isOnline: false,
+                  lastSeen: new Date().toISOString(),
+                }),
+              });
+            } catch (error) {
+              console.error('Error updating user offline status:', error);
+            }
+            
             socket.broadcast.emit('user:offline', userId);
           }
         }

@@ -100,6 +100,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     const handleNewMessage = (message: any) => {
       console.log("New message received:", message);
 
+      // Check if message is valid
+      if (!message || !message.room_id) {
+        console.error("Received invalid message:", message);
+        return;
+      }
+
       // Invalidate rooms query to update last message
       queryClient.invalidateQueries({
         queryKey: ROOMS_QUERY_KEYS.rooms(user.id),
@@ -168,6 +174,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setUserOffline(userId);
     };
 
+    // Handle initial online users list
+    const handleOnlineUsersList = (userIds: string[]) => {
+      console.log("Received online users list:", userIds);
+      userIds.forEach(userId => {
+        setUserOnline(userId);
+      });
+    };
+
     // Handle errors
     const handleError = (error: { message: string; code?: string }) => {
       console.error("Socket error:", error);
@@ -183,6 +197,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     on("room:users_invited", handleUsersInvited);
     on("user:online", handleUserOnline);
     on("user:offline", handleUserOffline);
+    on("users:online_list", handleOnlineUsersList);
     on("error", handleError);
 
     // Cleanup listeners on unmount
@@ -196,6 +211,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       off("room:users_invited", handleUsersInvited);
       off("user:online", handleUserOnline);
       off("user:offline", handleUserOffline);
+      off("users:online_list", handleOnlineUsersList);
       off("error", handleError);
     };
   }, [

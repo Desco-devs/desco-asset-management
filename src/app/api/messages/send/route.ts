@@ -61,11 +61,18 @@ export async function POST(request: NextRequest) {
       data: { updated_at: new Date() },
     });
 
-    // Emit socket event for real-time updates
-    if (global.io) {
-      global.io.to(`room:${roomId}`).emit('message:new', message);
-      console.log(`Message emitted to room:${roomId}`, message.content);
-    }
+    // NOTE: Socket emission disabled here because messages are handled via socket.io in server.js
+    // This prevents duplicate message events
+    // if (global.io) {
+    //   try {
+    //     global.io.to(`room:${roomId}`).emit('message:new', message);
+    //     console.log(`Message emitted to room:${roomId}`, message.content);
+    //   } catch (error) {
+    //     console.error('Error emitting socket event:', error);
+    //   }
+    // } else {
+    //   console.warn('global.io not available for socket emission');
+    // }
 
     return NextResponse.json({
       success: true,

@@ -21,11 +21,16 @@ export async function fetchLocations(): Promise<location[]> {
     }
 
     const data = await response.json();
-    // Ensure the data is sorted by creation date DESC (newest first)
-    return data.sort(
-      (a: location, b: location) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+    // Ensure the data is an array and sorted by creation date DESC (newest first)
+    if (Array.isArray(data)) {
+      return data.sort(
+        (a: location, b: location) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    } else {
+      console.error("API returned non-array data:", data);
+      return [];
+    }
   } catch (error) {
     console.error("Error fetching locations:", error);
     throw error;

@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth'
 import { getResourcePermissions } from '@/lib/auth/utils'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
 
 function isPrismaError(err: unknown): err is { code?: string } {
   return (

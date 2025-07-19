@@ -537,6 +537,12 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     const handleNewMessage = (message: MessageWithRelations) => {
       console.log('Received new message via Socket.io:', message);
 
+      // Check if message is valid
+      if (!message || !message.room_id) {
+        console.error('Received invalid message in useChatApp:', message);
+        return;
+      }
+
       // Add message to the appropriate room
       dispatchMessages({
         type: 'ADD_MESSAGE',

@@ -1,10 +1,8 @@
 // app/api/projects/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
 import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth'
 import { getResourcePermissions } from '@/lib/auth/utils'
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 // GET /api/projects - View all projects with proper role-based access control
 export const GET = withResourcePermission('projects', 'view', async (request: NextRequest, user: AuthenticatedUser) => {
