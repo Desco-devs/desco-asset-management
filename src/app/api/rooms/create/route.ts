@@ -4,13 +4,13 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { 
-      name, 
-      description, 
-      type, 
-      ownerId, 
-      invitedUsers = [], 
-      inviteUsername 
+    const {
+      name,
+      description,
+      type,
+      ownerId,
+      invitedUsers = [],
+      inviteUsername
     } = body;
 
     if (!name || !type || !ownerId) {
@@ -98,9 +98,9 @@ export async function POST(request: NextRequest) {
           room: result.room,
           creatorId: ownerId,
         });
-        
+
         result.invitations.forEach((invitation) => {
-          global.io.to(`user:${invitation.invited_user}`).emit('room:created', {
+          global?.io?.to(`user:${invitation.invited_user}`).emit('room:created', {
             room: result.room,
             creatorId: ownerId,
           });
