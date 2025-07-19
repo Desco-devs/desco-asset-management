@@ -18,6 +18,23 @@ interface AlertItem {
   project?: string;
 }
 
+interface EquipmentItem {
+  id: string;
+  brand: string;
+  model: string;
+  inspection_date?: string;
+  insurance_expiration_date?: string;
+}
+
+interface VehicleItem {
+  id: string;
+  brand: string;
+  model: string;
+  plate_number: string;
+  inspection_date?: string;
+  expiry_date?: string;
+}
+
 export function MaintenanceAlerts() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -42,7 +59,7 @@ export function MaintenanceAlerts() {
         const now = new Date();
 
         // Check equipment for upcoming inspections and insurance expiration
-        equipment?.forEach((item: any) => {
+        equipment?.forEach((item: EquipmentItem) => {
           const inspectionDate = item.inspection_date ? new Date(item.inspection_date) : null;
           const insuranceDate = item.insurance_expiration_date ? new Date(item.insurance_expiration_date) : null;
 
@@ -80,7 +97,7 @@ export function MaintenanceAlerts() {
         });
 
         // Check vehicles for upcoming inspections and registration expiry
-        vehicles?.forEach((item: any) => {
+        vehicles?.forEach((item: VehicleItem) => {
           const inspectionDate = item.inspection_date ? new Date(item.inspection_date) : null;
           const expiryDate = item.expiry_date ? new Date(item.expiry_date) : null;
 

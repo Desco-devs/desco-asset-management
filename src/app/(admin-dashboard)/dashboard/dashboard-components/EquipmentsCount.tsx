@@ -1,8 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { Label, Pie, PieChart } from "recharts";
-import { createClient } from "@/lib/supabase";
 import {
   Card,
   CardContent,
@@ -17,7 +15,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { toast } from "sonner";
+import { useAssetCounts } from "@/hooks/useAssetCounts";
+import type { AssetCountProps } from "@/types/dashboard";
 
 const chartConfig = {
   value: {
@@ -33,62 +32,14 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-interface EquipmentsCountProps {
-  initialData: {
-    OPERATIONAL: number;
-    NON_OPERATIONAL: number;
-  };
-}
+export function EquipmentsCount({ initialData }: AssetCountProps) {
+  // Use shared asset counts hook
+  const assetCounts = useAssetCounts({
+    equipment: initialData,
+    vehicles: { OPERATIONAL: 0, NON_OPERATIONAL: 0 } // Not used but required
+  });
 
-export function EquipmentsCount({ initialData }: EquipmentsCountProps) {
-  const [equipmentData, setEquipmentData] = useState(initialData);
-  const supabase = createClient();
-
-  useEffect(() => {
-    // Subscribe to equipment table changes
-    const equipmentChannel = supabase
-      .channel("equipment-count-realtime-channel")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "equipment" },
-        (payload) => {
-          // Update counts based on the database change
-          if (payload.eventType === "INSERT") {
-            const newEquipment = payload.new as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
-            setEquipmentData((prev) => ({
-              ...prev,
-              [newEquipment.status]: prev[newEquipment.status] + 1,
-            }));
-            toast.success("New equipment added to system");
-          } else if (payload.eventType === "UPDATE") {
-            const oldEquipment = payload.old as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
-            const newEquipment = payload.new as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
-            
-            if (oldEquipment.status !== newEquipment.status) {
-              setEquipmentData((prev) => ({
-                ...prev,
-                [oldEquipment.status]: prev[oldEquipment.status] - 1,
-                [newEquipment.status]: prev[newEquipment.status] + 1,
-              }));
-              toast.info(`Equipment status updated to ${newEquipment.status.toLowerCase()}`);
-            }
-          } else if (payload.eventType === "DELETE") {
-            const deletedEquipment = payload.old as { status: "OPERATIONAL" | "NON_OPERATIONAL" };
-            setEquipmentData((prev) => ({
-              ...prev,
-              [deletedEquipment.status]: prev[deletedEquipment.status] - 1,
-            }));
-            toast.error("Equipment removed from system");
-          }
-        }
-      )
-      .subscribe();
-
-    // Cleanup subscription on unmount
-    return () => {
-      supabase.removeChannel(equipmentChannel);
-    };
-  }, [supabase]);
+  const equipmentData = assetCounts.equipment;
 
   const totalEquipment = equipmentData.OPERATIONAL + equipmentData.NON_OPERATIONAL;
   const equipmentOperationalPercentage =

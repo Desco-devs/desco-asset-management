@@ -1,131 +1,117 @@
 "use client";
-import * as React from "react";
+import { useState, useEffect } from "react";
 import { Calendar, Plus, Settings, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { createClient } from "@/lib/supabase";
+import { toast } from "sonner";
+import type { ActivityItem, RecentActivityProps } from "@/types/dashboard";
 
-interface ActivityItem {
-  id: string;
-  type: 'equipment' | 'vehicle' | 'project' | 'client' | 'maintenance';
-  action: 'created' | 'updated' | 'reported';
-  title: string;
-  description: string;
-  timestamp: string;
-  status?: string;
-  priority?: string;
-}
+export function RecentActivity({ initialData }: RecentActivityProps) {
+  const [activities, setActivities] = useState<ActivityItem[]>(initialData);
+  const supabase = createClient();
 
-export function RecentActivity() {
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [activities, setActivities] = React.useState<ActivityItem[]>([]);
+  useEffect(() => {
+    // Subscribe to equipment changes
+    const equipmentChannel = supabase
+      .channel('equipment-recent-activity-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'equipment' }, (payload) => {
+        const newActivity: ActivityItem = {
+          id: payload.new.id,
+          type: 'equipment',
+          action: 'created',
+          title: `${payload.new.brand} ${payload.new.model}`,
+          description: `New ${payload.new.type} equipment added`,
+          timestamp: payload.new.created_at,
+          status: payload.new.status
+        };
+        setActivities(prev => [newActivity, ...prev].slice(0, 10));
+        toast.success('New equipment activity');
+      })
+      .subscribe();
 
-  React.useEffect(() => {
-    const fetchRecentActivity = async () => {
-      try {
-        setIsLoading(true);
-        
-        const [equipmentRes, vehicleRes, projectRes, clientRes, maintenanceRes] = await Promise.all([
-          fetch("/api/equipments/getall?limit=3"),
-          fetch("/api/vehicles/getall?limit=3"),
-          fetch("/api/projects/getall?limit=3"),
-          fetch("/api/clients/getall?limit=3"),
-          fetch("/api/maintenance-reports?limit=5")
-        ]);
+    // Subscribe to vehicle changes
+    const vehicleChannel = supabase
+      .channel('vehicle-recent-activity-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vehicles' }, (payload) => {
+        const newActivity: ActivityItem = {
+          id: payload.new.id,
+          type: 'vehicle',
+          action: 'created',
+          title: `${payload.new.brand} ${payload.new.model}`,
+          description: `Vehicle ${payload.new.plate_number} registered`,
+          timestamp: payload.new.created_at,
+          status: payload.new.status
+        };
+        setActivities(prev => [newActivity, ...prev].slice(0, 10));
+        toast.success('New vehicle activity');
+      })
+      .subscribe();
 
-        const [equipment, vehicles, projects, clients, maintenance] = await Promise.all([
-          equipmentRes.json(),
-          vehicleRes.json(),
-          projectRes.json(),
-          clientRes.json(),
-          maintenanceRes.json()
-        ]);
+    // Subscribe to project changes
+    const projectChannel = supabase
+      .channel('project-recent-activity-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'projects' }, (payload) => {
+        const newActivity: ActivityItem = {
+          id: payload.new.id,
+          type: 'project',
+          action: 'created',
+          title: payload.new.name,
+          description: 'New project created',
+          timestamp: payload.new.created_at
+        };
+        setActivities(prev => [newActivity, ...prev].slice(0, 10));
+        toast.success('New project activity');
+      })
+      .subscribe();
 
-        const allActivities: ActivityItem[] = [];
+    // Subscribe to client changes
+    const clientChannel = supabase
+      .channel('client-recent-activity-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients' }, (payload) => {
+        const newActivity: ActivityItem = {
+          id: payload.new.id,
+          type: 'client',
+          action: 'created',
+          title: payload.new.name,
+          description: 'New client registered',
+          timestamp: payload.new.created_at
+        };
+        setActivities(prev => [newActivity, ...prev].slice(0, 10));
+        toast.success('New client activity');
+      })
+      .subscribe();
 
-        // Add equipment activities
-        equipment?.slice(0, 3).forEach((item: any) => {
-          allActivities.push({
-            id: item.id,
-            type: 'equipment',
-            action: 'created',
-            title: `${item.brand} ${item.model}`,
-            description: `New ${item.type} equipment added`,
-            timestamp: item.created_at,
-            status: item.status
-          });
-        });
+    // Subscribe to maintenance changes
+    const maintenanceChannel = supabase
+      .channel('maintenance-recent-activity-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maintenance_equipment_reports' }, (payload) => {
+        const newActivity: ActivityItem = {
+          id: payload.new.id,
+          type: 'maintenance',
+          action: 'reported',
+          title: 'Maintenance Report',
+          description: payload.new.issue_description.substring(0, 50) + '...',
+          timestamp: payload.new.date_reported,
+          status: payload.new.status,
+          priority: payload.new.priority
+        };
+        setActivities(prev => [newActivity, ...prev].slice(0, 10));
+        toast.error('New maintenance report');
+      })
+      .subscribe();
 
-        // Add vehicle activities
-        vehicles?.slice(0, 3).forEach((item: any) => {
-          allActivities.push({
-            id: item.id,
-            type: 'vehicle',
-            action: 'created',
-            title: `${item.brand} ${item.model}`,
-            description: `Vehicle ${item.plate_number} registered`,
-            timestamp: item.created_at,
-            status: item.status
-          });
-        });
-
-        // Add project activities
-        projects?.slice(0, 2).forEach((item: any) => {
-          allActivities.push({
-            id: item.id,
-            type: 'project',
-            action: 'created',
-            title: item.name,
-            description: 'New project created',
-            timestamp: item.created_at
-          });
-        });
-
-        // Add client activities
-        clients?.slice(0, 2).forEach((item: any) => {
-          allActivities.push({
-            id: item.id,
-            type: 'client',
-            action: 'created',
-            title: item.name,
-            description: 'New client registered',
-            timestamp: item.created_at
-          });
-        });
-
-        // Add maintenance activities
-        maintenance?.slice(0, 5).forEach((item: any) => {
-          allActivities.push({
-            id: item.id,
-            type: 'maintenance',
-            action: 'reported',
-            title: 'Maintenance Report',
-            description: item.issue_description.substring(0, 50) + '...',
-            timestamp: item.date_reported,
-            status: item.status,
-            priority: item.priority
-          });
-        });
-
-        // Sort by timestamp and take the most recent 10
-        const sortedActivities = allActivities
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-          .slice(0, 10);
-
-        setActivities(sortedActivities);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch recent activity");
-        console.error("Error fetching recent activity:", err);
-      } finally {
-        setIsLoading(false);
-      }
+    return () => {
+      supabase.removeChannel(equipmentChannel);
+      supabase.removeChannel(vehicleChannel);
+      supabase.removeChannel(projectChannel);
+      supabase.removeChannel(clientChannel);
+      supabase.removeChannel(maintenanceChannel);
     };
+  }, [supabase]);
 
-    fetchRecentActivity();
-  }, []);
-
-  const getActivityIcon = (type: string, action: string) => {
+  const getActivityIcon = (action: string) => {
     if (action === 'reported') return <AlertCircle className="h-4 w-4" />;
     if (action === 'created') return <Plus className="h-4 w-4" />;
     return <Settings className="h-4 w-4" />;
@@ -153,49 +139,6 @@ export function RecentActivity() {
     return time.toLocaleDateString();
   };
 
-  if (isLoading) {
-    return (
-      <Card className="h-[400px]">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Recent Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-start space-x-3 animate-pulse">
-                <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="h-[400px]">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Recent Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center text-destructive py-8">
-            {error}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className="h-[400px]">
@@ -216,7 +159,7 @@ export function RecentActivity() {
               activities.map((activity) => (
                 <div key={activity.id} className="flex items-start space-x-3">
                   <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${getActivityColor(activity.type, activity.status, activity.priority)}`}>
-                    {getActivityIcon(activity.type, activity.action)}
+                    {getActivityIcon(activity.action)}
                   </div>
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center justify-between">
