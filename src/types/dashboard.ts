@@ -48,12 +48,13 @@ export interface ActivityItem {
 
 // Prisma result types (simplified)
 export interface LocationData {
-  id: string;
-  address: string;
-  created_at: Date;
-  clients?: { id: string; name: string }[];
-  user?: { full_name: string };
+  id: string
+  address: string
+  created_at: Date
+  clients?: { id: string; name: string }[]
+  user: { full_name: string } | null   // ✅ allow null
 }
+
 
 export interface ClientData {
   id: string;
@@ -67,8 +68,8 @@ export interface ProjectData {
   id: string;
   name: string;
   created_at: Date;
-  client?: { 
-    name: string; 
+  client?: {
+    name: string;
     location?: { address: string };
   };
   equipments?: { id: string }[];
@@ -83,8 +84,8 @@ export interface EquipmentData {
   status: 'OPERATIONAL' | 'NON_OPERATIONAL';
   owner: string;
   created_at: Date;
-  inspection_date?: string;
-  insurance_expiration_date?: string;
+  inspection_date?: Date | null          // ✅ allow Date | null
+  insurance_expiration_date?: Date | null // ✅ allow Date | null
   project?: {
     client?: {
       location?: { address: string };
@@ -101,8 +102,8 @@ export interface VehicleData {
   status: 'OPERATIONAL' | 'NON_OPERATIONAL';
   owner: string;
   created_at: Date;
-  inspection_date?: string;
-  expiry_date?: string;
+  inspection_date?: Date | null          // ✅ allow Date | null
+  insurance_expiration_date?: Date | null // ✅ allow Date | null
   project?: {
     client?: {
       location?: { address: string };
@@ -111,20 +112,22 @@ export interface VehicleData {
 }
 
 export interface MaintenanceReportData {
-  id: string;
-  issue_description: string;
-  status: 'REPORTED' | 'IN_PROGRESS' | 'COMPLETED';
-  priority: 'LOW' | 'MEDIUM' | 'HIGH';
-  date_reported: Date;
-  created_at: Date;
+  id: string
+  issue_description: string
+  status: 'REPORTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | null
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | null
+  date_reported: Date
+  created_at: Date
   equipment?: {
     project?: {
       client?: {
-        location?: { address: string };
-      };
-    };
-  };
+        location?: { address: string }
+      }
+    }
+  }
 }
+
+
 
 // Component Props Types
 export interface OverviewStatsProps {

@@ -61,7 +61,7 @@ const Header = () => {
 
   // Smart breadcrumb logic - only show relevant segments
   const getSmartBreadcrumbs = () => {
-    const segments = pathname.split("/").filter(Boolean);
+    const segments = pathname?.split("/").filter(Boolean) ?? [];
 
     // If we're at root, just return empty
     if (segments.length === 0) return { paths: [], currentPage: "Dashboard" };
@@ -127,7 +127,7 @@ const Header = () => {
   const { paths: breadcrumbPaths, currentPage } = getSmartBreadcrumbs();
 
   return (
-    <header className="w-full flex sticky top-0 bg-background h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 border-b z-50">
+    <header className="w-full flex sticky top-0 bg-background h-[8dvh] md:h-[10dvh] shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 border-b z-50">
       <div className="w-full flex items-center gap-2 px-4">
         {/* Sidebar trigger */}
         <SidebarTrigger className="-ml-1" />

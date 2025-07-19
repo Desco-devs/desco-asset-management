@@ -1,177 +1,82 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import RoomsList from "./chat-components/RoomsList";
 import ChatHeader from "./chat-components/ChatHeader";
 import MessagesList from "./chat-components/MessagesList";
 import MessageInput from "./chat-components/MessageInput";
 import CreateRoomModal from "./chat-components/CreateRoomModal";
+import InvitationModal from "./chat-components/InvitationModal";
 import { useAuth } from "@/app/context/AuthContext";
-import {
-  RoomListItem,
-  RoomType,
-  MessageWithRelations,
-  MessageType,
-  ChatUser,
-} from "@/types/chat-app";
+import { useChatApp } from "@/hooks/chat-app";
+import { useQueryClient } from "@tanstack/react-query";
+import { ROOM_INVITATIONS_QUERY_KEYS } from "@/hooks/chat-app/useRoomInvitations";
 
 const ChatApp = () => {
   const { user, loading: authLoading } = useAuth();
-  const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = useState(false);
-  const [users, setUsers] = useState<ChatUser[]>([]);
-  const [rooms, setRooms] = useState<RoomListItem[]>([]);
-  const [messages, setMessages] = useState<MessageWithRelations[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const currentUserId = user?.id;
 
-  useEffect(() => {
-    if (!currentUserId || authLoading) return;
+  // Use the combined chat app hook
+  const {
+    // State
+    selectedRoom,
+    invitationRoom,
+    messages,
+    currentRoom,
 
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
+    // Data
+    rooms,
+    users,
 
-        // Fetch users for room creation
-        const usersResponse = await fetch("/api/users/getall");
-        if (usersResponse.ok) {
-          const usersData = await usersResponse.json();
-          setUsers(usersData);
-        }
+    // Loading states
+    isLoading,
+    isLoadingMessages,
+    isLoadingMoreMessages,
+    hasMoreMessages,
+    isCreatingRoom,
+    isRespondingToInvitation,
+    isSendingMessage,
 
-        // Fetch user's rooms
-        const roomsResponse = await fetch(
-          `/api/rooms/getall?userId=${currentUserId}`
-        );
-        if (roomsResponse.ok) {
-          const roomsData = await roomsResponse.json();
-          setRooms(roomsData);
+    // Errors
+    error,
+    createRoomError,
+    invitationResponseError,
 
-          // Auto-select first room if available
-          if (roomsData.length > 0 && !selectedRoom) {
-            setSelectedRoom(roomsData[0].id);
-          }
-        } else {
-          console.error("Failed to fetch rooms");
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    // Actions
+    handleRoomSelect,
+    handleAcceptInvitation,
+    handleDeclineInvitation,
+    handleCreateRoom,
+    handleSendMessage,
+    setInvitationRoom,
+    loadMoreMessages,
+  } = useChatApp({
+    userId: currentUserId,
+    enabled: !authLoading && !!currentUserId,
+  });
 
-    fetchData();
-  }, [currentUserId, authLoading]);
-
-  // Fetch messages when room is selected
-  useEffect(() => {
-    if (!selectedRoom || !currentUserId) return;
-
-    const fetchMessages = async () => {
-      try {
-        // TODO: Replace with real message API
-        console.log(`Fetching messages for room: ${selectedRoom}`);
-
-        // For now, clear messages when switching rooms
-        setMessages([]);
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-      }
-    };
-
-    fetchMessages();
-  }, [selectedRoom, currentUserId]);
-
-  const currentRoom = rooms.find((room) => room.id === selectedRoom);
-
-  const handleSendMessage = (message: string) => {
-    if (!selectedRoom || !currentUserId || !currentRoom) return;
-
-    console.log(`Sending message to room ${currentRoom.name}:`, message);
-    // TODO: Implement real message sending via API/Socket.io
-
-    // Add message to local state for now
-    const newMessage: MessageWithRelations = {
-      id: Date.now().toString(),
-      room_id: selectedRoom,
-      sender_id: currentUserId,
-      content: message,
-      type: MessageType.TEXT,
-      created_at: new Date(),
-      updated_at: new Date(),
-      sender: {
-        id: currentUserId,
-        username: user?.username || "you",
-        full_name: "You",
-        user_profile: user?.user_profile || "",
-      },
-      room: {
-        id: selectedRoom,
-        name: currentRoom.name,
-        type: currentRoom.type as any,
-      },
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
-  };
-
-  const handleRoomSelect = (roomId: string) => {
-    setSelectedRoom(roomId);
-    console.log("Selected room:", rooms.find((r) => r.id === roomId)?.name);
-  };
-
-  const handleCreateRoom = () => {
+  const handleCreateRoomModal = () => {
     setIsCreateRoomModalOpen(true);
   };
 
   const handleCreateRoomSubmit = async (roomData: {
     name: string;
     description?: string;
-    type: RoomType;
-    invitedUsers: ChatUser[];
+    type: any;
+    invitedUsers: any[];
     inviteUsername?: string;
   }) => {
-    if (!currentUserId) return;
-
     try {
-      const response = await fetch("/api/rooms/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: roomData.name,
-          description: roomData.description,
-          type: roomData.type,
-          ownerId: currentUserId,
-          invitedUsers: roomData.invitedUsers,
-          inviteUsername: roomData.inviteUsername,
-        }),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log("Room created:", result);
-
-        // Refresh rooms list
-        const roomsResponse = await fetch(
-          `/api/rooms/getall?userId=${currentUserId}`
-        );
-        if (roomsResponse.ok) {
-          const roomsData = await roomsResponse.json();
-          setRooms(roomsData);
-
-          // Select the new room
-          setSelectedRoom(result.room.id);
-        }
-      } else {
-        console.error("Failed to create room");
-      }
+      await handleCreateRoom(roomData);
+      console.log("Room creation submitted successfully");
+      setIsCreateRoomModalOpen(false);
     } catch (error) {
-      console.error("Error creating room:", error);
+      console.error("Error in handleCreateRoomSubmit:", error);
+      // Don't close modal if there's an error
     }
   };
 
@@ -199,6 +104,82 @@ const ChatApp = () => {
     console.log("Open emoji picker");
   };
 
+  const handleDeleteRoom = async (roomId: string) => {
+    try {
+      console.log("Main page - handleDeleteRoom called with roomId:", roomId);
+      const response = await fetch(
+        `/api/rooms/${roomId}/delete?userId=${currentUserId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (response.ok) {
+        console.log("Room deleted successfully:", roomId);
+
+        // Navigate away from the deleted room
+        if (selectedRoom === roomId) {
+          // Find another room to select or go to empty state
+          const otherRoom = rooms.find((room) => room.id !== roomId);
+          if (otherRoom) {
+            handleRoomSelect(otherRoom.id);
+          }
+        }
+
+        // Refresh rooms list
+        // This will be handled by Socket.io or we can manually refetch
+      } else {
+        const error = await response.json();
+        console.error("Failed to delete room:", error.error);
+        // TODO: Show error toast to user
+      }
+    } catch (error) {
+      console.error("Error deleting room:", error);
+      // TODO: Show error toast to user
+    }
+  };
+
+  const handleInviteUsersToRoom = async (inviteData: {
+    invitedUsers: any[];
+    inviteUsername?: string;
+    inviteEmail?: string;
+  }) => {
+    if (!currentRoom) {
+      throw new Error("No current room selected");
+    }
+
+    const response = await fetch(`/api/rooms/${currentRoom.id}/invite`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        invitedUsers: inviteData.invitedUsers,
+        inviterId: currentUserId,
+        inviteUsername: inviteData.inviteUsername,
+        inviteEmail: inviteData.inviteEmail,
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log("Users invited successfully:", result.message);
+
+      // Invalidate room invitations cache to refresh the user list immediately
+      queryClient.invalidateQueries({
+        queryKey: ROOM_INVITATIONS_QUERY_KEYS.invitations(currentRoom.id),
+      });
+
+      // TODO: Show success toast to user
+      return result;
+    } else {
+      const error = await response.json();
+      console.error("Failed to invite users:", error.error);
+      // TODO: Show error toast to user
+      throw new Error(error.error || "Failed to invite users");
+    }
+  };
+
   // Show loading if auth is still loading or we're fetching data
   if (authLoading || isLoading || !currentUserId) {
     return (
@@ -208,19 +189,36 @@ const ChatApp = () => {
     );
   }
 
+  // Show error state if there's an error
+  if (error) {
+    return (
+      <div className="flex flex-row w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] bg-background items-center justify-center">
+        <div className="text-center">
+          <h3 className="text-lg font-medium text-destructive mb-2">
+            Failed to load chat
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {error.message || "An error occurred while loading the chat"}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <>
-      <div className="flex flex-row w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] bg-background">
-        <div className="hidden md:flex md:w-80 border-r bg-card">
+    <div className="w-full h-full p-2 md:p-4 overflow-hidden">
+      <div className="flex flex-row w-full h-[89dvh] md:h-[85dvh] bg-background border border-chart-1/20 rounded-md overflow-hidden">
+        <div className="h-full hidden md:flex md:w-80 border-r bg-card">
           <RoomsList
             rooms={rooms}
             selectedRoom={selectedRoom || ""}
             onRoomSelect={handleRoomSelect}
-            onCreateRoom={handleCreateRoom}
+            onCreateRoom={handleCreateRoomModal}
+            currentUserId={currentUserId}
           />
         </div>
 
-        <div className="flex-1 flex flex-col">
+        <div className="h-full flex-1 flex flex-col min-w-0">
           <ChatHeader
             currentRoom={currentRoom}
             rooms={rooms}
@@ -228,29 +226,46 @@ const ChatApp = () => {
             onRoomSelect={handleRoomSelect}
             isMobileMenuOpen={isMobileMenuOpen}
             setIsMobileMenuOpen={setIsMobileMenuOpen}
-            onCreateRoom={handleCreateRoom}
+            onCreateRoom={handleCreateRoomModal}
             onCall={handleCall}
             onVideoCall={handleVideoCall}
             onShowInfo={handleShowInfo}
             onShowMore={handleShowMore}
+            currentUserId={currentUserId}
+            users={users}
+            onDeleteRoom={handleDeleteRoom}
+            onInviteUsers={handleInviteUsersToRoom}
           />
 
           {currentRoom ? (
-            <>
-              <MessagesList
-                messages={messages}
-                currentUserId={currentUserId}
-                isLoading={false}
-              />
+            <div className="flex-1 flex flex-col min-h-0 w-full">
+              <div className="flex-1 overflow-hidden min-h-0">
+                <MessagesList
+                  messages={messages}
+                  currentUserId={currentUserId}
+                  roomId={selectedRoom || undefined}
+                  isLoading={isLoadingMessages}
+                  hasMoreMessages={hasMoreMessages}
+                  isLoadingMore={isLoadingMoreMessages}
+                  onLoadMore={() => {
+                    if (selectedRoom) {
+                      loadMoreMessages(selectedRoom);
+                    }
+                  }}
+                />
+              </div>
 
-              <MessageInput
-                roomName={currentRoom.name}
-                onSendMessage={handleSendMessage}
-                onAttachFile={handleAttachFile}
-                onEmojiPicker={handleEmojiPicker}
-                placeholder={`Message ${currentRoom.name}...`}
-              />
-            </>
+              <div className="flex-shrink-0 border-t bg-background">
+                <MessageInput
+                  roomName={currentRoom.name}
+                  onSendMessage={handleSendMessage}
+                  onAttachFile={handleAttachFile}
+                  onEmojiPicker={handleEmojiPicker}
+                  placeholder={`Message ${currentRoom.name}...`}
+                  disabled={isSendingMessage}
+                />
+              </div>
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-center">
               <div>
@@ -266,10 +281,18 @@ const ChatApp = () => {
                 </p>
                 {rooms.length === 0 && (
                   <button
-                    onClick={handleCreateRoom}
-                    className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                    onClick={handleCreateRoomModal}
+                    className="inline-flex items-center px-4 py-2 bg-chart-3 text-white rounded-md hover:bg-primary/90 transition-colors"
+                    disabled={isCreatingRoom}
                   >
-                    Create your first room
+                    {isCreatingRoom ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Creating...
+                      </>
+                    ) : (
+                      "Create your first room"
+                    )}
                   </button>
                 )}
               </div>
@@ -283,9 +306,36 @@ const ChatApp = () => {
         onClose={() => setIsCreateRoomModalOpen(false)}
         onCreateRoom={handleCreateRoomSubmit}
         users={users}
+        rooms={rooms}
         currentUserId={currentUserId}
       />
-    </>
+
+      {invitationRoom && (
+        <InvitationModal
+          isOpen={!!invitationRoom}
+          onClose={() => setInvitationRoom(null)}
+          room={invitationRoom}
+          onAccept={handleAcceptInvitation}
+          onDecline={handleDeclineInvitation}
+          isLoading={isRespondingToInvitation}
+        />
+      )}
+
+      {/* Error notifications */}
+      {createRoomError && (
+        <div className="fixed bottom-4 right-4 bg-destructive text-destructive-foreground p-3 rounded-md shadow-lg">
+          Failed to create room: {createRoomError.message}
+        </div>
+      )}
+
+      {invitationResponseError && (
+        <div className="fixed bottom-4 right-4 bg-destructive text-destructive-foreground p-3 rounded-md shadow-lg">
+          Failed to respond to invitation: {invitationResponseError.message}
+        </div>
+      )}
+
+      {/* sendMessageError removed - errors now handled via Socket.io in useChatApp */}
+    </div>
   );
 };
 

@@ -29,7 +29,7 @@ export default function ImagePreviewModal({
         onMouseLeave={() => onOpenChange(false)}
       >
         <DialogHeader>
-          <DialogTitle></DialogTitle>
+          <DialogTitle className="sr-only">Image Preview</DialogTitle>
         </DialogHeader>
         <div className="p-4">
           <img src={src} alt="Preview" className="w-full h-auto rounded" />

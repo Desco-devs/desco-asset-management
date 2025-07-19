@@ -1,11 +1,10 @@
 // File: app/api/equipments/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, status as EquipmentStatus } from '@prisma/client'
+import { status as EquipmentStatus } from '@prisma/client'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
 const supabase = createServiceRoleClient()
 
 // Helper to extract storage path from a Supabase URL
@@ -337,7 +336,7 @@ export const POST = withResourcePermission('equipment', 'create', async (request
       remarks,
       owner,
       plateNumber: plateNum,
-      project: { connect: { uid: projectId } },
+      project: { connect: { id: projectId } },
       equipmentParts: [], // Initialize empty array
       // only include `before` if provided
       ...(beforeStr !== '' ? { before: parseInt(beforeStr, 10) } : {}),
@@ -480,7 +479,7 @@ export const PUT = withResourcePermission('equipment', 'update', async (request:
       owner,
       plateNumber: plateNum,
       before: beforeStr !== '' ? parseInt(beforeStr, 10) : null,
-      project: { connect: { uid: projectId } },
+      project: { connect: { id: projectId } },
       // Handle insurance date conditionally
       ...(insExp ? { insuranceExpirationDate: new Date(insExp) } : { insuranceExpirationDate: null })
     }

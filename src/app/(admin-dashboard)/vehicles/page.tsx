@@ -60,14 +60,14 @@ async function fetchVehiclesFromProjects(projects: any[]) {
 
   for (const project of projects) {
     try {
-      const response = await fetch(`/api/vehicles?projectId=${project.uid}`);
+      const response = await fetch(`/api/vehicles?projectId=${project.id}`);
       if (response.ok) {
         const vehicles = await response.json();
         allVehicles.push(...vehicles);
       }
     } catch (error) {
       console.error(
-        `Failed to fetch vehicles for project ${project.uid}:`,
+        `Failed to fetch vehicles for project ${project.id}:`,
         error
       );
       // Continue with other projects even if one fails
@@ -228,7 +228,7 @@ export default function VehiclePage() {
   }
 
   return (
-    <div className="h-full container mx-auto py-[5dvh] p-6">
+    <div className="h-full container mx-auto py-[5dvh] p-4">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Vehicle Management</h1>
         <p className="text-muted-foreground">

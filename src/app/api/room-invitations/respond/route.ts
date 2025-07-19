@@ -56,13 +56,59 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // If declined and it's a DIRECT room, delete the room entirely
+      if (action === "DECLINED" && invitation.room.type === "DIRECT") {
+        // Delete all messages in the room
+        await tx.message.deleteMany({
+          where: { room_id: invitation.room_id },
+        });
+
+        // Delete all room members (the inviter)
+        await tx.room_member.deleteMany({
+          where: { room_id: invitation.room_id },
+        });
+
+        // Delete all invitations for this room
+        await tx.room_invitation.deleteMany({
+          where: { room_id: invitation.room_id },
+        });
+
+        // Delete the room itself
+        await tx.room.delete({
+          where: { id: invitation.room_id },
+        });
+
+        return { invitation: updatedInvitation, room: invitation.room, roomDeleted: true };
+      }
+
       return { invitation: updatedInvitation, room: invitation.room };
     });
+
+    // Emit socket events for real-time updates
+    if (global.io) {
+      // If room was deleted due to decline, notify the inviter
+      if (result.roomDeleted) {
+        global.io.to(`user:${result.room.owner_id}`).emit('room:deleted', {
+          roomId: result.room.id,
+          deletedBy: userId, // The user who declined
+          reason: 'invitation_declined'
+        });
+      } else {
+        // Normal invitation response
+        global.io.emit('invitation:responded', {
+          invitationId: result.invitation.id,
+          userId,
+          action,
+          room: result.room,
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,
       invitation: result.invitation,
       room: result.room,
+      roomDeleted: result.roomDeleted || false,
     });
 
   } catch (error) {

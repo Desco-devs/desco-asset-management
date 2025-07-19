@@ -1,8 +1,6 @@
 // app/api/projects/[uid]/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: Request,
@@ -47,7 +45,7 @@ export async function PATCH(
 
   try {
     const data: any = {};
-    if (name)     data.name     = name.trim();
+    if (name) data.name = name.trim();
     if (clientId) data.client_id = clientId;
 
     const project = await prisma.project.update({

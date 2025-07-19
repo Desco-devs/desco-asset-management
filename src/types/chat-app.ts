@@ -104,6 +104,10 @@ export interface MessageWithRelations extends Message {
   };
   reply_to?: MessageWithRelations;
   replies?: MessageWithRelations[];
+  // Optional properties for UI state management
+  pending?: boolean;
+  failed?: boolean;
+  sent?: boolean;
 }
 
 export interface RoomInvitationWithRelations extends RoomInvitation {
@@ -143,7 +147,8 @@ export interface UpdateRoomData {
 export interface SendMessageData {
   room_id: string;
   content: string;
-  type?: MessageType;
+  sender_id?: string;
+  type?: MessageType | string;
   file_url?: string;
   reply_to_id?: string;
 }
@@ -167,6 +172,7 @@ export interface RespondToInvitationData {
 export interface ChatUser {
   id: string;
   username: string;
+  email: string;
   full_name: string;
   user_profile?: string;
   user_status: 'ACTIVE' | 'INACTIVE';
@@ -209,8 +215,10 @@ export interface SocketListeners {
 export interface RoomListItem {
   id: string;
   name: string;
+  description?: string
   type: RoomType;
   avatar_url?: string;
+  owner_id?: string;
   lastMessage?: {
     content: string;
     sender_name: string;
@@ -220,6 +228,33 @@ export interface RoomListItem {
   unread_count: number;
   is_owner: boolean;
   member_count: number;
+  // For invitation handling
+  invitation_status?: InvitationStatus;
+  invitation_id?: string;
+  invited_by?: {
+    id: string;
+    username: string;
+    full_name: string;
+    user_profile?: string;
+  };
+  // Member information for filtering
+  members?: Array<{
+    user_id: string;
+    user?: {
+      id: string;
+      username: string;
+      full_name: string;
+      user_profile?: string;
+    };
+  }>;
+  owner?: {
+    id: string;
+    username: string;
+    full_name: string;
+    user_profile?: string;
+  };
+  created_at?: Date;
+  updated_at?: Date
 }
 
 export interface UserSearchResult {

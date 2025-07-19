@@ -45,7 +45,7 @@ import AddEquipmentModal from "./EquipmentAddModal";
 
 // Types based on your updated Prisma schema
 interface Equipment {
-  uid: string;
+  id: string;
   brand: string;
   model: string;
   type: string;
@@ -63,13 +63,13 @@ interface Equipment {
   pgpcInspectionImage?: string;
   equipmentParts?: string[];
   project: {
-    uid: string;
+    id: string;
     name: string;
     client: {
-      uid: string;
+      id: string;
       name: string;
       location: {
-        uid: string;
+        id: string;
         address: string;
       };
     };
@@ -77,16 +77,16 @@ interface Equipment {
 }
 
 interface Client {
-  uid: string;
+  id: string;
   name: string;
   location: {
-    uid: string;
+    id: string;
     address: string;
   };
 }
 
 interface Location {
-  uid: string;
+  id: string;
   address: string;
 }
 
@@ -170,14 +170,14 @@ const EquipmentCards = ({
 
     if (selectedClient !== "all") {
       filtered = filtered.filter(
-        (equipment) => equipment.project.client.uid === selectedClient
+        (equipment) => equipment.project.client.id === selectedClient
       );
     }
 
     if (selectedLocation !== "all") {
       filtered = filtered.filter(
         (equipment) =>
-          equipment.project.client.location.uid === selectedLocation
+          equipment.project.client.location.id === selectedLocation
       );
     }
 
@@ -335,7 +335,7 @@ const EquipmentCards = ({
   const handleEditIssue = async (e: React.MouseEvent, equipment: Equipment) => {
     e.stopPropagation();
 
-    const reports = await fetchEquipmentReports(equipment.uid);
+    const reports = await fetchEquipmentReports(equipment.id);
 
     if (!reports || reports.length === 0) {
       toast.info("No maintenance reports found for this equipment");
@@ -362,7 +362,7 @@ const EquipmentCards = ({
   ) => {
     e.stopPropagation();
 
-    const reports = await fetchEquipmentReports(equipment.uid);
+    const reports = await fetchEquipmentReports(equipment.id);
 
     if (!reports || reports.length === 0) {
       toast.info("No maintenance reports found for this equipment");
@@ -383,10 +383,10 @@ const EquipmentCards = ({
   };
 
   const deleteMaintenanceReport = async (report: MaintenanceReport) => {
-    setDeletingReportId(report.uid);
+    setDeletingReportId(report.id);
     try {
       const response = await fetch(
-        `/api/maintenance-reports/delete?reportId=${report.uid}`,
+        `/api/maintenance-reports/delete?reportId=${report.id}`,
         {
           method: "DELETE",
         }
@@ -404,13 +404,13 @@ const EquipmentCards = ({
       // Refresh the reports for this equipment
       if (selectedEquipmentThatHasIssues) {
         const updatedReports = await fetchEquipmentReports(
-          selectedEquipmentThatHasIssues.uid
+          selectedEquipmentThatHasIssues.id
         );
 
         // Update view reports data if modal is open
         if (
           showViewReportsModal &&
-          viewReportsEquipment?.uid === selectedEquipmentThatHasIssues.uid
+          viewReportsEquipment?.id === selectedEquipmentThatHasIssues.id
         ) {
           setViewReportsData(updatedReports);
         }
@@ -455,12 +455,12 @@ const EquipmentCards = ({
   const confirmDelete = async () => {
     if (!equipmentToDelete) return;
 
-    setDeletingEquipmentId(equipmentToDelete.uid);
+    setDeletingEquipmentId(equipmentToDelete.id);
     setShowDeleteDialog(false);
 
     try {
       const response = await fetch(
-        `/api/equipments?equipmentId=${equipmentToDelete.uid}`,
+        `/api/equipments?equipmentId=${equipmentToDelete.id}`,
         {
           method: "DELETE",
         }
@@ -554,20 +554,20 @@ const EquipmentCards = ({
   ) => {
     e.stopPropagation();
 
-    const reports = await fetchEquipmentReports(equipment.uid);
+    const reports = await fetchEquipmentReports(equipment.id);
     setViewReportsData(reports);
     setViewReportsEquipment(equipment);
     setShowViewReportsModal(true);
 
     // Ensure count is up to date
-    await fetchReportCount(equipment.uid);
+    await fetchReportCount(equipment.id);
   };
 
   // Add this useEffect to fetch report counts for all equipment when component loads
   useEffect(() => {
     const fetchAllReportCounts = async () => {
       for (const equipment of filteredEquipments) {
-        await fetchReportCount(equipment.uid);
+        await fetchReportCount(equipment.id);
       }
     };
 
@@ -592,7 +592,7 @@ const EquipmentCards = ({
               <SelectContent>
                 <SelectItem value="all">All Clients</SelectItem>
                 {clients.map((client) => (
-                  <SelectItem key={client.uid} value={client.uid}>
+                  <SelectItem key={client.id} value={client.id}>
                     {client.name}
                   </SelectItem>
                 ))}
@@ -614,7 +614,7 @@ const EquipmentCards = ({
               <SelectContent>
                 <SelectItem value="all">All Locations</SelectItem>
                 {locations.map((location) => (
-                  <SelectItem key={location.uid} value={location.uid}>
+                  <SelectItem key={location.id} value={location.id}>
                     {location.address}
                   </SelectItem>
                 ))}
@@ -663,14 +663,14 @@ const EquipmentCards = ({
         {selectedClient !== "all" && (
           <span>
             {" "}
-            • Client: {clients.find((c) => c.uid === selectedClient)?.name}
+            • Client: {clients.find((c) => c.id === selectedClient)?.name}
           </span>
         )}
         {selectedLocation !== "all" && (
           <span>
             {" "}
             • Location:{" "}
-            {locations.find((l) => l.uid === selectedLocation)?.address}
+            {locations.find((l) => l.id === selectedLocation)?.address}
           </span>
         )}
       </div>
@@ -679,7 +679,7 @@ const EquipmentCards = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredEquipments.map((equipment) => (
           <Card
-            key={equipment.uid}
+            key={equipment.id}
             className={`hover:shadow-lg transition-shadow ${
               !isEditMode ? "cursor-pointer" : ""
             } relative`}
@@ -695,7 +695,7 @@ const EquipmentCards = ({
                     </div>
                     {!isIssuesEnabled && !isEditMode && (
                       <>
-                        {reportCounts[equipment.uid] > 0 && (
+                        {reportCounts[equipment.id] > 0 && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -703,8 +703,8 @@ const EquipmentCards = ({
                             className="h-6 px-2 text-xs border-red-300 text-red-600 hover:bg-red-100 hover:border-red-400"
                           >
                             <Eye className="h-3 w-3 mr-1" />
-                            {reportCounts[equipment.uid]} issue
-                            {reportCounts[equipment.uid] !== 1 ? "s" : ""}
+                            {reportCounts[equipment.id]} issue
+                            {reportCounts[equipment.id] !== 1 ? "s" : ""}
                           </Button>
                         )}
                       </>
@@ -773,7 +773,7 @@ const EquipmentCards = ({
                       size="sm"
                       variant="default"
                       onClick={(e) => handleAddIssue(e, equipment)}
-                      disabled={deletingEquipmentId === equipment.uid}
+                      disabled={deletingEquipmentId === equipment.id}
                       className="flex gap-1 items-center text-xs bg-chart-2 text-accent dark:text-accent-foreground hover:bg-chart-3"
                     >
                       <Plus className="h-2 w-2" />
@@ -782,7 +782,7 @@ const EquipmentCards = ({
                       size="sm"
                       variant="outline"
                       onClick={(e) => handleEditIssue(e, equipment)}
-                      disabled={deletingEquipmentId === equipment.uid}
+                      disabled={deletingEquipmentId === equipment.id}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -790,9 +790,9 @@ const EquipmentCards = ({
                       size="sm"
                       variant="destructive"
                       onClick={(e) => handleDeleteIssue(e, equipment)}
-                      disabled={deletingEquipmentId === equipment.uid}
+                      disabled={deletingEquipmentId === equipment.id}
                     >
-                      {deletingEquipmentId === equipment.uid ? (
+                      {deletingEquipmentId === equipment.id ? (
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                       ) : (
                         <Trash2 className="h-4 w-4" />
@@ -807,7 +807,7 @@ const EquipmentCards = ({
                       size="sm"
                       variant="outline"
                       onClick={(e) => handleEditClick(e, equipment)}
-                      disabled={deletingEquipmentId === equipment.uid}
+                      disabled={deletingEquipmentId === equipment.id}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -815,9 +815,9 @@ const EquipmentCards = ({
                       size="sm"
                       variant="destructive"
                       onClick={(e) => handleDeleteIssue(e, equipment)}
-                      disabled={deletingEquipmentId === equipment.uid}
+                      disabled={deletingEquipmentId === equipment.id}
                     >
-                      {deletingEquipmentId === equipment.uid ? (
+                      {deletingEquipmentId === equipment.id ? (
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                       ) : (
                         <Trash2 className="h-4 w-4" />
@@ -943,7 +943,7 @@ const EquipmentCards = ({
         equipment={equipmentToDelete}
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
-        isDeleting={deletingEquipmentId === equipmentToDelete?.uid}
+        isDeleting={deletingEquipmentId === equipmentToDelete?.id}
       />
 
       <ReportSelectionDialog
@@ -961,8 +961,8 @@ const EquipmentCards = ({
           if (!open) {
             // Refresh data when closing the modal
             if (viewReportsEquipment) {
-              fetchEquipmentReports(viewReportsEquipment.uid);
-              fetchReportCount(viewReportsEquipment.uid);
+              fetchEquipmentReports(viewReportsEquipment.id);
+              fetchReportCount(viewReportsEquipment.id);
             }
           }
           setShowViewReportsModal(open);
@@ -994,7 +994,7 @@ const EquipmentCards = ({
           setShowReportDeleteDialog(false);
           setReportToDelete(null);
         }}
-        isDeleting={deletingReportId === reportToDelete?.uid}
+        isDeleting={deletingReportId === reportToDelete?.id}
       />
     </div>
   );

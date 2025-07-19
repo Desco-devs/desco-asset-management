@@ -50,7 +50,7 @@ export default function EditEquipmentModal({
   const [model, setModel] = useState(equipment.model);
   const [type, setType] = useState(equipment.type);
   const [expirationDate, setExpirationDate] = useState(
-    equipment.expirationDate.slice(0, 10)
+    equipment.insuranceExpirationDate.slice(0, 10)
   );
   const [status, setStatus] = useState<Status>(equipment.status);
   const [remarks, setRemarks] = useState<string | null>(
@@ -72,7 +72,7 @@ export default function EditEquipmentModal({
     setBrand(equipment.brand);
     setModel(equipment.model);
     setType(equipment.type);
-    setExpirationDate(equipment.expirationDate.slice(0, 10));
+    setExpirationDate(equipment.insuranceExpirationDate.slice(0, 10));
     setStatus(equipment.status);
     setRemarks(equipment.remarks ?? "");
     setOwner(equipment.owner);

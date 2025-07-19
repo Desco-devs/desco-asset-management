@@ -1,10 +1,7 @@
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase";
-import type {
-  OverviewStatsProps,
-  StatsData,
-} from "@/types/dashboard";
+import type { OverviewStatsProps, StatsData } from "@/types/dashboard";
 import {
   AlertTriangle,
   Building2,
@@ -15,14 +12,9 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-
-export function OverviewStats({
-  initialData,
-}: OverviewStatsProps) {
+export function OverviewStats({ initialData }: OverviewStatsProps) {
   const [stats, setStats] = useState<StatsData>(initialData);
   const supabase = createClient();
-  
-  
 
   useEffect(() => {
     const equipmentChannel = supabase
@@ -154,8 +146,6 @@ export function OverviewStats({
       supabase.removeChannel(vehicleChannel);
     };
   }, [supabase]);
-
-
 
   useEffect(() => {
     // Subscribe to location changes
@@ -388,7 +378,6 @@ export function OverviewStats({
           </CardContent>
         </Card>
       </div>
-
     </div>
   );
 }

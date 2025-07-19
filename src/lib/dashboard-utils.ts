@@ -11,6 +11,7 @@ import type {
   VehicleData,
   MaintenanceReportData
 } from "@/types/dashboard";
+import { report_priority, report_status } from "@prisma/client";
 
 /**
  * Transform equipment counts from Prisma groupBy result
@@ -192,8 +193,8 @@ export function generateRecentActivity(
       title: "Maintenance Report",
       description: (item.issue_description || 'No description').substring(0, 50) + "...",
       timestamp: (item.date_reported || item.created_at).toISOString(),
-      status: item.status,
-      priority: item.priority,
+      status: item.status || report_status.IN_PROGRESS,
+      priority: item.priority || report_priority.HIGH,
     });
   });
 

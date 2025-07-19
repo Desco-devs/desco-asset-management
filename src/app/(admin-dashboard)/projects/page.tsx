@@ -4,8 +4,8 @@ import Client from "./project-components/client";
 
 export default function Proejects() {
   return (
-    <div>
+    <div className="p-4">
       <Client />
-    </div> 
+    </div>
   );
 }
