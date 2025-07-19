@@ -211,11 +211,7 @@ async function fetchVehiclesList(): Promise<VehicleData[]> {
  * Fetch recent maintenance reports
  */
 async function fetchMaintenanceReports(): Promise<MaintenanceReportData[]> {
-<<<<<<< HEAD
   const reports = await prisma.maintenance_equipment_report.findMany({
-=======
-  const rows = await prisma.maintenance_equipment_report.findMany({
->>>>>>> eb5890dc14abe91e2f1c7abeea0894f901d59e26
     take: 10,
     orderBy: { date_reported: 'desc' },
     include: {
@@ -228,7 +224,6 @@ async function fetchMaintenanceReports(): Promise<MaintenanceReportData[]> {
           }
         }
       },
-<<<<<<< HEAD
       location: true,
     },
   });
@@ -286,14 +281,3 @@ export async function fetchMaintenanceReportsStatusCounts() {
     }
   });
 }
-=======
-      location: true
-    }
-  })
-
-  return rows.map(row => ({
-    ...row,
-    status: row.status === 'CANCELLED' ? null : row.status, // ✅ normalize CANCELLED to null
-  }))
-}
->>>>>>> eb5890dc14abe91e2f1c7abeea0894f901d59e26

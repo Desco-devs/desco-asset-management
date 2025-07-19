@@ -5,109 +5,176 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { createClient } from "@/lib/supabase";
-import { toast } from "sonner";
 import type { ActivityItem, RecentActivityProps } from "@/types/dashboard";
 
 export function RecentActivity({ initialData }: RecentActivityProps) {
   const [activities, setActivities] = useState<ActivityItem[]>(initialData);
+  const [isClient, setIsClient] = useState(false);
   const supabase = createClient();
 
+  // Ensure client-side rendering for time-sensitive content
   useEffect(() => {
-    // Subscribe to equipment changes
-    const equipmentChannel = supabase
-      .channel('equipment-recent-activity-channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'equipment' }, (payload) => {
-        const newActivity: ActivityItem = {
-          id: payload.new.id,
-          type: 'equipment',
-          action: 'created',
-          title: `${payload.new.brand} ${payload.new.model}`,
-          description: `New ${payload.new.type} equipment added`,
-          timestamp: payload.new.created_at,
-          status: payload.new.status
-        };
-        setActivities(prev => [newActivity, ...prev].slice(0, 10));
-        toast.success('New equipment activity');
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    // Set up realtime subscriptions after ensuring auth
+    const setupRealtimeSubscriptions = async () => {
+      // Get current session to ensure we're authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session || !session.access_token) {
+        console.warn('No active session or access token for realtime subscriptions');
+        return;
+      }
+
+      // Explicitly set the access token for realtime
+      await supabase.realtime.setAuth(session.access_token);
+
+      // Subscribe to equipment changes
+      const equipmentChannel = supabase
+        .channel('equipment-changes')
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'equipment' 
+        }, (payload) => {
+          console.log("🔥 Equipment payload:", payload);
+          
+          if (payload.new && Object.keys(payload.new).length > 0) {
+            const newEquipment = payload.new;
+            
+            const newActivity: ActivityItem = {
+              id: newEquipment.id,
+              type: 'equipment',
+              action: 'created',
+              title: `${newEquipment.brand} ${newEquipment.model}`,
+              description: `New ${newEquipment.type} added`,
+              timestamp: new Date().toISOString(), // Use current local time for realtime events
+              status: newEquipment.status || 'OPERATIONAL'
+            };
+            
+            setActivities(prev => [newActivity, ...prev].slice(0, 10));
+          }
+        })
+        .subscribe();
+
+      // Subscribe to vehicle changes
+      const vehicleChannel = supabase
+        .channel('vehicle-changes')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vehicles' }, (payload) => {
+          if (payload.new && Object.keys(payload.new).length > 0) {
+          const newVehicle = payload.new;
+          
+          // Generate a meaningful title
+          let title = "New Vehicle";
+          if (newVehicle.brand && newVehicle.model) {
+            title = `${newVehicle.brand} ${newVehicle.model}`;
+          } else if (newVehicle.brand) {
+            title = newVehicle.brand;
+          } else if (newVehicle.model) {
+            title = newVehicle.model;
+          } else if (newVehicle.plate_number) {
+            title = newVehicle.plate_number;
+          }
+          
+          const newActivity: ActivityItem = {
+            id: newVehicle.id,
+            type: 'vehicle',
+            action: 'created',
+            title: title,
+            description: `Vehicle ${newVehicle.plate_number || 'Unknown'} registered`,
+            timestamp: new Date().toISOString(),
+            status: newVehicle.status || 'OPERATIONAL'
+          };
+          
+          setActivities(prev => [newActivity, ...prev].slice(0, 10));
+        }
       })
       .subscribe();
 
-    // Subscribe to vehicle changes
-    const vehicleChannel = supabase
-      .channel('vehicle-recent-activity-channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vehicles' }, (payload) => {
-        const newActivity: ActivityItem = {
-          id: payload.new.id,
-          type: 'vehicle',
-          action: 'created',
-          title: `${payload.new.brand} ${payload.new.model}`,
-          description: `Vehicle ${payload.new.plate_number} registered`,
-          timestamp: payload.new.created_at,
-          status: payload.new.status
-        };
-        setActivities(prev => [newActivity, ...prev].slice(0, 10));
-        toast.success('New vehicle activity');
+      // Subscribe to project changes
+      const projectChannel = supabase
+        .channel('project-changes')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'projects' }, (payload) => {
+          if (payload.new && Object.keys(payload.new).length > 0) {
+          const newProject = payload.new;
+          
+          const newActivity: ActivityItem = {
+            id: newProject.id,
+            type: 'project',
+            action: 'created',
+            title: newProject.name || 'New Project',
+            description: 'New project created',
+            timestamp: new Date().toISOString()
+          };
+          
+          setActivities(prev => [newActivity, ...prev].slice(0, 10));
+        }
       })
       .subscribe();
 
-    // Subscribe to project changes
-    const projectChannel = supabase
-      .channel('project-recent-activity-channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'projects' }, (payload) => {
-        const newActivity: ActivityItem = {
-          id: payload.new.id,
-          type: 'project',
-          action: 'created',
-          title: payload.new.name,
-          description: 'New project created',
-          timestamp: payload.new.created_at
-        };
-        setActivities(prev => [newActivity, ...prev].slice(0, 10));
-        toast.success('New project activity');
+      // Subscribe to client changes
+      const clientChannel = supabase
+        .channel('client-changes')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients' }, (payload) => {
+          if (payload.new && Object.keys(payload.new).length > 0) {
+          const newClient = payload.new;
+          
+          const newActivity: ActivityItem = {
+            id: newClient.id,
+            type: 'client',
+            action: 'created',
+            title: newClient.name || 'New Client',
+            description: 'New client registered',
+            timestamp: new Date().toISOString()
+          };
+          
+          setActivities(prev => [newActivity, ...prev].slice(0, 10));
+        }
       })
       .subscribe();
 
-    // Subscribe to client changes
-    const clientChannel = supabase
-      .channel('client-recent-activity-channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients' }, (payload) => {
-        const newActivity: ActivityItem = {
-          id: payload.new.id,
-          type: 'client',
-          action: 'created',
-          title: payload.new.name,
-          description: 'New client registered',
-          timestamp: payload.new.created_at
-        };
-        setActivities(prev => [newActivity, ...prev].slice(0, 10));
-        toast.success('New client activity');
+      // Subscribe to maintenance changes
+      const maintenanceChannel = supabase
+        .channel('maintenance-changes')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maintenance_equipment_reports' }, (payload) => {
+          if (payload.new && Object.keys(payload.new).length > 0) {
+          const newMaintenance = payload.new;
+          const issueDescription = newMaintenance.issue_description || "No description";
+          
+          const newActivity: ActivityItem = {
+            id: newMaintenance.id,
+            type: 'maintenance',
+            action: 'reported',
+            title: 'Maintenance Report',
+            description: issueDescription.length > 50 ? issueDescription.substring(0, 50) + '...' : issueDescription,
+            timestamp: new Date().toISOString(),
+            status: newMaintenance.status || 'REPORTED',
+            priority: newMaintenance.priority || 'MEDIUM'
+          };
+          
+          setActivities(prev => [newActivity, ...prev].slice(0, 10));
+        }
       })
       .subscribe();
 
-    // Subscribe to maintenance changes
-    const maintenanceChannel = supabase
-      .channel('maintenance-recent-activity-channel')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maintenance_equipment_reports' }, (payload) => {
-        const newActivity: ActivityItem = {
-          id: payload.new.id,
-          type: 'maintenance',
-          action: 'reported',
-          title: 'Maintenance Report',
-          description: payload.new.issue_description.substring(0, 50) + '...',
-          timestamp: payload.new.date_reported,
-          status: payload.new.status,
-          priority: payload.new.priority
-        };
-        setActivities(prev => [newActivity, ...prev].slice(0, 10));
-        toast.error('New maintenance report');
-      })
-      .subscribe();
+      return () => {
+        supabase.removeChannel(equipmentChannel);
+        supabase.removeChannel(vehicleChannel);
+        supabase.removeChannel(projectChannel);
+        supabase.removeChannel(clientChannel);
+        supabase.removeChannel(maintenanceChannel);
+      };
+    };
 
+    // Call the setup function and store cleanup
+    const cleanupPromise = setupRealtimeSubscriptions();
+    
     return () => {
-      supabase.removeChannel(equipmentChannel);
-      supabase.removeChannel(vehicleChannel);
-      supabase.removeChannel(projectChannel);
-      supabase.removeChannel(clientChannel);
-      supabase.removeChannel(maintenanceChannel);
+      cleanupPromise.then(cleanup => {
+        if (cleanup) cleanup();
+      });
     };
   }, [supabase]);
 
@@ -130,11 +197,24 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
   const formatTimeAgo = (timestamp: string) => {
     const now = new Date();
     const time = new Date(timestamp);
-    const diffInHours = Math.floor((now.getTime() - time.getTime()) / (1000 * 60 * 60));
     
-    if (diffInHours < 1) return 'Just now';
+    // Check for invalid date
+    if (isNaN(time.getTime())) {
+      return 'Just now';
+    }
+    
+    const diffInMs = now.getTime() - time.getTime();
+    
+    // If timestamp is in the future or within 30 seconds, show "Just now"
+    if (diffInMs < 30000 || diffInMs < 0) return 'Just now';
+    
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInHours < 24) return `${diffInHours}h ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 7) return `${diffInDays}d ago`;
     return time.toLocaleDateString();
   };
@@ -167,7 +247,7 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
                         {activity.title}
                       </p>
                       <span className="text-xs text-muted-foreground">
-                        {formatTimeAgo(activity.timestamp)}
+                        {isClient ? formatTimeAgo(activity.timestamp) : 'Just now'}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">

@@ -37,7 +37,8 @@
       "Bash(timeout:*)",
       "Bash(cd:*)",
       "Bash(cd:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npm run lint:*)"
     ],
     "deny": []
   }
