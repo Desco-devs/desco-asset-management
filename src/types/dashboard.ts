@@ -83,6 +83,8 @@ export interface EquipmentData {
   status: 'OPERATIONAL' | 'NON_OPERATIONAL';
   owner: string;
   created_at: Date;
+  inspection_date?: string;
+  insurance_expiration_date?: string;
   project?: {
     client?: {
       location?: { address: string };
@@ -99,6 +101,8 @@ export interface VehicleData {
   status: 'OPERATIONAL' | 'NON_OPERATIONAL';
   owner: string;
   created_at: Date;
+  inspection_date?: string;
+  expiry_date?: string;
   project?: {
     client?: {
       location?: { address: string };

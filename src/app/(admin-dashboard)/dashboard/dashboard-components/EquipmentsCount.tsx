@@ -1,4 +1,5 @@
 "use client";
+import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { Label, Pie, PieChart } from "recharts";
 import {
@@ -15,7 +16,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { useAssetCounts } from "@/hooks/useAssetCounts";
+import { createClient } from "@/lib/supabase";
 import type { AssetCountProps } from "@/types/dashboard";
 
 const chartConfig = {
@@ -33,13 +34,48 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function EquipmentsCount({ initialData }: AssetCountProps) {
-  // Use shared asset counts hook
-  const assetCounts = useAssetCounts({
-    equipment: initialData,
-    vehicles: { OPERATIONAL: 0, NON_OPERATIONAL: 0 } // Not used but required
-  });
+  const [equipmentData, setEquipmentData] = useState(initialData);
+  const supabase = createClient();
 
-  const equipmentData = assetCounts.equipment;
+  useEffect(() => {
+    const channel = supabase
+      .channel(`equipment-status-${Date.now()}`)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'equipment' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const status = payload.new.status as keyof typeof initialData;
+            setEquipmentData(prev => ({
+              ...prev,
+              [status]: prev[status] + 1
+            }));
+          } else if (payload.eventType === 'UPDATE') {
+            const oldStatus = payload.old.status as keyof typeof initialData;
+            const newStatus = payload.new.status as keyof typeof initialData;
+            if (oldStatus !== newStatus) {
+              setEquipmentData(prev => ({
+                ...prev,
+                [oldStatus]: Math.max(0, prev[oldStatus] - 1),
+                [newStatus]: prev[newStatus] + 1
+              }));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const status = payload.old.status as keyof typeof initialData;
+            if (status && (status === 'OPERATIONAL' || status === 'NON_OPERATIONAL')) {
+              setEquipmentData(prev => ({
+                ...prev,
+                [status]: Math.max(0, prev[status] - 1)
+              }));
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase]);
 
   const totalEquipment = equipmentData.OPERATIONAL + equipmentData.NON_OPERATIONAL;
   const equipmentOperationalPercentage =
@@ -47,15 +83,21 @@ export function EquipmentsCount({ initialData }: AssetCountProps) {
       ? (equipmentData.OPERATIONAL / totalEquipment) * 100
       : 0;
 
-  const equipmentChartData = [
+  const equipmentChartData = totalEquipment === 0 ? [
+    {
+      name: "no_data",
+      value: 1,
+      fill: "hsl(var(--muted))",
+    },
+  ] : [
     {
       name: "operational",
-      value: equipmentData.OPERATIONAL,
+      value: equipmentData.OPERATIONAL || 0,
       fill: "oklch(0.62 0.18 145.0)",
     },
     {
       name: "non_operational",
-      value: equipmentData.NON_OPERATIONAL,
+      value: equipmentData.NON_OPERATIONAL || 0,
       fill: "oklch(0.65 0.18 25.0)",
     },
   ];
@@ -98,16 +140,16 @@ export function EquipmentsCount({ initialData }: AssetCountProps) {
                         <tspan
                           x={viewBox.cx}
                           y={viewBox.cy}
-                          className="fill-foreground text-3xl font-bold"
+                          className={`text-3xl font-bold ${totalEquipment === 0 ? 'fill-muted-foreground' : 'fill-foreground'}`}
                         >
-                          {totalEquipment.toLocaleString()}
+                          {totalEquipment === 0 ? '0' : totalEquipment.toLocaleString()}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
                           y={(viewBox.cy || 0) + 24}
-                          className="fill-muted-foreground"
+                          className="fill-muted-foreground text-sm"
                         >
-                          Equipment
+                          {totalEquipment === 0 ? 'No Equipment' : 'Equipment'}
                         </tspan>
                       </text>
                     );
@@ -119,23 +161,36 @@ export function EquipmentsCount({ initialData }: AssetCountProps) {
         </ChartContainer>
       </CardContent>
       <CardFooter className="flex-col gap-2 text-sm">
-        <div className="flex items-center gap-2 font-medium leading-none">
-          {isEquipmentTrendingUp ? (
-            <>
-              {equipmentOperationalPercentage.toFixed(1)}% operational{" "}
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            </>
-          ) : (
-            <>
-              {equipmentOperationalPercentage.toFixed(1)}% operational{" "}
-              <TrendingDown className="h-4 w-4 text-red-500" />
-            </>
-          )}
-        </div>
-        <div className="leading-none text-muted-foreground">
-          Operational: {equipmentData.OPERATIONAL} | Non-Operational:{" "}
-          {equipmentData.NON_OPERATIONAL}
-        </div>
+        {totalEquipment === 0 ? (
+          <div className="text-center">
+            <div className="text-muted-foreground text-sm">
+              No equipment registered yet
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Add equipment to start tracking
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 font-medium leading-none">
+              {isEquipmentTrendingUp ? (
+                <>
+                  {equipmentOperationalPercentage.toFixed(1)}% operational{" "}
+                  <TrendingUp className="h-4 w-4 text-green-500" />
+                </>
+              ) : (
+                <>
+                  {equipmentOperationalPercentage.toFixed(1)}% operational{" "}
+                  <TrendingDown className="h-4 w-4 text-red-500" />
+                </>
+              )}
+            </div>
+            <div className="leading-none text-muted-foreground">
+              Operational: {equipmentData.OPERATIONAL} | Non-Operational:{" "}
+              {equipmentData.NON_OPERATIONAL}
+            </div>
+          </>
+        )}
       </CardFooter>
     </Card>
   );

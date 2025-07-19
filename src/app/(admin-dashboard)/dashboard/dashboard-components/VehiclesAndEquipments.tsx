@@ -1,6 +1,6 @@
 "use client";
-import * as React from "react";
-import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { Label, Pie, PieChart, Cell } from "recharts";
 import {
   Card,
@@ -16,27 +16,18 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { createClient } from "@/lib/supabase";
 
-interface ChartDataItem {
-  name: string;
-  value: number;
-  fill: string;
+
+
+interface AssetCounts {
+  OPERATIONAL: number;
+  NON_OPERATIONAL: number;
 }
 
-interface AssetStats {
-  totalVehicles: number;
-  totalEquipment: number;
-  operational: number;
-  nonOperational: number;
-  vehiclesOperational: number;
-  vehiclesNonOperational: number;
-  equipmentOperational: number;
-  equipmentNonOperational: number;
-}
-
-interface AssetData {
-  chartData: ChartDataItem[];
-  stats: AssetStats;
+interface VehiclesAndEquipmentsProps {
+  initialVehicleData: AssetCounts;
+  initialEquipmentData: AssetCounts;
 }
 
 const chartConfig = {
@@ -53,116 +44,136 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function VehiclesAndEquipments() {
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [data, setData] = React.useState<AssetData | null>(null);
+export function VehiclesAndEquipments({ 
+  initialVehicleData, 
+  initialEquipmentData 
+}: VehiclesAndEquipmentsProps) {
+  const [vehicleData, setVehicleData] = useState(initialVehicleData);
+  const [equipmentData, setEquipmentData] = useState(initialEquipmentData);
+  const supabase = createClient();
 
-  React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch("/api/vehicles/count");
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch status counts");
+  useEffect(() => {
+    const equipmentChannel = supabase
+      .channel(`equipment-overview-${Date.now()}`)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'equipment' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const status = payload.new.status as keyof AssetCounts;
+            setEquipmentData(prev => ({
+              ...prev,
+              [status]: prev[status] + 1
+            }));
+          } else if (payload.eventType === 'UPDATE') {
+            const oldStatus = payload.old.status as keyof AssetCounts;
+            const newStatus = payload.new.status as keyof AssetCounts;
+            if (oldStatus !== newStatus) {
+              setEquipmentData(prev => ({
+                ...prev,
+                [oldStatus]: Math.max(0, prev[oldStatus] - 1),
+                [newStatus]: prev[newStatus] + 1
+              }));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const status = payload.old.status as keyof AssetCounts;
+            if (status && (status === 'OPERATIONAL' || status === 'NON_OPERATIONAL')) {
+              setEquipmentData(prev => ({
+                ...prev,
+                [status]: Math.max(0, prev[status] - 1)
+              }));
+            }
+          }
         }
+      )
+      .subscribe();
 
-        const result = await response.json();
+    const vehicleChannel = supabase
+      .channel(`vehicles-overview-${Date.now()}`)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'vehicles' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const status = payload.new.status as keyof AssetCounts;
+            setVehicleData(prev => ({
+              ...prev,
+              [status]: prev[status] + 1
+            }));
+          } else if (payload.eventType === 'UPDATE') {
+            const oldStatus = payload.old.status as keyof AssetCounts;
+            const newStatus = payload.new.status as keyof AssetCounts;
+            if (oldStatus !== newStatus) {
+              setVehicleData(prev => ({
+                ...prev,
+                [oldStatus]: Math.max(0, prev[oldStatus] - 1),
+                [newStatus]: prev[newStatus] + 1
+              }));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const status = payload.old.status as keyof AssetCounts;
+            if (status && (status === 'OPERATIONAL' || status === 'NON_OPERATIONAL')) {
+              setVehicleData(prev => ({
+                ...prev,
+                [status]: Math.max(0, prev[status] - 1)
+              }));
+            }
+          }
+        }
+      )
+      .subscribe();
 
-        const chartData = [
-          {
-            name: "operational",
-            value:
-              (result.vehicles.OPERATIONAL || 0) +
-              (result.equipments.OPERATIONAL || 0),
-            fill: "oklch(0.62 0.18 145.0)",
-          },
-          {
-            name: "non_operational",
-            value:
-              (result.vehicles.NON_OPERATIONAL || 0) +
-              (result.equipments.NON_OPERATIONAL || 0),
-            fill: "oklch(0.65 0.18 25.0)",
-          },
-        ];
-
-        const totalVehicles =
-          (result.vehicles.OPERATIONAL || 0) +
-          (result.vehicles.NON_OPERATIONAL || 0);
-        const totalEquipment =
-          (result.equipments.OPERATIONAL || 0) +
-          (result.equipments.NON_OPERATIONAL || 0);
-
-        setData({
-          chartData,
-          stats: {
-            totalVehicles,
-            totalEquipment,
-            operational:
-              (result.vehicles.OPERATIONAL || 0) +
-              (result.equipments.OPERATIONAL || 0),
-            nonOperational:
-              (result.vehicles.NON_OPERATIONAL || 0) +
-              (result.equipments.NON_OPERATIONAL || 0),
-            vehiclesOperational: result.vehicles.OPERATIONAL || 0,
-            vehiclesNonOperational: result.vehicles.NON_OPERATIONAL || 0,
-            equipmentOperational: result.equipments.OPERATIONAL || 0,
-            equipmentNonOperational: result.equipments.NON_OPERATIONAL || 0,
-          },
-        });
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "An unknown error occurred"
-        );
-        console.error("Error fetching status counts:", err);
-      } finally {
-        setIsLoading(false);
-      }
+    return () => {
+      supabase.removeChannel(equipmentChannel);
+      supabase.removeChannel(vehicleChannel);
     };
+  }, [supabase]);
 
-    fetchData();
-  }, []);
 
-  const totalAssets = React.useMemo(() => {
-    if (!data) return 0;
+  // Calculate derived data from current state
+  const data = useMemo(() => {
+    const totalVehicles = (vehicleData.OPERATIONAL || 0) + (vehicleData.NON_OPERATIONAL || 0);
+    const totalEquipment = (equipmentData.OPERATIONAL || 0) + (equipmentData.NON_OPERATIONAL || 0);
+    const totalAssets = totalVehicles + totalEquipment;
+    
+    const chartData = totalAssets === 0 ? [
+      {
+        name: "no_data",
+        value: 1,
+        fill: "hsl(var(--muted))",
+      },
+    ] : [
+      {
+        name: "operational",
+        value: (vehicleData.OPERATIONAL || 0) + (equipmentData.OPERATIONAL || 0),
+        fill: "oklch(0.62 0.18 145.0)",
+      },
+      {
+        name: "non_operational",
+        value: (vehicleData.NON_OPERATIONAL || 0) + (equipmentData.NON_OPERATIONAL || 0),
+        fill: "oklch(0.65 0.18 25.0)",
+      },
+    ];
+
+    return {
+      chartData,
+      stats: {
+        totalVehicles,
+        totalEquipment,
+        operational: vehicleData.OPERATIONAL + equipmentData.OPERATIONAL,
+        nonOperational: vehicleData.NON_OPERATIONAL + equipmentData.NON_OPERATIONAL,
+      },
+    };
+  }, [vehicleData, equipmentData]);
+
+  const totalAssets = useMemo(() => {
     return data.stats.operational + data.stats.nonOperational;
   }, [data]);
 
-  const operationalPercentage = React.useMemo(() => {
-    if (!data || totalAssets === 0) return 0;
+  const operationalPercentage = useMemo(() => {
+    if (totalAssets === 0) return 0;
     return (data.stats.operational / totalAssets) * 100;
   }, [data, totalAssets]);
 
   const isTrendingUp = operationalPercentage > 75;
-
-  if (isLoading) {
-    return (
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-0">
-          <CardTitle>Asset Status</CardTitle>
-          <CardDescription>Loading data...</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center flex-1 pb-0 pt-8">
-          <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-0">
-          <CardTitle>Asset Status</CardTitle>
-          <CardDescription>Error loading data</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center flex-1 pb-0 text-destructive">
-          {error || "Failed to load asset data"}
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className="flex flex-col">
@@ -187,7 +198,7 @@ export function VehiclesAndEquipments() {
               innerRadius={60}
               strokeWidth={5}
             >
-              {data.chartData.map((entry: ChartDataItem, index: number) => (
+              {data.chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />
               ))}
               <Label
@@ -203,16 +214,16 @@ export function VehiclesAndEquipments() {
                         <tspan
                           x={viewBox.cx}
                           y={viewBox.cy}
-                          className="fill-foreground text-3xl font-bold"
+                          className={`text-3xl font-bold ${totalAssets === 0 ? 'fill-muted-foreground' : 'fill-foreground'}`}
                         >
-                          {totalAssets.toLocaleString()}
+                          {totalAssets === 0 ? '0' : totalAssets.toLocaleString()}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
                           y={(viewBox.cy || 0) + 24}
-                          className="fill-muted-foreground"
+                          className="fill-muted-foreground text-sm"
                         >
-                          Total Assets
+                          {totalAssets === 0 ? 'No Assets' : 'Total Assets'}
                         </tspan>
                       </text>
                     );
@@ -224,23 +235,36 @@ export function VehiclesAndEquipments() {
         </ChartContainer>
       </CardContent>
       <CardFooter className="flex-col gap-2 text-sm">
-        <div className="flex items-center gap-2 font-medium leading-none">
-          {isTrendingUp ? (
-            <>
-              {operationalPercentage.toFixed(1)}% operational assets{" "}
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            </>
-          ) : (
-            <>
-              {operationalPercentage.toFixed(1)}% operational assets{" "}
-              <TrendingDown className="h-4 w-4 text-red-500" />
-            </>
-          )}
-        </div>
-        <div className="leading-none text-muted-foreground">
-          Vehicles: {data.stats.totalVehicles} | Equipment:{" "}
-          {data.stats.totalEquipment}
-        </div>
+        {totalAssets === 0 ? (
+          <div className="text-center">
+            <div className="text-muted-foreground text-sm">
+              No assets registered yet
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Add vehicles and equipment to start tracking
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 font-medium leading-none">
+              {isTrendingUp ? (
+                <>
+                  {operationalPercentage.toFixed(1)}% operational assets{" "}
+                  <TrendingUp className="h-4 w-4 text-green-500" />
+                </>
+              ) : (
+                <>
+                  {operationalPercentage.toFixed(1)}% operational assets{" "}
+                  <TrendingDown className="h-4 w-4 text-red-500" />
+                </>
+              )}
+            </div>
+            <div className="leading-none text-muted-foreground">
+              Vehicles: {data.stats.totalVehicles} | Equipment:{" "}
+              {data.stats.totalEquipment}
+            </div>
+          </>
+        )}
       </CardFooter>
     </Card>
   );
