@@ -41,6 +41,32 @@ export async function middleware(request: NextRequest) {
   // Get user with server verification - More secure for middleware authentication
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
+  // Cache for user data within this request to avoid multiple API calls
+  let userData: any = null;
+  
+  // Helper function to fetch user data once and cache it
+  const getUserData = async () => {
+    if (userData || !user) return userData;
+    
+    try {
+      const apiUrl = new URL("/api/session", request.url);
+      const sessionResponse = await fetch(apiUrl.toString(), {
+        headers: {
+          'cookie': request.headers.get('cookie') || '',
+        },
+      });
+
+      if (sessionResponse.ok) {
+        const result = await sessionResponse.json();
+        userData = result.user;
+      }
+    } catch (error) {
+      console.error("❌ Error fetching user data:", error);
+    }
+    
+    return userData;
+  };
+
   console.log("🔍 User check:", {
     path: request.nextUrl.pathname,
     hasUser: !!user,
@@ -63,25 +89,12 @@ export async function middleware(request: NextRequest) {
   if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/landing-page")) {
     console.log("🚀 BLOCKING: Authenticated user accessing public page, redirecting based on role");
     
-    try {
-      // Get user role to determine redirect destination
-      const apiUrl = new URL("/api/session", request.url);
-      const sessionResponse = await fetch(apiUrl.toString(), {
-        headers: {
-          'cookie': request.headers.get('cookie') || '',
-        },
-      });
-
-      if (sessionResponse.ok) {
-        const { user: userData } = await sessionResponse.json();
-        if (userData && userData.user_status === "ACTIVE") {
-          const redirectPath = getDefaultRedirectPath(userData.role);
-          console.log("✅ Redirecting authenticated user to:", redirectPath, "Role:", userData.role);
-          return NextResponse.redirect(new URL(redirectPath, request.url));
-        }
-      }
-    } catch (error) {
-      console.error("❌ Role-based redirect error:", error);
+    const currentUserData = await getUserData();
+    
+    if (currentUserData && currentUserData.user_status === "ACTIVE") {
+      const redirectPath = getDefaultRedirectPath(currentUserData.role);
+      console.log("✅ Redirecting authenticated user to:", redirectPath, "Role:", currentUserData.role);
+      return NextResponse.redirect(new URL(redirectPath, request.url));
     }
     
     // Fallback redirect
@@ -92,25 +105,12 @@ export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname === "/" && user) {
     console.log("🚀 Redirecting authenticated user from root based on role");
     
-    try {
-      // Get user role to determine redirect destination
-      const apiUrl = new URL("/api/session", request.url);
-      const sessionResponse = await fetch(apiUrl.toString(), {
-        headers: {
-          'cookie': request.headers.get('cookie') || '',
-        },
-      });
-
-      if (sessionResponse.ok) {
-        const { user: userData } = await sessionResponse.json();
-        if (userData && userData.user_status === "ACTIVE") {
-          const redirectPath = getDefaultRedirectPath(userData.role);
-          console.log("✅ Redirecting user from root to:", redirectPath, "Role:", userData.role);
-          return NextResponse.redirect(new URL(redirectPath, request.url));
-        }
-      }
-    } catch (error) {
-      console.error("❌ Root redirect error:", error);
+    const currentUserData = await getUserData();
+    
+    if (currentUserData && currentUserData.user_status === "ACTIVE") {
+      const redirectPath = getDefaultRedirectPath(currentUserData.role);
+      console.log("✅ Redirecting user from root to:", redirectPath, "Role:", currentUserData.role);
+      return NextResponse.redirect(new URL(redirectPath, request.url));
     }
     
     // Fallback redirect
@@ -143,29 +143,15 @@ export async function middleware(request: NextRequest) {
   if (user && isDashboardProtectedRoute) {
     console.log("🔐 Checking if viewer should be redirected from dashboard route");
     
-    try {
-      // Get user role to determine if they can access dashboard routes
-      const apiUrl = new URL("/api/session", request.url);
-      const sessionResponse = await fetch(apiUrl.toString(), {
-        headers: {
-          'cookie': request.headers.get('cookie') || '',
-        },
-      });
-
-      if (sessionResponse.ok) {
-        const { user: userData } = await sessionResponse.json();
-        
-        // If user is a VIEWER, redirect them to assets (they can only access assets)
-        if (userData && userData.role === 'VIEWER') {
-          console.log("🚀 BLOCKING: Viewer trying to access dashboard route, redirecting to assets");
-          return NextResponse.redirect(new URL(DEFAULT_AUTHENTICATED_REDIRECT, request.url));
-        }
-        
-        console.log("✅ Admin/SuperAdmin accessing dashboard route:", userData?.role);
-      }
-    } catch (error) {
-      console.error("❌ Error checking user role:", error);
+    const currentUserData = await getUserData();
+    
+    // If user is a VIEWER, redirect them to assets (they can only access assets)
+    if (currentUserData && currentUserData.role === 'VIEWER') {
+      console.log("🚀 BLOCKING: Viewer trying to access dashboard route, redirecting to assets");
+      return NextResponse.redirect(new URL(DEFAULT_AUTHENTICATED_REDIRECT, request.url));
     }
+    
+    console.log("✅ Admin/SuperAdmin accessing dashboard route:", currentUserData?.role);
   }
 
   // Add user info to headers if authenticated (for use in API routes and components)

@@ -28,6 +28,7 @@ import {
 import { useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export function NavUser({
   CurrentUser,
@@ -41,15 +42,18 @@ export function NavUser({
   const { isMobile } = useSidebar();
   const { user, supabaseUser, signOut } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const router = useRouter();
 
   async function handleLogout() {
     setLoggingOut(true);
     try {
+      toast.loading("Logging out...", { id: "logout" });
       await signOut();
-      toast.success("Logout successful!");
+      toast.success("Logged out successfully!", { id: "logout" });
+      router.push("/login");
     } catch (error) {
-      console.error(error);
-      toast.error("Logout error");
+      console.error("Logout failed:", error);
+      toast.error("Failed to logout. Please try again.", { id: "logout" });
     } finally {
       setLoggingOut(false);
     }
@@ -123,9 +127,13 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
+            <DropdownMenuItem 
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="text-red-600"
+            >
               <LogOut />
-              Log out
+              {loggingOut ? "Logging out..." : "Log out"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
