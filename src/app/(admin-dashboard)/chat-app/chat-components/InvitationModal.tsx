@@ -129,11 +129,11 @@ const InvitationModal = ({
             </Button>
             <Button
               onClick={handleAccept}
-              className="flex-1"
+              className="flex-1 text-white bg-chart-3"
               disabled={isLoading}
             >
               {isLoading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 "></div>
               ) : (
                 <UserCheck className="h-4 w-4 mr-2" />
               )}

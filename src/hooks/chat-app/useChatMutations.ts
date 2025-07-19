@@ -80,47 +80,7 @@ export const useChatMutations = (currentUserId?: string) => {
     },
   });
 
-  const sendMessageMutation = useMutation({
-    mutationFn: async (data: SendMessageData) => {
-      const response = await fetch('/api/messages/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          roomId: data.room_id,
-          content: data.content,
-          senderId: data.sender_id || currentUserId,
-          type: data.type || 'TEXT',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
-
-      return response.json();
-    },
-    onSuccess: (data, variables) => {
-      // Invalidate and refetch room messages immediately
-      queryClient.invalidateQueries({
-        queryKey: ROOMS_QUERY_KEYS.roomMessages(variables.room_id),
-      });
-      queryClient.refetchQueries({
-        queryKey: ROOMS_QUERY_KEYS.roomMessages(variables.room_id),
-      });
-      
-      // Update rooms list to show new last message
-      if (currentUserId) {
-        queryClient.invalidateQueries({
-          queryKey: ROOMS_QUERY_KEYS.rooms(currentUserId),
-        });
-        queryClient.refetchQueries({
-          queryKey: ROOMS_QUERY_KEYS.rooms(currentUserId),
-        });
-      }
-    },
-  });
+  // sendMessage functionality removed - now handled via Socket.io in useChatApp
 
   const markAsReadMutation = useMutation({
     mutationFn: async (roomId: string) => {
@@ -163,11 +123,7 @@ export const useChatMutations = (currentUserId?: string) => {
     isRespondingToInvitation: respondToInvitationMutation.isPending,
     invitationResponseError: respondToInvitationMutation.error,
 
-    // Send message
-    sendMessage: sendMessageMutation.mutate,
-    sendMessageAsync: sendMessageMutation.mutateAsync,
-    isSendingMessage: sendMessageMutation.isPending,
-    sendMessageError: sendMessageMutation.error,
+    // Send message functionality removed - now handled via Socket.io
 
     // Mark messages as read
     markAsRead: markAsReadMutation.mutate,
@@ -179,7 +135,6 @@ export const useChatMutations = (currentUserId?: string) => {
     mutations: {
       createRoom: createRoomMutation,
       respondToInvitation: respondToInvitationMutation,
-      sendMessage: sendMessageMutation,
       markAsRead: markAsReadMutation,
     },
   };

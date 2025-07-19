@@ -120,14 +120,44 @@ const SocketHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
       console.log(`Invitation ${invitationId} ${action} by user ${userId}`);
     });
 
-    // Handle sending messages
-    socket.on('message:send', (data) => {
-      const { roomId, message } = data;
+    // Handle sending messages - now saves to database and broadcasts
+    socket.on('message:send', async (data) => {
+      const { roomId, content, senderId, type = 'TEXT', tempId } = data;
       
-      // Broadcast message to all room members
-      io.to(`room:${roomId}`).emit('message:new', message);
-      
-      console.log(`Message sent to room ${roomId} by ${message.sender_id}`);
+      try {
+        // Save message to database (we'll create this API endpoint)
+        const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/messages/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            roomId,
+            content,
+            senderId,
+            type
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          const message = result.message;
+          
+          // Broadcast message to all room members except sender
+          socket.to(`room:${roomId}`).emit('message:new', message);
+          
+          // Send acknowledgment back to sender with real message
+          socket.emit('message:ack', { tempId, message });
+          
+          console.log(`Message saved and broadcast to room ${roomId} by ${senderId}`);
+        } else {
+          // Send error back to sender
+          socket.emit('message:error', { tempId, error: 'Failed to save message' });
+        }
+      } catch (error) {
+        console.error('Error handling message:send:', error);
+        socket.emit('message:error', { tempId, error: 'Internal server error' });
+      }
     });
 
     // Handle typing indicators

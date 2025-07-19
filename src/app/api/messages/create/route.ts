@@ -61,21 +61,15 @@ export async function POST(request: NextRequest) {
       data: { updated_at: new Date() },
     });
 
-    // Emit socket event for real-time updates
-    if (global.io) {
-      global.io.to(`room:${roomId}`).emit('message:new', message);
-      console.log(`Message emitted to room:${roomId}`, message.content);
-    }
-
     return NextResponse.json({
       success: true,
       message,
     });
 
   } catch (error) {
-    console.error("Error sending message:", error);
+    console.error("Error creating message:", error);
     return NextResponse.json(
-      { error: "Failed to send message" },
+      { error: "Failed to create message" },
       { status: 500 }
     );
   }

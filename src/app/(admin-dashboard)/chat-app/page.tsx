@@ -40,7 +40,6 @@ const ChatApp = () => {
     error,
     createRoomError,
     invitationResponseError,
-    sendMessageError,
 
     // Actions
     handleRoomSelect,
@@ -119,9 +118,9 @@ const ChatApp = () => {
   }
 
   return (
-    <>
-      <div className="flex flex-row w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] bg-background">
-        <div className="hidden md:flex md:w-80 border-r bg-card">
+    <div className="w-full h-full p-4 overflow-hidden">
+      <div className="flex flex-row w-full h-[85dvh] bg-background border border-chart-1/20 rounded-md overflow-hidden">
+        <div className="h-full hidden md:flex md:w-80 border-r bg-card">
           <RoomsList
             rooms={rooms}
             selectedRoom={selectedRoom || ""}
@@ -130,7 +129,7 @@ const ChatApp = () => {
           />
         </div>
 
-        <div className="flex-1 flex flex-col">
+        <div className="h-full flex-1 flex flex-col ">
           <ChatHeader
             currentRoom={currentRoom}
             rooms={rooms}
@@ -143,25 +142,37 @@ const ChatApp = () => {
             onVideoCall={handleVideoCall}
             onShowInfo={handleShowInfo}
             onShowMore={handleShowMore}
+            currentUserId={currentUserId}
           />
 
           {currentRoom ? (
-            <>
-              <MessagesList
-                messages={messages}
-                currentUserId={currentUserId}
-                isLoading={isLoadingMessages}
-              />
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-hidden">
+                <MessagesList
+                  messages={messages}
+                  currentUserId={currentUserId}
+                  roomId={selectedRoom || undefined}
+                  isLoading={isLoadingMessages}
+                  hasMoreMessages={false} // TODO: Implement based on API response
+                  isLoadingMore={false} // TODO: Implement load more state
+                  onLoadMore={() => {
+                    // TODO: Implement load more functionality
+                    console.log("Load more messages requested");
+                  }}
+                />
+              </div>
 
-              <MessageInput
-                roomName={currentRoom.name}
-                onSendMessage={handleSendMessage}
-                onAttachFile={handleAttachFile}
-                onEmojiPicker={handleEmojiPicker}
-                placeholder={`Message ${currentRoom.name}...`}
-                disabled={isSendingMessage}
-              />
-            </>
+              <div className="flex-shrink-0">
+                <MessageInput
+                  roomName={currentRoom.name}
+                  onSendMessage={handleSendMessage}
+                  onAttachFile={handleAttachFile}
+                  onEmojiPicker={handleEmojiPicker}
+                  placeholder={`Message ${currentRoom.name}...`}
+                  disabled={isSendingMessage}
+                />
+              </div>
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-center">
               <div>
@@ -230,12 +241,8 @@ const ChatApp = () => {
         </div>
       )}
 
-      {sendMessageError && (
-        <div className="fixed bottom-4 right-4 bg-destructive text-destructive-foreground p-3 rounded-md shadow-lg">
-          Failed to send message: {sendMessageError.message}
-        </div>
-      )}
-    </>
+      {/* sendMessageError removed - errors now handled via Socket.io in useChatApp */}
+    </div>
   );
 };
 

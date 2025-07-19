@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
-import { useRooms, useRoomMessages } from './useRooms';
+import { useState, useEffect, useReducer, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRooms } from './useRooms';
 import { useUsers } from './useUsers';
 import { useChatMutations } from './useChatMutations';
+import { useSocketContext } from '@/context/SocketContext';
 import { RoomListItem, InvitationStatus, MessageWithRelations, SendMessageData, MessageType } from '@/types/chat-app';
 
 interface UseChatAppOptions {
@@ -9,10 +11,121 @@ interface UseChatAppOptions {
   enabled?: boolean;
 }
 
+// Messages state management
+interface MessagesState {
+  [roomId: string]: {
+    messages: MessageWithRelations[];
+    hasMore: boolean;
+    nextCursor: string | null;
+    isLoadingMore: boolean;
+  };
+}
+
+type MessagesAction = 
+  | { type: 'SET_MESSAGES'; roomId: string; messages: MessageWithRelations[]; hasMore: boolean; nextCursor: string | null }
+  | { type: 'PREPEND_MESSAGES'; roomId: string; messages: MessageWithRelations[]; hasMore: boolean; nextCursor: string | null }
+  | { type: 'ADD_MESSAGE'; roomId: string; message: MessageWithRelations }
+  | { type: 'UPDATE_MESSAGE'; roomId: string; messageId: string; updates: Partial<MessageWithRelations> }
+  | { type: 'REMOVE_MESSAGE'; roomId: string; messageId: string }
+  | { type: 'SET_LOADING_MORE'; roomId: string; isLoadingMore: boolean }
+  | { type: 'CLEAR_ROOM'; roomId: string }
+  | { type: 'CLEAR_ALL' };
+
+const messagesReducer = (state: MessagesState, action: MessagesAction): MessagesState => {
+  switch (action.type) {
+    case 'SET_MESSAGES':
+      return {
+        ...state,
+        [action.roomId]: {
+          messages: action.messages,
+          hasMore: action.hasMore,
+          nextCursor: action.nextCursor,
+          isLoadingMore: false
+        }
+      };
+    case 'PREPEND_MESSAGES':
+      const existingRoom = state[action.roomId];
+      return {
+        ...state,
+        [action.roomId]: {
+          messages: [...action.messages, ...(existingRoom?.messages || [])],
+          hasMore: action.hasMore,
+          nextCursor: action.nextCursor,
+          isLoadingMore: false
+        }
+      };
+    case 'ADD_MESSAGE':
+      const currentRoom = state[action.roomId];
+      return {
+        ...state,
+        [action.roomId]: {
+          ...currentRoom,
+          messages: [...(currentRoom?.messages || []), action.message]
+        }
+      };
+    case 'UPDATE_MESSAGE':
+      const roomToUpdate = state[action.roomId];
+      return {
+        ...state,
+        [action.roomId]: {
+          ...roomToUpdate,
+          messages: (roomToUpdate?.messages || []).map(msg => 
+            msg.id === action.messageId ? { ...msg, ...action.updates } : msg
+          )
+        }
+      };
+    case 'REMOVE_MESSAGE':
+      const roomToRemoveFrom = state[action.roomId];
+      return {
+        ...state,
+        [action.roomId]: {
+          ...roomToRemoveFrom,
+          messages: (roomToRemoveFrom?.messages || []).filter(msg => msg.id !== action.messageId)
+        }
+      };
+    case 'SET_LOADING_MORE':
+      const roomForLoading = state[action.roomId];
+      return {
+        ...state,
+        [action.roomId]: {
+          ...roomForLoading,
+          isLoadingMore: action.isLoadingMore
+        }
+      };
+    case 'CLEAR_ROOM':
+      return {
+        ...state,
+        [action.roomId]: {
+          messages: [],
+          hasMore: false,
+          nextCursor: null,
+          isLoadingMore: false
+        }
+      };
+    case 'CLEAR_ALL':
+      return {};
+    default:
+      return state;
+  }
+};
+
 export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [invitationRoom, setInvitationRoom] = useState<RoomListItem | null>(null);
-  const [pendingMessages, setPendingMessages] = useState<Map<string, MessageWithRelations>>(new Map());
+  const [messagesState, dispatchMessages] = useReducer(messagesReducer, {});
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const loadedRoomsRef = useRef<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+  const { socket, emit, joinRoom, leaveRoom, isConnected } = useSocketContext();
+
+  // Clear messages when user changes
+  useEffect(() => {
+    if (userId) {
+      dispatchMessages({ type: 'CLEAR_ALL' });
+      loadedRoomsRef.current.clear();
+    }
+  }, [userId]);
 
   // TanStack Query hooks
   const {
@@ -28,16 +141,11 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     error: usersError,
   } = useUsers();
 
-  // Get messages for selected room
-  const {
-    data: messages = [],
-    isLoading: isLoadingMessages,
-    error: messagesError,
-  } = useRoomMessages({
-    roomId: selectedRoom || undefined,
-    userId,
-    enabled: !!selectedRoom && !!userId
-  });
+  // Get messages for current room
+  const roomData = selectedRoom ? messagesState[selectedRoom] : undefined;
+  const messages = roomData?.messages || [];
+  const hasMoreMessages = roomData?.hasMore || false;
+  const isLoadingMoreMessages = roomData?.isLoadingMore || false;
 
   const {
     createRoomAsync,
@@ -46,9 +154,6 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     respondToInvitationAsync,
     isRespondingToInvitation,
     invitationResponseError,
-    sendMessageAsync,
-    isSendingMessage,
-    sendMessageError,
     markAsReadAsync,
     isMarkingAsRead,
     markAsReadError,
@@ -56,22 +161,99 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
 
   // Auto-select first accepted room when rooms are loaded
   useEffect(() => {
+    console.log('Auto-select effect:', { roomsLength: rooms.length, selectedRoom });
     if (rooms.length > 0 && !selectedRoom) {
       const firstAcceptedRoom = rooms.find(
         room => room.invitation_status !== InvitationStatus.PENDING
       );
+      console.log('First accepted room found:', firstAcceptedRoom?.name);
       if (firstAcceptedRoom) {
         setSelectedRoom(firstAcceptedRoom.id);
       }
     }
   }, [rooms, selectedRoom]);
 
-  // Log when selected room changes (messages will be fetched automatically by useRoomMessages)
-  useEffect(() => {
-    if (selectedRoom) {
-      console.log(`Selected room changed to: ${selectedRoom}`);
+  // Load messages for a room via HTTP API (initial load only)
+  const loadRoomMessages = useCallback(async (roomId: string) => {
+    if (!userId) return;
+    
+    setIsLoadingMessages(true);
+    try {
+      // Load latest 20 messages initially
+      const response = await fetch(`/api/messages/${roomId}?userId=${userId}&limit=20`);
+      if (response.ok) {
+        const data = await response.json();
+        dispatchMessages({ 
+          type: 'SET_MESSAGES', 
+          roomId, 
+          messages: data.messages || [],
+          hasMore: data.hasMore || false,
+          nextCursor: data.nextCursor || null
+        });
+      }
+    } catch (error) {
+      console.error('Error loading room messages:', error);
+    } finally {
+      setIsLoadingMessages(false);
     }
-  }, [selectedRoom]);
+  }, [userId]);
+
+  // Load older messages when scrolling up
+  const loadMoreMessages = useCallback(async (roomId: string) => {
+    if (!userId) return;
+    
+    const roomData = messagesState[roomId];
+    if (!roomData || !roomData.hasMore || roomData.isLoadingMore) return;
+
+    dispatchMessages({ type: 'SET_LOADING_MORE', roomId, isLoadingMore: true });
+    
+    try {
+      const response = await fetch(
+        `/api/messages/${roomId}?userId=${userId}&limit=20&cursor=${roomData.nextCursor}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        dispatchMessages({ 
+          type: 'PREPEND_MESSAGES', 
+          roomId, 
+          messages: data.messages || [],
+          hasMore: data.hasMore || false,
+          nextCursor: data.nextCursor || null
+        });
+      }
+    } catch (error) {
+      console.error('Error loading more messages:', error);
+    } finally {
+      dispatchMessages({ type: 'SET_LOADING_MORE', roomId, isLoadingMore: false });
+    }
+  }, [userId, messagesState]);
+
+  // Handle room changes - join/leave Socket.io rooms and load messages
+  useEffect(() => {
+    console.log('Room change effect:', { selectedRoom, isConnected });
+    if (!selectedRoom || !isConnected) return;
+
+    console.log(`Selected room changed to: ${selectedRoom}`);
+    
+    // Join the Socket.io room
+    joinRoom(selectedRoom);
+    
+    // Load initial messages for this room if not already loaded
+    if (!loadedRoomsRef.current.has(selectedRoom)) {
+      console.log(`Loading messages for room: ${selectedRoom}`);
+      loadedRoomsRef.current.add(selectedRoom);
+      loadRoomMessages(selectedRoom);
+    } else {
+      console.log(`Messages already loaded for room: ${selectedRoom}`);
+    }
+    
+    // Leave room on cleanup
+    return () => {
+      if (selectedRoom) {
+        leaveRoom(selectedRoom);
+      }
+    };
+  }, [selectedRoom, isConnected, joinRoom, leaveRoom, loadRoomMessages]);
 
   const handleRoomSelect = async (roomId: string) => {
     const room = rooms.find(r => r.id === roomId);
@@ -86,12 +268,31 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     // Regular room selection
     setSelectedRoom(roomId);
     
-    // Mark messages as read when user opens the conversation
+    // Immediately update the room's unread count to 0 in the cache for instant UI feedback
     if (userId && room.unread_count > 0) {
+      queryClient.setQueryData<RoomListItem[]>(
+        ['rooms', userId],
+        (oldRooms = []) => {
+          return oldRooms.map(r =>
+            r.id === roomId ? { ...r, unread_count: 0 } : r
+          );
+        }
+      );
+
+      // Mark messages as read on the server
       try {
         await markAsReadAsync(roomId);
       } catch (error) {
         console.error('Error marking messages as read:', error);
+        // Revert the optimistic update on error
+        queryClient.setQueryData<RoomListItem[]>(
+          ['rooms', userId],
+          (oldRooms = []) => {
+            return oldRooms.map(r =>
+              r.id === roomId ? { ...r, unread_count: room.unread_count } : r
+            );
+          }
+        );
       }
     }
   };
@@ -156,13 +357,16 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     }
   };
 
-  const handleSendMessage = async (content: string) => {
-    if (!selectedRoom || !userId) return;
+  // Send message via Socket.io (primary method)
+  const handleSendMessage = useCallback(async (content: string) => {
+    if (!selectedRoom || !userId || !isConnected) return;
 
     const currentRoom = rooms.find(room => room.id === selectedRoom);
     if (!currentRoom) return;
 
     console.log(`Sending message to room ${currentRoom.name}:`, content);
+    
+    setIsSendingMessage(true);
     
     // Create a temporary message ID for tracking
     const tempMessageId = `temp-${Date.now()}-${Math.random()}`;
@@ -190,49 +394,143 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
       },
     };
 
-    // Add to pending messages for UI feedback
-    setPendingMessages(prev => new Map(prev).set(tempMessageId, optimisticMessage));
+    // Add optimistic message immediately
+    dispatchMessages({ 
+      type: 'ADD_MESSAGE', 
+      roomId: selectedRoom, 
+      message: optimisticMessage 
+    });
     
     try {
-      await sendMessageAsync({
-        room_id: selectedRoom,
-        content,
-        sender_id: userId,
+      // Send via Socket.io
+      emit('message:send', {
+        roomId: selectedRoom,
+        content: content.trim(),
+        senderId: userId,
         type: MessageType.TEXT,
+        tempId: tempMessageId // Include temp ID for tracking
       });
       
-      // Remove from pending messages on success
-      setPendingMessages(prev => {
-        const newMap = new Map(prev);
-        newMap.delete(tempMessageId);
-        return newMap;
+      // Update to "sent" state
+      dispatchMessages({ 
+        type: 'UPDATE_MESSAGE', 
+        roomId: selectedRoom, 
+        messageId: tempMessageId, 
+        updates: { pending: false, sent: true } 
       });
+      
     } catch (error) {
       console.error('Error sending message:', error);
       
       // Mark message as failed
-      setPendingMessages(prev => {
-        const newMap = new Map(prev);
-        const failedMessage = newMap.get(tempMessageId);
-        if (failedMessage) {
-          newMap.set(tempMessageId, {
-            ...failedMessage,
-            pending: false,
-            failed: true,
-          });
-        }
-        return newMap;
+      dispatchMessages({ 
+        type: 'UPDATE_MESSAGE', 
+        roomId: selectedRoom, 
+        messageId: tempMessageId, 
+        updates: { pending: false, failed: true } 
       });
+    } finally {
+      setIsSendingMessage(false);
     }
-  };
+  }, [selectedRoom, userId, isConnected, rooms, emit, dispatchMessages]);
 
   const currentRoom = rooms.find(room => room.id === selectedRoom);
+  
+  // Debug logging
+  console.log('useChatApp state:', {
+    selectedRoom,
+    currentRoom: currentRoom?.name,
+    messagesCount: messages.length,
+    isLoadingMessages,
+    roomsCount: rooms.length,
+    isConnected
+  });
 
-  // Combine real messages with pending messages
-  const allMessages = [
-    ...messages,
-    ...Array.from(pendingMessages.values()).filter(msg => msg.room_id === selectedRoom)
-  ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  // Handle Socket.io events for real-time messages
+  useEffect(() => {
+    if (!socket || !userId) return;
+
+    // Handle new messages from Socket.io
+    const handleNewMessage = (message: MessageWithRelations) => {
+      console.log('Received new message via Socket.io:', message);
+      
+      // Add message to the appropriate room
+      dispatchMessages({ 
+        type: 'ADD_MESSAGE', 
+        roomId: message.room_id, 
+        message 
+      });
+      
+      // If this message corresponds to our optimistic message, remove the optimistic one
+      const roomMessages = messagesState[message.room_id] || [];
+      const optimisticMessage = roomMessages.find(msg => 
+        msg.pending === false && 
+        msg.sent === true &&
+        msg.sender_id === message.sender_id &&
+        msg.content === message.content &&
+        msg.id.startsWith('temp-')
+      );
+      
+      if (optimisticMessage) {
+        dispatchMessages({ 
+          type: 'REMOVE_MESSAGE', 
+          roomId: message.room_id, 
+          messageId: optimisticMessage.id 
+        });
+        console.log('Removed optimistic message after real message arrived');
+      }
+    };
+
+    // Handle message acknowledgments (when server confirms receipt)
+    const handleMessageAck = (data: { tempId: string; message: MessageWithRelations }) => {
+      console.log('Message acknowledged:', data);
+      
+      // Replace temp message with real message
+      dispatchMessages({ 
+        type: 'REMOVE_MESSAGE', 
+        roomId: data.message.room_id, 
+        messageId: data.tempId 
+      });
+      
+      dispatchMessages({ 
+        type: 'ADD_MESSAGE', 
+        roomId: data.message.room_id, 
+        message: data.message 
+      });
+    };
+
+    // Handle message errors
+    const handleMessageError = (data: { tempId: string; error: string }) => {
+      console.error('Message error:', data);
+      
+      // Find the temp message and mark it as failed
+      Object.keys(messagesState).forEach(roomId => {
+        const roomMessages = messagesState[roomId] || [];
+        const tempMessage = roomMessages.find(msg => msg.id === data.tempId);
+        if (tempMessage) {
+          dispatchMessages({ 
+            type: 'UPDATE_MESSAGE', 
+            roomId, 
+            messageId: data.tempId, 
+            updates: { pending: false, failed: true, sent: false } 
+          });
+        }
+      });
+    };
+
+    socket.on('message:new', handleNewMessage);
+    socket.on('message:ack', handleMessageAck);
+    socket.on('message:error', handleMessageError);
+
+    return () => {
+      socket.off('message:new', handleNewMessage);
+      socket.off('message:ack', handleMessageAck);
+      socket.off('message:error', handleMessageError);
+    };
+  }, [socket, userId, messagesState]);
+
+  // Messages are now directly managed in local state - no complex merging needed
+  const allMessages = messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   return {
     // State
@@ -256,13 +554,11 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     isMarkingAsRead,
 
     // Errors
-    error: roomsError || usersError || messagesError,
+    error: roomsError || usersError,
     roomsError,
     usersError,
-    messagesError,
     createRoomError,
     invitationResponseError,
-    sendMessageError,
     markAsReadError,
 
     // Actions

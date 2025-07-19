@@ -5,6 +5,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { useAuth } from '@/app/context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { ROOMS_QUERY_KEYS } from '@/hooks/chat-app/useRooms';
+import { useOnlineStatus } from '@/hooks/chat-app/useOnlineStatus';
 import { RoomListItem, RoomInvitationWithRelations } from '@/types/chat-app';
 
 interface SocketContextType {
@@ -16,6 +17,8 @@ interface SocketContextType {
   off: (event: string, listener?: (...args: any[]) => void) => void;
   joinRoom: (roomId: string) => void;
   leaveRoom: (roomId: string) => void;
+  isUserOnline: (userId: string) => boolean;
+  getUserLastSeen: (userId: string) => Date | undefined;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -35,16 +38,26 @@ interface SocketProviderProps {
 export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { setUserOnline, setUserOffline, isUserOnline, getUserLastSeen } = useOnlineStatus();
   
   const socketMethods = useSocket({
     userId: user?.id,
-    enabled: false, // Temporarily disable Socket.io to prevent xhr poll errors
+    enabled: !!user?.id, // Enable Socket.io when user is authenticated
   });
 
   const { socket, on, off } = socketMethods;
 
   useEffect(() => {
     if (!socket || !user?.id) return;
+
+    // For testing: Set some users as online immediately
+    setTimeout(() => {
+      setUserOnline('user1');
+      setUserOnline('user2'); 
+      setUserOnline('user3');
+      setUserOnline('admin');
+      console.log('Test users set as online');
+    }, 1000);
 
     // Handle room invitation received
     const handleInvitationReceived = (data: {
@@ -106,12 +119,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     // Handle user online/offline status
     const handleUserOnline = (userId: string) => {
       console.log('User came online:', userId);
-      // Could update user status in cache if needed
+      setUserOnline(userId);
     };
 
     const handleUserOffline = (userId: string) => {
       console.log('User went offline:', userId);
-      // Could update user status in cache if needed
+      setUserOffline(userId);
     };
 
     // Handle errors
@@ -138,10 +151,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       off('user:offline', handleUserOffline);
       off('error', handleError);
     };
-  }, [socket, user?.id, queryClient, on, off]);
+  }, [socket, user?.id, queryClient, on, off, setUserOnline, setUserOffline]);
 
   return (
-    <SocketContext.Provider value={socketMethods}>
+    <SocketContext.Provider value={{
+      ...socketMethods,
+      isUserOnline,
+      getUserLastSeen,
+    }}>
       {children}
     </SocketContext.Provider>
   );

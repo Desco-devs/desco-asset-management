@@ -107,6 +107,7 @@ export interface MessageWithRelations extends Message {
   // Optional properties for UI state management
   pending?: boolean;
   failed?: boolean;
+  sent?: boolean;
 }
 
 export interface RoomInvitationWithRelations extends RoomInvitation {

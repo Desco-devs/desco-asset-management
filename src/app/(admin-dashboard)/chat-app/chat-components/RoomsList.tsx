@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RoomListItem, RoomType, InvitationStatus } from "@/types/chat-app";
+import { useSocketContext } from "@/context/SocketContext";
 
 interface RoomsListProps {
   rooms: RoomListItem[];
@@ -32,13 +33,14 @@ const RoomsList = ({
   onCreateRoom,
 }: RoomsListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const { isUserOnline } = useSocketContext();
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
-    <div className="w-full h-full flex flex-col border dark:border-chart-2 border-chart-3/20">
+    <div className="w-full h-full flex flex-col ">
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Messages</h2>
@@ -110,32 +112,49 @@ const RoomsList = ({
                           <Clock className="h-2 w-2 text-white" />
                         </div>
                       ) : room.type === RoomType.DIRECT ? (
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background bg-green-500" />
+                        <div
+                          className={cn(
+                            "absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background",
+                            // For testing, use some test user IDs
+                            isUserOnline('user1') || isUserOnline('user2') || isUserOnline('user3') 
+                              ? "bg-green-500"
+                              : "bg-gray-400"
+                          )}
+                        />
                       ) : null}
                     </div>
 
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 md:max-w-56 w-full">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center ">
                           {room.type === RoomType.GROUP && (
                             <Hash className="h-3 w-3 text-muted-foreground" />
                           )}
-                          {room.type === RoomType.DIRECT && (
-                            <div className="w-3" />
-                          )}
-                          <p className="text-sm font-medium truncate">
+
+                          <p className="text-sm font-medium line-clamp-1">
                             {room.name}
                           </p>
+                        </div>
+                        <div className="">
                           {room.invitation_status ===
                             InvitationStatus.PENDING && (
-                            <Badge variant="secondary" className="text-xs ml-1">
+                            <Badge
+                              variant="secondary"
+                              className="text-xs ml-1 bg-chart-3 text-white"
+                            >
                               <UserPlus className="h-3 w-3 mr-1" />
                               Invitation
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs text-muted-foreground">
+                        <div
+                          className={`${
+                            room.lastMessage?.created_at !== undefined || null
+                              ? "flex"
+                              : "hidden"
+                          } items-center space-x-2`}
+                        >
+                          <span className="text-xs text-white">
                             {room.lastMessage?.created_at
                               ? new Date(
                                   room.lastMessage.created_at
@@ -145,17 +164,18 @@ const RoomsList = ({
                                 })
                               : ""}
                           </span>
-                          {room.unread_count > 0 && (
-                            <Badge
-                              variant="default"
-                              className="h-5 min-w-5 px-1 text-xs"
-                            >
-                              {room.unread_count}
-                            </Badge>
-                          )}
+                          {room.unread_count > 0 &&
+                            selectedRoom !== room.id && (
+                              <Badge
+                                variant="default"
+                                className="h-5 min-w-5 px-1 text-xs"
+                              >
+                                {room.unread_count}
+                              </Badge>
+                            )}
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate mt-1">
+                      <p className="text-xs text-muted-foreground line-clamp-1 truncate mt-1">
                         {room.invitation_status === InvitationStatus.PENDING ? (
                           room.invited_by ? (
                             `Invited by ${room.invited_by.full_name}`
