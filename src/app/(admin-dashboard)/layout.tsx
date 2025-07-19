@@ -16,8 +16,8 @@ export default function DashboardLayout({
       <AppSidebar />
       <div className="flex h-screen w-full flex-col">
         <Header />
-        <main className="w-full h-full ">
-          <CardContent className="p-0 md:p-4">{children}</CardContent>
+        <main className="w-full h-full">
+          <CardContent>{children}</CardContent>
         </main>
       </div>
     </SidebarProvider>

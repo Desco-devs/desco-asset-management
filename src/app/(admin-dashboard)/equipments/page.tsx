@@ -243,7 +243,7 @@ export default function EquipmentPage() {
   }
 
   return (
-    <div className=" mx-auto">
+    <div className="container mx-auto py-[5dvh]">
       <div className="mb-6">
         <div className="flex justify-between items-start">
           <div>
