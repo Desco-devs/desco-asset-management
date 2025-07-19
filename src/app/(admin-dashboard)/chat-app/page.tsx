@@ -9,11 +9,14 @@ import CreateRoomModal from "./chat-components/CreateRoomModal";
 import InvitationModal from "./chat-components/InvitationModal";
 import { useAuth } from "@/app/context/AuthContext";
 import { useChatApp } from "@/hooks/chat-app";
+import { useQueryClient } from "@tanstack/react-query";
+import { ROOM_INVITATIONS_QUERY_KEYS } from "@/hooks/chat-app/useRoomInvitations";
 
 const ChatApp = () => {
   const { user, loading: authLoading } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const currentUserId = user?.id;
 
@@ -32,6 +35,8 @@ const ChatApp = () => {
     // Loading states
     isLoading,
     isLoadingMessages,
+    isLoadingMoreMessages,
+    hasMoreMessages,
     isCreatingRoom,
     isRespondingToInvitation,
     isSendingMessage,
@@ -48,6 +53,7 @@ const ChatApp = () => {
     handleCreateRoom,
     handleSendMessage,
     setInvitationRoom,
+    loadMoreMessages,
   } = useChatApp({
     userId: currentUserId,
     enabled: !authLoading && !!currentUserId,
@@ -64,8 +70,14 @@ const ChatApp = () => {
     invitedUsers: any[];
     inviteUsername?: string;
   }) => {
-    await handleCreateRoom(roomData);
-    setIsCreateRoomModalOpen(false);
+    try {
+      await handleCreateRoom(roomData);
+      console.log("Room creation submitted successfully");
+      setIsCreateRoomModalOpen(false);
+    } catch (error) {
+      console.error("Error in handleCreateRoomSubmit:", error);
+      // Don't close modal if there's an error
+    }
   };
 
   const handleCall = () => {
@@ -90,6 +102,82 @@ const ChatApp = () => {
 
   const handleEmojiPicker = () => {
     console.log("Open emoji picker");
+  };
+
+  const handleDeleteRoom = async (roomId: string) => {
+    try {
+      console.log("Main page - handleDeleteRoom called with roomId:", roomId);
+      const response = await fetch(
+        `/api/rooms/${roomId}/delete?userId=${currentUserId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (response.ok) {
+        console.log("Room deleted successfully:", roomId);
+
+        // Navigate away from the deleted room
+        if (selectedRoom === roomId) {
+          // Find another room to select or go to empty state
+          const otherRoom = rooms.find((room) => room.id !== roomId);
+          if (otherRoom) {
+            handleRoomSelect(otherRoom.id);
+          }
+        }
+
+        // Refresh rooms list
+        // This will be handled by Socket.io or we can manually refetch
+      } else {
+        const error = await response.json();
+        console.error("Failed to delete room:", error.error);
+        // TODO: Show error toast to user
+      }
+    } catch (error) {
+      console.error("Error deleting room:", error);
+      // TODO: Show error toast to user
+    }
+  };
+
+  const handleInviteUsersToRoom = async (inviteData: {
+    invitedUsers: any[];
+    inviteUsername?: string;
+    inviteEmail?: string;
+  }) => {
+    if (!currentRoom) {
+      throw new Error("No current room selected");
+    }
+
+    const response = await fetch(`/api/rooms/${currentRoom.id}/invite`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        invitedUsers: inviteData.invitedUsers,
+        inviterId: currentUserId,
+        inviteUsername: inviteData.inviteUsername,
+        inviteEmail: inviteData.inviteEmail,
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log("Users invited successfully:", result.message);
+
+      // Invalidate room invitations cache to refresh the user list immediately
+      queryClient.invalidateQueries({
+        queryKey: ROOM_INVITATIONS_QUERY_KEYS.invitations(currentRoom.id),
+      });
+
+      // TODO: Show success toast to user
+      return result;
+    } else {
+      const error = await response.json();
+      console.error("Failed to invite users:", error.error);
+      // TODO: Show error toast to user
+      throw new Error(error.error || "Failed to invite users");
+    }
   };
 
   // Show loading if auth is still loading or we're fetching data
@@ -118,18 +206,19 @@ const ChatApp = () => {
   }
 
   return (
-    <div className="w-full h-full p-4 overflow-hidden">
-      <div className="flex flex-row w-full h-[85dvh] bg-background border border-chart-1/20 rounded-md overflow-hidden">
+    <div className="w-full h-full p-2 md:p-4 overflow-hidden">
+      <div className="flex flex-row w-full h-[89dvh] md:h-[85dvh] bg-background border border-chart-1/20 rounded-md overflow-hidden">
         <div className="h-full hidden md:flex md:w-80 border-r bg-card">
           <RoomsList
             rooms={rooms}
             selectedRoom={selectedRoom || ""}
             onRoomSelect={handleRoomSelect}
             onCreateRoom={handleCreateRoomModal}
+            currentUserId={currentUserId}
           />
         </div>
 
-        <div className="h-full flex-1 flex flex-col ">
+        <div className="h-full flex-1 flex flex-col min-w-0">
           <ChatHeader
             currentRoom={currentRoom}
             rooms={rooms}
@@ -143,26 +232,30 @@ const ChatApp = () => {
             onShowInfo={handleShowInfo}
             onShowMore={handleShowMore}
             currentUserId={currentUserId}
+            users={users}
+            onDeleteRoom={handleDeleteRoom}
+            onInviteUsers={handleInviteUsersToRoom}
           />
 
           {currentRoom ? (
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className="flex-1 overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-0 w-full">
+              <div className="flex-1 overflow-hidden min-h-0">
                 <MessagesList
                   messages={messages}
                   currentUserId={currentUserId}
                   roomId={selectedRoom || undefined}
                   isLoading={isLoadingMessages}
-                  hasMoreMessages={false} // TODO: Implement based on API response
-                  isLoadingMore={false} // TODO: Implement load more state
+                  hasMoreMessages={hasMoreMessages}
+                  isLoadingMore={isLoadingMoreMessages}
                   onLoadMore={() => {
-                    // TODO: Implement load more functionality
-                    console.log("Load more messages requested");
+                    if (selectedRoom) {
+                      loadMoreMessages(selectedRoom);
+                    }
                   }}
                 />
               </div>
 
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 border-t bg-background">
                 <MessageInput
                   roomName={currentRoom.name}
                   onSendMessage={handleSendMessage}
@@ -189,7 +282,7 @@ const ChatApp = () => {
                 {rooms.length === 0 && (
                   <button
                     onClick={handleCreateRoomModal}
-                    className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                    className="inline-flex items-center px-4 py-2 bg-chart-3 text-white rounded-md hover:bg-primary/90 transition-colors"
                     disabled={isCreatingRoom}
                   >
                     {isCreatingRoom ? (

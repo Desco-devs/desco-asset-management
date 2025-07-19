@@ -58,7 +58,7 @@ const InvitationModal = ({
 
         <div className="space-y-6">
           {/* Room Info */}
-          <div className="flex items-center space-x-4 p-4 bg-muted/50 rounded-lg">
+          <div className="flex items-start space-x-4 p-4 bg-muted/50 rounded-lg">
             <div className="relative">
               <Avatar className="h-12 w-12">
                 <AvatarImage src={room.avatar_url || ""} />
@@ -76,8 +76,10 @@ const InvitationModal = ({
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2">
-                <h3 className="font-semibold text-lg truncate">{room.name}</h3>
+              <div className="flex items-start space-x-2">
+                <h3 className="font-semibold text-lg wrap-break-word">
+                  {room.name}
+                </h3>
                 <Badge variant="outline" className="text-xs">
                   {room.type === RoomType.DIRECT ? "Direct" : "Group"}
                 </Badge>
@@ -145,6 +147,12 @@ const InvitationModal = ({
           <div className="text-xs text-muted-foreground text-center space-y-1">
             <p>By accepting, you'll be able to see the conversation history</p>
             <p>and participate in this {room.type.toLowerCase()} chat.</p>
+            {room.type === RoomType.DIRECT && (
+              <p className="text-orange-600 dark:text-orange-400 mt-2">
+                Note: Declining a direct message will delete the conversation
+                for both users.
+              </p>
+            )}
           </div>
         </div>
       </DialogContent>

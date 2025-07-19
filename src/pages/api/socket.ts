@@ -45,7 +45,7 @@ const SocketHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
     console.log('User connected:', socket.id);
 
     // Handle user authentication and join their personal room
-    socket.on('user:authenticate', (userId) => {
+    socket.on('user:authenticate', async (userId) => {
       if (!userId) return;
       
       // Store user connection
@@ -53,16 +53,32 @@ const SocketHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
       
       if (!userSockets.has(userId)) {
         userSockets.set(userId, new Set());
+        
+        // Update user status to online in database (only on first connection)
+        try {
+          await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/users/status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              isOnline: true,
+              lastSeen: new Date().toISOString(),
+            }),
+          });
+        } catch (error) {
+          console.error('Error updating user online status:', error);
+        }
+        
+        // Notify user is online
+        socket.broadcast.emit('user:online', userId);
       }
+      
       userSockets.get(userId).add(socket.id);
       
       // Join user's personal room for receiving invitations
       socket.join(`user:${userId}`);
       
       console.log(`User ${userId} authenticated with socket ${socket.id}`);
-      
-      // Notify user is online
-      socket.broadcast.emit('user:online', userId);
     });
 
     // Handle joining specific chat rooms
@@ -172,7 +188,7 @@ const SocketHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
     });
 
     // Handle disconnection
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       const userId = socketUsers.get(socket.id);
       
       if (userId) {
@@ -183,6 +199,22 @@ const SocketHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
           // If user has no more connections, mark as offline
           if (userSocketSet.size === 0) {
             userSockets.delete(userId);
+            
+            // Update user status to offline in database
+            try {
+              await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/users/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId,
+                  isOnline: false,
+                  lastSeen: new Date().toISOString(),
+                }),
+              });
+            } catch (error) {
+              console.error('Error updating user offline status:', error);
+            }
+            
             socket.broadcast.emit('user:offline', userId);
           }
         }

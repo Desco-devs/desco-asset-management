@@ -1,6 +1,6 @@
 import { useState, useEffect, useReducer, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRooms } from './useRooms';
+import { useRooms, ROOMS_QUERY_KEYS, useInvalidateRooms } from './useRooms';
 import { useUsers } from './useUsers';
 import { useChatMutations } from './useChatMutations';
 import { useSocketContext } from '@/context/SocketContext';
@@ -21,7 +21,7 @@ interface MessagesState {
   };
 }
 
-type MessagesAction = 
+type MessagesAction =
   | { type: 'SET_MESSAGES'; roomId: string; messages: MessageWithRelations[]; hasMore: boolean; nextCursor: string | null }
   | { type: 'PREPEND_MESSAGES'; roomId: string; messages: MessageWithRelations[]; hasMore: boolean; nextCursor: string | null }
   | { type: 'ADD_MESSAGE'; roomId: string; message: MessageWithRelations }
@@ -69,7 +69,7 @@ const messagesReducer = (state: MessagesState, action: MessagesAction): Messages
         ...state,
         [action.roomId]: {
           ...roomToUpdate,
-          messages: (roomToUpdate?.messages || []).map(msg => 
+          messages: (roomToUpdate?.messages || []).map(msg =>
             msg.id === action.messageId ? { ...msg, ...action.updates } : msg
           )
         }
@@ -159,16 +159,34 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     markAsReadError,
   } = useChatMutations(userId);
 
+  const { addRoomToCache } = useInvalidateRooms();
+
   // Auto-select first accepted room when rooms are loaded
   useEffect(() => {
-    console.log('Auto-select effect:', { roomsLength: rooms.length, selectedRoom });
     if (rooms.length > 0 && !selectedRoom) {
       const firstAcceptedRoom = rooms.find(
         room => room.invitation_status !== InvitationStatus.PENDING
       );
-      console.log('First accepted room found:', firstAcceptedRoom?.name);
       if (firstAcceptedRoom) {
         setSelectedRoom(firstAcceptedRoom.id);
+      }
+    }
+  }, [rooms, selectedRoom]);
+
+  // Clean up selectedRoom if current room is no longer available
+  useEffect(() => {
+    if (selectedRoom && rooms.length > 0) {
+      const roomExists = rooms.find(room => room.id === selectedRoom);
+      if (!roomExists) {
+        console.log("Selected room no longer exists, clearing selection");
+        setSelectedRoom(null);
+        // Optionally auto-select another room
+        const firstAcceptedRoom = rooms.find(
+          room => room.invitation_status !== InvitationStatus.PENDING
+        );
+        if (firstAcceptedRoom) {
+          setSelectedRoom(firstAcceptedRoom.id);
+        }
       }
     }
   }, [rooms, selectedRoom]);
@@ -176,16 +194,16 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
   // Load messages for a room via HTTP API (initial load only)
   const loadRoomMessages = useCallback(async (roomId: string) => {
     if (!userId) return;
-    
+
     setIsLoadingMessages(true);
     try {
       // Load latest 20 messages initially
       const response = await fetch(`/api/messages/${roomId}?userId=${userId}&limit=20`);
       if (response.ok) {
         const data = await response.json();
-        dispatchMessages({ 
-          type: 'SET_MESSAGES', 
-          roomId, 
+        dispatchMessages({
+          type: 'SET_MESSAGES',
+          roomId,
           messages: data.messages || [],
           hasMore: data.hasMore || false,
           nextCursor: data.nextCursor || null
@@ -201,21 +219,21 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
   // Load older messages when scrolling up
   const loadMoreMessages = useCallback(async (roomId: string) => {
     if (!userId) return;
-    
+
     const roomData = messagesState[roomId];
     if (!roomData || !roomData.hasMore || roomData.isLoadingMore) return;
 
     dispatchMessages({ type: 'SET_LOADING_MORE', roomId, isLoadingMore: true });
-    
+
     try {
       const response = await fetch(
         `/api/messages/${roomId}?userId=${userId}&limit=20&cursor=${roomData.nextCursor}`
       );
       if (response.ok) {
         const data = await response.json();
-        dispatchMessages({ 
-          type: 'PREPEND_MESSAGES', 
-          roomId, 
+        dispatchMessages({
+          type: 'PREPEND_MESSAGES',
+          roomId,
           messages: data.messages || [],
           hasMore: data.hasMore || false,
           nextCursor: data.nextCursor || null
@@ -230,23 +248,19 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
 
   // Handle room changes - join/leave Socket.io rooms and load messages
   useEffect(() => {
-    console.log('Room change effect:', { selectedRoom, isConnected });
     if (!selectedRoom || !isConnected) return;
 
     console.log(`Selected room changed to: ${selectedRoom}`);
-    
+
     // Join the Socket.io room
     joinRoom(selectedRoom);
-    
+
     // Load initial messages for this room if not already loaded
     if (!loadedRoomsRef.current.has(selectedRoom)) {
-      console.log(`Loading messages for room: ${selectedRoom}`);
       loadedRoomsRef.current.add(selectedRoom);
       loadRoomMessages(selectedRoom);
-    } else {
-      console.log(`Messages already loaded for room: ${selectedRoom}`);
     }
-    
+
     // Leave room on cleanup
     return () => {
       if (selectedRoom) {
@@ -267,7 +281,7 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
 
     // Regular room selection
     setSelectedRoom(roomId);
-    
+
     // Immediately update the room's unread count to 0 in the cache for instant UI feedback
     if (userId && room.unread_count > 0) {
       queryClient.setQueryData<RoomListItem[]>(
@@ -301,15 +315,28 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     if (!userId) return;
 
     try {
-      await respondToInvitationAsync({
+      const result = await respondToInvitationAsync({
         invitationId,
         userId,
         action: 'ACCEPTED',
       });
 
-      // Select the accepted room if it exists in the updated rooms list
+      console.log('Invitation accepted:', result);
+
+      // Select the accepted room and load its messages
       if (invitationRoom) {
+        console.log('Auto-selecting accepted room:', invitationRoom.id);
+
+        // Select the room immediately (it should already be in the rooms list)
         setSelectedRoom(invitationRoom.id);
+
+        // Load messages for the accepted room
+        loadRoomMessages(invitationRoom.id);
+
+        // Join the room via Socket.io for real-time updates
+        if (joinRoom) {
+          joinRoom(invitationRoom.id);
+        }
       }
       setInvitationRoom(null);
     } catch (error) {
@@ -348,9 +375,66 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
         ownerId: userId,
       });
 
-      // Select the new room after creation
-      if (result?.room?.id) {
+      console.log('Room created successfully:', result);
+
+      // Select the new room after creation and load its messages
+      if (result?.room?.id && userId) {
+        console.log('Auto-selecting newly created room:', result.room.id);
+
+        // Create a RoomListItem structure for the cache
+        const newRoomForCache: RoomListItem = {
+          id: result.room.id,
+          name: result.room.name,
+          description: result.room.description || '',
+          type: result.room.type,
+          avatar_url: result.room.avatar_url || '',
+          owner_id: result.room.owner_id || userId, // Fallback to userId if not provided
+          member_count: 1, // Just the creator initially
+          unread_count: 0,
+          lastMessage: undefined,
+          invitation_status: InvitationStatus.ACCEPTED, // Creator is automatically accepted
+          invited_by: undefined,
+          invitation_id: undefined,
+          created_at: result.room.created_at || new Date().toISOString(),
+          updated_at: result.room.updated_at || new Date().toISOString(),
+          is_owner: true, // Creator is always the owner
+          // Add member data for filtering
+          members: [{
+            user_id: userId,
+            user: {
+              id: userId,
+              username: 'you', // TODO: Get actual username from user context
+              full_name: 'You',
+              user_profile: '',
+            }
+          }],
+          owner: {
+            id: userId,
+            username: 'you',
+            full_name: 'You',
+            user_profile: '',
+          }
+        };
+
+        console.log("useChatApp - Creating room cache with owner data:");
+        console.log("- result.room.owner_id:", result.room.owner_id);
+        console.log("- userId:", userId);
+        console.log("- newRoomForCache.owner_id:", newRoomForCache.owner_id);
+        console.log("- newRoomForCache.is_owner:", newRoomForCache.is_owner);
+
+        // Add room to cache immediately for instant UI update
+        addRoomToCache(userId, newRoomForCache);
+
+        // Select the room immediately
         setSelectedRoom(result.room.id);
+
+        // Load messages for the new room immediately  
+        loadRoomMessages(result.room.id);
+
+        // Join the room via Socket.io for real-time updates
+        if (joinRoom) {
+          joinRoom(result.room.id);
+        }
       }
     } catch (error) {
       console.error('Error creating room:', error);
@@ -365,12 +449,12 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     if (!currentRoom) return;
 
     console.log(`Sending message to room ${currentRoom.name}:`, content);
-    
+
     setIsSendingMessage(true);
-    
+
     // Create a temporary message ID for tracking
     const tempMessageId = `temp-${Date.now()}-${Math.random()}`;
-    
+
     // Create optimistic message for immediate UI feedback
     const optimisticMessage: MessageWithRelations = {
       id: tempMessageId,
@@ -395,12 +479,12 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     };
 
     // Add optimistic message immediately
-    dispatchMessages({ 
-      type: 'ADD_MESSAGE', 
-      roomId: selectedRoom, 
-      message: optimisticMessage 
+    dispatchMessages({
+      type: 'ADD_MESSAGE',
+      roomId: selectedRoom,
+      message: optimisticMessage
     });
-    
+
     try {
       // Send via Socket.io
       emit('message:send', {
@@ -410,24 +494,24 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
         type: MessageType.TEXT,
         tempId: tempMessageId // Include temp ID for tracking
       });
-      
+
       // Update to "sent" state
-      dispatchMessages({ 
-        type: 'UPDATE_MESSAGE', 
-        roomId: selectedRoom, 
-        messageId: tempMessageId, 
-        updates: { pending: false, sent: true } 
+      dispatchMessages({
+        type: 'UPDATE_MESSAGE',
+        roomId: selectedRoom,
+        messageId: tempMessageId,
+        updates: { pending: false, sent: true }
       });
-      
+
     } catch (error) {
       console.error('Error sending message:', error);
-      
+
       // Mark message as failed
-      dispatchMessages({ 
-        type: 'UPDATE_MESSAGE', 
-        roomId: selectedRoom, 
-        messageId: tempMessageId, 
-        updates: { pending: false, failed: true } 
+      dispatchMessages({
+        type: 'UPDATE_MESSAGE',
+        roomId: selectedRoom,
+        messageId: tempMessageId,
+        updates: { pending: false, failed: true }
       });
     } finally {
       setIsSendingMessage(false);
@@ -435,16 +519,15 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
   }, [selectedRoom, userId, isConnected, rooms, emit, dispatchMessages]);
 
   const currentRoom = rooms.find(room => room.id === selectedRoom);
-  
-  // Debug logging
-  console.log('useChatApp state:', {
-    selectedRoom,
-    currentRoom: currentRoom?.name,
-    messagesCount: messages.length,
-    isLoadingMessages,
-    roomsCount: rooms.length,
-    isConnected
-  });
+
+  // Debug logging for currentRoom calculation
+  useEffect(() => {
+    if (selectedRoom) {
+      console.log("useChatApp - selectedRoom:", selectedRoom);
+      console.log("useChatApp - currentRoom found:", currentRoom?.id, currentRoom?.name);
+      console.log("useChatApp - available rooms:", rooms.map(r => ({ id: r.id, name: r.name })));
+    }
+  }, [selectedRoom, currentRoom, rooms]);
 
   // Handle Socket.io events for real-time messages
   useEffect(() => {
@@ -453,29 +536,30 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     // Handle new messages from Socket.io
     const handleNewMessage = (message: MessageWithRelations) => {
       console.log('Received new message via Socket.io:', message);
-      
+
       // Add message to the appropriate room
-      dispatchMessages({ 
-        type: 'ADD_MESSAGE', 
-        roomId: message.room_id, 
-        message 
+      dispatchMessages({
+        type: 'ADD_MESSAGE',
+        roomId: message.room_id,
+        message
       });
-      
+
       // If this message corresponds to our optimistic message, remove the optimistic one
-      const roomMessages = messagesState[message.room_id] || [];
-      const optimisticMessage = roomMessages.find(msg => 
-        msg.pending === false && 
+      const roomData = messagesState[message.room_id];
+      const roomMessages = roomData?.messages || [];
+      const optimisticMessage = roomMessages.find(msg =>
+        msg.pending === false &&
         msg.sent === true &&
         msg.sender_id === message.sender_id &&
         msg.content === message.content &&
         msg.id.startsWith('temp-')
       );
-      
+
       if (optimisticMessage) {
-        dispatchMessages({ 
-          type: 'REMOVE_MESSAGE', 
-          roomId: message.room_id, 
-          messageId: optimisticMessage.id 
+        dispatchMessages({
+          type: 'REMOVE_MESSAGE',
+          roomId: message.room_id,
+          messageId: optimisticMessage.id
         });
         console.log('Removed optimistic message after real message arrived');
       }
@@ -484,35 +568,36 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     // Handle message acknowledgments (when server confirms receipt)
     const handleMessageAck = (data: { tempId: string; message: MessageWithRelations }) => {
       console.log('Message acknowledged:', data);
-      
+
       // Replace temp message with real message
-      dispatchMessages({ 
-        type: 'REMOVE_MESSAGE', 
-        roomId: data.message.room_id, 
-        messageId: data.tempId 
+      dispatchMessages({
+        type: 'REMOVE_MESSAGE',
+        roomId: data.message.room_id,
+        messageId: data.tempId
       });
-      
-      dispatchMessages({ 
-        type: 'ADD_MESSAGE', 
-        roomId: data.message.room_id, 
-        message: data.message 
+
+      dispatchMessages({
+        type: 'ADD_MESSAGE',
+        roomId: data.message.room_id,
+        message: data.message
       });
     };
 
     // Handle message errors
     const handleMessageError = (data: { tempId: string; error: string }) => {
       console.error('Message error:', data);
-      
+
       // Find the temp message and mark it as failed
       Object.keys(messagesState).forEach(roomId => {
-        const roomMessages = messagesState[roomId] || [];
+        const roomData = messagesState[roomId];
+        const roomMessages = roomData?.messages || [];
         const tempMessage = roomMessages.find(msg => msg.id === data.tempId);
         if (tempMessage) {
-          dispatchMessages({ 
-            type: 'UPDATE_MESSAGE', 
-            roomId, 
-            messageId: data.tempId, 
-            updates: { pending: false, failed: true, sent: false } 
+          dispatchMessages({
+            type: 'UPDATE_MESSAGE',
+            roomId,
+            messageId: data.tempId,
+            updates: { pending: false, failed: true, sent: false }
           });
         }
       });
@@ -548,6 +633,8 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     isLoadingRooms,
     isLoadingUsers,
     isLoadingMessages,
+    isLoadingMoreMessages,
+    hasMoreMessages,
     isCreatingRoom,
     isRespondingToInvitation,
     isSendingMessage,
@@ -568,6 +655,7 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     handleCreateRoom,
     handleSendMessage,
     setInvitationRoom,
+    loadMoreMessages,
 
     // Utilities
     refetchRooms,

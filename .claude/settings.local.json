@@ -34,7 +34,9 @@
       "Bash(pgrep:*)",
       "Bash(timeout 30s npm run dev)",
       "Bash(timeout 10s npm run dev)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(cd:*)",
+      "Bash(cd:*)"
     ],
     "deny": []
   }
