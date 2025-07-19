@@ -156,8 +156,8 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
                 No recent activity found
               </div>
             ) : (
-              activities.map((activity) => (
-                <div key={activity.id} className="flex items-start space-x-3">
+              activities.map((activity, index) => (
+                <div key={`${activity.type}-${activity.id}-${activity.timestamp}-${index}`} className="flex items-start space-x-3">
                   <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${getActivityColor(activity.type, activity.status, activity.priority)}`}>
                     {getActivityIcon(activity.action)}
                   </div>

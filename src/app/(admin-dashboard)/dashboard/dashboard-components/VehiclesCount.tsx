@@ -1,4 +1,5 @@
 "use client";
+import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { Pie, PieChart, Cell, Label } from "recharts";
 import {
@@ -15,7 +16,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { useAssetCounts } from "@/hooks/useAssetCounts";
+import { createClient } from "@/lib/supabase";
 import type { AssetCountProps } from "@/types/dashboard";
 
 const chartConfig = {
@@ -33,13 +34,48 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function VehiclesCount({ initialData }: AssetCountProps) {
-  // Use shared asset counts hook
-  const assetCounts = useAssetCounts({
-    equipment: { OPERATIONAL: 0, NON_OPERATIONAL: 0 }, // Not used but required
-    vehicles: initialData
-  });
+  const [vehicleData, setVehicleData] = useState(initialData);
+  const supabase = createClient();
 
-  const vehicleData = assetCounts.vehicles;
+  useEffect(() => {
+    const channel = supabase
+      .channel(`vehicles-status-${Date.now()}`)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'vehicles' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const status = payload.new.status as keyof typeof initialData;
+            setVehicleData(prev => ({
+              ...prev,
+              [status]: prev[status] + 1
+            }));
+          } else if (payload.eventType === 'UPDATE') {
+            const oldStatus = payload.old.status as keyof typeof initialData;
+            const newStatus = payload.new.status as keyof typeof initialData;
+            if (oldStatus !== newStatus) {
+              setVehicleData(prev => ({
+                ...prev,
+                [oldStatus]: Math.max(0, prev[oldStatus] - 1),
+                [newStatus]: prev[newStatus] + 1
+              }));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const status = payload.old.status as keyof typeof initialData;
+            if (status && (status === 'OPERATIONAL' || status === 'NON_OPERATIONAL')) {
+              setVehicleData(prev => ({
+                ...prev,
+                [status]: Math.max(0, prev[status] - 1)
+              }));
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase]);
 
   const totalVehicles = vehicleData.OPERATIONAL + vehicleData.NON_OPERATIONAL;
   const vehicleOperationalPercentage =
@@ -47,15 +83,21 @@ export function VehiclesCount({ initialData }: AssetCountProps) {
       ? (vehicleData.OPERATIONAL / totalVehicles) * 100
       : 0;
 
-  const vehicleChartData = [
+  const vehicleChartData = totalVehicles === 0 ? [
+    {
+      name: "no_data",
+      value: 1,
+      fill: "hsl(var(--muted))",
+    },
+  ] : [
     {
       name: "operational",
-      value: vehicleData.OPERATIONAL,
+      value: vehicleData.OPERATIONAL || 0,
       fill: "oklch(0.62 0.18 145.0)",
     },
     {
       name: "non_operational",
-      value: vehicleData.NON_OPERATIONAL,
+      value: vehicleData.NON_OPERATIONAL || 0,
       fill: "oklch(0.65 0.18 25.0)",
     },
   ];
@@ -101,16 +143,16 @@ export function VehiclesCount({ initialData }: AssetCountProps) {
                         <tspan
                           x={viewBox.cx}
                           y={viewBox.cy}
-                          className="fill-foreground text-3xl font-bold"
+                          className={`text-3xl font-bold ${totalVehicles === 0 ? 'fill-muted-foreground' : 'fill-foreground'}`}
                         >
-                          {totalVehicles.toLocaleString()}
+                          {totalVehicles === 0 ? '0' : totalVehicles.toLocaleString()}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
                           y={(viewBox.cy || 0) + 24}
-                          className="fill-muted-foreground"
+                          className="fill-muted-foreground text-sm"
                         >
-                          Vehicles
+                          {totalVehicles === 0 ? 'No Vehicles' : 'Vehicles'}
                         </tspan>
                       </text>
                     );
@@ -122,23 +164,36 @@ export function VehiclesCount({ initialData }: AssetCountProps) {
         </ChartContainer>
       </CardContent>
       <CardFooter className="flex-col gap-2 text-sm">
-        <div className="flex items-center gap-2 font-medium leading-none">
-          {isVehicleTrendingUp ? (
-            <>
-              {vehicleOperationalPercentage.toFixed(1)}% operational{" "}
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            </>
-          ) : (
-            <>
-              {vehicleOperationalPercentage.toFixed(1)}% operational{" "}
-              <TrendingDown className="h-4 w-4 text-red-500" />
-            </>
-          )}
-        </div>
-        <div className="leading-none text-muted-foreground">
-          Operational: {vehicleData.OPERATIONAL} | Non-Operational:{" "}
-          {vehicleData.NON_OPERATIONAL}
-        </div>
+        {totalVehicles === 0 ? (
+          <div className="text-center">
+            <div className="text-muted-foreground text-sm">
+              No vehicles registered yet
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Add vehicles to start tracking
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 font-medium leading-none">
+              {isVehicleTrendingUp ? (
+                <>
+                  {vehicleOperationalPercentage.toFixed(1)}% operational{" "}
+                  <TrendingUp className="h-4 w-4 text-green-500" />
+                </>
+              ) : (
+                <>
+                  {vehicleOperationalPercentage.toFixed(1)}% operational{" "}
+                  <TrendingDown className="h-4 w-4 text-red-500" />
+                </>
+              )}
+            </div>
+            <div className="leading-none text-muted-foreground">
+              Operational: {vehicleData.OPERATIONAL} | Non-Operational:{" "}
+              {vehicleData.NON_OPERATIONAL}
+            </div>
+          </>
+        )}
       </CardFooter>
     </Card>
   );

@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase";
+import type { EquipmentData, VehicleData } from "@/types/dashboard";
 
 interface AlertItem {
   id: string;
@@ -18,48 +20,23 @@ interface AlertItem {
   project?: string;
 }
 
-interface EquipmentItem {
-  id: string;
-  brand: string;
-  model: string;
-  inspection_date?: string;
-  insurance_expiration_date?: string;
+interface MaintenanceAlertsProps {
+  initialEquipmentData: EquipmentData[];
+  initialVehicleData: VehicleData[];
 }
 
-interface VehicleItem {
-  id: string;
-  brand: string;
-  model: string;
-  plate_number: string;
-  inspection_date?: string;
-  expiry_date?: string;
-}
-
-export function MaintenanceAlerts() {
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+export function MaintenanceAlerts({ initialEquipmentData, initialVehicleData }: MaintenanceAlertsProps) {
+  const [equipmentData, setEquipmentData] = React.useState<EquipmentData[]>(initialEquipmentData);
+  const [vehicleData, setVehicleData] = React.useState<VehicleData[]>(initialVehicleData);
   const [alerts, setAlerts] = React.useState<AlertItem[]>([]);
+  const supabase = createClient();
 
-  React.useEffect(() => {
-    const fetchAlerts = async () => {
-      try {
-        setIsLoading(true);
-        
-        const [equipmentRes, vehicleRes] = await Promise.all([
-          fetch("/api/equipments/getall"),
-          fetch("/api/vehicles/getall")
-        ]);
+  const calculateAlerts = React.useCallback(() => {
+    const allAlerts: AlertItem[] = [];
+    const now = new Date();
 
-        const [equipment, vehicles] = await Promise.all([
-          equipmentRes.json(),
-          vehicleRes.json()
-        ]);
-
-        const allAlerts: AlertItem[] = [];
-        const now = new Date();
-
-        // Check equipment for upcoming inspections and insurance expiration
-        equipment?.forEach((item: EquipmentItem) => {
+    // Check equipment for upcoming inspections and insurance expiration
+    equipmentData?.forEach((item) => {
           const inspectionDate = item.inspection_date ? new Date(item.inspection_date) : null;
           const insuranceDate = item.insurance_expiration_date ? new Date(item.insurance_expiration_date) : null;
 
@@ -96,8 +73,8 @@ export function MaintenanceAlerts() {
           }
         });
 
-        // Check vehicles for upcoming inspections and registration expiry
-        vehicles?.forEach((item: VehicleItem) => {
+    // Check vehicles for upcoming inspections and registration expiry
+    vehicleData?.forEach((item) => {
           const inspectionDate = item.inspection_date ? new Date(item.inspection_date) : null;
           const expiryDate = item.expiry_date ? new Date(item.expiry_date) : null;
 
@@ -134,26 +111,82 @@ export function MaintenanceAlerts() {
           }
         });
 
-        // Sort by severity and days until due
-        const sortedAlerts = allAlerts.sort((a, b) => {
-          const severityOrder = { critical: 0, warning: 1, info: 2 };
-          if (severityOrder[a.severity] !== severityOrder[b.severity]) {
-            return severityOrder[a.severity] - severityOrder[b.severity];
-          }
-          return a.daysUntilDue - b.daysUntilDue;
-        });
-
-        setAlerts(sortedAlerts.slice(0, 15)); // Show top 15 alerts
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch maintenance alerts");
-        console.error("Error fetching maintenance alerts:", err);
-      } finally {
-        setIsLoading(false);
+    // Sort by severity and days until due
+    const sortedAlerts = allAlerts.sort((a, b) => {
+      const severityOrder = { critical: 0, warning: 1, info: 2 };
+      if (severityOrder[a.severity] !== severityOrder[b.severity]) {
+        return severityOrder[a.severity] - severityOrder[b.severity];
       }
-    };
+      return a.daysUntilDue - b.daysUntilDue;
+    });
 
-    fetchAlerts();
-  }, []);
+    setAlerts(sortedAlerts.slice(0, 15)); // Show top 15 alerts
+  }, [equipmentData, vehicleData]);
+
+  React.useEffect(() => {
+    calculateAlerts();
+  }, [calculateAlerts]);
+
+  React.useEffect(() => {
+    const equipmentChannel = supabase
+      .channel(`maintenance-equipment-${Date.now()}`)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'equipment' },
+        (payload) => {
+          try {
+            if (!payload || typeof payload !== 'object') {
+              console.warn('Invalid payload received:', payload);
+              return;
+            }
+            
+            if (payload.eventType === 'INSERT' && payload.new && typeof payload.new === 'object') {
+              setEquipmentData(prev => [...prev, payload.new as EquipmentData]);
+            } else if (payload.eventType === 'UPDATE' && payload.new && typeof payload.new === 'object' && payload.new.id) {
+              setEquipmentData(prev => 
+                prev.map(item => item.id === payload.new.id ? payload.new as EquipmentData : item)
+              );
+            } else if (payload.eventType === 'DELETE' && payload.old && typeof payload.old === 'object' && payload.old.id) {
+              setEquipmentData(prev => prev.filter(item => item.id !== payload.old.id));
+            }
+          } catch (error) {
+            console.error('Error handling equipment realtime event:', error, payload);
+          }
+        }
+      )
+      .subscribe();
+
+    const vehicleChannel = supabase
+      .channel(`maintenance-vehicles-${Date.now()}`)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'vehicles' },
+        (payload) => {
+          try {
+            if (!payload || typeof payload !== 'object') {
+              console.warn('Invalid payload received:', payload);
+              return;
+            }
+            
+            if (payload.eventType === 'INSERT' && payload.new && typeof payload.new === 'object') {
+              setVehicleData(prev => [...prev, payload.new as VehicleData]);
+            } else if (payload.eventType === 'UPDATE' && payload.new && typeof payload.new === 'object' && payload.new.id) {
+              setVehicleData(prev => 
+                prev.map(item => item.id === payload.new.id ? payload.new as VehicleData : item)
+              );
+            } else if (payload.eventType === 'DELETE' && payload.old && typeof payload.old === 'object' && payload.old.id) {
+              setVehicleData(prev => prev.filter(item => item.id !== payload.old.id));
+            }
+          } catch (error) {
+            console.error('Error handling vehicle realtime event:', error, payload);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(equipmentChannel);
+      supabase.removeChannel(vehicleChannel);
+    };
+  }, [supabase]);
 
   const getAlertIcon = (severity: string) => {
     switch (severity) {
@@ -187,49 +220,6 @@ export function MaintenanceAlerts() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <Card className="h-[500px]">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5" />
-            Maintenance Alerts
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-start space-x-3 animate-pulse">
-                <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="h-[500px]">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5" />
-            Maintenance Alerts
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center text-destructive py-8">
-            {error}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className="h-[500px]">

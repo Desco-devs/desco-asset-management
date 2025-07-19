@@ -139,7 +139,10 @@ export default async function Dashboard() {
           </div>
 
           {/* Combined Assets Overview */}
-          <VehiclesAndEquipments />
+          <VehiclesAndEquipments 
+            initialVehicleData={vehicleData}
+            initialEquipmentData={equipmentData}
+          />
 
           {/* Quick Actions */}
           <QuickActions />
@@ -147,7 +150,10 @@ export default async function Dashboard() {
 
         {/* Right Column - Activity & Alerts */}
         <div className="space-y-6">
-          <MaintenanceAlerts />
+          <MaintenanceAlerts 
+            initialEquipmentData={detailedData.equipment}
+            initialVehicleData={detailedData.vehicles}
+          />
           <RecentActivity initialData={recentActivityData} />
         </div>
       </div>
