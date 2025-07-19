@@ -20,7 +20,6 @@ import {
 import { TeamSwitcher } from "./team-switcher";
 import { NavMain } from "./nav-main";
 import { NavProjects } from "./nav-projects";
-import { NavUser } from "./nav-user";
 
 const data = {
   user: {
@@ -95,7 +94,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser CurrentUser={data.user} />
+        {/* Profile dropdown moved to header for better UX */}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

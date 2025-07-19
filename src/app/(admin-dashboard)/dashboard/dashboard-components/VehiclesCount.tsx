@@ -1,6 +1,5 @@
 "use client";
-import * as React from "react";
-import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { Pie, PieChart, Cell, Label } from "recharts";
 import {
   Card,
@@ -16,6 +15,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { useAssetCounts } from "@/hooks/useAssetCounts";
+import type { AssetCountProps } from "@/types/dashboard";
 
 const chartConfig = {
   value: {
@@ -31,95 +32,35 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function VehiclesCount() {
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [vehicleData, setVehicleData] = React.useState<{
-    OPERATIONAL: number;
-    NON_OPERATIONAL: number;
-  } | null>(null);
+export function VehiclesCount({ initialData }: AssetCountProps) {
+  // Use shared asset counts hook
+  const assetCounts = useAssetCounts({
+    equipment: { OPERATIONAL: 0, NON_OPERATIONAL: 0 }, // Not used but required
+    vehicles: initialData
+  });
 
-  React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch("/api/vehicles/count");
+  const vehicleData = assetCounts.vehicles;
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch vehicle counts");
-        }
-
-        const result = await response.json();
-
-        setVehicleData({
-          OPERATIONAL: result.OPERATIONAL || 0,
-          NON_OPERATIONAL: result.NON_OPERATIONAL || 0,
-        });
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "An unknown error occurred"
-        );
-        console.error("Error fetching vehicle counts:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  const totalVehicles = vehicleData
-    ? vehicleData.OPERATIONAL + vehicleData.NON_OPERATIONAL
-    : 0;
+  const totalVehicles = vehicleData.OPERATIONAL + vehicleData.NON_OPERATIONAL;
   const vehicleOperationalPercentage =
     totalVehicles > 0
-      ? ((vehicleData?.OPERATIONAL || 0) / totalVehicles) * 100
+      ? (vehicleData.OPERATIONAL / totalVehicles) * 100
       : 0;
 
-  const vehicleChartData = vehicleData
-    ? [
-        {
-          name: "operational",
-          value: vehicleData.OPERATIONAL,
-          fill: "oklch(0.62 0.18 145.0)",
-        },
-        {
-          name: "non_operational",
-          value: vehicleData.NON_OPERATIONAL,
-          fill: "oklch(0.65 0.18 25.0)",
-        },
-      ]
-    : [];
+  const vehicleChartData = [
+    {
+      name: "operational",
+      value: vehicleData.OPERATIONAL,
+      fill: "oklch(0.62 0.18 145.0)",
+    },
+    {
+      name: "non_operational",
+      value: vehicleData.NON_OPERATIONAL,
+      fill: "oklch(0.65 0.18 25.0)",
+    },
+  ];
 
   const isVehicleTrendingUp = vehicleOperationalPercentage > 75;
-
-  if (isLoading) {
-    return (
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-0">
-          <CardTitle>Vehicle Status</CardTitle>
-          <CardDescription>Loading data...</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center flex-1 pb-0 pt-8">
-          <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error || !vehicleData) {
-    return (
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-0">
-          <CardTitle>Vehicle Status</CardTitle>
-          <CardDescription>Error loading data</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center flex-1 pb-0 text-destructive">
-          {error || "Failed to load vehicle data"}
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className="flex flex-col">

@@ -38,15 +38,15 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Get session
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  // Get user with server verification - More secure for middleware authentication
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-  console.log("🔍 Session check:", {
+  console.log("🔍 User check:", {
     path: request.nextUrl.pathname,
-    hasSession: !!session,
-    userEmail: session?.user?.email,
-    userId: session?.user?.id,
-    error: sessionError?.message,
+    hasUser: !!user,
+    userEmail: user?.email,
+    userId: user?.id,
+    error: userError?.message,
   });
 
   // Check if this is a public route
@@ -60,7 +60,7 @@ export async function middleware(request: NextRequest) {
   );
 
   // If authenticated user tries to access login or landing page, redirect based on role
-  if (session && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/landing-page")) {
+  if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/landing-page")) {
     console.log("🚀 BLOCKING: Authenticated user accessing public page, redirecting based on role");
     
     try {
@@ -88,8 +88,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(DEFAULT_AUTHENTICATED_REDIRECT, request.url));
   }
 
-  // If accessing root with session, redirect based on role
-  if (request.nextUrl.pathname === "/" && session) {
+  // If accessing root with user, redirect based on role
+  if (request.nextUrl.pathname === "/" && user) {
     console.log("🚀 Redirecting authenticated user from root based on role");
     
     try {
@@ -117,30 +117,30 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(DEFAULT_AUTHENTICATED_REDIRECT, request.url));
   }
 
-  // If accessing root without session, redirect to landing page
-  if (request.nextUrl.pathname === "/" && !session) {
+  // If accessing root without user, redirect to landing page
+  if (request.nextUrl.pathname === "/" && !user) {
     console.log("🚀 Redirecting unauthenticated user from root to landing page");
     return NextResponse.redirect(new URL("/landing-page", request.url));
   }
 
-  // If accessing dashboard protected routes without session, redirect to login
-  if (isDashboardProtectedRoute && !session) {
-    console.log("🔒 Dashboard route accessed without session, redirecting to login");
+  // If accessing dashboard protected routes without user, redirect to login
+  if (isDashboardProtectedRoute && !user) {
+    console.log("🔒 Dashboard route accessed without user, redirecting to login");
     const redirectUrl = new URL("/login", request.url);
     redirectUrl.searchParams.set("redirectTo", request.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
-  // If accessing any non-public route without session, redirect to login
-  if (!isPublicRoute && !session && request.nextUrl.pathname !== "/assets") {
-    console.log("🔒 Protected route accessed without session, redirecting to login");
+  // If accessing any non-public route without user, redirect to login
+  if (!isPublicRoute && !user && request.nextUrl.pathname !== "/assets") {
+    console.log("🔒 Protected route accessed without user, redirecting to login");
     const redirectUrl = new URL("/login", request.url);
     redirectUrl.searchParams.set("redirectTo", request.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
   // For authenticated users accessing dashboard routes, check if they're viewers
-  if (session && isDashboardProtectedRoute) {
+  if (user && isDashboardProtectedRoute) {
     console.log("🔐 Checking if viewer should be redirected from dashboard route");
     
     try {
@@ -169,8 +169,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Add user info to headers if authenticated (for use in API routes and components)
-  if (session) {
-    response.headers.set("x-user-id", session.user.id);
+  if (user) {
+    response.headers.set("x-user-id", user.id);
   }
 
   return response;

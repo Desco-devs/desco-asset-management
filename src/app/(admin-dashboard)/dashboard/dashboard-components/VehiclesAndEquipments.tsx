@@ -17,6 +17,28 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 
+interface ChartDataItem {
+  name: string;
+  value: number;
+  fill: string;
+}
+
+interface AssetStats {
+  totalVehicles: number;
+  totalEquipment: number;
+  operational: number;
+  nonOperational: number;
+  vehiclesOperational: number;
+  vehiclesNonOperational: number;
+  equipmentOperational: number;
+  equipmentNonOperational: number;
+}
+
+interface AssetData {
+  chartData: ChartDataItem[];
+  stats: AssetStats;
+}
+
 const chartConfig = {
   value: {
     label: "Count",
@@ -34,7 +56,7 @@ const chartConfig = {
 export function VehiclesAndEquipments() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [data, setData] = React.useState<any>(null);
+  const [data, setData] = React.useState<AssetData | null>(null);
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -165,7 +187,7 @@ export function VehiclesAndEquipments() {
               innerRadius={60}
               strokeWidth={5}
             >
-              {data.chartData.map((entry: any, index: number) => (
+              {data.chartData.map((entry: ChartDataItem, index: number) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />
               ))}
               <Label

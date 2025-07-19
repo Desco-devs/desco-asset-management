@@ -1,54 +1,113 @@
-"use client";
-
 import {
-  OverviewStats,
-  VehiclesCount,
   EquipmentsCount,
-  VehiclesAndEquipments,
-  RecentActivity,
   MaintenanceAlerts,
+  OverviewStats,
   QuickActions,
+  RecentActivity,
+  VehiclesAndEquipments,
+  VehiclesCount,
 } from "./dashboard-components";
 
-export default function Dashboard() {
-  // const { user, loading, clearUser } = useAuth();
-  // const [loggingOut, setLoggingOut] = useState(false);
+// Import organized functions and types
+import { fetchDashboardData } from "@/lib/dashboard-data";
+import {
+  transformEquipmentCounts,
+  transformVehicleCounts,
+  calculateGrowthMetrics,
+  transformOverviewStats,
+  transformDetailedData,
+  generateRecentActivity,
+} from "@/lib/dashboard-utils";
+import type { ActivityItem, DetailedData } from "@/types/dashboard";
 
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center">
-  //       <p>Loading user data...</p>
-  //     </div>
-  //   );
-  // }
+export default async function Dashboard() {
+  // Initialize default values
+  let equipmentData = { OPERATIONAL: 0, NON_OPERATIONAL: 0 };
+  let vehicleData = { OPERATIONAL: 0, NON_OPERATIONAL: 0 };
+  let overviewStatsData = {
+    locations: 0,
+    clients: 0,
+    projects: 0,
+    vehicles: { total: 0, operational: 0, nonOperational: 0 },
+    equipment: { total: 0, operational: 0, nonOperational: 0 },
+    maintenanceReports: { total: 0, pending: 0, inProgress: 0 },
+    growth: {
+      newClientsThisWeek: 0,
+      newProjectsThisWeek: 0,
+      newEquipmentThisWeek: 0,
+      newVehiclesThisWeek: 0
+    }
+  };
+  let recentActivityData: ActivityItem[] = [];
+  let detailedData: DetailedData = {
+    locations: [],
+    clients: [],
+    projects: [],
+    equipment: [],
+    vehicles: [],
+    maintenanceReports: [],
+  };
 
-  // if (!user) {
-  //   return (
-  //     <div className="min-h-screen flex items-center justify-center">
-  //       <p>User is not authenticated.</p>
-  //     </div>
-  //   );
-  // }
-  // async function handleLogout() {
-  //   setLoggingOut(true);
-  //   try {
-  //     const res = await fetch("/api/authentication/logout", { method: "POST" });
-  //     if (res.ok) {
-  //       clearUser();
-  //       toast.success("Logout successful!");
-  //     } else {
-  //       toast.error("Logout failed");
-  //     }
-  //   } catch (error) {
-  //     console.error(error);
-  //     toast.error("Logout error");
-  //   } finally {
-  //     setLoggingOut(false);
-  //   }
-  // }
+  try {
+    // Fetch all data using organized data fetching functions
+    const {
+      equipmentCounts,
+      vehicleCounts,
+      locationsData,
+      clientsData,
+      projectsData,
+      equipmentListData,
+      vehiclesListData,
+      maintenanceReportsData,
+    } = await fetchDashboardData();
+
+    // Transform counts using utility functions
+    equipmentData = transformEquipmentCounts(equipmentCounts);
+    vehicleData = transformVehicleCounts(vehicleCounts);
+
+    // Calculate growth metrics
+    const growth = calculateGrowthMetrics(
+      clientsData,
+      projectsData,
+      equipmentListData,
+      vehiclesListData
+    );
+
+    // Transform overview stats
+    overviewStatsData = transformOverviewStats(
+      locationsData,
+      clientsData,
+      projectsData,
+      equipmentData,
+      vehicleData,
+      maintenanceReportsData,
+      growth
+    );
+
+    // Transform detailed data for overview cards
+    detailedData = transformDetailedData(
+      locationsData,
+      clientsData,
+      projectsData,
+      equipmentListData,
+      vehiclesListData,
+      maintenanceReportsData
+    );
+
+    // Generate recent activity
+    recentActivityData = generateRecentActivity(
+      equipmentListData,
+      vehiclesListData,
+      projectsData,
+      clientsData,
+      maintenanceReportsData
+    );
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error);
+  }
 
   return (
-    <div className="min-h-screen py-6 space-y-6 p-4">
+    <div className="min-h-screen py-6 px-6 space-y-6">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -63,7 +122,10 @@ export default function Dashboard() {
       {/* Overview Statistics */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Overview</h2>
-        <OverviewStats />
+        <OverviewStats 
+          initialData={overviewStatsData} 
+          detailedData={detailedData}
+        />
       </div>
 
       {/* Main Dashboard Grid */}
@@ -72,8 +134,8 @@ export default function Dashboard() {
         <div className="lg:col-span-2 space-y-6">
           {/* Status Charts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <EquipmentsCount />
-            <VehiclesCount />
+            <EquipmentsCount initialData={equipmentData} />
+            <VehiclesCount initialData={vehicleData} />
           </div>
 
           {/* Combined Assets Overview */}
@@ -86,7 +148,7 @@ export default function Dashboard() {
         {/* Right Column - Activity & Alerts */}
         <div className="space-y-6">
           <MaintenanceAlerts />
-          <RecentActivity />
+          <RecentActivity initialData={recentActivityData} />
         </div>
       </div>
     </div>
