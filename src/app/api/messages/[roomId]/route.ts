@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
@@ -11,7 +11,7 @@ export async function GET(
     const cursor = searchParams.get("cursor");
     const limit = parseInt(searchParams.get("limit") || "50");
 
-    const { roomId } = params;
+    const { roomId } = await params;
 
     if (!roomId || !userId) {
       return NextResponse.json(

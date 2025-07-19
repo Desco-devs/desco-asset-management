@@ -110,8 +110,8 @@ async function fetchProjects(): Promise<ProjectData[]> {
     orderBy: { created_at: "desc" },
     include: {
       client: {
-        select: { 
-          name: true, 
+        select: {
+          name: true,
           location: { select: { address: true } }
         }
       },
@@ -129,12 +129,12 @@ async function fetchEquipmentList(): Promise<EquipmentData[]> {
     take: 10,
     orderBy: { created_at: "desc" },
     include: {
-      project: { 
-        include: { 
-          client: { 
-            include: { location: true } 
-          } 
-        } 
+      project: {
+        include: {
+          client: {
+            include: { location: true }
+          }
+        }
       },
     },
   });
@@ -148,12 +148,12 @@ async function fetchVehiclesList(): Promise<VehicleData[]> {
     take: 10,
     orderBy: { created_at: "desc" },
     include: {
-      project: { 
-        include: { 
-          client: { 
-            include: { location: true } 
-          } 
-        } 
+      project: {
+        include: {
+          client: {
+            include: { location: true }
+          }
+        }
       },
     },
   });
@@ -163,22 +163,25 @@ async function fetchVehiclesList(): Promise<VehicleData[]> {
  * Fetch recent maintenance reports
  */
 async function fetchMaintenanceReports(): Promise<MaintenanceReportData[]> {
-  return prisma.maintenance_equipment_report.findMany({
+  const rows = await prisma.maintenance_equipment_report.findMany({
     take: 10,
-    orderBy: { date_reported: "desc" },
+    orderBy: { date_reported: 'desc' },
     include: {
       equipment: {
         include: {
-          project: { 
-            include: { 
-              client: { 
-                include: { location: true } 
-              } 
-            } 
-          },
-        },
+          project: {
+            include: {
+              client: { include: { location: true } }
+            }
+          }
+        }
       },
-      location: true,
-    },
-  });
+      location: true
+    }
+  })
+
+  return rows.map(row => ({
+    ...row,
+    status: row.status === 'CANCELLED' ? null : row.status, // ✅ normalize CANCELLED to null
+  }))
 }

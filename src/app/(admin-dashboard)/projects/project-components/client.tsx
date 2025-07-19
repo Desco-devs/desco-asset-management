@@ -88,10 +88,13 @@ export default function LocationManager() {
 
   const { user } = useAuth();
 
-  const canCreate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
-  const canUpdate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
-  const canDelete = user?.role === 'SUPERADMIN';
-  const canView = user?.role === 'VIEWER' || user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canCreate = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const canUpdate = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const canDelete = user?.role === "SUPERADMIN";
+  const canView =
+    user?.role === "VIEWER" ||
+    user?.role === "ADMIN" ||
+    user?.role === "SUPERADMIN";
 
   const [locations, setLocations] = useState<Location[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
@@ -183,7 +186,7 @@ export default function LocationManager() {
       else if (sortConfig.direction === "desc") direction = null;
     }
     setSortConfig(
-      direction ? { key, direction } : { key: "createdAt", direction: "desc" }
+      direction ? { key, direction } : { key: "created_at", direction: "desc" }
     );
   };
 
@@ -385,8 +388,8 @@ export default function LocationManager() {
                         loc.address
                       )}
                     </TableCell>
-                    <TableCell>{formatCreatedAt(loc.createdAt)}</TableCell>
-                    <TableCell>{formatCreatedAt(loc.updatedAt)}</TableCell>
+                    <TableCell>{formatCreatedAt(loc.created_at)}</TableCell>
+                    <TableCell>{formatCreatedAt(loc.updated_at)}</TableCell>
                     <TableCell className="text-right">
                       {editingId === loc.id ? (
                         <div className="flex justify-end gap-2">

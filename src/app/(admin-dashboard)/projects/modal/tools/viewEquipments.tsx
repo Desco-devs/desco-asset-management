@@ -111,7 +111,7 @@ export default function EquipmentModal({
           {!loading && !error && equipments.length > 0 && (
             <ul className="space-y-2">
               {equipments.map(e => {
-                const expDate = new Date(e.expirationDate)
+                const expDate = new Date(e.insuranceExpirationDate)
                 const daysToExpiry = Math.ceil(
                   (expDate.getTime() - today.getTime()) / msPerDay
                 )

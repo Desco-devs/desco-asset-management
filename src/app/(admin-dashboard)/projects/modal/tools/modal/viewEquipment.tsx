@@ -1,41 +1,45 @@
-"use client"
+"use client";
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import type { Equipment } from "@/app/service/types"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
+import type { Equipment } from "@/app/service/types";
 
 interface ViewDetailsModalProps {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  equipment: Equipment | null
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  equipment: Equipment | null;
 }
 
 function formatCountdown(ms: number) {
-  if (ms <= 0) return "0d 0h 0m 0s"
-  const totalSeconds = Math.floor(ms / 1000)
-  const days = Math.floor(totalSeconds / (3600 * 24))
-  const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-  return `${days}d ${hours}h ${minutes}m ${seconds}s`
+  if (ms <= 0) return "0d 0h 0m 0s";
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / (3600 * 24));
+  const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${days}d ${hours}h ${minutes}m ${seconds}s`;
 }
 
 function getColorByDaysLeft(daysLeft: number, warningThreshold = 5) {
-  if (daysLeft < 0) return "text-red-600"
-  if (daysLeft <= warningThreshold) return "text-yellow-600"
-  return "text-gray-700 dark:text-gray-300"
+  if (daysLeft < 0) return "text-red-600";
+  if (daysLeft <= warningThreshold) return "text-yellow-600";
+  return "text-gray-700 dark:text-gray-300";
 }
 
 function formatFullDate(dateStr: string) {
-  const date = new Date(dateStr)
+  const date = new Date(dateStr);
   return date.toLocaleString(undefined, {
     year: "numeric",
     month: "long",
@@ -43,43 +47,49 @@ function formatFullDate(dateStr: string) {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-  })
+  });
 }
 
-export default function ViewDetailsModal({ isOpen, onOpenChange, equipment }: ViewDetailsModalProps) {
-  const [now, setNow] = useState(new Date())
+export default function ViewDetailsModal({
+  isOpen,
+  onOpenChange,
+  equipment,
+}: ViewDetailsModalProps) {
+  const [now, setNow] = useState(new Date());
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) return;
 
-    const interval = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(interval)
-  }, [isOpen])
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, [isOpen]);
 
-  if (!equipment) return null
+  if (!equipment) return null;
 
   const renderCountdownDate = (
     dateStr: string | null | undefined,
     labelOverdue: string,
     labelExpired: string
   ) => {
-    if (!dateStr) return "-"
-    const date = new Date(dateStr)
-    const diffMs = date.getTime() - now.getTime()
-    const daysLeft = diffMs / (1000 * 60 * 60 * 24)
-    const colorClass = getColorByDaysLeft(daysLeft, 5)
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    const diffMs = date.getTime() - now.getTime();
+    const daysLeft = diffMs / (1000 * 60 * 60 * 24);
+    const colorClass = getColorByDaysLeft(daysLeft, 5);
 
     const displayText =
       diffMs <= 0
         ? labelOverdue === "Overdue"
           ? `Overdue ${Math.abs(Math.floor(daysLeft))}d`
           : `Expired ${Math.abs(Math.floor(daysLeft))}d ago`
-        : formatCountdown(diffMs)
+        : formatCountdown(diffMs);
 
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className={`${colorClass} font-semibold cursor-default underline decoration-dotted`}>
+          <span
+            className={`${colorClass} font-semibold cursor-default underline decoration-dotted`}
+          >
             {displayText}
           </span>
         </TooltipTrigger>
@@ -87,8 +97,8 @@ export default function ViewDetailsModal({ isOpen, onOpenChange, equipment }: Vi
           <p>{formatFullDate(dateStr)}</p>
         </TooltipContent>
       </Tooltip>
-    )
-  }
+    );
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -107,20 +117,42 @@ export default function ViewDetailsModal({ isOpen, onOpenChange, equipment }: Vi
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-gray-700 dark:text-gray-300">
-              <p><span className="font-semibold">Brand:</span> {equipment.brand}</p>
-              <p><span className="font-semibold">Model:</span> {equipment.model}</p>
-              <p><span className="font-semibold">Type:</span> {equipment.type}</p>
-              <p><span className="font-semibold">Owner:</span> {equipment.owner}</p>
-              <p><span className="font-semibold">Status:</span> {equipment.status}</p>
+              <p>
+                <span className="font-semibold">Brand:</span> {equipment.brand}
+              </p>
+              <p>
+                <span className="font-semibold">Model:</span> {equipment.model}
+              </p>
+              <p>
+                <span className="font-semibold">Type:</span> {equipment.type}
+              </p>
+              <p>
+                <span className="font-semibold">Owner:</span> {equipment.owner}
+              </p>
+              <p>
+                <span className="font-semibold">Status:</span>{" "}
+                {equipment.status}
+              </p>
               <p>
                 <span className="font-semibold">Expiration Date:</span>{" "}
-                {renderCountdownDate(equipment.expirationDate, "Expired", "Expired")}
+                {renderCountdownDate(
+                  equipment.insuranceExpirationDate,
+                  "Expired",
+                  "Expired"
+                )}
               </p>
               <p>
                 <span className="font-semibold">Inspection Date:</span>{" "}
-                {renderCountdownDate(equipment.inspectionDate, "Overdue", "Expired")}
+                {renderCountdownDate(
+                  equipment.inspectionDate,
+                  "Overdue",
+                  "Expired"
+                )}
               </p>
-              <p className="sm:col-span-2"><span className="font-semibold">Remarks:</span> {equipment.remarks || "-"}</p>
+              <p className="sm:col-span-2">
+                <span className="font-semibold">Remarks:</span>{" "}
+                {equipment.remarks || "-"}
+              </p>
             </div>
           </div>
 
@@ -152,5 +184,5 @@ export default function ViewDetailsModal({ isOpen, onOpenChange, equipment }: Vi
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

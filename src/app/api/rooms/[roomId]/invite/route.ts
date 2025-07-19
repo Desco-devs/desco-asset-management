@@ -3,10 +3,10 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
-    const { roomId } = params;
+    const { roomId } = await params;
     const body = await request.json();
     const { invitedUsers, inviterId, inviteUsername, inviteEmail } = body;
 
@@ -96,14 +96,14 @@ export async function POST(
     if (inviteEmail) {
       const userByEmail = await prisma.user.findFirst({
         where: {
-          email: inviteEmail,
+          username: inviteEmail,
         },
         select: {
           id: true,
           username: true,
           full_name: true,
           user_profile: true,
-          email: true,
+          // email: true,
         },
       });
 
@@ -178,7 +178,7 @@ export async function POST(
     if (global.io) {
       // Notify invited users about new invitation
       invitations.forEach((invitation) => {
-        global.io.to(`user:${invitation.invited_user}`).emit('invitation:received', {
+        global?.io?.to(`user:${invitation.invited_user}`).emit('invitation:received', {
           room: invitation.room,
           invitation,
           inviter: invitation.inviter,

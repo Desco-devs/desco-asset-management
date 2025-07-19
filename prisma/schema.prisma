@@ -16,6 +16,8 @@ model user {
   user_profile         String?
   role                 Role                           @default(VIEWER)
   user_status          user_status                    @default(ACTIVE)
+  is_online            Boolean                        @default(false)
+  last_seen            DateTime?
   created_at           DateTime                       @default(now())
   updated_at           DateTime                       @updatedAt
   created_clients      client[]                       @relation("ClientCreatedBy")

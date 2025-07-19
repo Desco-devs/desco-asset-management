@@ -32,15 +32,15 @@ const initializeSubscriptions = (initialData: AssetCounts) => {
     .channel("asset-counts-equipment-channel")
     .on(
       "postgres_changes",
-      { 
-        event: "*", 
-        schema: "public", 
+      {
+        event: "*",
+        schema: "public",
         table: "equipment",
         filter: undefined // Listen to all changes
       },
       (payload: any) => {
         // console.log("Asset counts - equipment change:", payload);
-        
+
         if (payload.eventType === "INSERT") {
           const status = payload.new.status as "OPERATIONAL" | "NON_OPERATIONAL";
           globalState = {
@@ -55,7 +55,7 @@ const initializeSubscriptions = (initialData: AssetCounts) => {
         } else if (payload.eventType === "UPDATE") {
           const oldStatus = payload.old.status as "OPERATIONAL" | "NON_OPERATIONAL";
           const newStatus = payload.new.status as "OPERATIONAL" | "NON_OPERATIONAL";
-          
+
           if (oldStatus !== newStatus) {
             globalState = {
               ...globalState!,
@@ -72,31 +72,36 @@ const initializeSubscriptions = (initialData: AssetCounts) => {
           // Supabase DELETE only sends the ID, not the full record
           // Use Supabase client to get fresh counts (still realtime, just a query)
           console.log("DELETE event detected for equipment, refreshing counts via Supabase");
-          
+
           // Use Supabase client for counting (faster than API)
           supabaseInstance
-            .from('equipment')
+            .from('vehicles')
             .select('status')
-            .then(({ data, error }) => {
+            .then(({ data, error }: { data: { status: 'OPERATIONAL' | 'NON_OPERATIONAL' }[] | null, error: any }) => {
               if (error) {
-                console.error("Failed to refresh equipment counts:", error);
-                return;
+                console.error("Failed to refresh vehicle counts:", error)
+                return
               }
-              
-              const counts = { OPERATIONAL: 0, NON_OPERATIONAL: 0 };
-              data?.forEach(item => {
+
+              const counts: Record<'OPERATIONAL' | 'NON_OPERATIONAL', number> = {
+                OPERATIONAL: 0,
+                NON_OPERATIONAL: 0
+              }
+
+              data?.forEach((item: { status: 'OPERATIONAL' | 'NON_OPERATIONAL' }) => {
                 if (item.status === 'OPERATIONAL' || item.status === 'NON_OPERATIONAL') {
-                  counts[item.status]++;
+                  counts[item.status]++
                 }
-              });
-              
+              })
+
               globalState = {
                 ...globalState!,
-                equipment: counts
-              };
-              notifySubscribers();
-              console.log("Equipment counts refreshed after delete:", globalState.equipment);
-            });
+                vehicles: counts
+              }
+              notifySubscribers()
+              console.log("Vehicle counts refreshed after delete:", globalState.vehicles)
+            })
+
         }
       }
     )
@@ -110,7 +115,7 @@ const initializeSubscriptions = (initialData: AssetCounts) => {
       { event: "*", schema: "public", table: "vehicles" },
       (payload: any) => {
         // console.log("Asset counts - vehicle change:", payload);
-        
+
         if (payload.eventType === "INSERT") {
           const status = payload.new.status as "OPERATIONAL" | "NON_OPERATIONAL";
           globalState = {
@@ -125,7 +130,7 @@ const initializeSubscriptions = (initialData: AssetCounts) => {
         } else if (payload.eventType === "UPDATE") {
           const oldStatus = payload.old.status as "OPERATIONAL" | "NON_OPERATIONAL";
           const newStatus = payload.new.status as "OPERATIONAL" | "NON_OPERATIONAL";
-          
+
           if (oldStatus !== newStatus) {
             globalState = {
               ...globalState!,
@@ -142,31 +147,36 @@ const initializeSubscriptions = (initialData: AssetCounts) => {
           // Supabase DELETE only sends the ID, not the full record
           // Use Supabase client to get fresh counts (still realtime, just a query)
           console.log("DELETE event detected for vehicle, refreshing counts via Supabase");
-          
+
           // Use Supabase client for counting (faster than API)
           supabaseInstance
             .from('vehicles')
             .select('status')
-            .then(({ data, error }) => {
+            .then(({ data, error }: { data: { status: 'OPERATIONAL' | 'NON_OPERATIONAL' }[] | null, error: any }) => {
               if (error) {
-                console.error("Failed to refresh vehicle counts:", error);
-                return;
+                console.error("Failed to refresh vehicle counts:", error)
+                return
               }
-              
-              const counts = { OPERATIONAL: 0, NON_OPERATIONAL: 0 };
-              data?.forEach(item => {
+
+              const counts: Record<'OPERATIONAL' | 'NON_OPERATIONAL', number> = {
+                OPERATIONAL: 0,
+                NON_OPERATIONAL: 0
+              }
+
+              data?.forEach((item: { status: 'OPERATIONAL' | 'NON_OPERATIONAL' }) => {
                 if (item.status === 'OPERATIONAL' || item.status === 'NON_OPERATIONAL') {
-                  counts[item.status]++;
+                  counts[item.status]++
                 }
-              });
-              
+              })
+
               globalState = {
                 ...globalState!,
                 vehicles: counts
-              };
-              notifySubscribers();
-              console.log("Vehicle counts refreshed after delete:", globalState.vehicles);
-            });
+              }
+              notifySubscribers()
+              console.log("Vehicle counts refreshed after delete:", globalState.vehicles)
+            })
+
         }
       }
     )
@@ -184,7 +194,7 @@ const cleanupState = () => {
       OPERATIONAL: globalState.vehicles.OPERATIONAL || 0,
       NON_OPERATIONAL: globalState.vehicles.NON_OPERATIONAL || 0
     };
-    
+
     globalState = {
       equipment: cleanEquipment,
       vehicles: cleanVehicles
@@ -221,7 +231,7 @@ export const useAssetCounts = (initialData: AssetCounts) => {
     // Cleanup
     return () => {
       subscribers.delete(setCounts);
-      
+
       // If this was the last subscriber, cleanup subscriptions
       if (subscribers.size === 0) {
         if (equipmentChannel) {

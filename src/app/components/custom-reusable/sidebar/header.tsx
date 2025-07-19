@@ -61,7 +61,7 @@ const Header = () => {
 
   // Smart breadcrumb logic - only show relevant segments
   const getSmartBreadcrumbs = () => {
-    const segments = pathname.split("/").filter(Boolean);
+    const segments = pathname?.split("/").filter(Boolean) ?? [];
 
     // If we're at root, just return empty
     if (segments.length === 0) return { paths: [], currentPage: "Dashboard" };
