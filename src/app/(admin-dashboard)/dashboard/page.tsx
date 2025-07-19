@@ -59,6 +59,11 @@ export default async function Dashboard() {
       equipmentListData,
       vehiclesListData,
       maintenanceReportsData,
+      locationsTotalCount,
+      clientsTotalCount,
+      projectsTotalCount,
+      maintenanceReportsTotalCount,
+      maintenanceReportsStatusCounts,
     } = await fetchDashboardData();
 
     // Transform counts using utility functions
@@ -75,12 +80,13 @@ export default async function Dashboard() {
 
     // Transform overview stats
     overviewStatsData = transformOverviewStats(
-      locationsData,
-      clientsData,
-      projectsData,
+      locationsTotalCount,
+      clientsTotalCount,
+      projectsTotalCount,
       equipmentData,
       vehicleData,
-      maintenanceReportsData,
+      maintenanceReportsTotalCount,
+      maintenanceReportsStatusCounts,
       growth
     );
 

@@ -59,7 +59,7 @@ export interface ClientData {
   id: string;
   name: string;
   created_at: Date;
-  location?: { address: string };
+  location?: { id: string; address: string; created_at: Date };
   projects?: { id: string }[];
 }
 

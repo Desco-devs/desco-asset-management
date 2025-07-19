@@ -53,21 +53,34 @@ export function calculateGrowthMetrics(
 }
 
 /**
+ * Transform maintenance status counts from Prisma groupBy result
+ */
+export function transformMaintenanceStatusCounts(maintenanceStatusCounts: any[]) {
+  return {
+    pending: maintenanceStatusCounts.find((item) => item.status === "REPORTED")?._count.status || 0,
+    inProgress: maintenanceStatusCounts.find((item) => item.status === "IN_PROGRESS")?._count.status || 0,
+  };
+}
+
+/**
  * Transform all data into overview stats format
  */
 export function transformOverviewStats(
-  locationsData: LocationData[],
-  clientsData: ClientData[],
-  projectsData: ProjectData[],
+  locationsTotalCount: number,
+  clientsTotalCount: number,
+  projectsTotalCount: number,
   equipmentData: EquipmentVehicleCounts,
   vehicleData: EquipmentVehicleCounts,
-  maintenanceReportsData: MaintenanceReportData[],
+  maintenanceReportsTotalCount: number,
+  maintenanceStatusCounts: any[],
   growth: GrowthMetrics
 ): StatsData {
+  const maintenanceStats = transformMaintenanceStatusCounts(maintenanceStatusCounts);
+  
   return {
-    locations: locationsData.length,
-    clients: clientsData.length,
-    projects: projectsData.length,
+    locations: locationsTotalCount,
+    clients: clientsTotalCount,
+    projects: projectsTotalCount,
     vehicles: {
       total: vehicleData.OPERATIONAL + vehicleData.NON_OPERATIONAL,
       operational: vehicleData.OPERATIONAL,
@@ -79,9 +92,9 @@ export function transformOverviewStats(
       nonOperational: equipmentData.NON_OPERATIONAL,
     },
     maintenanceReports: {
-      total: maintenanceReportsData.length,
-      pending: maintenanceReportsData.filter((r) => r.status === "REPORTED").length,
-      inProgress: maintenanceReportsData.filter((r) => r.status === "IN_PROGRESS").length,
+      total: maintenanceReportsTotalCount,
+      pending: maintenanceStats.pending,
+      inProgress: maintenanceStats.inProgress,
     },
     growth,
   };

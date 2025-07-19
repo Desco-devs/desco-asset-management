@@ -22,6 +22,11 @@ export async function fetchDashboardData() {
       equipmentListData,
       vehiclesListData,
       maintenanceReportsData,
+      locationsTotalCount,
+      clientsTotalCount,
+      projectsTotalCount,
+      maintenanceReportsTotalCount,
+      maintenanceReportsStatusCounts,
     ] = await Promise.all([
       fetchEquipmentCounts(),
       fetchVehicleCounts(),
@@ -31,6 +36,11 @@ export async function fetchDashboardData() {
       fetchEquipmentList(),
       fetchVehiclesList(),
       fetchMaintenanceReports(),
+      fetchLocationsTotalCount(),
+      fetchClientsTotalCount(),
+      fetchProjectsTotalCount(),
+      fetchMaintenanceReportsTotalCount(),
+      fetchMaintenanceReportsStatusCounts(),
     ]);
 
     return {
@@ -42,6 +52,11 @@ export async function fetchDashboardData() {
       equipmentListData,
       vehiclesListData,
       maintenanceReportsData,
+      locationsTotalCount,
+      clientsTotalCount,
+      projectsTotalCount,
+      maintenanceReportsTotalCount,
+      maintenanceReportsStatusCounts,
     };
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
@@ -73,7 +88,7 @@ async function fetchVehicleCounts() {
  * Fetch locations with client count and creator info
  */
 async function fetchLocations(): Promise<LocationData[]> {
-  return prisma.location.findMany({
+  const locations = await prisma.location.findMany({
     take: 15,
     orderBy: { created_at: "desc" },
     include: {
@@ -85,6 +100,14 @@ async function fetchLocations(): Promise<LocationData[]> {
       }
     }
   });
+
+  return locations.map(location => ({
+    id: location.id,
+    address: location.address,
+    created_at: location.created_at,
+    clients: location.clients,
+    user: location.user || undefined
+  }));
 }
 
 /**
@@ -95,7 +118,7 @@ async function fetchClients(): Promise<ClientData[]> {
     take: 15,
     orderBy: { created_at: "desc" },
     include: {
-      location: { select: { address: true } },
+      location: true,
       projects: { select: { id: true } }
     }
   });
@@ -125,7 +148,7 @@ async function fetchProjects(): Promise<ProjectData[]> {
  * Fetch recent equipment
  */
 async function fetchEquipmentList(): Promise<EquipmentData[]> {
-  return prisma.equipment.findMany({
+  const equipment = await prisma.equipment.findMany({
     take: 10,
     orderBy: { created_at: "desc" },
     include: {
@@ -138,13 +161,25 @@ async function fetchEquipmentList(): Promise<EquipmentData[]> {
       },
     },
   });
+
+  return equipment.map(item => ({
+    id: item.id,
+    brand: item.brand,
+    model: item.model,
+    type: item.type,
+    status: item.status as 'OPERATIONAL' | 'NON_OPERATIONAL',
+    owner: item.owner,
+    created_at: item.created_at,
+    inspection_date: item.inspection_date?.toISOString(),
+    project: item.project
+  }));
 }
 
 /**
  * Fetch recent vehicles
  */
 async function fetchVehiclesList(): Promise<VehicleData[]> {
-  return prisma.vehicle.findMany({
+  const vehicles = await prisma.vehicle.findMany({
     take: 10,
     orderBy: { created_at: "desc" },
     include: {
@@ -157,13 +192,26 @@ async function fetchVehiclesList(): Promise<VehicleData[]> {
       },
     },
   });
+
+  return vehicles.map(item => ({
+    id: item.id,
+    brand: item.brand,
+    model: item.model,
+    type: item.type,
+    plate_number: item.plate_number,
+    status: item.status as 'OPERATIONAL' | 'NON_OPERATIONAL',
+    owner: item.owner,
+    created_at: item.created_at,
+    inspection_date: item.inspection_date.toISOString(),
+    project: item.project
+  }));
 }
 
 /**
  * Fetch recent maintenance reports
  */
 async function fetchMaintenanceReports(): Promise<MaintenanceReportData[]> {
-  return prisma.maintenance_equipment_report.findMany({
+  const reports = await prisma.maintenance_equipment_report.findMany({
     take: 10,
     orderBy: { date_reported: "desc" },
     include: {
@@ -180,5 +228,58 @@ async function fetchMaintenanceReports(): Promise<MaintenanceReportData[]> {
       },
       location: true,
     },
+  });
+
+  return reports.map(item => ({
+    id: item.id,
+    issue_description: item.issue_description || '',
+    status: (item.status || 'REPORTED') as 'REPORTED' | 'IN_PROGRESS' | 'COMPLETED',
+    priority: (item.priority || 'MEDIUM') as 'LOW' | 'MEDIUM' | 'HIGH',
+    date_reported: item.date_reported || item.created_at,
+    created_at: item.created_at,
+    equipment: item.equipment
+  }));
+}
+
+/**
+ * Fetch total count of locations
+ */
+async function fetchLocationsTotalCount(): Promise<number> {
+  return prisma.location.count();
+}
+
+/**
+ * Fetch total count of clients
+ */
+async function fetchClientsTotalCount(): Promise<number> {
+  return prisma.client.count();
+}
+
+/**
+ * Fetch total count of projects
+ */
+async function fetchProjectsTotalCount(): Promise<number> {
+  return prisma.project.count();
+}
+
+/**
+ * Fetch total count of maintenance reports
+ */
+async function fetchMaintenanceReportsTotalCount(): Promise<number> {
+  return prisma.maintenance_equipment_report.count();
+}
+
+/**
+ * Fetch maintenance reports status counts
+ */
+export async function fetchMaintenanceReportsStatusCounts() {
+  return prisma.maintenance_equipment_report.groupBy({
+    by: ["status"],
+    _count: { status: true },
+    where: {
+      status: {
+        not: null
+      }
+    }
   });
 }
