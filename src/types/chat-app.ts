@@ -104,6 +104,9 @@ export interface MessageWithRelations extends Message {
   };
   reply_to?: MessageWithRelations;
   replies?: MessageWithRelations[];
+  // Optional properties for UI state management
+  pending?: boolean;
+  failed?: boolean;
 }
 
 export interface RoomInvitationWithRelations extends RoomInvitation {
@@ -143,7 +146,8 @@ export interface UpdateRoomData {
 export interface SendMessageData {
   room_id: string;
   content: string;
-  type?: MessageType;
+  sender_id?: string;
+  type?: MessageType | string;
   file_url?: string;
   reply_to_id?: string;
 }
@@ -220,6 +224,15 @@ export interface RoomListItem {
   unread_count: number;
   is_owner: boolean;
   member_count: number;
+  // For invitation handling
+  invitation_status?: InvitationStatus;
+  invitation_id?: string;
+  invited_by?: {
+    id: string;
+    username: string;
+    full_name: string;
+    user_profile?: string;
+  };
 }
 
 export interface UserSearchResult {

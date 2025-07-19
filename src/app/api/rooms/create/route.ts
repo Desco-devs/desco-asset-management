@@ -79,6 +79,15 @@ export async function POST(request: NextRequest) {
       return { room, invitations };
     });
 
+    // TODO: Emit socket event for real-time updates when socket is properly initialized
+    // if (global.io) {
+    //   global.io.emit('room:created', {
+    //     room: result.room,
+    //     invitations: result.invitations,
+    //     creatorId: ownerId,
+    //   });
+    // }
+
     return NextResponse.json({
       success: true,
       room: result.room,

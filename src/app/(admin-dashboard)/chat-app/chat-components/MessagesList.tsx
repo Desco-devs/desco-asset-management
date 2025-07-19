@@ -18,6 +18,8 @@ const MessagesList = ({ messages, currentUserId, onLoadMore, isLoading }: Messag
       <div className="space-y-4">
         {messages.map((msg) => {
           const isMe = msg.sender_id === currentUserId;
+          const isPending = msg.pending;
+          const isFailed = msg.failed;
           
           return (
             <div
@@ -45,17 +47,40 @@ const MessagesList = ({ messages, currentUserId, onLoadMore, isLoading }: Messag
                 )}
                 <div
                   className={cn(
-                    "rounded-lg px-3 py-2 text-sm",
+                    "rounded-lg px-3 py-2 text-sm relative",
                     isMe
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
+                      : "bg-muted",
+                    isPending && "opacity-70",
+                    isFailed && "bg-destructive/20 border border-destructive/40"
                   )}
                 >
                   {msg.content}
+                  {isPending && (
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-background rounded-full border-2 border-primary flex items-center justify-center">
+                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                    </div>
+                  )}
+                  {isFailed && (
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-background rounded-full border-2 border-destructive flex items-center justify-center">
+                      <span className="text-xs text-destructive">!</span>
+                    </div>
+                  )}
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <div className="flex items-center space-x-1">
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {isPending && (
+                    <span className="text-xs text-muted-foreground italic">Sending...</span>
+                  )}
+                  {isFailed && (
+                    <span className="text-xs text-destructive italic">Failed to send</span>
+                  )}
+                  {!isPending && !isFailed && isMe && (
+                    <span className="text-xs text-muted-foreground">✓</span>
+                  )}
+                </div>
               </div>
             </div>
           );

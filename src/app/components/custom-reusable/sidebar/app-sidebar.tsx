@@ -43,8 +43,8 @@ const data = {
 
   navMain: [
     {
-      title: "Home",
-      url: "/home",
+      title: "Dashboard",
+      url: "/dashboard",
       icon: Frame,
       isActive: true,
     },

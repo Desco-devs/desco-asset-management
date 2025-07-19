@@ -32,7 +32,7 @@ import {
   AtSign
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ChatUser, RoomType } from "@/types/chat-app";
+import { ChatUser, RoomType, RoomListItem, InvitationStatus } from "@/types/chat-app";
 
 interface CreateRoomModalProps {
   isOpen: boolean;
@@ -45,6 +45,7 @@ interface CreateRoomModalProps {
     inviteUsername?: string;
   }) => void;
   users: ChatUser[];
+  rooms: RoomListItem[];
   currentUserId?: string;
 }
 
@@ -53,6 +54,7 @@ const CreateRoomModal = ({
   onClose, 
   onCreateRoom, 
   users, 
+  rooms,
   currentUserId 
 }: CreateRoomModalProps) => {
   const [step, setStep] = useState<'type' | 'details' | 'invite'>('type');
@@ -64,16 +66,56 @@ const CreateRoomModal = ({
   const [inviteUsername, setInviteUsername] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<ChatUser[]>([]);
 
-  const filteredUsers = users.filter(user => 
-    user.id !== currentUserId &&
-    (user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-     user.username.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Get users who have pending direct message invitations with the current user
+  const usersWithPendingDirectMessages = rooms
+    .filter(room => 
+      room.type === RoomType.DIRECT && 
+      room.invitation_status === InvitationStatus.PENDING
+    )
+    .map(room => {
+      // For direct messages, we need to find who the other user is
+      // Since it's pending, we can get this from the invited_by field
+      return room.invited_by?.id;
+    })
+    .filter(Boolean);
 
-  const suggestedUsers = users.filter(user => 
-    user.id !== currentUserId &&
-    user.username.toLowerCase().includes(inviteUsername.toLowerCase())
-  ).slice(0, 5);
+  // Filter users based on room type and pending direct messages
+  const getFilteredUsers = () => {
+    let filtered = users.filter(user => 
+      user.id !== currentUserId &&
+      (user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       user.username.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
+    // For DIRECT rooms, exclude users with pending direct message invitations
+    if (roomType === RoomType.DIRECT) {
+      filtered = filtered.filter(user => 
+        !usersWithPendingDirectMessages.includes(user.id)
+      );
+    }
+
+    return filtered;
+  };
+
+  const filteredUsers = getFilteredUsers();
+
+  const getSuggestedUsers = () => {
+    let suggested = users.filter(user => 
+      user.id !== currentUserId &&
+      user.username.toLowerCase().includes(inviteUsername.toLowerCase())
+    );
+
+    // For DIRECT rooms, exclude users with pending direct message invitations
+    if (roomType === RoomType.DIRECT) {
+      suggested = suggested.filter(user => 
+        !usersWithPendingDirectMessages.includes(user.id)
+      );
+    }
+
+    return suggested.slice(0, 5);
+  };
+
+  const suggestedUsers = getSuggestedUsers();
 
   const handleReset = () => {
     setStep('type');

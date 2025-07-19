@@ -1,13 +1,13 @@
 "use client";
 
-import { 
-  OverviewStats, 
-  VehiclesCount, 
-  EquipmentsCount, 
-  VehiclesAndEquipments, 
-  RecentActivity, 
-  MaintenanceAlerts, 
-  QuickActions 
+import {
+  OverviewStats,
+  VehiclesCount,
+  EquipmentsCount,
+  VehiclesAndEquipments,
+  RecentActivity,
+  MaintenanceAlerts,
+  QuickActions,
 } from "./dashboard-components";
 
 export default function Dashboard() {
@@ -48,13 +48,14 @@ export default function Dashboard() {
   // }
 
   return (
-    <div className="min-h-screen py-6 space-y-6">
+    <div className="min-h-screen py-6 space-y-6 p-4">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome to your admin dashboard. Monitor and manage your fleet operations.
+            Welcome to your admin dashboard. Monitor and manage your fleet
+            operations.
           </p>
         </div>
       </div>
@@ -74,10 +75,10 @@ export default function Dashboard() {
             <EquipmentsCount />
             <VehiclesCount />
           </div>
-          
+
           {/* Combined Assets Overview */}
           <VehiclesAndEquipments />
-          
+
           {/* Quick Actions */}
           <QuickActions />
         </div>
