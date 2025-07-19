@@ -11,18 +11,18 @@ export function useUserRole() {
     const fetchUserRole = async () => {
       try {
         const supabase = createClient()
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { user }, error } = await supabase.auth.getUser()
         
-        if (session) {
+        if (user && !error) {
           const { data: userData } = await supabase
             .from('users')
             .select('role')
-            .eq('id', session.user.id)
+            .eq('id', user.id)
             .single()
           
           if (userData) {
             setUserRole(userData.role)
-            setUserId(session.user.id)
+            setUserId(user.id)
           }
         }
       } catch (error) {

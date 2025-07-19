@@ -67,15 +67,15 @@ export function SignInForm({ onToggle, onForgotPassword }: SignInProps) {
       } else {
         // Wait a short moment for auth state to update, then get user profile
         setTimeout(async () => {
-          // Get current session to fetch user ID
+          // Get current user with server verification
           const { createClient } = await import('@/lib/supabase')
           const supabase = createClient()
-          const { data: { session } } = await supabase.auth.getSession()
+          const { data: { user }, error } = await supabase.auth.getUser()
           
-          if (session?.user) {
+          if (user && !error) {
             try {
               // Fetch user profile to get role
-              const response = await fetch(`/api/users/${session.user.id}`)
+              const response = await fetch(`/api/users/${user.id}`)
               if (response.ok) {
                 const userData = await response.json()
                 const redirectPath = getDefaultRedirectPath(userData.role)

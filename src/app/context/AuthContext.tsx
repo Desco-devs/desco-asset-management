@@ -6,48 +6,21 @@ import React, {
   useState,
   ReactNode,
   useEffect,
+  useCallback,
 } from "react";
 import { createClient } from "@/lib/supabase";
 import { User, AuthContextType } from "@/types/auth";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(null);
-  const [supabaseUser, setSupabaseUser] = useState<any | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setSupabaseUser(session.user);
-        await fetchUserProfile(session.user.id);
-      }
-      setLoading(false);
-    };
-
-    getInitialSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          setSupabaseUser(session.user);
-          await fetchUserProfile(session.user.id);
-        } else if (event === 'SIGNED_OUT') {
-          setSupabaseUser(null);
-          setUserState(null);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = useCallback(async (userId: string) => {
     try {
       const response = await fetch(`/api/users/${userId}`);
       if (response.ok) {
@@ -57,7 +30,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Error fetching user profile:", error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // Get initial user with server verification
+    const getInitialUser = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (user && !error) {
+        setSupabaseUser(user);
+        await fetchUserProfile(user.id);
+      }
+      setLoading(false);
+    };
+
+    getInitialUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event) => {
+        if (event === 'SIGNED_IN') {
+          // Verify user with server on sign in
+          const { data: { user }, error } = await supabase.auth.getUser();
+          if (user && !error) {
+            setSupabaseUser(user);
+            await fetchUserProfile(user.id);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setSupabaseUser(null);
+          setUserState(null);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [fetchUserProfile]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
