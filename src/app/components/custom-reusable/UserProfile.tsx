@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -23,10 +24,12 @@ import {
   Bell,
   HelpCircle,
   Mail,
+  Loader2,
 } from "lucide-react";
 import { color } from "@/lib/color";
 
 export default function UserProfile() {
+  const router = useRouter();
   const { user, signOut } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -42,11 +45,13 @@ export default function UserProfile() {
   async function handleLogout() {
     setLoggingOut(true);
     try {
+      toast.loading("Logging out...", { id: "logout" });
       await signOut();
-      toast.success("Logout successful!");
+      toast.success("Logged out successfully!", { id: "logout" });
+      router.push("/login");
     } catch (error) {
-      console.error(error);
-      toast.error("Logout error");
+      console.error("Logout failed:", error);
+      toast.error("Failed to logout. Please try again.", { id: "logout" });
     } finally {
       setLoggingOut(false);
     }
@@ -115,7 +120,11 @@ export default function UserProfile() {
           onClick={handleLogout}
           disabled={loggingOut}
         >
-          <LogOut className="mr-2 h-4 w-4" />
+          {loggingOut ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <LogOut className="mr-2 h-4 w-4" />
+          )}
           <span>{loggingOut ? "Logging out..." : "Log out"}</span>
           <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
         </DropdownMenuItem>
