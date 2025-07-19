@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient, status as VehicleStatus } from '@prisma/client'
+import { status as VehicleStatus } from '@prisma/client'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
 const supabase = createServiceRoleClient()
 
 // GET: Retrieve vehicles with proper role-based access control

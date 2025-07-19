@@ -22,7 +22,6 @@ export const useSocket = ({ userId, enabled = true }: UseSocketOptions = {}) => 
     console.log('Initializing socket connection to:', socketUrl);
 
     const socket = io(socketUrl, {
-      path: '/api/socket',
       transports: ['polling', 'websocket'], // Try polling first, then upgrade to websocket
       upgrade: true,
       rememberUpgrade: false, // Don't remember upgrade to avoid connection issues
