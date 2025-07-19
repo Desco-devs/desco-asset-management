@@ -9,7 +9,6 @@ import { getProjectsByClient } from "@/app/service/client/dynamicClients";
 import DataTable, {
   Column,
 } from "@/app/components/custom-reusable/table/ReusableTable";
-import CreateProjectModal from "@/app/(dashboard)/projects/modal/addProjects";
 import AlertModal from "@/app/components/custom-reusable/modal/AlertModal";
 import { Project } from "@/app/service/types";
 
@@ -34,10 +33,13 @@ export default function ProjectsPage() {
 
   const { user } = useAuth();
 
-  const canCreate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
-  const canUpdate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
-  const canDelete = user?.role === 'SUPERADMIN';
-  const canView = user?.role === 'VIEWER' || user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canCreate = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const canUpdate = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const canDelete = user?.role === "SUPERADMIN";
+  const canView =
+    user?.role === "VIEWER" ||
+    user?.role === "ADMIN" ||
+    user?.role === "SUPERADMIN";
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -282,13 +284,6 @@ export default function ProjectsPage() {
             </Button>
           ) : null
         }
-      />
-
-      <CreateProjectModal
-        isOpen={createModalOpen}
-        onOpenChange={setCreateModalOpen}
-        clientId={clientId}
-        onCreated={loadProjects}
       />
 
       <AlertModal

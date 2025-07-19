@@ -25,10 +25,10 @@ import {
 import { MoreHorizontal } from "lucide-react";
 
 import AlertModal from "@/app/components/custom-reusable/modal/AlertModal";
-import ProjectsModal from "@/app/(dashboard)/projects/modal/viewProjects";
 import { useAuth } from "@/app/context/AuthContext";
-import { AddClientModal } from "@/app/(dashboard)/projects/modal/addClient";
 import { color } from "@/lib/color";
+import { AddClientModal } from "@/app/(admin-dashboard)/projects/modal/addClient";
+import ProjectsModal from "@/app/(admin-dashboard)/projects/modal/viewProjects";
 
 interface Client {
   uid: string;
@@ -82,10 +82,13 @@ export default function ClientsPage() {
   }, []);
 
   // Permissions checks
-  const canCreate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
-  const canUpdate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
-  const canDelete = user?.role === 'SUPERADMIN';
-  const canView = user?.role === 'VIEWER' || user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canCreate = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const canUpdate = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const canDelete = user?.role === "SUPERADMIN";
+  const canView =
+    user?.role === "VIEWER" ||
+    user?.role === "ADMIN" ||
+    user?.role === "SUPERADMIN";
 
   async function handleSaveEdit(uid: string) {
     if (!editName.trim() || !locationId) return;
