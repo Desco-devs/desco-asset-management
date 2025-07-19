@@ -8,8 +8,6 @@ import { getEquipmentsByProject } from "@/app/service/client/dynamicClients";
 import { deleteEquipment } from "@/app/service/equipments/equipment";
 
 import AlertModal from "@/app/components/custom-reusable/modal/AlertModal";
-import AddEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/addEquipment";
-import EditEquipmentModal from "@/app/(dashboard)/projects/modal/tools/modal/editEquipment";
 
 import DataTable, {
   Column,
@@ -31,10 +29,12 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
-import ViewDetailsModal from "@/app/(dashboard)/projects/modal/tools/modal/viewEquipment";
 
 import { useAuth } from "@/app/context/AuthContext";
 import { color } from "@/lib/color";
+import AddEquipmentModal from "@/app/(admin-dashboard)/equipments/equipment-components/EquipmentAddModal";
+import EditEquipmentModal from "@/app/(admin-dashboard)/projects/modal/tools/modal/editEquipment";
+import ViewDetailsModal from "@/app/(admin-dashboard)/projects/modal/tools/modal/viewEquipment";
 
 function formatCountdown(ms: number) {
   if (ms <= 0) return "0d 0h 0m 0s";
@@ -61,10 +61,13 @@ export default function EquipmentsPage() {
   const { user } = useAuth();
   const [projectName, setProjectName] = useState<string | null>(null);
 
-  const canCreate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
-  const canUpdate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
-  const canDelete = user?.role === 'SUPERADMIN';
-  const canView = user?.role === 'VIEWER' || user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canCreate = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const canUpdate = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const canDelete = user?.role === "SUPERADMIN";
+  const canView =
+    user?.role === "VIEWER" ||
+    user?.role === "ADMIN" ||
+    user?.role === "SUPERADMIN";
 
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);

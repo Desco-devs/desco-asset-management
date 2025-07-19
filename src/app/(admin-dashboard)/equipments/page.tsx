@@ -107,10 +107,10 @@ export default function EquipmentPage() {
       // Prepare data for export
       const dataToExport = allReports.map((report: unknown, index: number) => {
         const r = report as {
-          equipment?: { 
-            brand?: string; 
-            model?: string; 
-            type?: string; 
+          equipment?: {
+            brand?: string;
+            model?: string;
+            type?: string;
             plateNumber?: string;
             owner?: string;
             project?: { name?: string; client?: { name?: string } };
@@ -131,31 +131,35 @@ export default function EquipmentPage() {
           attachmentUrls?: string[];
         };
         return {
-        "Report #": index + 1,
-        "Equipment Brand": r.equipment?.brand || "",
-        "Equipment Model": r.equipment?.model || "",
-        "Equipment Type": r.equipment?.type || "",
-        "Plate Number": r.equipment?.plateNumber || "",
-        "Equipment Owner": r.equipment?.owner || "",
-        "Project Name": r.equipment?.project?.name || "",
-        "Client Name": r.equipment?.project?.client?.name || "",
-        "Issue Description": r.issueDescription || "",
-        Priority: r.priority || "",
-        Status: r.status?.replace("_", " ") || "",
-        "Reported Date": r.dateReported ? new Date(r.dateReported).toLocaleDateString() : "",
-        "Reported By": r.reportedBy || "",
-        "Assigned To": r.repairedBy || "",
-        "Repaired Date": r.dateRepaired
-          ? new Date(r.dateRepaired).toLocaleDateString()
-          : "",
-        Location: r.location?.address || "",
-        "Downtime Hours": r.downtimeHours || "",
-        "Parts Replaced": r.partsReplaced?.join(", ") || "",
-        "Inspection Details": r.inspectionDetails || "",
-        "Action Taken": r.actionTaken || "",
-        Remarks: r.remarks || "",
-        "Attachments Count": r.attachmentUrls?.length || 0,
-        "Created Date": r.dateReported ? new Date(r.dateReported).toISOString() : "",
+          "Report #": index + 1,
+          "Equipment Brand": r.equipment?.brand || "",
+          "Equipment Model": r.equipment?.model || "",
+          "Equipment Type": r.equipment?.type || "",
+          "Plate Number": r.equipment?.plateNumber || "",
+          "Equipment Owner": r.equipment?.owner || "",
+          "Project Name": r.equipment?.project?.name || "",
+          "Client Name": r.equipment?.project?.client?.name || "",
+          "Issue Description": r.issueDescription || "",
+          Priority: r.priority || "",
+          Status: r.status?.replace("_", " ") || "",
+          "Reported Date": r.dateReported
+            ? new Date(r.dateReported).toLocaleDateString()
+            : "",
+          "Reported By": r.reportedBy || "",
+          "Assigned To": r.repairedBy || "",
+          "Repaired Date": r.dateRepaired
+            ? new Date(r.dateRepaired).toLocaleDateString()
+            : "",
+          Location: r.location?.address || "",
+          "Downtime Hours": r.downtimeHours || "",
+          "Parts Replaced": r.partsReplaced?.join(", ") || "",
+          "Inspection Details": r.inspectionDetails || "",
+          "Action Taken": r.actionTaken || "",
+          Remarks: r.remarks || "",
+          "Attachments Count": r.attachmentUrls?.length || 0,
+          "Created Date": r.dateReported
+            ? new Date(r.dateReported).toISOString()
+            : "",
         };
       });
 
@@ -239,7 +243,7 @@ export default function EquipmentPage() {
   }
 
   return (
-    <div className="container mx-auto py-[5dvh]">
+    <div className="container mx-auto py-[5dvh] p-6">
       <div className="mb-6">
         <div className="flex justify-between items-start">
           <div>

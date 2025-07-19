@@ -1,7 +1,7 @@
 "use client";
 
 import type { EquipmentFolder, EquipmentPart } from "@/types/equipment-parts";
-import EquipmentPartsManager from "@/app/(dashboard)/equipments/equipment-components/EquipmentPartsManager";
+import EquipmentPartsManager from "@/app/(admin-dashboard)/equipments/equipment-components/EquipmentPartsManager";
 
 interface EquipmentPartsSectionProps {
   equipmentParts: EquipmentPart[];

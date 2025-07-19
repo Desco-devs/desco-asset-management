@@ -73,6 +73,12 @@ const data = {
       icon: User,
       isActive: true,
     },
+    {
+      title: "Chat",
+      url: "/chat-app",
+      icon: User,
+      isActive: true,
+    },
   ],
 };
 

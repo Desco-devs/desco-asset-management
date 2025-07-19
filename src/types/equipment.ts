@@ -32,7 +32,7 @@ export interface Equipment {
   brand: string;
   model: string;
   type: string;
-  insuranceExpirationDate: string;
+  insuranceExpirationDate?: string;
   before?: number;
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;

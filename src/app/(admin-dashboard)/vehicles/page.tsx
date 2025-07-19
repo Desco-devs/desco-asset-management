@@ -228,7 +228,7 @@ export default function VehiclePage() {
   }
 
   return (
-    <div className="h-full container mx-auto py-[5dvh]">
+    <div className="h-full container mx-auto py-[5dvh] p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Vehicle Management</h1>
         <p className="text-muted-foreground">
@@ -245,4 +245,3 @@ export default function VehiclePage() {
     </div>
   );
 }
-  

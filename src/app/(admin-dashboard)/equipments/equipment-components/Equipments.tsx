@@ -33,7 +33,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import EquipmentDeleteAlertDialog from "./AlertDialog";
-import AddEquipmentModal from "./EquipmentAddModal";
 import EquipmentModal from "./EquipmentModal";
 import MaintenanceReportModal, {
   MaintenanceReport,
@@ -42,6 +41,7 @@ import MaintenanceReportModal, {
 import ReportDeleteAlertDialog from "./ReportDeleteAlertDialog";
 import ReportSelectionDialog from "./ReportSelection";
 import ViewReportsModal from "./ViewReportsModal";
+import AddEquipmentModal from "./EquipmentAddModal";
 
 // Types based on your updated Prisma schema
 interface Equipment {
@@ -105,15 +105,16 @@ const EquipmentCards = ({
 }: EquipmentCardsProps) => {
   const { user } = useAuth();
 
-  const isAdmin = (user?.role === 'ADMIN' || user?.role === 'SUPERADMIN') ?? false;
+  const isAdmin =
+    (user?.role === "ADMIN" || user?.role === "SUPERADMIN") ?? false;
 
   const [filteredEquipments, setFilteredEquipments] =
     useState<Equipment[]>(equipments);
   const [selectedClient, setSelectedClient] = useState<string>("all");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
-  const [selectedEquipment, setSelectedEquipment] = useState<
-    Equipment | null | ""
-  >(null);
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(
+    null
+  );
   const [selectedEquipmentThatHasIssues, setSelectedEquipmentThatHasIssues] =
     useState<Equipment | null | "">(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -450,7 +451,6 @@ const EquipmentCards = ({
     setReportToDelete(report);
     setShowReportDeleteDialog(true);
   };
-
 
   const confirmDelete = async () => {
     if (!equipmentToDelete) return;

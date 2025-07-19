@@ -6,8 +6,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 import AlertModal from "@/app/components/custom-reusable/modal/AlertModal";
-import AddVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/addVehicle";
-import EditVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/editVehicle";
 
 import DataTable, {
   Column,
@@ -24,7 +22,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
 
-import ViewVehicleModal from "@/app/(dashboard)/projects/modal/tools/modal/viewVehicle";
 import { useAuth } from "@/app/context/AuthContext";
 
 import {
@@ -38,6 +35,8 @@ import {
   getVehiclesByProject,
 } from "@/app/service/vehicles/vehicles";
 import { color } from "@/lib/color";
+import EditVehicleModal from "@/app/(admin-dashboard)/projects/modal/tools/modal/editVehicle";
+import { AddVehicleModal } from "@/app/(admin-dashboard)/vehicles/vehicles-components";
 
 function formatCountdown(ms: number) {
   if (ms <= 0) return "0d 0h 0m 0s";
@@ -65,10 +64,13 @@ export default function VehiclesPage() {
 
   const [projectName, setProjectName] = useState<string | null>(null);
 
-  const canCreate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
-  const canUpdate = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
-  const canDelete = user?.role === 'SUPERADMIN';
-  const canView = user?.role === 'VIEWER' || user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
+  const canCreate = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const canUpdate = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const canDelete = user?.role === "SUPERADMIN";
+  const canView =
+    user?.role === "VIEWER" ||
+    user?.role === "ADMIN" ||
+    user?.role === "SUPERADMIN";
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
