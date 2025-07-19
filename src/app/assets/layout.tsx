@@ -1,6 +1,16 @@
 import type { ReactNode } from "react";
+import { redirect } from "next/navigation";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 
-export default function AssetsLayout({ children }: { children: ReactNode }) {
+export default async function AssetsLayout({ children }: { children: ReactNode }) {
+  // Server-side auth check - defense in depth
+  const supabase = await createServerSupabaseClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  if (!user || error) {
+    redirect('/login');
+  }
+
   return (
     <div className="relative h-full w-full min-h-screen">
       {/* Beautiful gradient background like the landing page */}

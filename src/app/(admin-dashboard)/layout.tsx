@@ -1,25 +1,20 @@
-"use client";
-
 import React from "react";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "../components/custom-reusable/sidebar/app-sidebar";
-import Header from "../components/custom-reusable/sidebar/header";
-import { CardContent } from "@/components/ui/card";
+import { redirect } from "next/navigation";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+import DashboardClientLayout from "./DashboardClientLayout";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <SidebarProvider>
-      <AppSidebar />
-      <div className="flex h-screen w-full flex-col">
-        <Header />
-        <main className="w-full h-full">
-          <CardContent className="p-0">{children}</CardContent>
-        </main>
-      </div>
-    </SidebarProvider>
-  );
+  // Server-side auth check - defense in depth
+  const supabase = await createServerSupabaseClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  if (!user || error) {
+    redirect('/login');
+  }
+
+  return <DashboardClientLayout>{children}</DashboardClientLayout>;
 }

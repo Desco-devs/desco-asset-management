@@ -8,9 +8,276 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ============================================
-// ENUMS
-// ============================================
+model user {
+  id                   String                         @id @db.Uuid
+  username             String                         @unique
+  full_name            String
+  phone                String?
+  user_profile         String?
+  role                 Role                           @default(VIEWER)
+  user_status          user_status                    @default(ACTIVE)
+  created_at           DateTime                       @default(now())
+  updated_at           DateTime                       @updatedAt
+  created_clients      client[]                       @relation("ClientCreatedBy")
+  created_equipments   equipment[]                    @relation("EquipmentCreatedBy")
+  created_locations    location[]                     @relation("LocationCreatedBy")
+  repaired_maintenance maintenance_equipment_report[] @relation("RepairedBy")
+  reported_maintenance maintenance_equipment_report[] @relation("ReportedBy")
+  sent_messages        message[]                      @relation("MessageCreatedBy")
+  created_projects     project[]                      @relation("ProjectCreatedBy")
+  sent_invitations     room_invitation[]              @relation("InvitationSentBy")
+  received_invitations room_invitation[]              @relation("InvitationSentTo")
+  room_memberships     room_member[]                  @relation("UserRoomMember")
+  owned_rooms          room[]                         @relation("RoomOwner")
+  created_vehicles     vehicle[]                      @relation("VehicleCreatedBy")
+
+  @@index([role])
+  @@index([user_status])
+  @@index([created_at])
+  @@map("users")
+}
+
+model room {
+  id          String            @id @default(uuid()) @db.Uuid
+  name        String
+  type        room_type         @default(GROUP)
+  description String?
+  avatar_url  String?
+  owner_id    String            @db.Uuid
+  created_at  DateTime          @default(now())
+  updated_at  DateTime          @updatedAt
+  messages    message[]
+  invitations room_invitation[]
+  members     room_member[]
+  owner       user              @relation("RoomOwner", fields: [owner_id], references: [id])
+
+  @@index([owner_id])
+  @@index([type])
+  @@index([created_at])
+  @@map("rooms")
+}
+
+model room_member {
+  id        String    @id @default(uuid()) @db.Uuid
+  room_id   String    @db.Uuid
+  user_id   String    @db.Uuid
+  joined_at DateTime  @default(now())
+  last_read DateTime?
+  room      room      @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  user      user      @relation("UserRoomMember", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([room_id, user_id])
+  @@index([room_id])
+  @@index([user_id])
+  @@map("room_members")
+}
+
+model message {
+  id          String       @id @default(uuid()) @db.Uuid
+  room_id     String       @db.Uuid
+  sender_id   String       @db.Uuid
+  content     String
+  type        message_type @default(TEXT)
+  file_url    String?
+  reply_to_id String?      @db.Uuid
+  edited_at   DateTime?
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+  reply_to    message?     @relation("MessageReply", fields: [reply_to_id], references: [id])
+  replies     message[]    @relation("MessageReply")
+  room        room         @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  sender      user         @relation("MessageCreatedBy", fields: [sender_id], references: [id])
+
+  @@index([room_id])
+  @@index([sender_id])
+  @@index([created_at])
+  @@index([reply_to_id])
+  @@map("messages")
+}
+
+model room_invitation {
+  id           String            @id @default(uuid()) @db.Uuid
+  room_id      String            @db.Uuid
+  invited_by   String            @db.Uuid
+  invited_user String            @db.Uuid
+  status       invitation_status @default(PENDING)
+  message      String?
+  created_at   DateTime          @default(now())
+  responded_at DateTime?
+  inviter      user              @relation("InvitationSentBy", fields: [invited_by], references: [id])
+  invitee      user              @relation("InvitationSentTo", fields: [invited_user], references: [id])
+  room         room              @relation(fields: [room_id], references: [id], onDelete: Cascade)
+
+  @@unique([room_id, invited_user])
+  @@index([room_id])
+  @@index([invited_user])
+  @@index([invited_by])
+  @@index([status])
+  @@map("room_invitations")
+}
+
+model location {
+  id                            String                         @id @default(uuid()) @db.Uuid
+  address                       String
+  created_at                    DateTime                       @default(now())
+  updated_at                    DateTime                       @updatedAt
+  created_by                    String?                        @db.Uuid
+  clients                       client[]
+  user                          user?                          @relation("LocationCreatedBy", fields: [created_by], references: [id])
+  maintenance_equipment_reports maintenance_equipment_report[]
+
+  @@index([created_by])
+  @@index([created_at])
+  @@map("locations")
+}
+
+model client {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  location_id String    @db.Uuid
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  created_by  String?   @db.Uuid
+  user        user?     @relation("ClientCreatedBy", fields: [created_by], references: [id])
+  location    location  @relation(fields: [location_id], references: [id], onDelete: Cascade)
+  projects    project[]
+
+  @@index([location_id])
+  @@index([created_by])
+  @@index([name])
+  @@index([created_at])
+  @@map("clients")
+}
+
+model project {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  client_id  String      @db.Uuid
+  created_at DateTime    @default(now())
+  updated_at DateTime    @updatedAt
+  created_by String?     @db.Uuid
+  equipments equipment[]
+  client     client      @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  user       user?       @relation("ProjectCreatedBy", fields: [created_by], references: [id])
+  vehicles   vehicle[]
+
+  @@index([client_id])
+  @@index([created_by])
+  @@index([name])
+  @@index([created_at])
+  @@map("projects")
+}
+
+model equipment {
+  id                          String                         @id @default(uuid()) @db.Uuid
+  brand                       String
+  model                       String
+  type                        String
+  insurance_expiration_date   DateTime?                      @default(now())
+  before                      Int?
+  status                      status
+  remarks                     String?
+  owner                       String
+  image_url                   String?
+  inspection_date             DateTime?
+  project_id                  String                         @db.Uuid
+  plate_number                String?
+  original_receipt_url        String?
+  equipment_registration_url  String?
+  thirdparty_inspection_image String?
+  pgpc_inspection_image       String?
+  equipment_parts             String[]
+  created_at                  DateTime                       @default(now())
+  updated_at                  DateTime                       @updatedAt
+  created_by                  String?                        @db.Uuid
+  user                        user?                          @relation("EquipmentCreatedBy", fields: [created_by], references: [id])
+  project                     project                        @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  maintenance_reports         maintenance_equipment_report[]
+
+  @@index([project_id])
+  @@index([created_by])
+  @@index([status])
+  @@index([type])
+  @@index([brand])
+  @@index([inspection_date])
+  @@index([insurance_expiration_date])
+  @@index([created_at])
+  @@map("equipment")
+}
+
+model vehicle {
+  id                    String   @id @default(uuid()) @db.Uuid
+  brand                 String
+  model                 String
+  type                  String
+  plate_number          String
+  inspection_date       DateTime
+  before                Int
+  expiry_date           DateTime
+  status                status
+  remarks               String?
+  owner                 String
+  front_img_url         String?
+  back_img_url          String?
+  side1_img_url         String?
+  side2_img_url         String?
+  original_receipt_url  String?
+  car_registration_url  String?
+  pgpc_inspection_image String?
+  project_id            String   @db.Uuid
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+  created_by            String?  @db.Uuid
+  user                  user?    @relation("VehicleCreatedBy", fields: [created_by], references: [id])
+  project               project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@index([project_id])
+  @@index([created_by])
+  @@index([status])
+  @@index([type])
+  @@index([brand])
+  @@index([plate_number])
+  @@index([inspection_date])
+  @@index([expiry_date])
+  @@index([created_at])
+  @@map("vehicles")
+}
+
+model maintenance_equipment_report {
+  id                 String           @id @default(uuid()) @db.Uuid
+  equipment_id       String           @db.Uuid
+  location_id        String           @db.Uuid
+  issue_description  String
+  remarks            String?
+  inspection_details String?
+  action_taken       String?
+  parts_replaced     String[]
+  priority           report_priority?
+  status             report_status?
+  downtime_hours     String?
+  date_repaired      DateTime?
+  date_reported      DateTime         @default(now())
+  attachment_urls    String[]
+  created_at         DateTime         @default(now())
+  updated_at         DateTime         @updatedAt
+  reported_by        String?          @db.Uuid
+  repaired_by        String?          @db.Uuid
+  equipment          equipment        @relation(fields: [equipment_id], references: [id], onDelete: Cascade)
+  location           location         @relation(fields: [location_id], references: [id])
+  repaired_user      user?            @relation("RepairedBy", fields: [repaired_by], references: [id])
+  reported_user      user?            @relation("ReportedBy", fields: [reported_by], references: [id])
+
+  @@index([equipment_id])
+  @@index([location_id])
+  @@index([reported_by])
+  @@index([repaired_by])
+  @@index([status])
+  @@index([priority])
+  @@index([date_reported])
+  @@index([date_repaired])
+  @@index([created_at])
+  @@map("maintenance_equipment_reports")
+}
 
 enum Role {
   SUPERADMIN
@@ -41,50 +308,6 @@ enum report_status {
   CANCELLED
 }
 
-// ============================================
-// MODELS - HIERARCHICAL ORDER
-// ============================================
-
-// Base User Model
-model user {
-  id           String      @id @db.Uuid // Same as auth.users.id from Supabase
-  username     String      @unique
-  full_name    String
-  phone        String?
-  user_profile String?
-  role         Role        @default(VIEWER)
-  user_status  user_status @default(ACTIVE)
-  created_at   DateTime    @default(now())
-  updated_at   DateTime    @updatedAt
-
-  // Relationships
-  created_locations  location[]  @relation("LocationCreatedBy")
-  created_clients    client[]    @relation("ClientCreatedBy")
-  created_projects   project[]   @relation("ProjectCreatedBy")
-  created_equipments equipment[] @relation("EquipmentCreatedBy")
-  created_vehicles   vehicle[]   @relation("VehicleCreatedBy")
-
-  // Maintenance relationships
-  reported_maintenance maintenance_equipment_report[] @relation("ReportedBy")
-  repaired_maintenance maintenance_equipment_report[] @relation("RepairedBy")
-
-  //CHAT APP
-  owned_rooms          room[]            @relation("RoomOwner")
-  room_memberships     room_member[]     @relation("UserRoomMember")
-  sent_messages        message[]         @relation("MessageCreatedBy")
-  sent_invitations     room_invitation[] @relation("InvitationSentBy")
-  received_invitations room_invitation[] @relation("InvitationSentTo")
-
-  @@index([role])
-  @@index([user_status])
-  @@index([created_at])
-  @@map("users")
-}
-
-// ============================================
-// CHAT MODELS
-// ============================================
-
 enum room_type {
   DIRECT
   GROUP
@@ -102,277 +325,4 @@ enum invitation_status {
   ACCEPTED
   DECLINED
   CANCELLED
-}
-
-model room {
-  id          String    @id @default(uuid()) @db.Uuid
-  name        String
-  type        room_type @default(GROUP)
-  description String?
-  avatar_url  String?
-  owner_id    String    @db.Uuid
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
-
-  owner       user              @relation("RoomOwner", fields: [owner_id], references: [id])
-  members     room_member[]
-  messages    message[]
-  invitations room_invitation[]
-
-  @@index([owner_id])
-  @@index([type])
-  @@index([created_at])
-  @@map("rooms")
-}
-
-model room_member {
-  id        String    @id @default(uuid()) @db.Uuid
-  room_id   String    @db.Uuid
-  user_id   String    @db.Uuid
-  joined_at DateTime  @default(now())
-  last_read DateTime?
-
-  room room @relation(fields: [room_id], references: [id], onDelete: Cascade)
-  user user @relation("UserRoomMember", fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@unique([room_id, user_id])
-  @@index([room_id])
-  @@index([user_id])
-  @@map("room_members")
-}
-
-model message {
-  id          String       @id @default(uuid()) @db.Uuid
-  room_id     String       @db.Uuid
-  sender_id   String       @db.Uuid
-  content     String
-  type        message_type @default(TEXT)
-  file_url    String?
-  reply_to_id String?      @db.Uuid
-  edited_at   DateTime?
-  created_at  DateTime     @default(now())
-  updated_at  DateTime     @updatedAt
-
-  room     room      @relation(fields: [room_id], references: [id], onDelete: Cascade)
-  sender   user      @relation("MessageCreatedBy", fields: [sender_id], references: [id])
-  reply_to message?  @relation("MessageReply", fields: [reply_to_id], references: [id])
-  replies  message[] @relation("MessageReply")
-
-  @@index([room_id])
-  @@index([sender_id])
-  @@index([created_at])
-  @@index([reply_to_id])
-  @@map("messages")
-}
-
-model room_invitation {
-  id           String            @id @default(uuid()) @db.Uuid
-  room_id      String            @db.Uuid
-  invited_by   String            @db.Uuid
-  invited_user String            @db.Uuid
-  status       invitation_status @default(PENDING)
-  message      String?
-  created_at   DateTime          @default(now())
-  responded_at DateTime?
-
-  room    room @relation(fields: [room_id], references: [id], onDelete: Cascade)
-  inviter user @relation("InvitationSentBy", fields: [invited_by], references: [id])
-  invitee user @relation("InvitationSentTo", fields: [invited_user], references: [id])
-
-  @@unique([room_id, invited_user])
-  @@index([room_id])
-  @@index([invited_user])
-  @@index([invited_by])
-  @@index([status])
-  @@map("room_invitations")
-}
-
-// =============================================
-
-// Level 1: Locations
-model location {
-  id         String   @id @default(uuid()) @db.Uuid
-  address    String
-  created_by String?  @db.Uuid
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  // Relationships
-  user                          user?                          @relation("LocationCreatedBy", fields: [created_by], references: [id])
-  clients                       client[]
-  maintenance_equipment_reports maintenance_equipment_report[]
-
-  @@index([created_by])
-  @@index([created_at])
-  @@map("locations")
-}
-
-// Level 2: Clients (under Locations)
-model client {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String
-  location_id String   @db.Uuid
-  created_by  String?  @db.Uuid
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-
-  // Relationships
-  location location  @relation(fields: [location_id], references: [id], onDelete: Cascade)
-  user     user?     @relation("ClientCreatedBy", fields: [created_by], references: [id])
-  projects project[]
-
-  @@index([location_id])
-  @@index([created_by])
-  @@index([name])
-  @@index([created_at])
-  @@map("clients")
-}
-
-// Level 3: Projects (under Clients)
-model project {
-  id         String   @id @default(uuid()) @db.Uuid
-  name       String
-  client_id  String   @db.Uuid
-  created_by String?  @db.Uuid
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  // Relationships
-  client     client      @relation(fields: [client_id], references: [id], onDelete: Cascade)
-  user       user?       @relation("ProjectCreatedBy", fields: [created_by], references: [id])
-  equipments equipment[]
-  vehicles   vehicle[]
-
-  @@index([client_id])
-  @@index([created_by])
-  @@index([name])
-  @@index([created_at])
-  @@map("projects")
-}
-
-// Level 4: Equipment (under Projects)
-model equipment {
-  id                          String    @id @default(uuid()) @db.Uuid
-  brand                       String
-  model                       String
-  type                        String
-  insurance_expiration_date   DateTime? @default(now())
-  before                      Int? // in months
-  status                      status
-  remarks                     String?
-  owner                       String
-  image_url                   String?
-  inspection_date             DateTime?
-  project_id                  String    @db.Uuid
-  created_by                  String?   @db.Uuid
-  plate_number                String?
-  original_receipt_url        String?
-  equipment_registration_url  String?
-  thirdparty_inspection_image String?
-  pgpc_inspection_image       String?
-  equipment_parts             String[]
-  created_at                  DateTime  @default(now())
-  updated_at                  DateTime  @updatedAt
-
-  // Relationships
-  project             project                        @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  user                user?                          @relation("EquipmentCreatedBy", fields: [created_by], references: [id])
-  maintenance_reports maintenance_equipment_report[]
-
-  @@index([project_id])
-  @@index([created_by])
-  @@index([status])
-  @@index([type])
-  @@index([brand])
-  @@index([inspection_date])
-  @@index([insurance_expiration_date])
-  @@index([created_at])
-  @@map("equipment")
-}
-
-// Level 4: Vehicles (under Projects)
-model vehicle {
-  id                    String   @id @default(uuid()) @db.Uuid
-  brand                 String
-  model                 String
-  type                  String
-  plate_number          String
-  inspection_date       DateTime
-  before                Int // in months
-  expiry_date           DateTime
-  status                status
-  remarks               String?
-  owner                 String
-  front_img_url         String?
-  back_img_url          String?
-  side1_img_url         String?
-  side2_img_url         String?
-  original_receipt_url  String? //image man ini para sa OR
-  car_registration_url  String? //image man ini para sa CR
-  pgpc_inspection_image String? //same with the equipments igwa man pgpc
-  project_id            String   @db.Uuid
-  created_by            String?  @db.Uuid
-  created_at            DateTime @default(now())
-  updated_at            DateTime @updatedAt
-
-  // Relationships
-  project project @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  user    user?   @relation("VehicleCreatedBy", fields: [created_by], references: [id])
-
-  @@index([project_id])
-  @@index([created_by])
-  @@index([status])
-  @@index([type])
-  @@index([brand])
-  @@index([plate_number])
-  @@index([inspection_date])
-  @@index([expiry_date])
-  @@index([created_at])
-  @@map("vehicles")
-}
-
-// Supporting Model: Maintenance Reports
-model maintenance_equipment_report {
-  id                 String           @id @default(uuid()) @db.Uuid
-  equipment_id       String           @db.Uuid
-  location_id        String           @db.Uuid
-  //reported and repaired by - now references user table
-  reported_by        String?          @db.Uuid
-  repaired_by        String?          @db.Uuid
-  //issue details
-  issue_description  String
-  remarks            String?
-  inspection_details String?
-  action_taken       String?
-  //parts
-  parts_replaced     String[]
-  priority           report_priority?
-  //status of the report
-  status             report_status?
-  downtime_hours     String?
-  //dates
-  date_repaired      DateTime?
-  date_reported      DateTime         @default(now())
-  //attachment URLs
-  attachment_urls    String[]
-  //datecreated and updated
-  created_at         DateTime         @default(now())
-  updated_at         DateTime         @updatedAt
-
-  // Relationships
-  equipment     equipment @relation(fields: [equipment_id], references: [id], onDelete: Cascade)
-  location      location  @relation(fields: [location_id], references: [id])
-  reported_user user?     @relation("ReportedBy", fields: [reported_by], references: [id])
-  repaired_user user?     @relation("RepairedBy", fields: [repaired_by], references: [id])
-
-  @@index([equipment_id])
-  @@index([location_id])
-  @@index([reported_by])
-  @@index([repaired_by])
-  @@index([status])
-  @@index([priority])
-  @@index([date_reported])
-  @@index([date_repaired])
-  @@index([created_at])
-  @@map("maintenance_equipment_reports")
 }
