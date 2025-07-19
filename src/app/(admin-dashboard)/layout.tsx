@@ -17,7 +17,7 @@ export default function DashboardLayout({
       <div className="flex h-screen w-full flex-col">
         <Header />
         <main className="w-full h-full">
-          <CardContent>{children}</CardContent>
+          <CardContent className="p-0">{children}</CardContent>
         </main>
       </div>
     </SidebarProvider>

@@ -69,10 +69,10 @@ model user {
   repaired_maintenance maintenance_equipment_report[] @relation("RepairedBy")
 
   //CHAT APP
-  owned_rooms         room[]             @relation("RoomOwner")
-  room_memberships    room_member[]      @relation("UserRoomMember")
-  sent_messages       message[]          @relation("MessageCreatedBy")
-  sent_invitations    room_invitation[]  @relation("InvitationSentBy")
+  owned_rooms          room[]            @relation("RoomOwner")
+  room_memberships     room_member[]     @relation("UserRoomMember")
+  sent_messages        message[]         @relation("MessageCreatedBy")
+  sent_invitations     room_invitation[] @relation("InvitationSentBy")
   received_invitations room_invitation[] @relation("InvitationSentTo")
 
   @@index([role])
@@ -97,17 +97,24 @@ enum message_type {
   SYSTEM
 }
 
+enum invitation_status {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
 model room {
-  id          String        @id @default(uuid()) @db.Uuid
+  id          String    @id @default(uuid()) @db.Uuid
   name        String
-  type        room_type     @default(GROUP)
+  type        room_type @default(GROUP)
   description String?
   avatar_url  String?
-  owner_id    String        @db.Uuid
-  created_at  DateTime      @default(now())
-  updated_at  DateTime      @updatedAt
-  
-  owner       user          @relation("RoomOwner", fields: [owner_id], references: [id])
+  owner_id    String    @db.Uuid
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  owner       user              @relation("RoomOwner", fields: [owner_id], references: [id])
   members     room_member[]
   messages    message[]
   invitations room_invitation[]
@@ -156,6 +163,28 @@ model message {
   @@index([created_at])
   @@index([reply_to_id])
   @@map("messages")
+}
+
+model room_invitation {
+  id           String            @id @default(uuid()) @db.Uuid
+  room_id      String            @db.Uuid
+  invited_by   String            @db.Uuid
+  invited_user String            @db.Uuid
+  status       invitation_status @default(PENDING)
+  message      String?
+  created_at   DateTime          @default(now())
+  responded_at DateTime?
+
+  room    room @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  inviter user @relation("InvitationSentBy", fields: [invited_by], references: [id])
+  invitee user @relation("InvitationSentTo", fields: [invited_user], references: [id])
+
+  @@unique([room_id, invited_user])
+  @@index([room_id])
+  @@index([invited_user])
+  @@index([invited_by])
+  @@index([status])
+  @@map("room_invitations")
 }
 
 // =============================================
@@ -346,33 +375,4 @@ model maintenance_equipment_report {
   @@index([date_repaired])
   @@index([created_at])
   @@map("maintenance_equipment_reports")
-}
-
-enum invitation_status {
-  PENDING
-  ACCEPTED
-  DECLINED
-  CANCELLED
-}
-
-model room_invitation {
-  id           String            @id @default(uuid()) @db.Uuid
-  room_id      String            @db.Uuid
-  invited_by   String            @db.Uuid
-  invited_user String            @db.Uuid
-  status       invitation_status @default(PENDING)
-  message      String?
-  created_at   DateTime          @default(now())
-  responded_at DateTime?
-
-  room         room @relation(fields: [room_id], references: [id], onDelete: Cascade)
-  inviter      user @relation("InvitationSentBy", fields: [invited_by], references: [id])
-  invitee      user @relation("InvitationSentTo", fields: [invited_user], references: [id])
-
-  @@unique([room_id, invited_user])
-  @@index([room_id])
-  @@index([invited_user])
-  @@index([invited_by])
-  @@index([status])
-  @@map("room_invitations")
 }
