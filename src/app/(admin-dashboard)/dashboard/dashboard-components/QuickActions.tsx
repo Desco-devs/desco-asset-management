@@ -4,6 +4,7 @@ import { Plus, Users, Building2, FolderOpen, Truck, Wrench, FileText, Settings }
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { LocationFormDialog } from "@/app/components/custom-reuseable/LocationFormDialog";
 
 interface QuickAction {
   id: string;
@@ -23,7 +24,6 @@ export function QuickActions() {
       title: "Add Location",
       description: "Create a new location for clients",
       icon: <Building2 className="h-5 w-5" />,
-      href: "/locations",
       variant: "outline",
       color: "text-blue-600"
     },
@@ -104,7 +104,26 @@ export function QuickActions() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {quickActions.map((action) => (
             <div key={action.id} className="group">
-              {action.href ? (
+              {action.id === "add-location" ? (
+                <LocationFormDialog
+                  trigger={
+                    <Button
+                      variant={action.variant || "outline"}
+                      className="w-full h-auto flex-col p-4 space-y-2 hover:scale-105 transition-transform"
+                    >
+                      <div className={`${action.color} group-hover:scale-110 transition-transform`}>
+                        {action.icon}
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="font-medium text-sm">{action.title}</p>
+                        <p className="text-xs text-muted-foreground leading-tight">
+                          {action.description}
+                        </p>
+                      </div>
+                    </Button>
+                  }
+                />
+              ) : action.href ? (
                 <Link href={action.href}>
                   <Button
                     variant={action.variant || "outline"}

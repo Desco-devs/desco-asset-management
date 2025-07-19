@@ -106,7 +106,8 @@ export default async function Dashboard() {
       vehiclesListData,
       projectsData,
       clientsData,
-      maintenanceReportsData
+      maintenanceReportsData,
+      locationsData
     );
   } catch (error) {
     console.error("Error fetching dashboard data:", error);

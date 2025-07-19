@@ -159,12 +159,34 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
       })
       .subscribe();
 
+      // Subscribe to location changes
+      const locationChannel = supabase
+        .channel('location-changes')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'locations' }, (payload) => {
+          if (payload.new && Object.keys(payload.new).length > 0) {
+          const newLocation = payload.new;
+          
+          const newActivity: ActivityItem = {
+            id: newLocation.id,
+            type: 'location',
+            action: 'created',
+            title: newLocation.address || 'New Location',
+            description: 'New location added',
+            timestamp: new Date().toISOString()
+          };
+          
+          setActivities(prev => [newActivity, ...prev].slice(0, 10));
+        }
+      })
+      .subscribe();
+
       return () => {
         supabase.removeChannel(equipmentChannel);
         supabase.removeChannel(vehicleChannel);
         supabase.removeChannel(projectChannel);
         supabase.removeChannel(clientChannel);
         supabase.removeChannel(maintenanceChannel);
+        supabase.removeChannel(locationChannel);
       };
     };
 

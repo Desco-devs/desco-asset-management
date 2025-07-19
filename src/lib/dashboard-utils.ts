@@ -130,7 +130,8 @@ export function generateRecentActivity(
   vehiclesListData: VehicleData[],
   projectsData: ProjectData[],
   clientsData: ClientData[],
-  maintenanceReportsData: MaintenanceReportData[]
+  maintenanceReportsData: MaintenanceReportData[],
+  locationsData: LocationData[]
 ): ActivityItem[] {
   const allActivities: ActivityItem[] = [];
 
@@ -195,6 +196,18 @@ export function generateRecentActivity(
       timestamp: (item.date_reported || item.created_at).toISOString(),
       status: item.status || report_status.IN_PROGRESS,
       priority: item.priority || report_priority.HIGH,
+    });
+  });
+
+  // Add location activities
+  locationsData.slice(0, 2).forEach((item) => {
+    allActivities.push({
+      id: item.id,
+      type: "location",
+      action: "created",
+      title: item.address,
+      description: "New location added",
+      timestamp: item.created_at.toISOString(),
     });
   });
 

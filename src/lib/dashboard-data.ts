@@ -103,6 +103,7 @@ async function fetchLocations(): Promise<LocationData[]> {
 
   return locations.map(location => ({
     id: location.id,
+    name: location.name,
     address: location.address,
     created_at: location.created_at,
     clients: location.clients,

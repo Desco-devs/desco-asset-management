@@ -37,7 +37,7 @@ export interface DetailedData {
 
 export interface ActivityItem {
   id: string;
-  type: 'equipment' | 'vehicle' | 'project' | 'client' | 'maintenance';
+  type: 'equipment' | 'vehicle' | 'project' | 'client' | 'maintenance' | 'location';
   action: 'created' | 'updated' | 'reported';
   title: string;
   description: string;
@@ -49,6 +49,7 @@ export interface ActivityItem {
 // Prisma result types (simplified)
 export interface LocationData {
   id: string
+  name: string
   address: string
   created_at: Date
   clients?: { id: string; name: string }[]
