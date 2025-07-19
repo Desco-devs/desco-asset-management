@@ -14,23 +14,34 @@ export async function GET() {
       );
     }
 
-    const locations = await prisma.location.findMany({
-      select: {
-        id: true,
-        address: true,
-        created_at: true
+    const clients = await prisma.client.findMany({
+      include: {
+        location: true,
+        user: {
+          select: {
+            id: true,
+            full_name: true,
+            username: true
+          }
+        },
+        projects: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
       },
       orderBy: {
-        address: 'asc'
+        created_at: 'desc'
       }
     });
 
-    return NextResponse.json(locations);
+    return NextResponse.json(clients);
 
   } catch (error: any) {
-    console.error("Error fetching locations:", error);
+    console.error("Error fetching clients:", error);
     return NextResponse.json(
-      { error: "Failed to fetch locations" },
+      { error: "Failed to fetch clients" },
       { status: 500 }
     );
   }
@@ -53,6 +64,8 @@ export async function POST(request: NextRequest) {
       where: { id: user.id },
       select: {
         id: true,
+        username: true,
+        full_name: true,
         role: true,
         user_status: true,
       },
@@ -72,35 +85,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has permission to create locations (ADMIN or SUPERADMIN)
+    // Check if user has permission to create clients (ADMIN or SUPERADMIN)
     if (userProfile.role !== 'ADMIN' && userProfile.role !== 'SUPERADMIN') {
       return NextResponse.json(
-        { error: "Insufficient permissions to create locations" },
+        { error: "Insufficient permissions to create clients" },
         { status: 403 }
       );
     }
 
-    const { address } = await request.json();
+    const { name, locationId } = await request.json();
 
-    if (!address || typeof address !== "string" || !address.trim()) {
+    // Validate inputs
+    if (!name?.trim()) {
       return NextResponse.json(
-        { error: "Address is required and must be a non-empty string" },
+        { error: "Client name is required" },
         { status: 400 }
       );
     }
 
-    const newLocation = await prisma.location.create({
+    if (!locationId?.trim()) {
+      return NextResponse.json(
+        { error: "Location is required" },
+        { status: 400 }
+      );
+    }
+
+    // Check if location exists
+    const location = await prisma.location.findUnique({
+      where: { id: locationId }
+    });
+
+    if (!location) {
+      return NextResponse.json(
+        { error: "Selected location does not exist" },
+        { status: 400 }
+      );
+    }
+
+    // Create the client
+    const client = await prisma.client.create({
       data: {
-        address: address.trim(),
+        name: name.trim(),
+        location_id: locationId,
         created_by: userProfile.id,
       },
-      include: { 
-        clients: true,
+      include: {
+        location: true,
         user: {
           select: {
             id: true,
             full_name: true,
-            username: true,
+            username: true
           }
         }
       }
@@ -108,21 +143,22 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: newLocation,
+      client,
+      message: "Client created successfully"
     });
 
   } catch (error: any) {
-    console.error("Error creating location:", error);
+    console.error("Error creating client:", error);
     
     if (error.code === "P2002") {
       return NextResponse.json(
-        { error: "Location with this address already exists" },
+        { error: "Client with this name already exists in this location" },
         { status: 409 }
       );
     }
     
     return NextResponse.json(
-      { error: error.message || "Failed to create location" },
+      { error: error.message || "Failed to create client" },
       { status: 500 }
     );
   }

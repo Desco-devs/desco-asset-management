@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { LocationFormDialog } from "@/app/components/custom-reuseable/LocationFormDialog";
+import { ClientFormDialog } from "@/app/components/custom-reuseable/ClientFormDialog";
+import { ProjectFormDialog } from "@/app/components/custom-reuseable/ProjectFormDialog";
 
 interface QuickAction {
   id: string;
@@ -32,7 +34,6 @@ export function QuickActions() {
       title: "Add Client",
       description: "Register a new client",
       icon: <Users className="h-5 w-5" />,
-      href: "/projects", // Assuming this is where client management is
       variant: "outline",
       color: "text-green-600"
     },
@@ -41,7 +42,6 @@ export function QuickActions() {
       title: "New Project",
       description: "Start a new project",
       icon: <FolderOpen className="h-5 w-5" />,
-      href: "/projects",
       variant: "outline",
       color: "text-purple-600"
     },
@@ -109,7 +109,45 @@ export function QuickActions() {
                   trigger={
                     <Button
                       variant={action.variant || "outline"}
-                      className="w-full h-auto flex-col p-4 space-y-2 hover:scale-105 transition-transform"
+                      className="w-full h-auto flex-col p-4 space-y-2 hover:scale-105 transition-transform hover:bg-blue-50 hover:border-blue-200 dark:hover:bg-blue-950 dark:hover:border-blue-800"
+                    >
+                      <div className={`${action.color} group-hover:scale-110 transition-transform`}>
+                        {action.icon}
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="font-medium text-sm">{action.title}</p>
+                        <p className="text-xs text-muted-foreground leading-tight">
+                          {action.description}
+                        </p>
+                      </div>
+                    </Button>
+                  }
+                />
+              ) : action.id === "add-client" ? (
+                <ClientFormDialog
+                  trigger={
+                    <Button
+                      variant={action.variant || "outline"}
+                      className="w-full h-auto flex-col p-4 space-y-2 hover:scale-105 transition-transform hover:bg-green-50 hover:border-green-200 dark:hover:bg-green-950 dark:hover:border-green-800"
+                    >
+                      <div className={`${action.color} group-hover:scale-110 transition-transform`}>
+                        {action.icon}
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="font-medium text-sm">{action.title}</p>
+                        <p className="text-xs text-muted-foreground leading-tight">
+                          {action.description}
+                        </p>
+                      </div>
+                    </Button>
+                  }
+                />
+              ) : action.id === "add-project" ? (
+                <ProjectFormDialog
+                  trigger={
+                    <Button
+                      variant={action.variant || "outline"}
+                      className="w-full h-auto flex-col p-4 space-y-2 hover:scale-105 transition-transform hover:bg-purple-50 hover:border-purple-200 dark:hover:bg-purple-950 dark:hover:border-purple-800"
                     >
                       <div className={`${action.color} group-hover:scale-110 transition-transform`}>
                         {action.icon}

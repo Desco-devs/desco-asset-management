@@ -70,15 +70,15 @@ export function LocationFormDialog({ trigger, onLocationAdded }: LocationFormDia
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New Location</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-foreground">Add New Location</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
             Create a new location for organizing clients and projects.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="address" className="text-foreground">Address</Label>
               <Input
                 id="address"
                 placeholder="Enter location address"
@@ -86,6 +86,7 @@ export function LocationFormDialog({ trigger, onLocationAdded }: LocationFormDia
                 onChange={(e) => setAddress(e.target.value)}
                 disabled={isLoading}
                 required
+                className="text-foreground bg-background"
               />
             </div>
           </div>
