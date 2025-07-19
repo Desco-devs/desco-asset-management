@@ -467,6 +467,7 @@ export function OverviewStats({
               address: payload.new.address || "No address provided",
               created_at: isNaN(createdAt.getTime()) ? new Date() : createdAt,
               clients: [],
+              user: null,
             };
             setRealtimeDetailedData((prev) => ({
               ...prev,

@@ -1,22 +1,8 @@
 "use client";
 
-import { useEffect } from 'react';
-
 const SocketInitializer = () => {
-  useEffect(() => {
-    // Initialize Socket.io server by making a request to the API route
-    const initializeSocket = async () => {
-      try {
-        await fetch('/api/socket');
-        console.log('Socket.io server initialized');
-      } catch (error) {
-        console.error('Failed to initialize Socket.io server:', error);
-      }
-    };
-
-    initializeSocket();
-  }, []);
-
+  // Socket.io server is initialized in server.js custom server
+  // No additional initialization needed here
   return null; // This component doesn't render anything
 };
 
