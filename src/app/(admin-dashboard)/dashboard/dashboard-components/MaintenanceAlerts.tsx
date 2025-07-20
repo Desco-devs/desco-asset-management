@@ -45,8 +45,8 @@ export function MaintenanceAlerts({
       const inspectionDate = item.inspection_date
         ? new Date(item.inspection_date)
         : null;
-      const insuranceDate = item.insurance_expiration_date
-        ? new Date(item.insurance_expiration_date)
+      const insuranceDate = item.inspection_date
+        ? new Date(item.inspection_date)
         : null;
 
       if (inspectionDate) {
