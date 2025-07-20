@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase";
+import VehicleModal from "./VehicleModal";
+import { Eye } from "lucide-react";
 
 interface Vehicle {
   id: string;
@@ -57,6 +59,19 @@ export default function VehiclesList({
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // 🔥 DYNAMIC TOTAL COUNT - updates with real-time changes
+  const [dynamicTotalCount, setDynamicTotalCount] = useState(totalCount);
+  
+  // 🔥 MODAL STATE
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // 🔥 HANDLE VEHICLE CLICK
+  const handleVehicleClick = (vehicle: Vehicle) => {
+    setSelectedVehicle(vehicle);
+    setIsModalOpen(true);
+  };
   
   // 🔥 RESPONSIVE ITEMS PER PAGE: 6 on mobile, 12 on desktop
   const effectiveItemsPerPage = isMobile ? 6 : itemsPerPage;
@@ -114,7 +129,8 @@ export default function VehiclesList({
 
   // Sync state with fresh server data and handle responsive changes
   useEffect(() => {
-    if (initialVehicles && initialVehicles.length > 0) {
+    // Always sync, even if empty array
+    if (initialVehicles !== undefined) {
       // Slice data based on current mode
       const displayVehicles = isMobile ? initialVehicles.slice(0, 6) : initialVehicles;
       setVehicles(displayVehicles);
@@ -124,7 +140,10 @@ export default function VehiclesList({
       setPageCache(new Map([[cacheKey, displayVehicles]]));
       setCurrentPage(1); // Reset to page 1 on mode change
       
-      console.log(`🚙 VehiclesList: Loaded ${isMobile ? 'mobile' : 'desktop'} vehicles:`, displayVehicles.length);
+      // 🔥 SYNC DYNAMIC TOTAL COUNT with server data
+      setDynamicTotalCount(totalCount);
+      
+      console.log(`🚙 VehiclesList: Loaded ${isMobile ? 'mobile' : 'desktop'} vehicles:`, displayVehicles.length, displayVehicles.length === 0 ? '(empty array)' : '');
       console.log('📦 Total vehicles:', totalCount);
       console.log('🏗️ Reference data loaded:', {
         projects: initialProjects.length,
@@ -185,6 +204,14 @@ export default function VehiclesList({
             const model = payload.new.model || "Unknown Model";
             const vehicleId = payload.new.id;
 
+            console.log('🔥 REALTIME INSERT:', {
+              vehicleId,
+              currentPage,
+              currentVehiclesCount: vehicles.length,
+              isMobile,
+              effectiveItemsPerPage
+            });
+
             // Find the actual project from the existing projects data (MASTERPIECE PATTERN)
             const project = initialProjects.find(p => p.id === payload.new.project_id);
             
@@ -231,15 +258,29 @@ export default function VehiclesList({
               user: null
             };
 
-            // Add to current page if we're on page 1, otherwise just update cache
+            // 🔥 ALWAYS add new vehicle if we're on page 1, even if array is empty
             if (currentPage === 1) {
-              setVehicles(prev => [newVehicle, ...prev.slice(0, effectiveItemsPerPage - 1)]);
+              setVehicles(prev => {
+                // If empty array, just add the new vehicle
+                if (prev.length === 0) {
+                  return [newVehicle];
+                }
+                // Otherwise, add to top and slice to maintain page size
+                return [newVehicle, ...prev.slice(0, effectiveItemsPerPage - 1)];
+              });
+              
               // Update page 1 cache for current mode
               setPageCache(prev => {
                 const newCache = new Map(prev);
                 const cacheKey = `${isMobile ? 'mobile' : 'desktop'}-1`;
                 const page1Data = newCache.get(cacheKey) || [];
-                newCache.set(cacheKey, [newVehicle, ...page1Data.slice(0, effectiveItemsPerPage - 1)]);
+                
+                // If cache is empty, start fresh with new vehicle
+                if (page1Data.length === 0) {
+                  newCache.set(cacheKey, [newVehicle]);
+                } else {
+                  newCache.set(cacheKey, [newVehicle, ...page1Data.slice(0, effectiveItemsPerPage - 1)]);
+                }
                 return newCache;
               });
             } else {
@@ -251,7 +292,15 @@ export default function VehiclesList({
                 return newCache;
               });
             }
-            console.log('🔥 REALTIME: Added new vehicle with complete data:', vehicleId);
+            // 🔥 INCREMENT TOTAL COUNT for pagination
+            setDynamicTotalCount(prev => prev + 1);
+            
+            console.log('🔥 REALTIME: Added new vehicle with complete data:', {
+              vehicleId,
+              newVehiclesCount: vehicles.length + 1,
+              newTotalCount: dynamicTotalCount + 1,
+              wasOnPage1: currentPage === 1
+            });
             
           } else if (payload.eventType === 'UPDATE') {
             setVehicles(prev => 
@@ -263,7 +312,14 @@ export default function VehiclesList({
             
           } else if (payload.eventType === 'DELETE') {
             setVehicles(prev => prev.filter(vehicle => vehicle.id !== payload.old.id));
-            console.log('🔥 REALTIME: Deleted vehicle:', payload.old.id);
+            
+            // 🔥 DECREMENT TOTAL COUNT for pagination
+            setDynamicTotalCount(prev => Math.max(0, prev - 1));
+            
+            console.log('🔥 REALTIME: Deleted vehicle:', {
+              vehicleId: payload.old.id,
+              newTotalCount: Math.max(0, dynamicTotalCount - 1)
+            });
           }
         }
       )
@@ -299,7 +355,7 @@ export default function VehiclesList({
       {isLoadingPage ? (
         <div className="space-y-4">
           {Array.from({ length: effectiveItemsPerPage }).map((_, index) => (
-            <div key={index} className="border rounded-lg p-4 bg-white shadow-sm animate-pulse">
+            <div key={`skeleton-${currentPage}-${isMobile ? 'mobile' : 'desktop'}-${index}`} className="border rounded-lg p-4 bg-white shadow-sm animate-pulse">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <div className="h-6 bg-gray-200 rounded mb-2"></div>
@@ -333,16 +389,27 @@ export default function VehiclesList({
         </div>
       ) : (
         <div className="space-y-4">
-          {vehicles.map((vehicle) => (
-            <div key={vehicle.id} className="border rounded-lg p-4 bg-white shadow-sm">
+          {vehicles.map((vehicle, index) => (
+            <div 
+              key={`${vehicle.id}-${currentPage}-${isMobile ? 'mobile' : 'desktop'}-${index}`}
+              className="group border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-all cursor-pointer hover:bg-gray-50 hover:border-blue-200"
+              onClick={() => handleVehicleClick(vehicle)}
+            >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <h3 className="font-semibold text-lg">
-                    {vehicle.brand} {vehicle.model}
-                  </h3>
-                  <p className="text-gray-600">Plate: {vehicle.plate_number}</p>
-                  <p className="text-gray-600">Type: {vehicle.type}</p>
-                  <p className="text-gray-600">Owner: {vehicle.owner}</p>
+                <div className="relative">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-semibold text-lg">
+                        {vehicle.brand} {vehicle.model}
+                      </h3>
+                      <p className="text-gray-600">Plate: {vehicle.plate_number}</p>
+                      <p className="text-gray-600">Type: {vehicle.type}</p>
+                      <p className="text-gray-600">Owner: {vehicle.owner}</p>
+                    </div>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Eye className="h-5 w-5 text-blue-500" />
+                    </div>
+                  </div>
                 </div>
                 
                 <div>
@@ -378,8 +445,14 @@ export default function VehiclesList({
                 </div>
               )}
               
-              <div className="mt-4 text-xs text-gray-400">
-                Added by {vehicle.user?.full_name || "System"} on {new Date(vehicle.created_at).toLocaleString()}
+              <div className="mt-4 flex items-center justify-between">
+                <div className="text-xs text-gray-400">
+                  Added by {vehicle.user?.full_name || "System"} on {new Date(vehicle.created_at).toLocaleString()}
+                </div>
+                <div className="text-xs text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                  <Eye className="h-3 w-3" />
+                  Click to view details
+                </div>
               </div>
             </div>
           ))}
@@ -387,10 +460,10 @@ export default function VehiclesList({
       )}
 
       {/* 🔥 RESPONSIVE PAGINATION CONTROLS */}
-      {!isLoadingPage && totalCount > effectiveItemsPerPage && (
+      {!isLoadingPage && dynamicTotalCount > effectiveItemsPerPage && (
         <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="text-sm text-gray-600 text-center md:text-left">
-            Showing {((currentPage - 1) * effectiveItemsPerPage) + 1} to {Math.min(currentPage * effectiveItemsPerPage, totalCount)} of {totalCount} vehicles
+            Showing {((currentPage - 1) * effectiveItemsPerPage) + 1} to {Math.min(currentPage * effectiveItemsPerPage, dynamicTotalCount)} of {dynamicTotalCount} vehicles
             {isMobile && <span className="block text-xs text-gray-400 mt-1">📱 Mobile: 6 per page</span>}
           </div>
           
@@ -404,9 +477,9 @@ export default function VehiclesList({
             </button>
             
             {/* Page numbers - simplified for mobile */}
-            {Array.from({ length: Math.ceil(totalCount / effectiveItemsPerPage) }, (_, i) => i + 1)
+            {Array.from({ length: Math.ceil(dynamicTotalCount / effectiveItemsPerPage) }, (_, i) => i + 1)
               .filter(page => {
-                const totalPages = Math.ceil(totalCount / effectiveItemsPerPage);
+                const totalPages = Math.ceil(dynamicTotalCount / effectiveItemsPerPage);
                 if (isMobile) {
                   // Mobile: Show fewer page numbers
                   return page === 1 || 
@@ -443,7 +516,7 @@ export default function VehiclesList({
             
             <button
               onClick={() => loadPage(currentPage + 1)}
-              disabled={currentPage === Math.ceil(totalCount / effectiveItemsPerPage)}
+              disabled={currentPage === Math.ceil(dynamicTotalCount / effectiveItemsPerPage)}
               className="px-2 md:px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               {isMobile ? '→' : 'Next'}
@@ -451,6 +524,13 @@ export default function VehiclesList({
           </div>
         </div>
       )}
+
+      {/* 🔥 VEHICLE DETAIL MODAL */}
+      <VehicleModal
+        isOpen={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        vehicle={selectedVehicle}
+      />
     </div>
   );
 }
