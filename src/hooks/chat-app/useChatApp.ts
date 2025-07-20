@@ -167,21 +167,56 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     }
   };
 
-  // Send message via Supabase
+  // Send message via API route (bypasses Supabase permission issues)
   const handleSendMessage = useCallback(async (content: string) => {
-    if (!selectedRoom || !userId) return;
+    if (!selectedRoom || !userId) {
+      console.error('Cannot send message: missing selectedRoom or userId');
+      return;
+    }
 
     const currentRoom = rooms.find(room => room.id === selectedRoom);
-    if (!currentRoom) return;
+    if (!currentRoom) {
+      console.error('Cannot send message: room not found');
+      return;
+    }
 
     console.log(`Sending message to room ${currentRoom.name}:`, content);
 
     try {
-      await sendMessage(content.trim());
+      console.log('Sending message via API with:', { 
+        roomId: selectedRoom, 
+        senderId: userId, 
+        content: content.trim() 
+      });
+
+      const response = await fetch('/api/messages/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          roomId: selectedRoom,
+          senderId: userId,
+          content: content.trim(),
+          type: 'TEXT'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(errorData.error || 'Failed to send message');
+      }
+
+      const result = await response.json();
+      console.log('Message sent successfully via API:', result);
+      
+      // The message will be picked up by the real-time subscription
+      
     } catch (error) {
       console.error('Error sending message:', error);
     }
-  }, [selectedRoom, userId, rooms, sendMessage]);
+  }, [selectedRoom, userId, rooms]);
 
   const currentRoom = rooms.find(room => room.id === selectedRoom);
 

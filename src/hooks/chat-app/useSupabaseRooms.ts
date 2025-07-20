@@ -120,7 +120,7 @@ export const useSupabaseRooms = () => {
         .from('rooms')
         .select(`
           *,
-          owner:users!rooms_owner_id_fkey (
+          owner:users (
             id,
             username,
             full_name,
@@ -143,7 +143,7 @@ export const useSupabaseRooms = () => {
             content,
             created_at,
             type,
-            sender:users!messages_sender_id_fkey (
+            sender:users (
               full_name
             )
           )
@@ -158,8 +158,9 @@ export const useSupabaseRooms = () => {
       setRooms(convertedRooms);
     } catch (err) {
       console.error('Error fetching rooms:', err);
+      console.error('Full error details:', JSON.stringify(err, null, 2));
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch rooms';
-      setError(`Chat setup incomplete: ${errorMessage}`);
+      setError(`Database error: ${errorMessage}`);
       // Set empty rooms on error so app doesn't crash
       setRooms([]);
     } finally {
@@ -172,12 +173,8 @@ export const useSupabaseRooms = () => {
     fetchRooms();
   }, [fetchRooms]);
 
-  // Subscribe to real-time changes (disabled until Supabase Realtime is enabled)
+  // Subscribe to real-time changes
   useEffect(() => {
-    // TODO: Enable this once Supabase Realtime is configured
-    console.log('Realtime subscriptions disabled until Supabase setup is complete');
-    return;
-    
     const supabase = createClient();
     
     // Subscribe to room changes

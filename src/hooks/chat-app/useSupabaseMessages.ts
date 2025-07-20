@@ -34,17 +34,18 @@ const convertToMessageWithRelations = (record: any): MessageWithRelations => {
     created_at: new Date(record.created_at),
     updated_at: new Date(record.updated_at),
     sender: {
-      id: record.sender.id,
-      username: record.sender.username || record.sender.full_name,
-      full_name: record.sender.full_name,
-      user_profile: record.sender.user_profile,
+      id: record.sender?.id || record.sender_id,
+      username: record.sender?.username || record.sender?.full_name || 'Unknown',
+      full_name: record.sender?.full_name || 'Unknown User',
+      user_profile: record.sender?.user_profile,
     },
     room: {
       id: record.room_id,
       name: 'Room', // We'll need to pass this from context or fetch it
       type: RoomType.GROUP, // Default for now
     },
-    reply_to: record.reply_to ? convertToMessageWithRelations(record.reply_to) : undefined,
+    // Temporarily disable reply_to until we fix the foreign key relationship
+    reply_to: undefined,
   };
 };
 
@@ -76,18 +77,10 @@ export const useSupabaseMessages = ({
           .from('messages')
           .select(`
             *,
-            sender:users!messages_sender_id_fkey (
+            sender:users (
               id,
               full_name,
               user_profile
-            ),
-            reply_to:messages!messages_reply_to_id_fkey (
-              id,
-              content,
-              sender:users!messages_sender_id_fkey (
-                id,
-                full_name
-              )
             )
           `)
           .eq('room_id', roomId)
@@ -98,8 +91,9 @@ export const useSupabaseMessages = ({
         setMessages(convertedMessages);
       } catch (err) {
         console.error('Error fetching messages:', err);
+        console.error('Full error details:', JSON.stringify(err, null, 2));
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch messages';
-        setError(`Chat setup incomplete: ${errorMessage}`);
+        setError(`Database error: ${errorMessage}`);
         // Set empty messages on error so app doesn't crash
         setMessages([]);
       } finally {
@@ -110,13 +104,9 @@ export const useSupabaseMessages = ({
     fetchMessages();
   }, [roomId, enabled]);
 
-  // Subscribe to real-time changes (disabled until Supabase Realtime is enabled)
+  // Subscribe to real-time changes
   useEffect(() => {
     if (!enabled || !roomId) return;
-    
-    // TODO: Enable this once Supabase Realtime is configured
-    console.log('Realtime subscriptions disabled until Supabase setup is complete');
-    return;
 
     const supabase = createClient();
     const subscription = supabase
@@ -140,18 +130,10 @@ export const useSupabaseMessages = ({
             .from('messages')
             .select(`
               *,
-              sender:users!messages_sender_id_fkey (
+              sender:users (
                 id,
                 full_name,
                 user_profile
-              ),
-              reply_to:messages!messages_reply_to_id_fkey (
-                id,
-                content,
-                sender:users!messages_sender_id_fkey (
-                  id,
-                  full_name
-                )
               )
             `)
             .eq('id', newMessageRecord.id)
@@ -182,18 +164,10 @@ export const useSupabaseMessages = ({
             .from('messages')
             .select(`
               *,
-              sender:users!messages_sender_id_fkey (
+              sender:users (
                 id,
                 full_name,
                 user_profile
-              ),
-              reply_to:messages!messages_reply_to_id_fkey (
-                id,
-                content,
-                sender:users!messages_sender_id_fkey (
-                  id,
-                  full_name
-                )
               )
             `)
             .eq('id', updatedMessageRecord.id)
@@ -236,26 +210,39 @@ export const useSupabaseMessages = ({
 
   // Send message function
   const sendMessage = async (content: string, type: 'TEXT' | 'IMAGE' | 'FILE' = 'TEXT', replyToId?: string) => {
-    if (!roomId) throw new Error('No room ID');
+    try {
+      if (!roomId) throw new Error('No room ID');
 
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({
-        room_id: roomId,
-        sender_id: user.id,
-        content,
-        type,
-        reply_to_id: replyToId,
-      })
-      .select()
-      .single();
+      console.log('Sending message:', { roomId, userId: user.id, content, type });
 
-    if (error) throw error;
-    return data;
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          room_id: roomId,
+          sender_id: user.id,
+          content,
+          type,
+          reply_to_id: replyToId,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error inserting message:', error);
+        console.error('Full error details:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+      
+      console.log('Message sent successfully:', data);
+      return data;
+    } catch (err) {
+      console.error('Send message error:', err);
+      throw err;
+    }
   };
 
   return {
