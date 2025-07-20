@@ -120,8 +120,8 @@ export async function createVehicleMaintenanceReportAction(formData: FormData) {
         inspection_details: inspectionDetails || null,
         action_taken: actionTaken || null,
         parts_replaced: partsReplacedArray,
-        priority: priority ? priority as any : null,
-        status: status ? status as any : 'REPORTED',
+        priority: priority ? (priority as "LOW" | "MEDIUM" | "HIGH") : null,
+        status: status ? (status as "REPORTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED") : 'REPORTED',
         downtime_hours: downtimeHours || null,
         date_reported: dateReported ? new Date(dateReported) : new Date(),
         date_repaired: dateRepaired ? new Date(dateRepaired) : null,
@@ -248,7 +248,7 @@ export async function updateVehicleMaintenanceReportAction(formData: FormData) {
       : [];
 
     // Update maintenance report basic data
-    const updatedReport = await prisma.maintenance_vehicle_report.update({
+    await prisma.maintenance_vehicle_report.update({
       where: { id: reportId },
       data: {
         vehicle_id: vehicleId,
@@ -258,8 +258,8 @@ export async function updateVehicleMaintenanceReportAction(formData: FormData) {
         inspection_details: inspectionDetails || null,
         action_taken: actionTaken || null,
         parts_replaced: partsReplacedArray,
-        priority: priority ? priority as any : null,
-        status: status ? status as any : existingReport.status,
+        priority: priority ? (priority as "LOW" | "MEDIUM" | "HIGH") : null,
+        status: status ? (status as "REPORTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED") : existingReport.status,
         downtime_hours: downtimeHours || null,
         date_reported: dateReported ? new Date(dateReported) : existingReport.date_reported,
         date_repaired: dateRepaired ? new Date(dateRepaired) : null,
