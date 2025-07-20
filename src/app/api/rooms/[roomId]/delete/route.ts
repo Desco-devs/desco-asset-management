@@ -60,7 +60,7 @@ export async function DELETE(
 
     // Delete room and all related data (cascade should handle this)
     // Order matters due to foreign key constraints
-    
+
     // Delete messages first
     await prisma.message.deleteMany({
       where: { room_id: roomId },
