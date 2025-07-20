@@ -14,10 +14,10 @@ export const useSocket = ({ userId, enabled = true }: UseSocketOptions = {}) => 
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return;
 
-    // Initialize socket connection using API route
-    const socketUrl = process.env.NODE_ENV === 'production' 
-      ? process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin
-      : 'http://localhost:3000';
+    // Initialize socket connection
+    const socketUrl = process.env.NODE_ENV === 'production'
+      ? process.env.NEXT_PUBLIC_SOCKET_URL || 'wss://your-socket-server.railway.app'
+      : 'http://localhost:4000'; // Use 3001 for standalone socket server
 
     console.log('Initializing socket connection to:', socketUrl);
 
@@ -36,7 +36,7 @@ export const useSocket = ({ userId, enabled = true }: UseSocketOptions = {}) => 
       console.log('Socket connected:', socket.id);
       setIsConnected(true);
       setConnectionError(null);
-      
+
       // Authenticate user if userId is provided
       if (userId) {
         socket.emit('user:authenticate', userId);

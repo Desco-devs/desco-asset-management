@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,7 +16,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RoomListItem, RoomType, InvitationStatus } from "@/types/chat-app";
-import { useSocketContext } from "@/context/SocketContext";
 
 interface RoomsListProps {
   rooms: RoomListItem[];
@@ -35,7 +33,9 @@ const RoomsList = ({
   currentUserId,
 }: RoomsListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const { isUserOnline } = useSocketContext();
+  
+  // For now, we'll assume users are online (can be improved later with Supabase presence)
+  const isUserOnline = (userId: string) => false;
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
