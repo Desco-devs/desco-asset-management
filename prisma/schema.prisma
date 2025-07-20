@@ -25,6 +25,8 @@ model user {
   created_locations    location[]                     @relation("LocationCreatedBy")
   repaired_maintenance maintenance_equipment_report[] @relation("RepairedBy")
   reported_maintenance maintenance_equipment_report[] @relation("ReportedBy")
+  repaired_vehicle_maintenance maintenance_vehicle_report[] @relation("VehicleRepairedBy")
+  reported_vehicle_maintenance maintenance_vehicle_report[] @relation("VehicleReportedBy")
   sent_messages        message[]                      @relation("MessageCreatedBy")
   created_projects     project[]                      @relation("ProjectCreatedBy")
   sent_invitations     room_invitation[]              @relation("InvitationSentBy")
@@ -127,6 +129,7 @@ model location {
   clients                       client[]
   user                          user?                          @relation("LocationCreatedBy", fields: [created_by], references: [id])
   maintenance_equipment_reports maintenance_equipment_report[]
+  maintenance_vehicle_reports   maintenance_vehicle_report[]
 
   @@index([created_by])
   @@index([created_at])
@@ -208,7 +211,7 @@ model equipment {
 }
 
 model vehicle {
-  id                    String   @id @default(uuid()) @db.Uuid
+  id                    String                      @id @default(uuid()) @db.Uuid
   brand                 String
   model                 String
   type                  String
@@ -226,12 +229,13 @@ model vehicle {
   original_receipt_url  String?
   car_registration_url  String?
   pgpc_inspection_image String?
-  project_id            String   @db.Uuid
-  created_at            DateTime @default(now())
-  updated_at            DateTime @updatedAt
-  created_by            String?  @db.Uuid
-  user                  user?    @relation("VehicleCreatedBy", fields: [created_by], references: [id])
-  project               project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  project_id            String                      @db.Uuid
+  created_at            DateTime                    @default(now())
+  updated_at            DateTime                    @updatedAt
+  created_by            String?                     @db.Uuid
+  user                  user?                       @relation("VehicleCreatedBy", fields: [created_by], references: [id])
+  project               project                     @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  maintenance_reports   maintenance_vehicle_report[]
 
   @@index([project_id])
   @@index([created_by])
@@ -279,6 +283,42 @@ model maintenance_equipment_report {
   @@index([date_repaired])
   @@index([created_at])
   @@map("maintenance_equipment_reports")
+}
+
+model maintenance_vehicle_report {
+  id                 String           @id @default(uuid()) @db.Uuid
+  vehicle_id         String           @db.Uuid
+  location_id        String           @db.Uuid
+  issue_description  String
+  remarks            String?
+  inspection_details String?
+  action_taken       String?
+  parts_replaced     String[]
+  priority           report_priority?
+  status             report_status?
+  downtime_hours     String?
+  date_repaired      DateTime?
+  date_reported      DateTime         @default(now())
+  attachment_urls    String[]
+  created_at         DateTime         @default(now())
+  updated_at         DateTime         @updatedAt
+  reported_by        String?          @db.Uuid
+  repaired_by        String?          @db.Uuid
+  vehicle            vehicle          @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
+  location           location         @relation(fields: [location_id], references: [id])
+  repaired_user      user?            @relation("VehicleRepairedBy", fields: [repaired_by], references: [id])
+  reported_user      user?            @relation("VehicleReportedBy", fields: [reported_by], references: [id])
+
+  @@index([vehicle_id])
+  @@index([location_id])
+  @@index([reported_by])
+  @@index([repaired_by])
+  @@index([status])
+  @@index([priority])
+  @@index([date_reported])
+  @@index([date_repaired])
+  @@index([created_at])
+  @@map("maintenance_vehicle_reports")
 }
 
 enum Role {
