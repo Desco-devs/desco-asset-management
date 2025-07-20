@@ -48,12 +48,12 @@ export interface ActivityItem {
 
 // Prisma result types (simplified)
 export interface LocationData {
-  id: string
-  name: string
-  address: string
-  created_at: Date
-  clients?: { id: string; name: string }[]
-  user: { full_name: string } | null   // ✅ allow null
+  id: string;
+  name?: string;
+  address: string;
+  created_at: Date;
+  clients?: { id: string; name: string }[];
+  user?: { full_name: string } | null;
 }
 
 
@@ -85,8 +85,7 @@ export interface EquipmentData {
   status: 'OPERATIONAL' | 'NON_OPERATIONAL';
   owner: string;
   created_at: Date;
-  inspection_date?: Date | null          // ✅ allow Date | null
-  insurance_expiration_date?: Date | null // ✅ allow Date | null
+  inspection_date?: Date | null;
   project?: {
     client?: {
       location?: { address: string };
@@ -103,8 +102,7 @@ export interface VehicleData {
   status: 'OPERATIONAL' | 'NON_OPERATIONAL';
   owner: string;
   created_at: Date;
-  inspection_date?: Date | null          // ✅ allow Date | null
-  insurance_expiration_date?: Date | null // ✅ allow Date | null
+  inspection_date: Date;
   project?: {
     client?: {
       location?: { address: string };

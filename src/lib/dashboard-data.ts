@@ -103,11 +103,11 @@ async function fetchLocations(): Promise<LocationData[]> {
 
   return locations.map(location => ({
     id: location.id,
-    name: location.name,
+    name: location.user?.full_name,
     address: location.address,
     created_at: location.created_at,
-    clients: location.clients,
-    user: location.user || undefined
+    clients: location.clients || [],
+    user: location.user || null
   }));
 }
 
@@ -171,7 +171,7 @@ async function fetchEquipmentList(): Promise<EquipmentData[]> {
     status: item.status as 'OPERATIONAL' | 'NON_OPERATIONAL',
     owner: item.owner,
     created_at: item.created_at,
-    inspection_date: item.inspection_date?.toISOString(),
+    inspection_date: item.inspection_date,
     project: item.project
   }));
 }
@@ -203,7 +203,7 @@ async function fetchVehiclesList(): Promise<VehicleData[]> {
     status: item.status as 'OPERATIONAL' | 'NON_OPERATIONAL',
     owner: item.owner,
     created_at: item.created_at,
-    inspection_date: item.inspection_date.toISOString(),
+    inspection_date: item.inspection_date,
     project: item.project
   }));
 }

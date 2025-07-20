@@ -35,7 +35,7 @@ import { useAuth } from "@/app/context/AuthContext";
 
 // Types based on your Prisma schema
 interface Vehicle {
-  id: string;
+  uid: string;
   brand: string;
   model: string;
   type: string;
@@ -52,14 +52,15 @@ interface Vehicle {
   side2ImgUrl?: string;
   originalReceiptUrl?: string;
   carRegistrationUrl?: string;
+  pgpcInspectionImage?: string;
   project: {
-    id: string;
+    uid: string;
     name: string;
     client: {
-      id: string;
+      uid: string;
       name: string;
       location: {
-        id: string;
+        uid: string;
         address: string;
       };
     };
@@ -95,7 +96,8 @@ const VehicleCards = ({
 }: VehicleCardsProps) => {
   const { user } = useAuth();
 
-  const isAdmin = (user?.role === 'ADMIN' || user?.role === 'SUPERADMIN') ?? false;
+  const isAdmin =
+    (user?.role === "ADMIN" || user?.role === "SUPERADMIN") ?? false;
 
   const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>(vehicles);
   const [selectedClient, setSelectedClient] = useState<string>("all");
@@ -122,13 +124,13 @@ const VehicleCards = ({
 
     if (selectedClient !== "all") {
       filtered = filtered.filter(
-        (vehicle) => vehicle.project.client.id === selectedClient
+        (vehicle) => vehicle.project.client.uid === selectedClient
       );
     }
 
     if (selectedLocation !== "all") {
       filtered = filtered.filter(
-        (vehicle) => vehicle.project.client.location.id === selectedLocation
+        (vehicle) => vehicle.project.client.location.uid === selectedLocation
       );
     }
 
@@ -203,12 +205,12 @@ const VehicleCards = ({
   const confirmDelete = async () => {
     if (!vehicleToDelete) return;
 
-    setDeletingVehicleId(vehicleToDelete.id);
+    setDeletingVehicleId(vehicleToDelete.uid);
     setShowDeleteDialog(false);
 
     try {
       const response = await fetch(
-        `/api/vehicles?vehicleId=${vehicleToDelete.id}`,
+        `/api/vehicles?vehicleId=${vehicleToDelete.uid}`,
         {
           method: "DELETE",
         }
@@ -375,7 +377,7 @@ const VehicleCards = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredVehicles.map((vehicle) => (
           <Card
-            key={vehicle.id}
+            key={vehicle.uid}
             className={`hover:shadow-lg transition-shadow ${
               !isEditMode ? "cursor-pointer" : ""
             }`}
@@ -405,7 +407,7 @@ const VehicleCards = ({
                       size="sm"
                       variant="outline"
                       onClick={(e) => handleEditClick(e, vehicle)}
-                      disabled={deletingVehicleId === vehicle.id}
+                      disabled={deletingVehicleId === vehicle.uid}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -413,9 +415,9 @@ const VehicleCards = ({
                       size="sm"
                       variant="destructive"
                       onClick={(e) => handleDeleteClick(e, vehicle)}
-                      disabled={deletingVehicleId === vehicle.id}
+                      disabled={deletingVehicleId === vehicle.uid}
                     >
-                      {deletingVehicleId === vehicle.id ? (
+                      {deletingVehicleId === vehicle.uid ? (
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                       ) : (
                         <Trash2 className="h-4 w-4" />
