@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { createClient } from "@/lib/supabase";
+import { useAuth } from "@/app/context/AuthContext";
 import type { ActivityItem, RecentActivityProps } from "@/types/dashboard";
 
 export function RecentActivity({ initialData }: RecentActivityProps) {
   const [activities, setActivities] = useState<ActivityItem[]>(initialData);
   const [isClient, setIsClient] = useState(false);
+  const { user } = useAuth();
   const supabase = createClient();
 
   // Ensure client-side rendering for time-sensitive content
@@ -20,20 +22,21 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
   useEffect(() => {
     // Set up realtime subscriptions after ensuring auth
     const setupRealtimeSubscriptions = async () => {
-      // Get current session to ensure we're authenticated
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session || !session.access_token) {
-        console.warn('No active session or access token for realtime subscriptions');
+      // Ensure user is authenticated
+      if (!user) {
+        console.warn('No authenticated user for recent activity realtime');
         return;
       }
 
-      // Explicitly set the access token for realtime
-      await supabase.realtime.setAuth(session.access_token);
+      // Get session for realtime auth
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        await supabase.realtime.setAuth(session.access_token);
+      }
 
       // Subscribe to equipment changes
       const equipmentChannel = supabase
-        .channel('equipment-changes')
+        .channel(`recent-equipment-${Math.random().toString(36).substring(2, 11)}`)
         .on('postgres_changes', { 
           event: 'INSERT', 
           schema: 'public', 
@@ -61,7 +64,7 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
 
       // Subscribe to vehicle changes
       const vehicleChannel = supabase
-        .channel('vehicle-changes')
+        .channel(`recent-vehicles-${Math.random().toString(36).substring(2, 11)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vehicles' }, (payload) => {
           if (payload.new && Object.keys(payload.new).length > 0) {
           const newVehicle = payload.new;
@@ -95,7 +98,7 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
 
       // Subscribe to project changes
       const projectChannel = supabase
-        .channel('project-changes')
+        .channel(`recent-projects-${Math.random().toString(36).substring(2, 11)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'projects' }, (payload) => {
           if (payload.new && Object.keys(payload.new).length > 0) {
           const newProject = payload.new;
@@ -116,7 +119,7 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
 
       // Subscribe to client changes
       const clientChannel = supabase
-        .channel('client-changes')
+        .channel(`recent-clients-${Math.random().toString(36).substring(2, 11)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients' }, (payload) => {
           if (payload.new && Object.keys(payload.new).length > 0) {
           const newClient = payload.new;
@@ -137,7 +140,7 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
 
       // Subscribe to maintenance changes
       const maintenanceChannel = supabase
-        .channel('maintenance-changes')
+        .channel(`recent-maintenance-${Math.random().toString(36).substring(2, 11)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'maintenance_equipment_reports' }, (payload) => {
           if (payload.new && Object.keys(payload.new).length > 0) {
           const newMaintenance = payload.new;
@@ -161,7 +164,7 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
 
       // Subscribe to location changes
       const locationChannel = supabase
-        .channel('location-changes')
+        .channel(`recent-locations-${Math.random().toString(36).substring(2, 11)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'locations' }, (payload) => {
           if (payload.new && Object.keys(payload.new).length > 0) {
           const newLocation = payload.new;
@@ -198,7 +201,7 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
         if (cleanup) cleanup();
       });
     };
-  }, [supabase]);
+  }, [supabase, user]);
 
   const getActivityIcon = (action: string) => {
     if (action === 'reported') return <AlertCircle className="h-4 w-4" />;

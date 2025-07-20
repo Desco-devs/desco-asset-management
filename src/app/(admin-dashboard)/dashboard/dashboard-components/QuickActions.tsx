@@ -4,9 +4,10 @@ import { Plus, Users, Building2, FolderOpen, Truck, Wrench, FileText, Settings }
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { LocationFormDialog } from "@/app/components/custom-reuseable/LocationFormDialog";
-import { ClientFormDialog } from "@/app/components/custom-reuseable/ClientFormDialog";
-import { ProjectFormDialog } from "@/app/components/custom-reuseable/ProjectFormDialog";
+import { LocationFormDialog } from "@/app/components/custom-reusable/LocationFormDialog";
+import { ClientFormDialog } from "@/app/components/custom-reusable/ClientFormDialog";
+import { ProjectFormDialog } from "@/app/components/custom-reusable/ProjectFormDialog";
+import { EquipmentFormDialog } from "@/app/components/equipment";
 
 interface QuickAction {
   id: string;
@@ -50,7 +51,6 @@ export function QuickActions() {
       title: "Add Equipment",
       description: "Register new equipment",
       icon: <Wrench className="h-5 w-5" />,
-      href: "/equipments",
       variant: "outline",
       color: "text-orange-600"
     },
@@ -148,6 +148,25 @@ export function QuickActions() {
                     <Button
                       variant={action.variant || "outline"}
                       className="w-full h-auto flex-col p-4 space-y-2 hover:scale-105 transition-transform hover:bg-purple-50 hover:border-purple-200 dark:hover:bg-purple-950 dark:hover:border-purple-800"
+                    >
+                      <div className={`${action.color} group-hover:scale-110 transition-transform`}>
+                        {action.icon}
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="font-medium text-sm">{action.title}</p>
+                        <p className="text-xs text-muted-foreground leading-tight">
+                          {action.description}
+                        </p>
+                      </div>
+                    </Button>
+                  }
+                />
+              ) : action.id === "add-equipment" ? (
+                <EquipmentFormDialog
+                  trigger={
+                    <Button
+                      variant={action.variant || "outline"}
+                      className="w-full h-auto flex-col p-4 space-y-2 hover:scale-105 transition-transform hover:bg-orange-50 hover:border-orange-200 dark:hover:bg-orange-950 dark:hover:border-orange-800"
                     >
                       <div className={`${action.color} group-hover:scale-110 transition-transform`}>
                         {action.icon}

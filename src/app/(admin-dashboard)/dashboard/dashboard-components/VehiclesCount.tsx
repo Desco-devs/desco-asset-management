@@ -17,6 +17,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { createClient } from "@/lib/supabase";
+import { useAuth } from "@/app/context/AuthContext";
 import type { AssetCountProps } from "@/types/dashboard";
 
 const chartConfig = {
@@ -35,14 +36,31 @@ const chartConfig = {
 
 export function VehiclesCount({ initialData }: AssetCountProps) {
   const [vehicleData, setVehicleData] = useState(initialData);
+  const { user } = useAuth();
   const supabase = createClient();
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`vehicles-status-${Date.now()}`)
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'vehicles' },
-        (payload) => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    
+    const setupRealtimeSubscription = async () => {
+      // Ensure user is authenticated
+      if (!user) {
+        console.warn('No authenticated user for vehicle count realtime');
+        return;
+      }
+
+      // Get session for realtime auth
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        await supabase.realtime.setAuth(session.access_token);
+      }
+
+      channel = supabase
+        .channel(`vehicles-count-${Math.random().toString(36).substring(2, 11)}`)
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'vehicles' },
+          (payload) => {
+            console.log('🚗 Vehicle count update:', payload);
           if (payload.eventType === 'INSERT') {
             const status = payload.new.status as keyof typeof initialData;
             setVehicleData(prev => ({
@@ -68,14 +86,19 @@ export function VehiclesCount({ initialData }: AssetCountProps) {
               }));
             }
           }
-        }
-      )
-      .subscribe();
+          }
+        )
+        .subscribe();
+    };
+
+    setupRealtimeSubscription();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, [supabase]);
+  }, [supabase, initialData, user]);
 
   const totalVehicles = vehicleData.OPERATIONAL + vehicleData.NON_OPERATIONAL;
   const vehicleOperationalPercentage =

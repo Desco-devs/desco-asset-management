@@ -17,6 +17,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { createClient } from "@/lib/supabase";
+import { useAuth } from "@/app/context/AuthContext";
 
 
 
@@ -50,14 +51,32 @@ export function VehiclesAndEquipments({
 }: VehiclesAndEquipmentsProps) {
   const [vehicleData, setVehicleData] = useState(initialVehicleData);
   const [equipmentData, setEquipmentData] = useState(initialEquipmentData);
+  const { user } = useAuth();
   const supabase = createClient();
 
   useEffect(() => {
-    const equipmentChannel = supabase
-      .channel(`equipment-overview-${Date.now()}`)
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'equipment' },
-        (payload) => {
+    let equipmentChannel: ReturnType<typeof supabase.channel> | null = null;
+    let vehicleChannel: ReturnType<typeof supabase.channel> | null = null;
+    
+    const setupRealtimeSubscriptions = async () => {
+      // Ensure user is authenticated
+      if (!user) {
+        console.warn('No authenticated user for assets overview realtime');
+        return;
+      }
+
+      // Get session for realtime auth
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        await supabase.realtime.setAuth(session.access_token);
+      }
+
+      equipmentChannel = supabase
+        .channel(`assets-equipment-${Math.random().toString(36).substring(2, 11)}`)
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'equipment' },
+          (payload) => {
+            console.log('🚀 Assets equipment update:', payload);
           if (payload.eventType === 'INSERT') {
             const status = payload.new.status as keyof AssetCounts;
             setEquipmentData(prev => ({
@@ -83,15 +102,16 @@ export function VehiclesAndEquipments({
               }));
             }
           }
-        }
-      )
-      .subscribe();
+          }
+        )
+        .subscribe();
 
-    const vehicleChannel = supabase
-      .channel(`vehicles-overview-${Date.now()}`)
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'vehicles' },
-        (payload) => {
+      vehicleChannel = supabase
+        .channel(`assets-vehicles-${Math.random().toString(36).substring(2, 11)}`)
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'vehicles' },
+          (payload) => {
+            console.log('🚗 Assets vehicle update:', payload);
           if (payload.eventType === 'INSERT') {
             const status = payload.new.status as keyof AssetCounts;
             setVehicleData(prev => ({
@@ -117,15 +137,22 @@ export function VehiclesAndEquipments({
               }));
             }
           }
-        }
-      )
-      .subscribe();
+          }
+        )
+        .subscribe();
+    };
+
+    setupRealtimeSubscriptions();
 
     return () => {
-      supabase.removeChannel(equipmentChannel);
-      supabase.removeChannel(vehicleChannel);
+      if (equipmentChannel) {
+        supabase.removeChannel(equipmentChannel);
+      }
+      if (vehicleChannel) {
+        supabase.removeChannel(vehicleChannel);
+      }
     };
-  }, [supabase]);
+  }, [supabase, initialVehicleData, initialEquipmentData, user]);
 
 
   // Calculate derived data from current state
