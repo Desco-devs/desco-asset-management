@@ -66,7 +66,7 @@ export async function POST(
     }
 
     const invitations = [];
-    let usersToInvite = invitedUsers || [];
+    const usersToInvite = invitedUsers || [];
 
     // If inviting by username, find the user
     if (inviteUsername) {
