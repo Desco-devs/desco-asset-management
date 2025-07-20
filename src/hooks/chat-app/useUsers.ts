@@ -14,7 +14,7 @@ export const useUsers = () => {
       if (!response.ok) {
         throw new Error('Failed to fetch users');
       }
-      
+
       return response.json();
     },
     staleTime: 1000 * 60 * 10, // 10 minutes - user list doesn't change often
@@ -22,25 +22,3 @@ export const useUsers = () => {
   });
 };
 
-export const useUserProfile = (userId?: string) => {
-  return useQuery({
-    queryKey: QUERY_KEYS.userProfile(userId || ''),
-    queryFn: async (): Promise<ChatUser> => {
-      if (!userId) {
-        throw new Error('User ID is required');
-      }
-
-      const response = await fetch(`/api/users/${userId}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch user profile');
-      }
-      
-      return response.json();
-    },
-    enabled: !!userId,
-    staleTime: 1000 * 60 * 15, // 15 minutes - user profile data is relatively stable
-    refetchOnWindowFocus: false,
-  });
-};
-
-export { QUERY_KEYS as USERS_QUERY_KEYS };
