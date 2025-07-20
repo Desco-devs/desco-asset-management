@@ -163,6 +163,7 @@ export default function EquipmentClientViewer({
             model: string;
             type: string;
             insurance_expiration_date?: string;
+            before?: number;
             status: string;
             remarks?: string;
             owner: string;
@@ -173,6 +174,7 @@ export default function EquipmentClientViewer({
             equipment_registration_url?: string;
             thirdparty_inspection_image?: string;
             pgpc_inspection_image?: string;
+            equipment_parts?: string[];
             project: {
               id: string;
               name: string;
@@ -193,6 +195,7 @@ export default function EquipmentClientViewer({
             type: equipmentItem.type,
             insuranceExpirationDate:
               equipmentItem.insurance_expiration_date ? new Date(equipmentItem.insurance_expiration_date).toISOString() : "",
+            before: equipmentItem.before || undefined,
             status: equipmentItem.status as "OPERATIONAL" | "NON_OPERATIONAL",
             remarks: equipmentItem.remarks || undefined,
             owner: equipmentItem.owner,
@@ -203,6 +206,7 @@ export default function EquipmentClientViewer({
             equipmentRegistrationUrl: equipmentItem.equipment_registration_url || undefined,
             thirdpartyInspectionImage: equipmentItem.thirdparty_inspection_image || undefined,
             pgpcInspectionImage: equipmentItem.pgpc_inspection_image || undefined,
+            equipmentParts: equipmentItem.equipment_parts || undefined,
             project: {
               uid: equipmentItem.project.id,
               name: equipmentItem.project.name,

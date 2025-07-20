@@ -46,12 +46,8 @@ const AddEquipmentModal = ({
   const {
     formData,
     setFormData,
-    locations,
-    filteredClients,
     filteredProjects,
     isEditMode,
-    fetchLocations,
-    fetchClients,
     fetchProjects,
     resetForm,
     isFormValid,
@@ -138,8 +134,6 @@ const AddEquipmentModal = ({
   // Fetch data when dialog opens
   useEffect(() => {
     if (isOpen) {
-      fetchLocations();
-      fetchClients();
       fetchProjects();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,8 +169,6 @@ const AddEquipmentModal = ({
         <EquipmentFormContainer
           formData={formData}
           setFormData={setFormData}
-          locations={locations}
-          filteredClients={filteredClients}
           filteredProjects={filteredProjects}
           files={files}
           setFiles={setFiles}

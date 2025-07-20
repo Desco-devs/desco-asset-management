@@ -55,7 +55,11 @@ const EquipmentPage = async () => {
       }),
       prisma.project.findMany({
         include: {
-          client: true,
+          client: {
+            include: {
+              location: true,
+            },
+          },
         },
         orderBy: {
           created_at: "desc",
@@ -63,8 +67,6 @@ const EquipmentPage = async () => {
       }),
       prisma.equipment.count(),
     ]);
-
-    // Data fetched successfully from database
 
     // Serialize the equipment data (convert dates to strings)
     const serializedEquipment: Equipment[] = equipmentData.map((item) => ({
@@ -74,6 +76,7 @@ const EquipmentPage = async () => {
       type: item.type,
       insuranceExpirationDate:
         item.insurance_expiration_date?.toISOString() || "",
+      before: item.before || undefined,
       status: item.status as "OPERATIONAL" | "NON_OPERATIONAL",
       remarks: item.remarks || undefined,
       owner: item.owner,
@@ -84,6 +87,7 @@ const EquipmentPage = async () => {
       equipmentRegistrationUrl: item.equipment_registration_url || undefined,
       thirdpartyInspectionImage: item.thirdparty_inspection_image || undefined,
       pgpcInspectionImage: item.pgpc_inspection_image || undefined,
+      equipmentParts: item.equipment_parts || undefined,
       project: {
         uid: item.project.id,
         name: item.project.name,
@@ -118,6 +122,10 @@ const EquipmentPage = async () => {
       client: {
         uid: item.client.id,
         name: item.client.name,
+        location: {
+          uid: item.client.location.id,
+          address: item.client.location.address,
+        },
       },
     }));
 

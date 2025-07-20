@@ -39,6 +39,7 @@ export async function GET(request: Request) {
       type: item.type,
       insuranceExpirationDate:
         item.insurance_expiration_date?.toISOString() || "",
+      before: item.before || undefined,
       status: item.status as "OPERATIONAL" | "NON_OPERATIONAL",
       remarks: item.remarks || undefined,
       owner: item.owner,
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
       equipmentRegistrationUrl: item.equipment_registration_url || undefined,
       thirdpartyInspectionImage: item.thirdparty_inspection_image || undefined,
       pgpcInspectionImage: item.pgpc_inspection_image || undefined,
+      equipmentParts: item.equipment_parts || undefined,
       project: {
         uid: item.project.id,
         name: item.project.name,
