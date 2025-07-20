@@ -19,7 +19,11 @@ import {
   Receipt,
   ExternalLink,
   Shield,
+  Edit,
 } from "lucide-react";
+import EditVehicleDialog from "./EditVehicleDialog";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase";
 
 // Vehicle interface matching our current structure
 interface Vehicle {
@@ -68,12 +72,86 @@ interface VehicleModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   vehicle: Vehicle | null;
+  projects?: Array<{
+    id: string;
+    name: string;
+  }>;
 }
 
-const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
+const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects }: VehicleModalProps) => {
+  // 🔥 REAL-TIME VEHICLE STATE - updates instantly when vehicle is edited
+  const [currentVehicle, setCurrentVehicle] = useState<Vehicle | null>(vehicle);
+
+  // Sync with prop changes
+  useEffect(() => {
+    setCurrentVehicle(vehicle);
+  }, [vehicle]);
+
+  // 🔥 REAL-TIME SUBSCRIPTION for this specific vehicle
+  useEffect(() => {
+    if (!currentVehicle) return;
+
+    const supabase = createClient();
+    
+    const channel = supabase
+      .channel(`vehicle-${currentVehicle.id}-modal`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'vehicles',
+          filter: `id=eq.${currentVehicle.id}`
+        },
+        (payload) => {
+          console.log('🔥 MODAL REALTIME: Vehicle updated:', payload.new);
+          
+          // Update the current vehicle with new data, preserving relations
+          setCurrentVehicle(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              brand: payload.new.brand,
+              model: payload.new.model,
+              type: payload.new.type,
+              plate_number: payload.new.plate_number,
+              owner: payload.new.owner,
+              status: payload.new.status,
+              inspection_date: payload.new.inspection_date,
+              expiry_date: payload.new.expiry_date,
+              before: payload.new.before,
+              remarks: payload.new.remarks,
+              // Keep existing relations and file URLs (they don't change in basic update)
+              front_img_url: payload.new.front_img_url || prev.front_img_url,
+              back_img_url: payload.new.back_img_url || prev.back_img_url,
+              side1_img_url: payload.new.side1_img_url || prev.side1_img_url,
+              side2_img_url: payload.new.side2_img_url || prev.side2_img_url,
+              original_receipt_url: payload.new.original_receipt_url || prev.original_receipt_url,
+              car_registration_url: payload.new.car_registration_url || prev.car_registration_url,
+              pgpc_inspection_image: payload.new.pgpc_inspection_image || prev.pgpc_inspection_image,
+            };
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [currentVehicle?.id]);
+
   // Helper functions
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date';
+      }
+      return date.toLocaleDateString();
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid Date';
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -83,28 +161,49 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
   };
 
   const isExpiringSoon = (expiryDate: string, beforeMonths: number) => {
-    const expiry = new Date(expiryDate);
-    const today = new Date();
-    const warningDate = new Date(expiry);
-    warningDate.setMonth(warningDate.getMonth() - beforeMonths);
+    try {
+      const expiry = new Date(expiryDate);
+      if (isNaN(expiry.getTime())) return false;
+      
+      const today = new Date();
+      const warningDate = new Date(expiry);
+      warningDate.setMonth(warningDate.getMonth() - beforeMonths);
 
-    return today >= warningDate && today < expiry;
+      return today >= warningDate && today < expiry;
+    } catch (error) {
+      return false;
+    }
   };
 
   const isExpired = (expiryDate: string) => {
-    const expiry = new Date(expiryDate);
-    const today = new Date();
-    return expiry < today;
+    try {
+      const expiry = new Date(expiryDate);
+      if (isNaN(expiry.getTime())) return false;
+      
+      const today = new Date();
+      return expiry < today;
+    } catch (error) {
+      return false;
+    }
   };
 
   const getNextInspectionDate = (
     lastInspection: string,
     beforeMonths: number
   ) => {
-    const lastDate = new Date(lastInspection);
-    const nextDate = new Date(lastDate);
-    nextDate.setMonth(nextDate.getMonth() + beforeMonths);
-    return nextDate;
+    try {
+      const lastDate = new Date(lastInspection);
+      // Check if date is valid
+      if (isNaN(lastDate.getTime())) {
+        return new Date(); // Return current date as fallback
+      }
+      const nextDate = new Date(lastDate);
+      nextDate.setMonth(nextDate.getMonth() + beforeMonths);
+      return nextDate;
+    } catch (error) {
+      console.error('Error calculating next inspection date:', error);
+      return new Date(); // Return current date as fallback
+    }
   };
 
   const getFileNameFromUrl = (url: string) => {
@@ -144,7 +243,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
     return images;
   };
 
-  if (!vehicle) return null;
+  if (!currentVehicle) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -156,29 +255,47 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
       >
         {/* Fixed Header */}
         <DialogHeader className="p-6 pb-0 flex-shrink-0 border-b">
-          <DialogTitle className="flex items-center gap-2">
-            <Car className="h-6 w-6" />
-            {vehicle.brand} {vehicle.model}
-            <Badge className={getStatusColor(vehicle.status)}>
-              {vehicle.status}
-            </Badge>
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Car className="h-3 w-3" />
-              {vehicle.plate_number}
-            </Badge>
-          </DialogTitle>
-          <p className="text-muted-foreground">{vehicle.type}</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <DialogTitle className="flex items-center gap-2">
+                <Car className="h-6 w-6" />
+                {currentVehicle.brand} {currentVehicle.model}
+                <Badge className={getStatusColor(currentVehicle.status)}>
+                  {currentVehicle.status}
+                </Badge>
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Car className="h-3 w-3" />
+                  {currentVehicle.plate_number}
+                </Badge>
+              </DialogTitle>
+            </div>
+            
+            {/* Edit Button */}
+            {projects && projects.length > 0 && (
+              <EditVehicleDialog
+                vehicle={currentVehicle}
+                projects={projects}
+                trigger={
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Edit className="h-4 w-4" />
+                    Edit
+                  </Button>
+                }
+              />
+            )}
+          </div>
+          <p className="text-muted-foreground">{currentVehicle.type}</p>
         </DialogHeader>
 
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto scroll-none p-6 pt-6">
           <div className="space-y-6">
             {/* Vehicle Images Grid */}
-            {vehicleImages(vehicle).length > 0 && (
+            {vehicleImages(currentVehicle).length > 0 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Vehicle Photos</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-                  {vehicleImages(vehicle).map((image, index) => (
+                  {vehicleImages(currentVehicle).map((image, index) => (
                     <div
                       key={index}
                       className="border rounded-lg p-3 space-y-2"
@@ -186,7 +303,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                       <div className="aspect-video bg-white rounded-md overflow-hidden">
                         <img
                           src={image.url}
-                          alt={`${vehicle.brand} ${vehicle.model} - ${image.label}`}
+                          alt={`${currentVehicle.brand} ${currentVehicle.model} - ${image.label}`}
                           className="w-full h-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
                           onClick={() => openFile(image.url!)}
                         />
@@ -220,37 +337,37 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                   <div className="flex items-center gap-2 text-sm">
                     <User className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">Owner:</span>
-                    <span>{vehicle.owner}</span>
+                    <span>{currentVehicle.owner}</span>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm">
                     <Building2 className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">Client:</span>
-                    <span>{vehicle.project.client.name}</span>
+                    <span>{currentVehicle.project.client.name}</span>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">Location:</span>
-                    <span>{vehicle.project.client.location.address}</span>
+                    <span>{currentVehicle.project.client.location.address}</span>
                   </div>
 
                   <div className="text-sm">
                     <span className="font-medium">Project:</span>
-                    <span className="ml-2">{vehicle.project.name}</span>
+                    <span className="ml-2">{currentVehicle.project.name}</span>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm">
                     <Car className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">Plate Number:</span>
-                    <span>{vehicle.plate_number}</span>
+                    <span>{currentVehicle.plate_number}</span>
                   </div>
 
-                  {vehicle.user && (
+                  {currentVehicle.user && (
                     <div className="flex items-center gap-2 text-sm">
                       <User className="h-4 w-4 text-muted-foreground" />
                       <span className="font-medium">Added by:</span>
-                      <span>{vehicle.user.full_name}</span>
+                      <span>{currentVehicle.user.full_name}</span>
                     </div>
                   )}
                 </div>
@@ -265,17 +382,17 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                     <span className="font-medium">Registration Expires:</span>
                     <span
                       className={`${
-                        isExpired(vehicle.expiry_date)
+                        isExpired(currentVehicle.expiry_date)
                           ? "text-red-600 font-semibold"
-                          : isExpiringSoon(vehicle.expiry_date, vehicle.before)
+                          : isExpiringSoon(currentVehicle.expiry_date, currentVehicle.before)
                           ? "text-orange-600 font-semibold"
                           : ""
                       }`}
                     >
-                      {formatDate(vehicle.expiry_date)}
-                      {isExpired(vehicle.expiry_date) && " (Expired)"}
-                      {isExpiringSoon(vehicle.expiry_date, vehicle.before) &&
-                        !isExpired(vehicle.expiry_date) &&
+                      {formatDate(currentVehicle.expiry_date)}
+                      {isExpired(currentVehicle.expiry_date) && " (Expired)"}
+                      {isExpiringSoon(currentVehicle.expiry_date, currentVehicle.before) &&
+                        !isExpired(currentVehicle.expiry_date) &&
                         " (Expiring Soon)"}
                     </span>
                   </div>
@@ -283,7 +400,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                   <div className="flex items-center gap-2 text-sm">
                     <CalendarDays className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">Last Inspection:</span>
-                    <span>{formatDate(vehicle.inspection_date)}</span>
+                    <span>{formatDate(currentVehicle.inspection_date)}</span>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm">
@@ -292,13 +409,13 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                     <span
                       className={`${
                         getNextInspectionDate(
-                          vehicle.inspection_date,
-                          vehicle.before
+                          currentVehicle.inspection_date,
+                          currentVehicle.before
                         ) < new Date()
                           ? "text-red-600 font-semibold"
                           : getNextInspectionDate(
-                              vehicle.inspection_date,
-                              vehicle.before
+                              currentVehicle.inspection_date,
+                              currentVehicle.before
                             ).getTime() -
                               new Date().getTime() <
                             30 * 24 * 60 * 60 * 1000
@@ -308,8 +425,8 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                     >
                       {formatDate(
                         getNextInspectionDate(
-                          vehicle.inspection_date,
-                          vehicle.before
+                          currentVehicle.inspection_date,
+                          currentVehicle.before
                         ).toISOString()
                       )}
                     </span>
@@ -318,15 +435,15 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                   <div className="flex items-center gap-2 text-sm">
                     <span className="font-medium">Inspection Frequency:</span>
                     <span>
-                      Every {vehicle.before} month
-                      {vehicle.before !== 1 ? "s" : ""}
+                      Every {currentVehicle.before} month
+                      {currentVehicle.before !== 1 ? "s" : ""}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm">
                     <CalendarDays className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">Date Added:</span>
-                    <span>{formatDate(vehicle.created_at)}</span>
+                    <span>{formatDate(currentVehicle.created_at)}</span>
                   </div>
                 </div>
               </div>
@@ -338,7 +455,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Original Receipt */}
-                {vehicle.original_receipt_url && (
+                {currentVehicle.original_receipt_url && (
                   <div className="border rounded-lg p-4 space-y-2">
                     <div className="flex items-center gap-2">
                       <Receipt className="h-4 w-4 text-green-500" />
@@ -347,13 +464,13 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                       </span>
                     </div>
 
-                    {isImageFile(vehicle.original_receipt_url) ? (
+                    {isImageFile(currentVehicle.original_receipt_url) ? (
                       <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
                         <img
-                          src={vehicle.original_receipt_url}
+                          src={currentVehicle.original_receipt_url}
                           alt="Original Receipt"
                           className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => openFile(vehicle.original_receipt_url!)}
+                          onClick={() => openFile(currentVehicle.original_receipt_url!)}
                         />
                       </div>
                     ) : (
@@ -361,7 +478,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                         <div className="text-center">
                           <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
                           <p className="text-xs text-gray-500 truncate px-2">
-                            {getFileNameFromUrl(vehicle.original_receipt_url)}
+                            {getFileNameFromUrl(currentVehicle.original_receipt_url)}
                           </p>
                         </div>
                       </div>
@@ -371,7 +488,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                       variant="outline"
                       size="sm"
                       className="w-full text-xs"
-                      onClick={() => openFile(vehicle.original_receipt_url!)}
+                      onClick={() => openFile(currentVehicle.original_receipt_url!)}
                     >
                       <ExternalLink className="h-3 w-3 mr-1" />
                       Open Document
@@ -380,7 +497,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                 )}
 
                 {/* Car Registration */}
-                {vehicle.car_registration_url && (
+                {currentVehicle.car_registration_url && (
                   <div className="border rounded-lg p-4 space-y-2">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-blue-500" />
@@ -389,13 +506,13 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                       </span>
                     </div>
 
-                    {isImageFile(vehicle.car_registration_url) ? (
+                    {isImageFile(currentVehicle.car_registration_url) ? (
                       <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
                         <img
-                          src={vehicle.car_registration_url}
+                          src={currentVehicle.car_registration_url}
                           alt="Car Registration"
                           className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => openFile(vehicle.car_registration_url!)}
+                          onClick={() => openFile(currentVehicle.car_registration_url!)}
                         />
                       </div>
                     ) : (
@@ -403,7 +520,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                         <div className="text-center">
                           <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
                           <p className="text-xs text-gray-500 truncate px-2">
-                            {getFileNameFromUrl(vehicle.car_registration_url)}
+                            {getFileNameFromUrl(currentVehicle.car_registration_url)}
                           </p>
                         </div>
                       </div>
@@ -413,7 +530,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                       variant="outline"
                       size="sm"
                       className="w-full text-xs"
-                      onClick={() => openFile(vehicle.car_registration_url!)}
+                      onClick={() => openFile(currentVehicle.car_registration_url!)}
                     >
                       <ExternalLink className="h-3 w-3 mr-1" />
                       Open Document
@@ -422,7 +539,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                 )}
 
                 {/* PGPC Inspection Image */}
-                {vehicle.pgpc_inspection_image && (
+                {currentVehicle.pgpc_inspection_image && (
                   <div className="border rounded-lg p-4 space-y-2">
                     <div className="flex items-center gap-2">
                       <Shield className="h-4 w-4 text-purple-500" />
@@ -431,13 +548,13 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                       </span>
                     </div>
 
-                    {isImageFile(vehicle.pgpc_inspection_image) ? (
+                    {isImageFile(currentVehicle.pgpc_inspection_image) ? (
                       <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
                         <img
-                          src={vehicle.pgpc_inspection_image}
+                          src={currentVehicle.pgpc_inspection_image}
                           alt="PGPC Inspection"
                           className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => openFile(vehicle.pgpc_inspection_image!)}
+                          onClick={() => openFile(currentVehicle.pgpc_inspection_image!)}
                         />
                       </div>
                     ) : (
@@ -445,7 +562,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                         <div className="text-center">
                           <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
                           <p className="text-xs text-gray-500 truncate px-2">
-                            {getFileNameFromUrl(vehicle.pgpc_inspection_image)}
+                            {getFileNameFromUrl(currentVehicle.pgpc_inspection_image)}
                           </p>
                         </div>
                       </div>
@@ -455,7 +572,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                       variant="outline"
                       size="sm"
                       className="w-full text-xs"
-                      onClick={() => openFile(vehicle.pgpc_inspection_image!)}
+                      onClick={() => openFile(currentVehicle.pgpc_inspection_image!)}
                     >
                       <ExternalLink className="h-3 w-3 mr-1" />
                       Open Document
@@ -466,35 +583,35 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
 
               {/* Documents Summary */}
               <div className="flex flex-wrap gap-2">
-                {vehicle.original_receipt_url && (
+                {currentVehicle.original_receipt_url && (
                   <Badge variant="outline" className="text-xs">
                     <Receipt className="h-3 w-3 mr-1" />
                     OR Available
                   </Badge>
                 )}
-                {vehicle.car_registration_url && (
+                {currentVehicle.car_registration_url && (
                   <Badge variant="outline" className="text-xs">
                     <FileText className="h-3 w-3 mr-1" />
                     CR Available
                   </Badge>
                 )}
-                {vehicle.pgpc_inspection_image && (
+                {currentVehicle.pgpc_inspection_image && (
                   <Badge variant="outline" className="text-xs">
                     <Shield className="h-3 w-3 mr-1" />
                     PGPC Available
                   </Badge>
                 )}
-                {vehicleImages(vehicle).length > 0 && (
+                {vehicleImages(currentVehicle).length > 0 && (
                   <Badge variant="outline" className="text-xs">
                     <Image className="h-3 w-3 mr-1" />
-                    {vehicleImages(vehicle).length} Photo
-                    {vehicleImages(vehicle).length !== 1 ? "s" : ""}
+                    {vehicleImages(currentVehicle).length} Photo
+                    {vehicleImages(currentVehicle).length !== 1 ? "s" : ""}
                   </Badge>
                 )}
-                {!vehicle.original_receipt_url &&
-                  !vehicle.car_registration_url &&
-                  !vehicle.pgpc_inspection_image &&
-                  vehicleImages(vehicle).length === 0 && (
+                {!currentVehicle.original_receipt_url &&
+                  !currentVehicle.car_registration_url &&
+                  !currentVehicle.pgpc_inspection_image &&
+                  vehicleImages(currentVehicle).length === 0 && (
                     <span className="text-sm text-muted-foreground">
                       No documents or photos uploaded
                     </span>
@@ -503,11 +620,11 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
             </div>
 
             {/* Remarks */}
-            {vehicle.remarks && (
+            {currentVehicle.remarks && (
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold">Remarks</h3>
                 <p className="text-muted-foreground bg-gray-50 p-3 rounded-md">
-                  {vehicle.remarks}
+                  {currentVehicle.remarks}
                 </p>
               </div>
             )}

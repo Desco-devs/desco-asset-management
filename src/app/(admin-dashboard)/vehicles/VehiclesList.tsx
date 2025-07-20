@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase";
 import VehicleModal from "./VehicleModal";
+import CreateVehicleDialog from "./CreateVehicleDialog";
 import { Eye } from "lucide-react";
 
 interface Vehicle {
@@ -200,8 +201,6 @@ export default function VehiclesList({
           console.log('🔥 REALTIME: Vehicle change detected:', payload.eventType);
           
           if (payload.eventType === 'INSERT') {
-            const brand = payload.new.brand || "Unknown Brand";
-            const model = payload.new.model || "Unknown Model";
             const vehicleId = payload.new.id;
 
             console.log('🔥 REALTIME INSERT:', {
@@ -209,7 +208,8 @@ export default function VehiclesList({
               currentPage,
               currentVehiclesCount: vehicles.length,
               isMobile,
-              effectiveItemsPerPage
+              effectiveItemsPerPage,
+              payloadData: payload.new  // 🔥 Debug the actual payload data
             });
 
             // Find the actual project from the existing projects data (MASTERPIECE PATTERN)
@@ -218,20 +218,20 @@ export default function VehiclesList({
             // Find the client with location data
             const client = project ? initialClients.find(c => c.id === project.client.id) : null;
             
-            // Create vehicle object with complete realtime data - NO API CALLS NEEDED!
+            // Create vehicle object with complete realtime data - NO FALLBACKS, use actual data!
             const newVehicle: Vehicle = {
               id: vehicleId,
-              brand: brand,
-              model: model,
-              type: payload.new.type || "Unknown Type",
-              plate_number: payload.new.plate_number || "",
-              inspection_date: payload.new.inspection_date || new Date().toISOString(),
-              before: payload.new.before || 0,
-              expiry_date: payload.new.expiry_date || new Date().toISOString(),
-              status: payload.new.status || "OPERATIONAL",
-              remarks: payload.new.remarks || undefined,
-              owner: payload.new.owner || "Unknown Owner",
-              created_at: payload.new.created_at || new Date().toISOString(),
+              brand: payload.new.brand,
+              model: payload.new.model, 
+              type: payload.new.type,
+              plate_number: payload.new.plate_number,
+              inspection_date: payload.new.inspection_date,
+              before: payload.new.before,
+              expiry_date: payload.new.expiry_date,
+              status: payload.new.status,
+              remarks: payload.new.remarks,
+              owner: payload.new.owner,
+              created_at: payload.new.created_at,
               project: project && client ? {
                 id: project.id,
                 name: project.name,
@@ -297,6 +297,8 @@ export default function VehiclesList({
             
             console.log('🔥 REALTIME: Added new vehicle with complete data:', {
               vehicleId,
+              brand: payload.new.brand,
+              model: payload.new.model,
               newVehiclesCount: vehicles.length + 1,
               newTotalCount: dynamicTotalCount + 1,
               wasOnPage1: currentPage === 1
@@ -338,17 +340,27 @@ export default function VehiclesList({
   return (
     <div>
       <div className="mb-4 flex justify-between items-center">
-        <p className="text-gray-600">Total vehicles: {vehicles.length}</p>
-        <div className="flex items-center gap-2">
-          <div 
-            className={`w-2 h-2 rounded-full ${
-              isRealtimeConnected ? 'bg-green-500' : 'bg-red-500'
-            }`}
-          />
-          <span className="text-sm text-gray-500">
-            {isRealtimeConnected ? 'Real-time connected' : 'Real-time disconnected'}
-          </span>
+        <div className="flex items-center gap-4">
+          <p className="text-gray-600">Total vehicles: {dynamicTotalCount}</p>
+          <div className="flex items-center gap-2">
+            <div 
+              className={`w-2 h-2 rounded-full ${
+                isRealtimeConnected ? 'bg-green-500' : 'bg-red-500'
+              }`}
+            />
+            <span className="text-sm text-gray-500">
+              {isRealtimeConnected ? 'Real-time connected' : 'Real-time disconnected'}
+            </span>
+          </div>
         </div>
+        
+        {/* 🔥 ADD VEHICLE BUTTON */}
+        <CreateVehicleDialog 
+          projects={initialProjects.map(p => ({
+            id: p.id,
+            name: p.name
+          }))}
+        />
       </div>
 
       {/* 🔥 SKELETON LOADING while loading new page */}
@@ -530,6 +542,10 @@ export default function VehiclesList({
         isOpen={isModalOpen}
         onOpenChange={setIsModalOpen}
         vehicle={selectedVehicle}
+        projects={initialProjects.map(p => ({
+          id: p.id,
+          name: p.name
+        }))}
       />
     </div>
   );
