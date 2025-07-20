@@ -35,11 +35,8 @@ const ChatApp = () => {
     // Loading states
     isLoading,
     isLoadingMessages,
-    isLoadingMoreMessages,
-    hasMoreMessages,
     isCreatingRoom,
     isRespondingToInvitation,
-    isSendingMessage,
 
     // Errors
     error,
@@ -53,7 +50,6 @@ const ChatApp = () => {
     handleCreateRoom,
     handleSendMessage,
     setInvitationRoom,
-    loadMoreMessages,
   } = useChatApp({
     userId: currentUserId,
     enabled: !authLoading && !!currentUserId,
@@ -180,6 +176,12 @@ const ChatApp = () => {
     }
   };
 
+  //   I think you need to bringback the one that you removed in  │
+  // │   the page.tsx because Im using it in the components         │
+  // │   inside the chat-components/(all compoonents here) see the  │
+  // │   logics of each components..if that i thecase bring back    │
+  // │   and add function to the one you remove
+
   // Show loading if auth is still loading or we're fetching data
   if (authLoading || isLoading || !currentUserId) {
     return (
@@ -193,13 +195,24 @@ const ChatApp = () => {
   if (error) {
     return (
       <div className="flex flex-row w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] bg-background items-center justify-center">
-        <div className="text-center">
-          <h3 className="text-lg font-medium text-destructive mb-2">
-            Failed to load chat
+        <div className="text-center max-w-md">
+          <h3 className="text-lg font-medium text-orange-600 mb-2">
+            Chat Setup Required
           </h3>
-          <p className="text-sm text-muted-foreground">
-            {error.message || "An error occurred while loading the chat"}
+          <p className="text-sm text-muted-foreground mb-4">
+            Supabase Realtime needs to be configured. Please enable Realtime for
+            chat tables in your Supabase dashboard.
           </p>
+          <div className="text-xs text-muted-foreground bg-muted p-3 rounded">
+            <strong>Next steps:</strong>
+            <br />
+            1. Enable Realtime for: rooms, room_members, messages,
+            room_invitations
+            <br />
+            2. Set up RLS policies
+            <br />
+            3. Test real-time functionality
+          </div>
         </div>
       </div>
     );
@@ -245,13 +258,6 @@ const ChatApp = () => {
                   currentUserId={currentUserId}
                   roomId={selectedRoom || undefined}
                   isLoading={isLoadingMessages}
-                  hasMoreMessages={hasMoreMessages}
-                  isLoadingMore={isLoadingMoreMessages}
-                  onLoadMore={() => {
-                    if (selectedRoom) {
-                      loadMoreMessages(selectedRoom);
-                    }
-                  }}
                 />
               </div>
 
@@ -262,7 +268,6 @@ const ChatApp = () => {
                   onAttachFile={handleAttachFile}
                   onEmojiPicker={handleEmojiPicker}
                   placeholder={`Message ${currentRoom.name}...`}
-                  disabled={isSendingMessage}
                 />
               </div>
             </div>

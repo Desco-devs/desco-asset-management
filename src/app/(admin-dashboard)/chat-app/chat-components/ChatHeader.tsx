@@ -35,7 +35,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RoomListItem, RoomType, ChatUser } from "@/types/chat-app";
-import { useSocketContext } from "@/context/SocketContext";
 import RoomsList from "./RoomsList";
 import CreateRoomModal from "./CreateRoomModal";
 import InviteUsersModal from "./InviteUsersModal";
@@ -81,9 +80,12 @@ const ChatHeader = ({
   onDeleteRoom,
   onInviteUsers,
 }: ChatHeaderProps) => {
-  const { isUserOnline, getUserLastSeen } = useSocketContext();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  
+  // For now, we'll assume users are offline (can be improved later with Supabase presence)
+  const isUserOnline = (userId: string) => false;
+  const getUserLastSeen = (userId: string): Date | undefined => undefined;
 
   // For direct messages, we need to determine the other user
   const getOtherUserId = () => {
@@ -106,7 +108,7 @@ const ChatHeader = ({
 
     if (isOnline) {
       return "Online";
-    } else if (lastSeen) {
+    } else if (lastSeen instanceof Date) {
       const now = new Date();
       const diffMs = now.getTime() - lastSeen.getTime();
       const diffMinutes = Math.floor(diffMs / (1000 * 60));
