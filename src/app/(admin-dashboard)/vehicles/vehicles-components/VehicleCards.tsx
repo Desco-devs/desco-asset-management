@@ -467,6 +467,11 @@ const VehicleCards = ({
         isOpen={isModalOpen}
         onOpenChange={closeModal}
         vehicle={selectedVehicle}
+        locations={locations.map(loc => ({
+          uid: loc.id,
+          address: loc.address
+        }))}
+        users={[]} // For now, empty array - you can add users data from props if available
       />
 
       {/* Delete Confirmation AlertDialog */}

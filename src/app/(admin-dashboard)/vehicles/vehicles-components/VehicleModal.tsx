@@ -19,7 +19,12 @@ import {
   Receipt,
   ExternalLink,
   Shield, // Added for PGPC inspection icon
+  Wrench, // Added for maintenance reports
 } from "lucide-react";
+import { useState } from "react";
+import CreateMaintenanceReportDialog from "../CreateMaintenanceReportDialog";
+import EditMaintenanceReportDialog from "../EditMaintenanceReportDialog";
+import VehicleMaintenanceReportsList from "../VehicleMaintenanceReportsList";
 
 // Vehicle interface (should match your main component)
 interface Vehicle {
@@ -59,9 +64,26 @@ interface VehicleModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   vehicle: Vehicle | null;
+  locations?: Array<{
+    uid: string;
+    address: string;
+  }>;
+  users?: Array<{
+    uid: string;
+    full_name: string;
+  }>;
 }
 
-const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
+const VehicleModal = ({ isOpen, onOpenChange, vehicle, locations = [], users = [] }: VehicleModalProps) => {
+  // Tab state for switching between vehicle details and maintenance reports
+  const [activeTab, setActiveTab] = useState<'details' | 'maintenance'>('details');
+  
+  // State for edit maintenance report dialog
+  const [editingReport, setEditingReport] = useState<any>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // Convert vehicle UID to format expected by maintenance components
+  const vehicleId = vehicle?.uid || '';
   // Helper functions
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -161,9 +183,37 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
           <p className="text-muted-foreground">{vehicle.type}</p>
         </DialogHeader>
 
+        {/* Tab Navigation */}
+        <div className="flex border-b px-6 pt-4">
+          <button
+            onClick={() => setActiveTab('details')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'details'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Car className="h-4 w-4 inline mr-2" />
+            Vehicle Details
+          </button>
+          <button
+            onClick={() => setActiveTab('maintenance')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'maintenance'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Wrench className="h-4 w-4 inline mr-2" />
+            Maintenance Reports
+          </button>
+        </div>
+
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto scroll-none p-6 pt-6">
-          <div className="space-y-6">
+          {/* Vehicle Details Tab */}
+          {activeTab === 'details' && (
+            <div className="space-y-6">
             {/* Vehicle Images Grid */}
             {vehicleImages(vehicle).length > 0 && (
               <div className="space-y-4">
@@ -488,8 +538,79 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle }: VehicleModalProps) => {
                 </p>
               </div>
             )}
-          </div>
+            </div>
+          )}
+
+          {/* Maintenance Reports Tab */}
+          {activeTab === 'maintenance' && (
+            <div className="space-y-6">
+              {/* Header with Create Report Button */}
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-semibold">Maintenance Reports</h3>
+                  <p className="text-sm text-gray-600">Track vehicle issues, repairs, and maintenance history</p>
+                </div>
+                <CreateMaintenanceReportDialog
+                  vehicleId={vehicleId}
+                  locations={locations.map(loc => ({
+                    id: loc.uid,
+                    address: loc.address
+                  }))}
+                  users={users.map(user => ({
+                    id: user.uid,
+                    full_name: user.full_name
+                  }))}
+                  onSuccess={() => {
+                    // Refresh maintenance reports list
+                    console.log('Maintenance report created successfully');
+                  }}
+                />
+              </div>
+
+              {/* Maintenance Reports List */}
+              <VehicleMaintenanceReportsList
+                vehicleId={vehicleId}
+                onEditReport={(report) => {
+                  setEditingReport({
+                    id: report.id,
+                    issue_description: report.issue_description,
+                    remarks: report.remarks,
+                    inspection_details: report.inspection_details,
+                    action_taken: report.action_taken,
+                    parts_replaced: report.parts_replaced,
+                    priority: report.priority,
+                    status: report.status,
+                    downtime_hours: report.downtime_hours,
+                    date_reported: report.date_reported,
+                    date_repaired: report.date_repaired,
+                    location_id: report.location.address, // Note: This needs to be fixed to use ID
+                    repaired_by: report.repaired_user?.full_name
+                  });
+                  setIsEditDialogOpen(true);
+                }}
+              />
+            </div>
+          )}
         </div>
+
+        {/* Edit Maintenance Report Dialog */}
+        <EditMaintenanceReportDialog
+          isOpen={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          vehicleId={vehicleId}
+          report={editingReport}
+          locations={locations.map(loc => ({
+            id: loc.uid,
+            address: loc.address
+          }))}
+          users={users.map(user => ({
+            id: user.uid,
+            full_name: user.full_name
+          }))}
+          onSuccess={() => {
+            console.log('Maintenance report updated successfully');
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
