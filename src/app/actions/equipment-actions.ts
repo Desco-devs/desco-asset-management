@@ -146,6 +146,89 @@ interface CreateEquipmentData {
   }[];
 }
 
+// Form state interface for progressive enhancement
+interface FormState {
+  success: boolean | null;
+  message: string;
+  fieldErrors: Record<string, string>;
+  data?: unknown;
+}
+
+// Modern progressive enhancement action
+export async function createEquipmentAction(prevState: FormState, formData: FormData): Promise<FormState> {
+  try {
+    // Extract form data with proper null handling
+    const data: CreateEquipmentData = {
+      brand: (formData.get('brand') as string) || '',
+      model: (formData.get('model') as string) || '',
+      type: (formData.get('type') as string) || '',
+      owner: (formData.get('owner') as string) || '',
+      projectId: (formData.get('projectId') as string) || '',
+      status: (formData.get('status') as keyof typeof EquipmentStatus) || 'OPERATIONAL',
+      remarks: (formData.get('remarks') as string) || undefined,
+      plateNumber: (formData.get('plateNumber') as string) || undefined,
+      inspectionDate: (formData.get('inspectionDate') as string) || undefined,
+      insuranceExpirationDate: (formData.get('insuranceExpirationDate') as string) || undefined,
+      before: formData.get('before') ? Number(formData.get('before')) : undefined,
+      files: {
+        image: formData.get('image') as File || undefined,
+        originalReceipt: formData.get('originalReceipt') as File || undefined,
+        equipmentRegistration: formData.get('equipmentRegistration') as File || undefined,
+        thirdpartyInspection: formData.get('thirdpartyInspection') as File || undefined,
+        pgpcInspection: formData.get('pgpcInspection') as File || undefined,
+      }
+    };
+
+    // Extract equipment parts from FormData
+    const equipmentPartsCount = parseInt(formData.get('equipmentPartsCount') as string || '0');
+    const equipmentParts: { file: File; folderPath: string }[] = [];
+    
+    for (let i = 0; i < equipmentPartsCount; i++) {
+      const file = formData.get(`equipmentPart_${i}`) as File;
+      const folderPath = formData.get(`equipmentPartPath_${i}`) as string;
+      
+      if (file && folderPath) {
+        equipmentParts.push({ file, folderPath });
+      }
+    }
+    
+    data.equipmentParts = equipmentParts;
+
+    // Validate required fields
+    if (!data.brand?.trim()) {
+      return { success: false, message: "Brand is required", fieldErrors: { brand: "Brand is required" } };
+    }
+    if (!data.model?.trim()) {
+      return { success: false, message: "Model is required", fieldErrors: { model: "Model is required" } };
+    }
+    if (!data.type?.trim()) {
+      return { success: false, message: "Type is required", fieldErrors: { type: "Type is required" } };
+    }
+    if (!data.owner?.trim()) {
+      return { success: false, message: "Owner is required", fieldErrors: { owner: "Owner is required" } };
+    }
+    if (!data.projectId) {
+      return { success: false, message: "Project selection is required", fieldErrors: { projectId: "Please select a project" } };
+    }
+
+    const result = await createEquipment(data);
+    return { 
+      success: true, 
+      message: "Equipment created successfully",
+      data: result.data,
+      fieldErrors: {}
+    };
+
+  } catch (error) {
+    console.error("Error in createEquipmentAction:", error);
+    return { 
+      success: false, 
+      message: error instanceof Error ? error.message : "Failed to create equipment",
+      fieldErrors: {}
+    };
+  }
+}
+
 export async function createEquipment(data: CreateEquipmentData) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -206,7 +289,7 @@ export async function createEquipment(data: CreateEquipmentData) {
     const clientName = projectInfo.client.name;
 
     // Create equipment record first
-    const createData: any = {
+    const createData: Record<string, unknown> = {
       brand: data.brand,
       model: data.model,
       type: data.type,
@@ -231,10 +314,10 @@ export async function createEquipment(data: CreateEquipmentData) {
       createData.insurance_expiration_date = new Date(data.insuranceExpirationDate);
     }
 
-    const equipment = await prisma.equipment.create({ data: createData });
+    const equipment = await prisma.equipment.create({ data: createData as any });
 
     // Handle file uploads if any
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     // Upload regular files
     if (data.files) {

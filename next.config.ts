@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
     ],
   },
 
+
   // Add your other Next.js config options here
 }
 

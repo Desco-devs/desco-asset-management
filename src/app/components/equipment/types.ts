@@ -51,5 +51,6 @@ export interface EquipmentFormProps {
 }
 
 export interface EquipmentFormDialogProps extends EquipmentFormProps {
-  // Additional props specific to dialog wrapper
+  // Dialog-specific props
+  className?: string;
 }
