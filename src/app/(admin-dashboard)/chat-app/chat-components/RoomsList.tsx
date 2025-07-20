@@ -9,10 +9,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Search,
   Plus,
+  Hash,
   MessageSquare,
   Clock,
   UserPlus,
-  ChartBar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RoomListItem, RoomType, InvitationStatus } from "@/types/chat-app";
@@ -22,7 +22,6 @@ interface RoomsListProps {
   selectedRoom: string;
   onRoomSelect: (roomId: string) => void;
   onCreateRoom?: () => void;
-  currentUserId?: string;
 }
 
 const RoomsList = ({
@@ -30,7 +29,6 @@ const RoomsList = ({
   selectedRoom,
   onRoomSelect,
   onCreateRoom,
-  currentUserId,
 }: RoomsListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -41,19 +39,8 @@ const RoomsList = ({
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Helper function to get the other user ID in a direct message room
-  const getOtherUserId = (room: RoomListItem) => {
-    if (room.type === RoomType.DIRECT && room.members && currentUserId) {
-      const otherMember = room.members.find(
-        member => (member.user?.id || member.user_id) !== currentUserId
-      );
-      return otherMember?.user?.id || otherMember?.user_id || null;
-    }
-    return null;
-  };
-
   return (
-    <div className="w-full h-full flex flex-col md:bg-muted bg-chart-2/10">
+    <div className="w-full h-full flex flex-col ">
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Messages</h2>
@@ -72,7 +59,7 @@ const RoomsList = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scroll-none">
+      <ScrollArea className="flex-1">
         <div className="p-2 group">
           {filteredRooms.length === 0 ? (
             <div className="text-center py-2">
@@ -93,7 +80,7 @@ const RoomsList = ({
                   </p>
                 </div>
                 {!searchQuery && onCreateRoom && (
-                  <Button onClick={onCreateRoom} className="mt-4 text-white bg-chart-3">
+                  <Button onClick={onCreateRoom} className="mt-4">
                     <Plus className="h-4 w-4 mr-2" />
                     Start a conversation
                   </Button>
@@ -105,14 +92,14 @@ const RoomsList = ({
               <Card
                 key={room.id}
                 className={cn(
-                  "mb-2 cursor-pointer transition-colors hover:bg-chart-1/20 p-0 ",
+                  "mb-2 cursor-pointer transition-colors group-hover:bg-accent hover:bg-chart-1/20 p-0 ",
                   selectedRoom === room.id &&
                     "bg-chart-1/20 group-hover:bg-accent border border-chart-1/20 dark:border-chart-3"
                 )}
                 onClick={() => onRoomSelect(room.id)}
               >
-                <CardContent className="p-3">
-                  <div className="flex items-center space-x-3 w-full ">
+                <CardContent className="p-3 ">
+                  <div className="flex items-center space-x-3">
                     <div className="relative">
                       <Avatar className="h-10 w-10">
                         <AvatarImage src={room.avatar_url || ""} />
@@ -128,27 +115,23 @@ const RoomsList = ({
                         <div
                           className={cn(
                             "absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background",
-                            // Check if the other user in this DM is online
-                            (() => {
-                              const otherUserId = getOtherUserId(room);
-                              return otherUserId && isUserOnline(otherUserId) 
-                                ? "bg-green-500" 
-                                : "bg-gray-400";
-                            })()
+                            // For testing, use some test user IDs
+                            isUserOnline('user1') || isUserOnline('user2') || isUserOnline('user3') 
+                              ? "bg-green-500"
+                              : "bg-gray-400"
                           )}
                         />
                       ) : null}
                     </div>
 
-                    <div className="flex-1 min-w-0 md:max-w-56 max-w-48 w-full">
+                    <div className="flex-1 min-w-0 md:max-w-56 w-full">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center ">
                           {room.type === RoomType.GROUP && (
-                            // <Hash className="h-3 w-3 text-muted-foreground" />
-                            <ChartBar className="w-4 h-4 min-w-4 min-h-4 max-w-4 max-h-4 text-chart-1 dark:text-white" />
+                            <Hash className="h-3 w-3 text-muted-foreground" />
                           )}
 
-                          <p className="text-sm font-medium line-clamp-1 ">
+                          <p className="text-sm font-medium line-clamp-1">
                             {room.name}
                           </p>
                         </div>
@@ -171,7 +154,7 @@ const RoomsList = ({
                               : "hidden"
                           } items-center space-x-2`}
                         >
-                          <span className="text-xs w-fit whitespace-nowrap">
+                          <span className="text-xs text-white">
                             {room.lastMessage?.created_at
                               ? new Date(
                                   room.lastMessage.created_at
@@ -215,7 +198,7 @@ const RoomsList = ({
             ))
           )}
         </div>
-      </div>
+      </ScrollArea>
     </div>
   );
 };

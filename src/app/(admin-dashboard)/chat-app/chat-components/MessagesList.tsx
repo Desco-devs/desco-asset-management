@@ -81,15 +81,9 @@ const MessagesList = ({
     const element = event.currentTarget;
     const { scrollTop, scrollHeight, clientHeight } = element;
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-    const isNearTop = scrollTop < 100;
 
     setShouldAutoScroll(isNearBottom);
     setShowScrollToBottom(!isNearBottom && messages.length > 10);
-
-    // Auto-load more messages when scrolling near the top
-    if (isNearTop && hasMoreMessages && !isLoadingMore && onLoadMore) {
-      onLoadMore();
-    }
   };
 
   const scrollToBottom = () => {
@@ -98,9 +92,9 @@ const MessagesList = ({
     setShowScrollToBottom(false);
   };
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full">
       <ScrollArea
-        className="h-full w-full pt-2 sm:pt-6 px-2 sm:px-6"
+        className="h-full pt-6 px-6"
         ref={scrollAreaRef}
         onScrollCapture={handleScroll}
       >
@@ -140,14 +134,14 @@ const MessagesList = ({
               <div
                 key={msg.id}
                 className={cn(
-                  "flex items-end space-x-3 w-full sm:px-4",
+                  "flex space-x-3",
                   isMe && "flex-row-reverse space-x-reverse"
                 )}
               >
                 {!isMe && (
                   <Avatar className="h-8 w-8 mt-1">
                     <AvatarImage src={msg.sender.user_profile || ""} />
-                    <AvatarFallback className="text-xs bg-muted">
+                    <AvatarFallback className="text-xs">
                       {msg.sender.full_name.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -155,23 +149,27 @@ const MessagesList = ({
 
                 <div
                   className={cn(
-                    "flex flex-col space-y-1 max-w-[75%]  sm:max-w-xs lg:max-w-md",
+                    "flex flex-col space-y-1 max-w-xs lg:max-w-md",
                     isMe && "items-end"
                   )}
                 >
+                  {!isMe && (
+                    <span className="text-sm font-medium">
+                      {msg.sender.full_name}
+                    </span>
+                  )}
                   <div
                     className={cn(
-                      "rounded-lg px-4 py-2 text-sm relative break-words",
+                      "rounded-lg px-3 py-2 text-sm relative",
                       isMe
-                        ? "bg-chart-2 text-primary-foreground rounded-tr-2xl rounded-l-2xl rounded-br-none dark:text-accent-foreground"
-                        : "bg-chart-2/10 dark:bg-muted text-accent-foreground rounded-tl-2xl rounded-r-2xl rounded-bl-none",
+                        ? "bg-chart-2 text-primary-foreground dark:text-accent-foreground"
+                        : "bg-muted text-accent-foreground",
                       isPending && "opacity-70",
                       isFailed &&
                         "bg-destructive/20 border border-destructive/40"
                     )}
                   >
-                    {/* this is the message */}
-                    <p>{msg.content}</p>
+                    {msg.content}
                     {isPending && (
                       <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-background rounded-full border-2 border-primary flex items-center justify-center">
                         <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
@@ -184,18 +182,12 @@ const MessagesList = ({
                     )}
                   </div>
                   <div className="flex items-center space-x-2 px-1">
-                    <div className="text-xs text-muted-foreground flex gap-1 flex-row-reverse items-center">
-                      <span>
-                        {" "}
-                        {new Date(msg.created_at).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                      {!isMe && (
-                        <p className="capitalize">{msg.sender.full_name}</p>
-                      )}
-                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(msg.created_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
                     {isPending && (
                       <span className="text-xs text-muted-foreground italic">
                         Sending...
@@ -221,12 +213,12 @@ const MessagesList = ({
               </div>
             );
           })}
-          {/* 
+
           {isLoading && (
-            <div className="h-full w-full flex justify-center py-4">
+            <div className="flex justify-center py-4">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
             </div>
-          )} */}
+          )}
 
           {/* Invisible div to scroll to */}
           <div ref={messagesEndRef} />

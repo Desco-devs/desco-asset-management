@@ -175,7 +175,6 @@ export async function GET(request: NextRequest) {
         description: room.description,
         type: room.type,
         avatar_url: displayAvatarUrl,
-        owner_id: room.owner_id, // Add owner_id
         lastMessage: lastMessage ? {
           content: lastMessage.content,
           sender_name: lastMessage.sender.full_name,
