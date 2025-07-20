@@ -7,7 +7,8 @@ import Link from "next/link";
 import { LocationFormDialog } from "@/app/components/custom-reusable/LocationFormDialog";
 import { ClientFormDialog } from "@/app/components/custom-reusable/ClientFormDialog";
 import { ProjectFormDialog } from "@/app/components/custom-reusable/ProjectFormDialog";
-import { EquipmentFormDialog } from "@/app/components/equipment";
+import { EquipmentFormDialog } from "@/app/components/custom-reusable/EquipmentFormDialog";
+import { VehicleFormDialog } from "@/app/components/vehicles";
 
 interface QuickAction {
   id: string;
@@ -59,7 +60,6 @@ export function QuickActions() {
       title: "Add Vehicle",
       description: "Register a new vehicle",
       icon: <Truck className="h-5 w-5" />,
-      href: "/vehicles",
       variant: "outline",
       color: "text-red-600"
     },
@@ -167,6 +167,25 @@ export function QuickActions() {
                     <Button
                       variant={action.variant || "outline"}
                       className="w-full h-auto flex-col p-4 space-y-2 hover:scale-105 transition-transform hover:bg-orange-50 hover:border-orange-200 dark:hover:bg-orange-950 dark:hover:border-orange-800"
+                    >
+                      <div className={`${action.color} group-hover:scale-110 transition-transform`}>
+                        {action.icon}
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="font-medium text-sm">{action.title}</p>
+                        <p className="text-xs text-muted-foreground leading-tight">
+                          {action.description}
+                        </p>
+                      </div>
+                    </Button>
+                  }
+                />
+              ) : action.id === "add-vehicle" ? (
+                <VehicleFormDialog
+                  trigger={
+                    <Button
+                      variant={action.variant || "outline"}
+                      className="w-full h-auto flex-col p-4 space-y-2 hover:scale-105 transition-transform hover:bg-red-50 hover:border-red-200 dark:hover:bg-red-950 dark:hover:border-red-800"
                     >
                       <div className={`${action.color} group-hover:scale-110 transition-transform`}>
                         {action.icon}
