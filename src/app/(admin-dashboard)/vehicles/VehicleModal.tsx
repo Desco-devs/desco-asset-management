@@ -92,10 +92,10 @@ interface VehicleModalProps {
 }
 
 const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects, locations = [], users = [], initialMaintenanceReports = [] }: VehicleModalProps) => {
-  // 🔥 REAL-TIME VEHICLE STATE - updates instantly when vehicle is edited
+  // Real-time vehicle state - updates instantly when vehicle is edited
   const [currentVehicle, setCurrentVehicle] = useState<Vehicle | null>(vehicle);
   
-  // 🔥 TAB STATE for maintenance reports
+  // Tab state for maintenance reports
   const [activeTab, setActiveTab] = useState<'details' | 'maintenance'>('details');
   
   // State for edit maintenance report dialog
@@ -110,7 +110,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects, locations = [],
     setCurrentVehicle(vehicle);
   }, [vehicle]);
 
-  // 🔥 REAL-TIME SUBSCRIPTION for this specific vehicle AND its maintenance reports
+  // Real-time subscription for this specific vehicle and its maintenance reports
   useEffect(() => {
     if (!currentVehicle) return;
 
@@ -127,8 +127,6 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects, locations = [],
           filter: `id=eq.${currentVehicle.id}`
         },
         (payload) => {
-          // console.log('🔥 MODAL REALTIME: Vehicle updated:', payload.new);
-          
           // Update the current vehicle with new data, preserving relations
           setCurrentVehicle(prev => {
             if (!prev) return prev;
@@ -144,7 +142,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects, locations = [],
               expiry_date: payload.new.expiry_date,
               before: payload.new.before,
               remarks: payload.new.remarks,
-              // Keep existing relations and file URLs (they don't change in basic update)
+              // Keep existing relations and file URLs
               front_img_url: payload.new.front_img_url || prev.front_img_url,
               back_img_url: payload.new.back_img_url || prev.back_img_url,
               side1_img_url: payload.new.side1_img_url || prev.side1_img_url,
@@ -715,8 +713,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects, locations = [],
                     full_name: user.full_name
                   }))}
                   onSuccess={() => {
-                    // 🔥 FALLBACK: Force refresh if real-time doesn't work
-                    console.log('✅ Maintenance report created - triggering refresh');
+                    // Fallback: Force refresh if real-time doesn't work
                     setMaintenanceRefreshTrigger(prev => prev + 1);
                   }}
                 />
@@ -772,8 +769,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects, locations = [],
             full_name: user.full_name
           }))}
           onSuccess={() => {
-            // 🔥 OPTIMIZED: No refresh needed - real-time subscription handles it!
-            console.log('✅ Maintenance report updated - real-time will handle UI update');
+            // No refresh needed - real-time subscription handles it!
           }}
         />
       </DialogContent>

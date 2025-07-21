@@ -18,9 +18,6 @@ async function getVehicles() {
       return response.json();
     }
   } catch (error) {
-    console.log(
-      "Failed to fetch from /api/vehicles/getall, trying alternatives..."
-    );
   }
 
   try {
@@ -30,9 +27,6 @@ async function getVehicles() {
       return response.json();
     }
   } catch (error) {
-    console.log(
-      "Failed to fetch from /api/vehicles/all, trying alternatives..."
-    );
   }
 
   try {
@@ -128,7 +122,6 @@ export default function VehiclePage() {
       setLoading(true);
       setError(null);
 
-      console.log("Fetching vehicle data...");
 
       const [vehiclesData, clientsData, locationsData] = await Promise.all([
         getVehicles(),
@@ -136,11 +129,6 @@ export default function VehiclePage() {
         getLocations(),
       ]);
 
-      console.log("Successfully fetched data:", {
-        vehicles: vehiclesData?.length || 0,
-        clients: clientsData?.length || 0,
-        locations: locationsData?.length || 0,
-      });
 
       setVehicles(vehiclesData || []);
       setClients(clientsData || []);
@@ -163,11 +151,9 @@ export default function VehiclePage() {
   // Function to handle vehicle added - this will refresh the vehicle data
   const handleVehicleAdded = useCallback(async () => {
     try {
-      console.log("Refreshing vehicle data after vehicle added...");
       // Only refresh vehicle data since clients and locations don't change
       const vehiclesData = await getVehicles();
       setVehicles(vehiclesData || []);
-      console.log("Vehicle data refreshed successfully");
     } catch (error) {
       console.error("Error refreshing vehicle data:", error);
       // Don't show error toast here as the operation (add/edit) was successful

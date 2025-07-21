@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { getAllVehicleMaintenanceReportsAction, deleteVehicleMaintenanceReportAction } from "@/app/actions/vehicle-maintenance-actions";
+import { useState, useEffect, useRef } from "react";
+import { deleteVehicleMaintenanceReportAction } from "@/app/actions/vehicle-maintenance-actions";
 import { createClient } from "@/lib/supabase";
 import { toast } from "sonner";
 
@@ -80,37 +80,18 @@ export default function VehicleMaintenanceReportsList({
   locationsRef.current = initialLocations;
   vehicleRef.current = currentVehicle;
 
-  console.log('🔥 MAINTENANCE COMPONENT: Mounted with vehicleId:', vehicleId);
-
-  // Debug vehicleId (cleaned up)
-  // console.log('🔥 MAINTENANCE DEBUG: Component mounted with vehicleId:', vehicleId);
-
-  // 🔥 SYNC with pre-loaded data when initialMaintenanceReports changes
+  // Sync with pre-loaded data when initialMaintenanceReports changes
   useEffect(() => {
     const vehicleReports = initialMaintenanceReports.filter(report => report.vehicle_id === vehicleId);
     setReports(vehicleReports);
-    console.log('🔥 MAINTENANCE: Synced with pre-loaded data:', vehicleReports.length, 'reports for vehicle', vehicleId);
   }, [initialMaintenanceReports, vehicleId]);
 
-  // 🔥 OPTIMIZED: No longer needed since real-time updates handle everything instantly
-  // Real-time subscription below handles all updates without refresh triggers
-  useEffect(() => {
-    if (refreshTrigger && refreshTrigger > 0) {
-      console.log('🔥 MAINTENANCE: Real-time update triggered, but handled by subscription');
-      // No longer calling loadReports() - real-time handles it!
-    }
-  }, [refreshTrigger]);
 
-  // 🔥 REAL-TIME SUBSCRIPTION for maintenance reports
+  // Real-time subscription for maintenance reports
   useEffect(() => {
-    console.log('🔥 MAINTENANCE: useEffect triggered with vehicleId:', vehicleId);
-    if (!vehicleId) {
-      console.log('❌ MAINTENANCE: No vehicleId, skipping subscription');
-      return;
-    }
-    const supabase = createClient();
+    if (!vehicleId) return;
     
-    console.log('🔥 MAINTENANCE REALTIME: Setting up subscription for vehicleId:', vehicleId);
+    const supabase = createClient();
     
     const channel = supabase
       .channel(`maintenance-reports-${vehicleId}`)
@@ -123,15 +104,8 @@ export default function VehicleMaintenanceReportsList({
           filter: `vehicle_id=eq.${vehicleId}`
         },
         (payload) => {
-          console.log('🔥 MAINTENANCE REALTIME: Report change detected:', payload.eventType);
-          
           if (payload.eventType === 'INSERT') {
             const reportId = payload.new.id;
-            
-            console.log('🔥 MAINTENANCE REALTIME INSERT:', {
-              reportId,
-              payloadData: payload.new
-            });
 
             // Find the actual users and location from the existing reference data (MASTERPIECE PATTERN)
             const reportedUser = usersRef.current.find(u => u.id === payload.new.reported_by);
@@ -172,12 +146,10 @@ export default function VehicleMaintenanceReportsList({
               } : undefined,
             };
 
-            // 🔥 ALWAYS add new report to the top of the list
+            // Add new report to the top of the list
             setReports(prev => [newReport, ...prev]);
-            console.log('✅ MAINTENANCE REALTIME: Report added instantly!');
             
           } else if (payload.eventType === 'UPDATE') {
-            console.log('🔥 MAINTENANCE REALTIME UPDATE:', payload.new.id);
             
             const reportedUser = usersRef.current.find(u => u.id === payload.new.reported_by);
             const repairedUser = payload.new.repaired_by ? usersRef.current.find(u => u.id === payload.new.repaired_by) : null;
@@ -219,33 +191,20 @@ export default function VehicleMaintenanceReportsList({
             setReports(prev => prev.map(report => 
               report.id === payload.new.id ? updatedReport : report
             ));
-            console.log('✅ MAINTENANCE REALTIME: Report updated instantly!');
             
           } else if (payload.eventType === 'DELETE') {
-            console.log('🔥 MAINTENANCE REALTIME DELETE:', payload.old?.id);
             if (payload.old?.id) {
               setReports(prev => prev.filter(report => report.id !== payload.old.id));
-              console.log('✅ MAINTENANCE REALTIME: Report deleted instantly!');
             }
           }
         }
       )
-      .subscribe((status) => {
-        console.log('🔥 MAINTENANCE REALTIME: Subscription status:', status, 'for vehicle:', vehicleId);
-        if (status === 'SUBSCRIPTION_ERROR') {
-          console.error('❌ MAINTENANCE: Subscription error for vehicle:', vehicleId);
-        } else if (status === 'SUBSCRIBED') {
-          console.log('✅ MAINTENANCE: Successfully subscribed to maintenance_vehicle_reports for vehicle:', vehicleId);
-          console.log('🔥 MAINTENANCE: Listening for changes on table maintenance_vehicle_reports with filter vehicle_id=eq.' + vehicleId);
-        }
-      });
+      .subscribe();
 
-    // Cleanup subscription
     return () => {
-      console.log('🔥 MAINTENANCE REALTIME: Cleaning up subscription for vehicle:', vehicleId);
       channel.unsubscribe();
     };
-  }, []); // TEMP: Force run on mount to test
+  }, [vehicleId]);
 
   // Delete report
   const handleDeleteReport = async (reportId: string) => {
@@ -261,11 +220,6 @@ export default function VehicleMaintenanceReportsList({
       
       if (result.success) {
         toast.success("Maintenance report deleted successfully!");
-        
-        // 🔥 OPTIMIZED: No manual UI update needed - real-time subscription handles deletion instantly!
-        // The real-time DELETE event will automatically remove the report from the list
-        
-        // No longer calling loadReports() - real-time handles it!
       }
     } catch (error) {
       console.error("Error deleting report:", error);

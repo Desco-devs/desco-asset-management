@@ -65,26 +65,22 @@ export default function VehiclesList({
   const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   
-  // 🔥 DYNAMIC TOTAL COUNT - updates with real-time changes
   const [dynamicTotalCount, setDynamicTotalCount] = useState(totalCount);
-  
-  // 🔥 MODAL STATE
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 🔥 HANDLE VEHICLE CLICK
   const handleVehicleClick = (vehicle: Vehicle) => {
     setSelectedVehicle(vehicle);
     setIsModalOpen(true);
   };
   
-  // 🔥 RESPONSIVE ITEMS PER PAGE: 6 on mobile, 12 on desktop
+  // Responsive items per page: 6 on mobile, 12 on desktop
   const effectiveItemsPerPage = isMobile ? 6 : itemsPerPage;
   
-  // 🔥 SMART CACHING: Cache pages in memory (separate caches for mobile/desktop)
+  // Smart caching: Cache pages in memory (separate caches for mobile/desktop)
   const [pageCache, setPageCache] = useState<Map<string, Vehicle[]>>(new Map([['desktop-1', initialVehicles]]));
 
-  // 🔥 MOBILE DETECTION
+  // Mobile detection
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -96,20 +92,18 @@ export default function VehiclesList({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // 🔥 PAGINATION FUNCTION with Smart Caching + Responsive
+  // Pagination function with smart caching + responsive
   const loadPage = async (page: number) => {
     const cacheKey = `${isMobile ? 'mobile' : 'desktop'}-${page}`;
     
-    // Check cache first - INSTANT if cached!
+    // Check cache first - instant if cached!
     if (pageCache.has(cacheKey)) {
-      console.log(`🚀 CACHE HIT: ${isMobile ? 'Mobile' : 'Desktop'} page ${page} loaded instantly from cache!`);
       const cachedData = pageCache.get(cacheKey)!;
       setVehicles(cachedData);
       setCurrentPage(page);
       return;
     }
 
-    console.log(`📡 LOADING: ${isMobile ? 'Mobile' : 'Desktop'} page ${page} from server...`);
     setIsLoadingPage(true);
 
     try {
@@ -122,8 +116,6 @@ export default function VehiclesList({
         setPageCache(prev => new Map(prev.set(cacheKey, vehiclesData)));
         setVehicles(vehiclesData);
         setCurrentPage(page);
-        
-        console.log(`✅ CACHED: ${isMobile ? 'Mobile' : 'Desktop'} page ${page} loaded and cached!`);
       }
     } catch (error) {
       console.error('Error loading page:', error);
@@ -145,17 +137,8 @@ export default function VehiclesList({
       setPageCache(new Map([[cacheKey, displayVehicles]]));
       setCurrentPage(1); // Reset to page 1 on mode change
       
-      // 🔥 SYNC DYNAMIC TOTAL COUNT with server data
+      // Sync dynamic total count with server data
       setDynamicTotalCount(totalCount);
-      
-      console.log(`🚙 VehiclesList: Loaded ${isMobile ? 'mobile' : 'desktop'} vehicles:`, displayVehicles.length, displayVehicles.length === 0 ? '(empty array)' : '');
-      console.log('📦 Total vehicles:', totalCount);
-      console.log('🏗️ Reference data loaded:', {
-        projects: initialProjects.length,
-        clients: initialClients.length,
-        locations: initialLocations.length,
-        users: initialUsers.length
-      });
       
       // Clear old localStorage cache when we have fresh server data
       if (typeof window !== 'undefined') {
@@ -179,7 +162,6 @@ export default function VehiclesList({
         try {
           localStorage.setItem('vehicles-cache', JSON.stringify(vehicles));
           localStorage.setItem('vehicles-cache-time', Date.now().toString());
-          console.log("🚙 VehiclesList: Cached vehicles data:", vehicles.length);
         } catch (error) {
           console.error('Error caching vehicles data:', error);
         }
@@ -203,19 +185,8 @@ export default function VehiclesList({
           table: 'vehicles'
         },
         async (payload) => {
-          console.log('🔥 REALTIME: Vehicle change detected:', payload.eventType);
-          
           if (payload.eventType === 'INSERT') {
             const vehicleId = payload.new.id;
-
-            console.log('🔥 REALTIME INSERT:', {
-              vehicleId,
-              currentPage,
-              currentVehiclesCount: vehicles.length,
-              isMobile,
-              effectiveItemsPerPage,
-              payloadData: payload.new  // 🔥 Debug the actual payload data
-            });
 
             // Find the actual project from the existing projects data (MASTERPIECE PATTERN)
             const project = initialProjects.find(p => p.id === payload.new.project_id);
@@ -263,7 +234,7 @@ export default function VehiclesList({
               user: null
             };
 
-            // 🔥 ALWAYS add new vehicle if we're on page 1, even if array is empty
+            // Always add new vehicle if we're on page 1, even if array is empty
             if (currentPage === 1) {
               setVehicles(prev => {
                 // If empty array, just add the new vehicle
@@ -297,17 +268,8 @@ export default function VehiclesList({
                 return newCache;
               });
             }
-            // 🔥 INCREMENT TOTAL COUNT for pagination
+            // Increment total count for pagination
             setDynamicTotalCount(prev => prev + 1);
-            
-            console.log('🔥 REALTIME: Added new vehicle with complete data:', {
-              vehicleId,
-              brand: payload.new.brand,
-              model: payload.new.model,
-              newVehiclesCount: vehicles.length + 1,
-              newTotalCount: dynamicTotalCount + 1,
-              wasOnPage1: currentPage === 1
-            });
             
           } else if (payload.eventType === 'UPDATE') {
             setVehicles(prev => 
@@ -315,23 +277,16 @@ export default function VehiclesList({
                 vehicle.id === payload.new.id ? { ...vehicle, ...payload.new } as Vehicle : vehicle
               )
             );
-            console.log('🔥 REALTIME: Updated vehicle:', payload.new.id);
             
           } else if (payload.eventType === 'DELETE') {
             setVehicles(prev => prev.filter(vehicle => vehicle.id !== payload.old.id));
             
-            // 🔥 DECREMENT TOTAL COUNT for pagination
+            // Decrement total count for pagination
             setDynamicTotalCount(prev => Math.max(0, prev - 1));
-            
-            console.log('🔥 REALTIME: Deleted vehicle:', {
-              vehicleId: payload.old.id,
-              newTotalCount: Math.max(0, dynamicTotalCount - 1)
-            });
           }
         }
       )
       .subscribe((status) => {
-        console.log('Supabase subscription status:', status);
         setIsRealtimeConnected(status === 'SUBSCRIBED');
       });
 
@@ -359,7 +314,7 @@ export default function VehiclesList({
           </div>
         </div>
         
-        {/* 🔥 ADD VEHICLE BUTTON */}
+        {/* Add Vehicle Button */}
         <CreateVehicleDialog 
           projects={initialProjects.map(p => ({
             id: p.id,
@@ -368,7 +323,7 @@ export default function VehiclesList({
         />
       </div>
 
-      {/* 🔥 SKELETON LOADING while loading new page */}
+      {/* Skeleton loading while loading new page */}
       {isLoadingPage ? (
         <div className="space-y-4">
           {Array.from({ length: effectiveItemsPerPage }).map((_, index) => (
@@ -476,12 +431,12 @@ export default function VehiclesList({
         </div>
       )}
 
-      {/* 🔥 RESPONSIVE PAGINATION CONTROLS */}
+      {/* Responsive pagination controls */}
       {!isLoadingPage && dynamicTotalCount > effectiveItemsPerPage && (
         <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="text-sm text-gray-600 text-center md:text-left">
             Showing {((currentPage - 1) * effectiveItemsPerPage) + 1} to {Math.min(currentPage * effectiveItemsPerPage, dynamicTotalCount)} of {dynamicTotalCount} vehicles
-            {isMobile && <span className="block text-xs text-gray-400 mt-1">📱 Mobile: 6 per page</span>}
+            {isMobile && <span className="block text-xs text-gray-400 mt-1">Mobile: 6 per page</span>}
           </div>
           
           <div className="flex items-center gap-1 md:gap-2">
@@ -542,7 +497,7 @@ export default function VehiclesList({
         </div>
       )}
 
-      {/* 🔥 VEHICLE DETAIL MODAL */}
+      {/* Vehicle Detail Modal */}
       <VehicleModal
         isOpen={isModalOpen}
         onOpenChange={setIsModalOpen}

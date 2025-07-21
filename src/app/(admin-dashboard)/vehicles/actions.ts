@@ -184,7 +184,6 @@ export async function createVehicleAction(formData: FormData) {
           );
           
           fileUploads[uploadResult.field] = uploadResult.url;
-          console.log(`✅ Uploaded ${prefix}:`, uploadResult.url);
         } catch (error) {
           console.error(`❌ Failed to upload ${prefix}:`, error);
           // Continue with other files, don't fail the entire creation
@@ -198,7 +197,6 @@ export async function createVehicleAction(formData: FormData) {
         where: { id: vehicle.id },
         data: fileUploads,
       });
-      console.log(`📁 Updated vehicle ${vehicle.id} with ${Object.keys(fileUploads).length} files`);
     }
 
     // Revalidate the vehicles page
@@ -342,7 +340,6 @@ export async function updateVehicleAction(formData: FormData) {
           );
           
           fileUploads[uploadResult.field] = uploadResult.url;
-          console.log(`✅ Updated ${prefix}:`, uploadResult.url);
         } catch (error) {
           console.error(`❌ Failed to upload ${prefix}:`, error);
           // Continue with other files, don't fail the entire update
@@ -356,7 +353,6 @@ export async function updateVehicleAction(formData: FormData) {
         where: { id: vehicleId },
         data: fileUploads,
       });
-      console.log(`📁 Updated vehicle ${vehicleId} with ${Object.keys(fileUploads).length} new files`);
     }
 
     // Revalidate the vehicles page

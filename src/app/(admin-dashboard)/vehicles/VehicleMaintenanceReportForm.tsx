@@ -68,7 +68,6 @@ export default function VehicleMaintenanceReportForm({
         result = await createVehicleMaintenanceReportAction(formData);
       }
       
-      console.log(`✅ Maintenance report ${isEdit ? 'updated' : 'created'} successfully:`, result);
       
       // Show success message
       if (result.attachmentsUploaded && result.attachmentsUploaded > 0) {

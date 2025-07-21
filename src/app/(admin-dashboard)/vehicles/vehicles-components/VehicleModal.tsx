@@ -562,7 +562,6 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, locations = [], users = [
                   }))}
                   onSuccess={() => {
                     // Refresh maintenance reports list
-                    console.log('Maintenance report created successfully');
                   }}
                 />
               </div>
@@ -608,7 +607,6 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, locations = [], users = [
             full_name: user.full_name
           }))}
           onSuccess={() => {
-            console.log('Maintenance report updated successfully');
           }}
         />
       </DialogContent>

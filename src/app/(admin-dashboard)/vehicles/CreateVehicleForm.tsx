@@ -31,7 +31,6 @@ export default function CreateVehicleForm({ projects, onSuccess }: CreateVehicle
   const handleAction = async (formData: FormData) => {
     try {
       const result = await createVehicleAction(formData);
-      console.log("✅ Vehicle created successfully:", result);
       
       // Show success message
       if (result.filesUploaded > 0) {

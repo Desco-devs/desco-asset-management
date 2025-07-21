@@ -50,7 +50,6 @@ export default function EditVehicleForm({ vehicle, projects, onSuccess }: EditVe
   const handleAction = async (formData: FormData) => {
     try {
       const result = await updateVehicleAction(formData);
-      console.log("✅ Vehicle updated successfully:", result);
       
       // Show success message
       if (result.filesUpdated > 0) {
