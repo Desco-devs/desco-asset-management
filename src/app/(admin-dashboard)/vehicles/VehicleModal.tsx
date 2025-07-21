@@ -20,10 +20,14 @@ import {
   ExternalLink,
   Shield,
   Edit,
+  Wrench,
 } from "lucide-react";
 import EditVehicleDialog from "./EditVehicleDialog";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase";
+import CreateMaintenanceReportDialog from "./CreateMaintenanceReportDialog";
+import EditMaintenanceReportDialog from "./EditMaintenanceReportDialog";
+import VehicleMaintenanceReportsList from "./VehicleMaintenanceReportsList";
 
 // Vehicle interface matching our current structure
 interface Vehicle {
@@ -76,18 +80,37 @@ interface VehicleModalProps {
     id: string;
     name: string;
   }>;
+  locations?: Array<{
+    id: string;
+    address: string;
+  }>;
+  users?: Array<{
+    id: string;
+    full_name: string;
+  }>;
+  initialMaintenanceReports?: any[];
 }
 
-const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects }: VehicleModalProps) => {
+const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects, locations = [], users = [], initialMaintenanceReports = [] }: VehicleModalProps) => {
   // 🔥 REAL-TIME VEHICLE STATE - updates instantly when vehicle is edited
   const [currentVehicle, setCurrentVehicle] = useState<Vehicle | null>(vehicle);
+  
+  // 🔥 TAB STATE for maintenance reports
+  const [activeTab, setActiveTab] = useState<'details' | 'maintenance'>('details');
+  
+  // State for edit maintenance report dialog
+  const [editingReport, setEditingReport] = useState<any>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  
+  // State to force refresh of maintenance reports
+  const [maintenanceRefreshTrigger, setMaintenanceRefreshTrigger] = useState(0);
 
   // Sync with prop changes
   useEffect(() => {
     setCurrentVehicle(vehicle);
   }, [vehicle]);
 
-  // 🔥 REAL-TIME SUBSCRIPTION for this specific vehicle
+  // 🔥 REAL-TIME SUBSCRIPTION for this specific vehicle AND its maintenance reports
   useEffect(() => {
     if (!currentVehicle) return;
 
@@ -104,7 +127,7 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects }: VehicleModalP
           filter: `id=eq.${currentVehicle.id}`
         },
         (payload) => {
-          console.log('🔥 MODAL REALTIME: Vehicle updated:', payload.new);
+          // console.log('🔥 MODAL REALTIME: Vehicle updated:', payload.new);
           
           // Update the current vehicle with new data, preserving relations
           setCurrentVehicle(prev => {
@@ -133,12 +156,25 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects }: VehicleModalP
           });
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'maintenance_vehicle_reports',
+          filter: `vehicle_id=eq.${currentVehicle.id}`
+        },
+        (payload) => {
+          // Force refresh of maintenance reports list by incrementing trigger
+          setMaintenanceRefreshTrigger(prev => prev + 1);
+        }
+      )
       .subscribe();
 
     return () => {
       channel.unsubscribe();
     };
-  }, [currentVehicle?.id]);
+  }, [currentVehicle?.id, activeTab]);
 
   // Helper functions
   const formatDate = (dateString: string) => {
@@ -287,9 +323,37 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects }: VehicleModalP
           <p className="text-muted-foreground">{currentVehicle.type}</p>
         </DialogHeader>
 
+        {/* Tab Navigation */}
+        <div className="flex border-b px-6 pt-4">
+          <button
+            onClick={() => setActiveTab('details')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'details'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Car className="h-4 w-4 inline mr-2" />
+            Vehicle Details
+          </button>
+          <button
+            onClick={() => setActiveTab('maintenance')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'maintenance'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Wrench className="h-4 w-4 inline mr-2" />
+            Maintenance Reports
+          </button>
+        </div>
+
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto scroll-none p-6 pt-6">
-          <div className="space-y-6">
+          {/* Vehicle Details Tab */}
+          {activeTab === 'details' && (
+            <div className="space-y-6">
             {/* Vehicle Images Grid */}
             {vehicleImages(currentVehicle).length > 0 && (
               <div className="space-y-4">
@@ -628,8 +692,90 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects }: VehicleModalP
                 </p>
               </div>
             )}
-          </div>
+            </div>
+          )}
+
+          {/* Maintenance Reports Tab */}
+          {activeTab === 'maintenance' && (
+            <div className="space-y-6">
+              {/* Header with Create Report Button */}
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-semibold">Maintenance Reports</h3>
+                  <p className="text-sm text-gray-600">Track vehicle issues, repairs, and maintenance history</p>
+                </div>
+                <CreateMaintenanceReportDialog
+                  vehicleId={currentVehicle?.id || ''}
+                  locations={locations.map(loc => ({
+                    id: loc.id,
+                    address: loc.address
+                  }))}
+                  users={users.map(user => ({
+                    id: user.id,
+                    full_name: user.full_name
+                  }))}
+                  onSuccess={() => {
+                    // 🔥 FALLBACK: Force refresh if real-time doesn't work
+                    console.log('✅ Maintenance report created - triggering refresh');
+                    setMaintenanceRefreshTrigger(prev => prev + 1);
+                  }}
+                />
+              </div>
+
+              {/* Maintenance Reports List */}
+              <VehicleMaintenanceReportsList
+                vehicleId={currentVehicle?.id || ''}
+                refreshTrigger={maintenanceRefreshTrigger}
+                initialUsers={users}
+                initialLocations={locations}
+                initialMaintenanceReports={initialMaintenanceReports}
+                currentVehicle={currentVehicle ? {
+                  brand: currentVehicle.brand,
+                  model: currentVehicle.model,
+                  plate_number: currentVehicle.plate_number
+                } : undefined}
+                onEditReport={(report) => {
+                  setEditingReport({
+                    id: report.id,
+                    issue_description: report.issue_description,
+                    remarks: report.remarks,
+                    inspection_details: report.inspection_details,
+                    action_taken: report.action_taken,
+                    parts_replaced: report.parts_replaced,
+                    priority: report.priority,
+                    status: report.status,
+                    downtime_hours: report.downtime_hours,
+                    date_reported: report.date_reported,
+                    date_repaired: report.date_repaired,
+                    location_id: report.location.id,
+                    repaired_by: report.repaired_user?.full_name
+                  });
+                  setIsEditDialogOpen(true);
+                }}
+              />
+            </div>
+          )}
         </div>
+
+        {/* Edit Maintenance Report Dialog */}
+        <EditMaintenanceReportDialog
+          isOpen={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          vehicleId={currentVehicle?.id || ''}
+          report={editingReport}
+          locations={locations.map(loc => ({
+            id: loc.id,
+            address: loc.address
+          }))}
+          users={users.map(user => ({
+            id: user.id,
+            full_name: user.full_name
+          }))}
+          onSuccess={() => {
+            // 🔥 OPTIMIZED: No refresh needed - real-time subscription handles it!
+            console.log('✅ Maintenance report updated - real-time will handle UI update');
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

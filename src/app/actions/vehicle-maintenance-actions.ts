@@ -449,6 +449,7 @@ export async function getAllVehicleMaintenanceReportsAction(vehicleId: string) {
         },
         location: {
           select: {
+            id: true,
             address: true,
           },
         },

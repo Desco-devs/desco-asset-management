@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getAllVehicleMaintenanceReportsAction, deleteVehicleMaintenanceReportAction } from "@/app/actions/vehicle-maintenance-actions";
+import { createClient } from "@/lib/supabase";
+import { toast } from "sonner";
 
 interface MaintenanceReport {
   id: string;
@@ -36,38 +38,214 @@ interface MaintenanceReport {
 
 interface VehicleMaintenanceReportsListProps {
   vehicleId: string;
+  refreshTrigger?: number;
   onEditReport?: (report: MaintenanceReport) => void;
+  initialUsers?: Array<{
+    id: string;
+    full_name: string;
+  }>;
+  initialLocations?: Array<{
+    id: string;
+    address: string;
+  }>;
+  currentVehicle?: {
+    brand: string;
+    model: string;
+    plate_number: string;
+  };
+  initialMaintenanceReports?: any[];
 }
 
-export default function VehicleMaintenanceReportsList({ vehicleId, onEditReport }: VehicleMaintenanceReportsListProps) {
-  const [reports, setReports] = useState<MaintenanceReport[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function VehicleMaintenanceReportsList({ 
+  vehicleId, 
+  refreshTrigger, 
+  onEditReport, 
+  initialUsers = [], 
+  initialLocations = [],
+  currentVehicle,
+  initialMaintenanceReports = []
+}: VehicleMaintenanceReportsListProps) {
+  // 🔥 MASTERPIECE PATTERN: Use pre-loaded data, filter by vehicleId
+  const vehicleReports = initialMaintenanceReports.filter(report => report.vehicle_id === vehicleId);
+  const [reports, setReports] = useState<MaintenanceReport[]>(vehicleReports);
   const [error, setError] = useState<string | null>(null);
 
-  // Load maintenance reports
-  const loadReports = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await getAllVehicleMaintenanceReportsAction(vehicleId);
-      
-      if (result.success) {
-        setReports(result.data);
-      } else {
-        setError("Failed to load maintenance reports");
-      }
-    } catch (err) {
-      console.error("Error loading reports:", err);
-      setError(err instanceof Error ? err.message : "Failed to load reports");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use refs to avoid subscription recreation
+  const usersRef = useRef(initialUsers);
+  const locationsRef = useRef(initialLocations);
+  const vehicleRef = useRef(currentVehicle);
 
-  // Load reports on mount
+  // Update refs when props change
+  usersRef.current = initialUsers;
+  locationsRef.current = initialLocations;
+  vehicleRef.current = currentVehicle;
+
+  console.log('🔥 MAINTENANCE COMPONENT: Mounted with vehicleId:', vehicleId);
+
+  // Debug vehicleId (cleaned up)
+  // console.log('🔥 MAINTENANCE DEBUG: Component mounted with vehicleId:', vehicleId);
+
+  // 🔥 SYNC with pre-loaded data when initialMaintenanceReports changes
   useEffect(() => {
-    loadReports();
-  }, [vehicleId]);
+    const vehicleReports = initialMaintenanceReports.filter(report => report.vehicle_id === vehicleId);
+    setReports(vehicleReports);
+    console.log('🔥 MAINTENANCE: Synced with pre-loaded data:', vehicleReports.length, 'reports for vehicle', vehicleId);
+  }, [initialMaintenanceReports, vehicleId]);
+
+  // 🔥 OPTIMIZED: No longer needed since real-time updates handle everything instantly
+  // Real-time subscription below handles all updates without refresh triggers
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      console.log('🔥 MAINTENANCE: Real-time update triggered, but handled by subscription');
+      // No longer calling loadReports() - real-time handles it!
+    }
+  }, [refreshTrigger]);
+
+  // 🔥 REAL-TIME SUBSCRIPTION for maintenance reports
+  useEffect(() => {
+    console.log('🔥 MAINTENANCE: useEffect triggered with vehicleId:', vehicleId);
+    if (!vehicleId) {
+      console.log('❌ MAINTENANCE: No vehicleId, skipping subscription');
+      return;
+    }
+    const supabase = createClient();
+    
+    console.log('🔥 MAINTENANCE REALTIME: Setting up subscription for vehicleId:', vehicleId);
+    
+    const channel = supabase
+      .channel(`maintenance-reports-${vehicleId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'maintenance_vehicle_reports',
+          filter: `vehicle_id=eq.${vehicleId}`
+        },
+        (payload) => {
+          console.log('🔥 MAINTENANCE REALTIME: Report change detected:', payload.eventType);
+          
+          if (payload.eventType === 'INSERT') {
+            const reportId = payload.new.id;
+            
+            console.log('🔥 MAINTENANCE REALTIME INSERT:', {
+              reportId,
+              payloadData: payload.new
+            });
+
+            // Find the actual users and location from the existing reference data (MASTERPIECE PATTERN)
+            const reportedUser = usersRef.current.find(u => u.id === payload.new.reported_by);
+            const repairedUser = payload.new.repaired_by ? usersRef.current.find(u => u.id === payload.new.repaired_by) : null;
+            const location = locationsRef.current.find(l => l.id === payload.new.location_id);
+            
+            // Create complete maintenance report object with complete realtime data - NO FALLBACKS, use actual data!
+            const newReport: MaintenanceReport = {
+              id: reportId,
+              issue_description: payload.new.issue_description,
+              remarks: payload.new.remarks,
+              inspection_details: payload.new.inspection_details,
+              action_taken: payload.new.action_taken,
+              parts_replaced: payload.new.parts_replaced || [],
+              priority: payload.new.priority,
+              status: payload.new.status,
+              downtime_hours: payload.new.downtime_hours,
+              date_reported: payload.new.date_reported,
+              date_repaired: payload.new.date_repaired,
+              attachment_urls: payload.new.attachment_urls || [],
+              vehicle: {
+                brand: vehicleRef.current?.brand || 'Unknown',
+                model: vehicleRef.current?.model || 'Unknown',
+                plate_number: vehicleRef.current?.plate_number || 'Unknown',
+              },
+              location: location ? {
+                address: location.address
+              } : {
+                address: 'Unknown Location'
+              },
+              reported_user: reportedUser ? {
+                full_name: reportedUser.full_name,
+                username: reportedUser.id
+              } : undefined,
+              repaired_user: repairedUser ? {
+                full_name: repairedUser.full_name,
+                username: repairedUser.id
+              } : undefined,
+            };
+
+            // 🔥 ALWAYS add new report to the top of the list
+            setReports(prev => [newReport, ...prev]);
+            console.log('✅ MAINTENANCE REALTIME: Report added instantly!');
+            
+          } else if (payload.eventType === 'UPDATE') {
+            console.log('🔥 MAINTENANCE REALTIME UPDATE:', payload.new.id);
+            
+            const reportedUser = usersRef.current.find(u => u.id === payload.new.reported_by);
+            const repairedUser = payload.new.repaired_by ? usersRef.current.find(u => u.id === payload.new.repaired_by) : null;
+            const location = locationsRef.current.find(l => l.id === payload.new.location_id);
+            
+            const updatedReport: MaintenanceReport = {
+              id: payload.new.id,
+              issue_description: payload.new.issue_description,
+              remarks: payload.new.remarks,
+              inspection_details: payload.new.inspection_details,
+              action_taken: payload.new.action_taken,
+              parts_replaced: payload.new.parts_replaced || [],
+              priority: payload.new.priority,
+              status: payload.new.status,
+              downtime_hours: payload.new.downtime_hours,
+              date_reported: payload.new.date_reported,
+              date_repaired: payload.new.date_repaired,
+              attachment_urls: payload.new.attachment_urls || [],
+              vehicle: {
+                brand: vehicleRef.current?.brand || 'Unknown',
+                model: vehicleRef.current?.model || 'Unknown',
+                plate_number: vehicleRef.current?.plate_number || 'Unknown',
+              },
+              location: location ? {
+                address: location.address
+              } : {
+                address: 'Unknown Location'
+              },
+              reported_user: reportedUser ? {
+                full_name: reportedUser.full_name,
+                username: reportedUser.id
+              } : undefined,
+              repaired_user: repairedUser ? {
+                full_name: repairedUser.full_name,
+                username: repairedUser.id
+              } : undefined,
+            };
+            
+            setReports(prev => prev.map(report => 
+              report.id === payload.new.id ? updatedReport : report
+            ));
+            console.log('✅ MAINTENANCE REALTIME: Report updated instantly!');
+            
+          } else if (payload.eventType === 'DELETE') {
+            console.log('🔥 MAINTENANCE REALTIME DELETE:', payload.old?.id);
+            if (payload.old?.id) {
+              setReports(prev => prev.filter(report => report.id !== payload.old.id));
+              console.log('✅ MAINTENANCE REALTIME: Report deleted instantly!');
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔥 MAINTENANCE REALTIME: Subscription status:', status, 'for vehicle:', vehicleId);
+        if (status === 'SUBSCRIPTION_ERROR') {
+          console.error('❌ MAINTENANCE: Subscription error for vehicle:', vehicleId);
+        } else if (status === 'SUBSCRIBED') {
+          console.log('✅ MAINTENANCE: Successfully subscribed to maintenance_vehicle_reports for vehicle:', vehicleId);
+          console.log('🔥 MAINTENANCE: Listening for changes on table maintenance_vehicle_reports with filter vehicle_id=eq.' + vehicleId);
+        }
+      });
+
+    // Cleanup subscription
+    return () => {
+      console.log('🔥 MAINTENANCE REALTIME: Cleaning up subscription for vehicle:', vehicleId);
+      channel.unsubscribe();
+    };
+  }, []); // TEMP: Force run on mount to test
 
   // Delete report
   const handleDeleteReport = async (reportId: string) => {
@@ -82,13 +260,16 @@ export default function VehicleMaintenanceReportsList({ vehicleId, onEditReport 
       const result = await deleteVehicleMaintenanceReportAction(formData);
       
       if (result.success) {
-        alert("✅ Maintenance report deleted successfully!");
-        // Reload reports
-        loadReports();
+        toast.success("Maintenance report deleted successfully!");
+        
+        // 🔥 OPTIMIZED: No manual UI update needed - real-time subscription handles deletion instantly!
+        // The real-time DELETE event will automatically remove the report from the list
+        
+        // No longer calling loadReports() - real-time handles it!
       }
     } catch (error) {
       console.error("Error deleting report:", error);
-      alert("❌ Error: " + (error instanceof Error ? error.message : "Failed to delete report"));
+      toast.error("Error: " + (error instanceof Error ? error.message : "Failed to delete report"));
     }
   };
 
@@ -133,30 +314,11 @@ export default function VehicleMaintenanceReportsList({ vehicleId, onEditReport 
     }
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="border rounded-lg p-4 animate-pulse">
-            <div className="h-4 bg-gray-200 rounded mb-2 w-3/4"></div>
-            <div className="h-3 bg-gray-200 rounded mb-1 w-1/2"></div>
-            <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-          </div>
-        ))}
-      </div>
-    );
-  }
 
   if (error) {
     return (
       <div className="text-center py-8">
         <p className="text-red-600 mb-4">{error}</p>
-        <button 
-          onClick={loadReports}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-        >
-          Retry
-        </button>
       </div>
     );
   }
@@ -176,12 +338,6 @@ export default function VehicleMaintenanceReportsList({ vehicleId, onEditReport 
         <p className="text-sm text-gray-600">
           {reports.length} maintenance report{reports.length !== 1 ? 's' : ''} found
         </p>
-        <button 
-          onClick={loadReports}
-          className="text-blue-500 hover:text-blue-700 text-sm"
-        >
-          Refresh
-        </button>
       </div>
 
       {reports.map((report) => (

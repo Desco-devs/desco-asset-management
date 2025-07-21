@@ -8,6 +8,8 @@ export default async function VehiclesContainer() {
   let initialProjects = [];
   let initialClients = [];
   let initialLocations = [];
+  let initialUsers = [];
+  let initialMaintenanceReports = [];
   let totalCount = 0;
   let error = null;
 
@@ -15,8 +17,8 @@ export default async function VehiclesContainer() {
   const ITEMS_PER_PAGE = 12;
 
   try {
-    // Load paginated vehicles + all reference data + total count
-    const [vehiclesResult, projectsData, clientsData, locationsData, totalVehicleCount] = await Promise.all([
+    // Load paginated vehicles + all reference data + maintenance reports + total count
+    const [vehiclesResult, projectsData, clientsData, locationsData, usersData, maintenanceReportsData, totalVehicleCount] = await Promise.all([
       prisma.vehicle.findMany({
         include: {
           project: {
@@ -63,6 +65,53 @@ export default async function VehiclesContainer() {
           created_at: 'desc',
         },
       }),
+      prisma.user.findMany({     // 🔑 ALL user reference data for maintenance reports
+        select: {
+          id: true,
+          username: true,
+          full_name: true,
+          role: true,
+        },
+        where: {
+          user_status: 'ACTIVE',   // Only active users
+        },
+        orderBy: {
+          full_name: 'asc',
+        },
+      }),
+      prisma.maintenance_vehicle_report.findMany({  // 🔑 ALL maintenance reports
+        include: {
+          vehicle: {
+            select: {
+              id: true,
+              brand: true,
+              model: true,
+              plate_number: true,
+            },
+          },
+          location: {
+            select: {
+              id: true,
+              address: true,
+            },
+          },
+          reported_user: {
+            select: {
+              full_name: true,
+              username: true,
+            },
+          },
+          repaired_user: {
+            select: {
+              full_name: true,
+              username: true,
+            },
+          },
+        },
+        orderBy: {
+          date_reported: 'desc',
+        },
+      }),
       prisma.vehicle.count()     // Total count for pagination
     ]);
 
@@ -70,6 +119,8 @@ export default async function VehiclesContainer() {
     initialProjects = projectsData;
     initialClients = clientsData;
     initialLocations = locationsData;
+    initialUsers = usersData;
+    initialMaintenanceReports = maintenanceReportsData;
     totalCount = totalVehicleCount;
 
   } catch (err) {
@@ -91,6 +142,8 @@ export default async function VehiclesContainer() {
       initialProjects={initialProjects}
       initialClients={initialClients}
       initialLocations={initialLocations}
+      initialUsers={initialUsers}
+      initialMaintenanceReports={initialMaintenanceReports}
       totalCount={totalCount}
       itemsPerPage={ITEMS_PER_PAGE}
     />

@@ -43,6 +43,8 @@ interface VehiclesListProps {
   initialProjects: any[];
   initialClients: any[];
   initialLocations: any[];
+  initialUsers: any[];
+  initialMaintenanceReports: any[];
   totalCount: number;
   itemsPerPage: number;
 }
@@ -52,6 +54,8 @@ export default function VehiclesList({
   initialProjects, 
   initialClients, 
   initialLocations,
+  initialUsers,
+  initialMaintenanceReports,
   totalCount,
   itemsPerPage
 }: VehiclesListProps) {
@@ -149,7 +153,8 @@ export default function VehiclesList({
       console.log('🏗️ Reference data loaded:', {
         projects: initialProjects.length,
         clients: initialClients.length,
-        locations: initialLocations.length
+        locations: initialLocations.length,
+        users: initialUsers.length
       });
       
       // Clear old localStorage cache when we have fresh server data
@@ -162,7 +167,7 @@ export default function VehiclesList({
         }
       }
     }
-  }, [initialVehicles, initialProjects, initialClients, initialLocations, totalCount, isMobile]);
+  }, [initialVehicles, initialProjects, initialClients, initialLocations, initialUsers, totalCount, isMobile]);
   
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
@@ -546,6 +551,15 @@ export default function VehiclesList({
           id: p.id,
           name: p.name
         }))}
+        locations={initialLocations.map(l => ({
+          id: l.id,
+          address: l.address
+        }))}
+        users={initialUsers.map(u => ({
+          id: u.id,
+          full_name: u.full_name
+        }))}
+        initialMaintenanceReports={initialMaintenanceReports}
       />
     </div>
   );

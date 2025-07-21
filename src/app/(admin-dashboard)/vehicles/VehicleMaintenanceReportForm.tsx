@@ -2,6 +2,7 @@
 
 import { useFormStatus } from "react-dom";
 import { createVehicleMaintenanceReportAction, updateVehicleMaintenanceReportAction } from "@/app/actions/vehicle-maintenance-actions";
+import { toast } from "sonner";
 
 // Submit button component that uses useFormStatus
 function SubmitButton({ isEdit }: { isEdit?: boolean }) {
@@ -71,9 +72,9 @@ export default function VehicleMaintenanceReportForm({
       
       // Show success message
       if (result.attachmentsUploaded && result.attachmentsUploaded > 0) {
-        alert(`✅ Report ${isEdit ? 'updated' : 'created'} successfully with ${result.attachmentsUploaded} attachments!`);
+        toast.success(`Report ${isEdit ? 'updated' : 'created'} successfully with ${result.attachmentsUploaded} attachments!`);
       } else {
-        alert(`✅ Report ${isEdit ? 'updated' : 'created'} successfully!`);
+        toast.success(`Report ${isEdit ? 'updated' : 'created'} successfully!`);
       }
       
       if (onSuccess) {
@@ -81,7 +82,7 @@ export default function VehicleMaintenanceReportForm({
       }
     } catch (error) {
       console.error("Form submission error:", error);
-      alert("❌ Error: " + (error instanceof Error ? error.message : `Failed to ${isEdit ? 'update' : 'create'} maintenance report`));
+      toast.error("Error: " + (error instanceof Error ? error.message : `Failed to ${isEdit ? 'update' : 'create'} maintenance report`));
     }
   };
 
