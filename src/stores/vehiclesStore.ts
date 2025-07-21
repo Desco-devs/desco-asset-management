@@ -132,6 +132,12 @@ interface VehiclesState {
   // Image viewer state
   viewerImage: { url: string; title: string } | null;
   
+  // Delete confirmation state - unified approach
+  deleteConfirmation: {
+    isOpen: boolean;
+    vehicle: Vehicle | null;
+  };
+  
   // Pagination & filtering settings (persisted to localStorage)
   itemsPerPage: number;
   sortBy: 'created_at' | 'brand' | 'status' | 'expiry_date' | 'model' | 'plate_number' | 'owner' | '';
@@ -162,6 +168,7 @@ interface VehiclesState {
   setIsPhotosCollapsed: (collapsed: boolean) => void;
   setIsDocumentsCollapsed: (collapsed: boolean) => void;
   setViewerImage: (image: { url: string; title: string } | null) => void;
+  setDeleteConfirmation: (state: { isOpen: boolean; vehicle: Vehicle | null }) => void;
   
   // Filter & Sort Actions
   setSortBy: (sortBy: VehiclesState['sortBy']) => void;
@@ -218,6 +225,10 @@ export const useVehiclesStore = create<VehiclesState>()(
         isPhotosCollapsed: false,
         isDocumentsCollapsed: false,
         viewerImage: null,
+        deleteConfirmation: {
+          isOpen: false,
+          vehicle: null,
+        },
         
         // Pagination & filtering settings (persisted)
         itemsPerPage: 12,
@@ -249,6 +260,7 @@ export const useVehiclesStore = create<VehiclesState>()(
         setIsPhotosCollapsed: (collapsed) => set({ isPhotosCollapsed: collapsed }),
         setIsDocumentsCollapsed: (collapsed) => set({ isDocumentsCollapsed: collapsed }),
         setViewerImage: (image) => set({ viewerImage: image }),
+        setDeleteConfirmation: (state) => set({ deleteConfirmation: state }),
         
         // Filter & Sort Actions
         setSortBy: (sortBy) => set({ sortBy, currentPage: 1 }),
@@ -547,6 +559,7 @@ export const selectSearchQuery = (state: VehiclesState) => state.searchQuery;
 export const selectIsPhotosCollapsed = (state: VehiclesState) => state.isPhotosCollapsed;
 export const selectIsDocumentsCollapsed = (state: VehiclesState) => state.isDocumentsCollapsed;
 export const selectViewerImage = (state: VehiclesState) => state.viewerImage;
+export const selectDeleteConfirmation = (state: VehiclesState) => state.deleteConfirmation;
 export const selectItemsPerPage = (state: VehiclesState) => state.itemsPerPage;
 export const selectSortBy = (state: VehiclesState) => state.sortBy;
 export const selectSortOrder = (state: VehiclesState) => state.sortOrder;

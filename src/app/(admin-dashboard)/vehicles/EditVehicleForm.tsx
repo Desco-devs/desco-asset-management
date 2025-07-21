@@ -268,46 +268,6 @@ export default function EditVehicleForm({ vehicle, projects, onSuccess, onCancel
       </div>
 
 
-      {/* 🔥 DOCUMENTS SECTION */}
-      <div className="border-t pt-4">
-        <h3 className="text-lg font-medium mb-3">Update Documents (Optional)</h3>
-        <p className="text-sm text-gray-600 mb-3">Select new files only if you want to replace existing documents</p>
-        
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Original Receipt (OR)</label>
-            <input
-              type="file"
-              name="originalReceipt"
-              accept=".pdf,image/*"
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-            <p className="text-xs text-gray-500 mt-1">PDF or image files accepted</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Car Registration (CR)</label>
-            <input
-              type="file"
-              name="carRegistration"
-              accept=".pdf,image/*"
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-            <p className="text-xs text-gray-500 mt-1">PDF or image files accepted</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">PGPC Inspection</label>
-            <input
-              type="file"
-              name="pgpcInspection"
-              accept=".pdf,image/*"
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-            <p className="text-xs text-gray-500 mt-1">PDF or image files accepted</p>
-          </div>
-        </div>
-      </div>
 
       {/* Action Buttons */}
       <div className="flex gap-2">

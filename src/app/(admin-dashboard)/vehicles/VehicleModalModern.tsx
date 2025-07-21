@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -40,6 +41,7 @@ import {
   ChevronUp,
   ZoomIn,
   Download,
+  Loader2,
 } from "lucide-react";
 import { useVehiclesStore, selectSelectedVehicle, selectIsModalOpen, selectIsEditMode, selectIsMaintenanceModalOpen, selectSelectedMaintenanceReport, selectIsMobile, selectIsPhotosCollapsed, selectIsDocumentsCollapsed, selectViewerImage } from "@/stores/vehiclesStore";
 import { useVehiclesWithReferenceData, useUpdateVehicle, useDeleteVehicle } from "@/hooks/useVehiclesQuery";
@@ -63,8 +65,10 @@ export default function VehicleModalModern() {
   // Custom tab state
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'maintenance'>('details');
   
-  // Debug the viewerImage state
-  console.log('Current viewerImage state:', viewerImage, 'isMobile:', isMobile);
+  // Local delete confirmation state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  // Remove debug log that causes re-renders
   
   // Get the most up-to-date vehicle data from TanStack Query cache
   const selectedVehicle = selectedVehicleFromStore 
@@ -80,6 +84,7 @@ export default function VehicleModalModern() {
     setIsPhotosCollapsed,
     setIsDocumentsCollapsed,
     setViewerImage,
+    setDeleteConfirmation,
     closeAllModals
   } = useVehiclesStore();
 
@@ -246,17 +251,30 @@ export default function VehicleModalModern() {
     }, 100); // Small delay to ensure proper transition
   };
 
-  const handleDelete = async () => {
-    if (!selectedVehicle || !confirm("Are you sure you want to delete this vehicle? This action cannot be undone.")) {
-      return;
-    }
+  const handleDeleteClick = () => {
+    if (!selectedVehicle) return;
+    console.log('Delete button clicked, vehicle:', selectedVehicle);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedVehicle) return;
+    console.log('Delete confirmed for vehicle:', selectedVehicle.id);
 
     try {
       await deleteVehicleMutation.mutateAsync(selectedVehicle.id);
+      console.log('Vehicle deleted successfully');
+      setShowDeleteConfirm(false);
       closeAllModals();
     } catch (error) {
       console.error('Error deleting vehicle:', error);
+      setShowDeleteConfirm(false);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    console.log('Delete cancelled');
+    setShowDeleteConfirm(false);
   };
 
   const handleClose = () => {
@@ -269,6 +287,60 @@ export default function VehicleModalModern() {
   // Shared content component
   const VehicleContent = () => (
     <>
+      {/* Delete Confirmation Overlay - Inside the main dialog */}
+      {showDeleteConfirm && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-6">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-xs sm:max-w-lg p-4 sm:p-8">
+            <div className="text-center mb-6">
+              <h3 className="text-lg sm:text-xl font-semibold text-red-600 mb-2">Delete Vehicle</h3>
+              <p className="text-sm sm:text-base text-gray-600">This action cannot be undone</p>
+            </div>
+            
+            <div className="mb-6 sm:mb-8">
+              <p className="text-sm sm:text-base text-gray-700 mb-4 text-center">
+                Are you sure you want to delete this vehicle?
+              </p>
+              <div className="bg-gray-50 p-4 sm:p-5 rounded-md text-center">
+                <p className="font-medium text-sm sm:text-base text-gray-900">
+                  {selectedVehicle?.brand} {selectedVehicle?.model}
+                </p>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                  Plate: {selectedVehicle?.plate_number}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <Button 
+                variant="outline" 
+                onClick={handleDeleteCancel}
+                disabled={deleteVehicleMutation.isPending}
+                className="w-full order-2 sm:order-1 py-2 sm:py-3"
+                size="lg"
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={deleteVehicleMutation.isPending}
+                className="w-full order-1 sm:order-2 py-2 sm:py-3"
+                size="lg"
+              >
+                {deleteVehicleMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete Vehicle"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Custom Tabbed Content Area */}
       <div className="flex-1 overflow-y-auto scroll-none p-4">
         <div className="w-full">
@@ -324,6 +396,18 @@ export default function VehicleModalModern() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-sm">
                       <Car className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Brand:</span>
+                      <span>{selectedVehicle.brand}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <Car className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Model:</span>
+                      <span>{selectedVehicle.model}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <Car className="h-4 w-4 text-muted-foreground" />
                       <span className="font-medium">Type:</span>
                       <span>{selectedVehicle.type}</span>
                     </div>
@@ -338,6 +422,17 @@ export default function VehicleModalModern() {
                       <Car className="h-4 w-4 text-muted-foreground" />
                       <span className="font-medium">Plate Number:</span>
                       <span>{selectedVehicle.plate_number}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium">Status:</span>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        selectedVehicle.status === 'OPERATIONAL' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {selectedVehicle.status === 'OPERATIONAL' ? 'Operational' : 'Non-Operational'}
+                      </span>
                     </div>
 
                     <div className="text-sm">
@@ -810,11 +905,21 @@ export default function VehicleModalModern() {
               <div className="flex gap-2 w-full">
                 <Button 
                   variant="outline" 
-                  onClick={handleDelete} 
-                  className="flex-1 gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+                  onClick={handleDeleteClick} 
+                  disabled={deleteVehicleMutation.isPending}
+                  className="flex-1 gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-700 disabled:opacity-50"
                 >
-                  <X className="h-4 w-4" />
-                  Delete Vehicle
+                  {deleteVehicleMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <X className="h-4 w-4" />
+                      Delete Vehicle
+                    </>
+                  )}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -831,6 +936,7 @@ export default function VehicleModalModern() {
           {/* Edit Modal */}
           {isEditMode && <EditVehicleModalModern />}
         </Drawer>
+        
       </>
     );
   }
@@ -864,11 +970,21 @@ export default function VehicleModalModern() {
             <div className="flex gap-2 w-full">
               <Button 
                 variant="outline" 
-                onClick={handleDelete} 
-                className="flex-1 gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+                onClick={handleDeleteClick} 
+                disabled={deleteVehicleMutation.isPending}
+                className="flex-1 gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-700 disabled:opacity-50"
               >
-                <X className="h-4 w-4" />
-                Delete Vehicle
+                {deleteVehicleMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <X className="h-4 w-4" />
+                    Delete Vehicle
+                  </>
+                )}
               </Button>
               <Button 
                 variant="outline" 
@@ -885,6 +1001,7 @@ export default function VehicleModalModern() {
         {/* Edit Modal */}
         {isEditMode && <EditVehicleModalModern />}
       </Dialog>
+      
     </>
   );
 }

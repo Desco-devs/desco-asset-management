@@ -1,14 +1,18 @@
 "use client";
 
-import { useVehiclesStore, selectIsModalOpen, selectIsCreateModalOpen, selectIsMaintenanceModalOpen, selectIsEditMode, selectViewerImage, selectIsMobile } from "@/stores/vehiclesStore";
+import React from "react";
+import { useVehiclesStore, selectIsModalOpen, selectIsCreateModalOpen, selectIsMaintenanceModalOpen, selectIsEditMode, selectViewerImage, selectIsMobile, selectDeleteConfirmation } from "@/stores/vehiclesStore";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { X, Download } from "lucide-react";
+import { X, Download, Loader2 } from "lucide-react";
+import { useDeleteVehicle } from "@/hooks/useVehiclesQuery";
 import VehiclesListModern from "./VehiclesListModern";
 import VehicleModalModern from "./VehicleModalModern";
 import CreateVehicleModalModern from "./CreateVehicleModalModern";
@@ -22,9 +26,13 @@ export default function VehiclesPageModern() {
   const isMaintenanceModalOpen = useVehiclesStore(selectIsMaintenanceModalOpen);
   const viewerImage = useVehiclesStore(selectViewerImage);
   const isMobile = useVehiclesStore(selectIsMobile);
+  const deleteConfirmation = useVehiclesStore(selectDeleteConfirmation);
   
   // Actions
-  const { setViewerImage, setIsModalOpen } = useVehiclesStore();
+  const { setViewerImage, setIsModalOpen, setDeleteConfirmation, closeAllModals } = useVehiclesStore();
+  
+  // Mutations
+  const deleteVehicleMutation = useDeleteVehicle();
   
   // Image viewer functions
   const closeImageViewer = () => {
@@ -46,6 +54,43 @@ export default function VehiclesPageModern() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+  
+  // Delete confirmation functions
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmation.vehicle) return;
+    console.log('Delete confirmed for vehicle:', deleteConfirmation.vehicle.id);
+
+    try {
+      await deleteVehicleMutation.mutateAsync(deleteConfirmation.vehicle.id);
+      console.log('Vehicle deleted successfully');
+      setDeleteConfirmation({ isOpen: false, vehicle: null });
+      closeAllModals(); // Clean slate - everything closed
+    } catch (error) {
+      console.error('Error deleting vehicle:', error);
+      const vehicleToRestore = deleteConfirmation.vehicle;
+      setDeleteConfirmation({ isOpen: false, vehicle: null });
+      
+      // Reopen the vehicle details modal on error so user can try again
+      if (vehicleToRestore) {
+        setTimeout(() => {
+          setIsModalOpen(true);
+        }, 100);
+      }
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    console.log('Delete cancelled');
+    const vehicleToRestore = deleteConfirmation.vehicle;
+    setDeleteConfirmation({ isOpen: false, vehicle: null });
+    
+    // Reopen the vehicle details modal since we closed it completely
+    if (vehicleToRestore) {
+      setTimeout(() => {
+        setIsModalOpen(true);
+      }, 100);
+    }
   };
   
   // Image Viewer Modal Component
@@ -103,6 +148,80 @@ export default function VehiclesPageModern() {
       </Dialog>
     );
   };
+  
+  // Delete Confirmation Modal Component - Stabilized to prevent re-renders
+  const DeleteConfirmationModal = React.memo(() => {
+    if (!deleteConfirmation.isOpen || !deleteConfirmation.vehicle) return null;
+    
+    // Extract vehicle data to prevent re-renders during deletion
+    const vehicle = deleteConfirmation.vehicle;
+    
+    return (
+      <Dialog 
+        open={deleteConfirmation.isOpen} 
+        onOpenChange={(open) => {
+          if (!open && !deleteVehicleMutation.isPending) {
+            handleDeleteCancel();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <X className="h-5 w-5" />
+              Delete Vehicle
+            </DialogTitle>
+            <DialogDescription>
+              Confirm deletion of this vehicle. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Are you sure you want to delete this vehicle? This action cannot be undone.
+            </p>
+            
+            <div className="bg-muted/50 p-3 rounded-md">
+              <p className="font-medium text-sm">
+                {vehicle.brand} {vehicle.model}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Plate: {vehicle.plate_number}
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={handleDeleteCancel}
+              disabled={deleteVehicleMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={deleteVehicleMutation.isPending}
+              className="gap-2"
+            >
+              {deleteVehicleMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <X className="h-4 w-4" />
+                  Delete Vehicle
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  });
 
   return (
     <div className="container mx-auto py-6 px-4">
@@ -124,6 +243,9 @@ export default function VehiclesPageModern() {
       
       {/* Global Image Viewer Modal - Always available */}
       <ImageViewerModal />
+      
+      {/* Global Delete Confirmation Modal - Temporarily disabled for debugging */}
+      {/* <DeleteConfirmationModal /> */}
     </div>
   );
 }
