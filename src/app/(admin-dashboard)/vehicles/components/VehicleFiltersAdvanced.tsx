@@ -206,52 +206,55 @@ export default function VehicleFiltersAdvanced({
 
   return (
     <div className="space-y-4">
-      {/* Filter Toggle Button */}
-      <div className="flex items-center gap-2">
-        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-          <CollapsibleTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Advanced Filters
-              {activeFilterCount > 0 && (
-                <Badge variant="secondary" className="h-5 w-5 p-0 flex items-center justify-center text-xs">
-                  {activeFilterCount}
-                </Badge>
-              )}
-              {isOpen ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
-          </CollapsibleTrigger>
+      {/* Filter Toggle Button - Mobile Optimized */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
+          <div className="flex gap-2">
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 flex-1 sm:flex-none">
+                <Filter className="h-4 w-4" />
+                <span className="sm:hidden">Filters</span>
+                <span className="hidden sm:inline">Advanced Filters</span>
+                {activeFilterCount > 0 && (
+                  <Badge variant="secondary" className="h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    {activeFilterCount}
+                  </Badge>
+                )}
+                {isOpen ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            
+            {/* Clear All Filters Button */}
+            {activeFilterCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="gap-1 text-muted-foreground hover:text-destructive flex-shrink-0"
+              >
+                <X className="h-4 w-4" />
+                <span className="sm:hidden">Clear</span>
+                <span className="hidden sm:inline">Clear All</span>
+              </Button>
+            )}
+          </div>
           
-          {/* Clear All Filters Button */}
-          {activeFilterCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={resetFilters}
-              className="gap-1 text-muted-foreground hover:text-destructive"
-            >
-              <X className="h-4 w-4" />
-              Clear All
-            </Button>
-          )}
-          
-          <CollapsibleContent className="space-y-4">
-            <div className="border rounded-lg p-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <CollapsibleContent className="space-y-4 mt-4">
+            <div className="border rounded-lg p-3 md:p-4 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                 
                 {/* Status Filter */}
                 <div className="space-y-2">
                   <Label htmlFor="status-filter">Status</Label>
                   <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Statuses" />
+                    <SelectTrigger className="h-11 w-full">
+                      <SelectValue placeholder="Select Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
                       <SelectItem value="OPERATIONAL">Operational</SelectItem>
                       <SelectItem value="NON_OPERATIONAL">Non-Operational</SelectItem>
                     </SelectContent>
@@ -262,7 +265,7 @@ export default function VehicleFiltersAdvanced({
                 <div className="space-y-2">
                   <Label htmlFor="project-filter">Project</Label>
                   <Select value={filterProject} onValueChange={setFilterProject}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-11 w-full">
                       <SelectValue placeholder="All Projects" />
                     </SelectTrigger>
                     <SelectContent>
@@ -280,7 +283,7 @@ export default function VehicleFiltersAdvanced({
                 <div className="space-y-2">
                   <Label htmlFor="type-filter">Vehicle Type</Label>
                   <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-11 w-full">
                       <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
@@ -298,7 +301,7 @@ export default function VehicleFiltersAdvanced({
                 <div className="space-y-2">
                   <Label htmlFor="maintenance-filter">Maintenance Status</Label>
                   <Select value={filterMaintenance} onValueChange={setFilterMaintenance}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-11 w-full">
                       <SelectValue placeholder="All Maintenance Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -313,7 +316,7 @@ export default function VehicleFiltersAdvanced({
                 <div className="space-y-2">
                   <Label htmlFor="owner-filter">Owner</Label>
                   <Select value={filterOwner} onValueChange={setFilterOwner}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-11 w-full">
                       <SelectValue placeholder="All Owners" />
                     </SelectTrigger>
                     <SelectContent>
@@ -369,7 +372,7 @@ export default function VehicleFiltersAdvanced({
                       setFilterDateRange({ ...filterDateRange, dateType: value })
                     }
                   >
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="h-11 w-full sm:w-40">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

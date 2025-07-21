@@ -28,9 +28,6 @@ export const GET = withResourcePermission('maintenance_reports', 'view', async (
       if (endDate) where.date_reported.lte = new Date(endDate);
     }
 
-    // Debug: Log the query filters
-    console.log('Export filters:', { vehicleId, status, priority, startDate, endDate, where });
-    
     // Fetch maintenance reports with full relations
     const reports = await prisma.maintenance_vehicle_report.findMany({
       where,
@@ -68,9 +65,6 @@ export const GET = withResourcePermission('maintenance_reports', 'view', async (
         date_reported: 'desc'
       }
     });
-
-    // Debug: Log the results count
-    console.log(`Found ${reports.length} maintenance reports for export`);
 
     if (reports.length === 0) {
       return NextResponse.json({ error: 'No maintenance reports found for export' }, { status: 404 });

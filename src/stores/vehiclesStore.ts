@@ -14,6 +14,13 @@ export interface Vehicle {
   before: number;
   remarks?: string;
   created_at: string;
+  front_img_url?: string;
+  back_img_url?: string;
+  side1_img_url?: string;
+  side2_img_url?: string;
+  original_receipt_url?: string;
+  car_registration_url?: string;
+  pgpc_inspection_image?: string;
   project: {
     id: string;
     name: string;
@@ -122,7 +129,7 @@ interface VehiclesState {
   
   // Pagination & filtering settings (persisted to localStorage)
   itemsPerPage: number;
-  sortBy: 'created_at' | 'brand' | 'status' | 'expiry_date' | 'model' | 'plate_number';
+  sortBy: 'created_at' | 'brand' | 'status' | 'expiry_date' | 'model' | 'plate_number' | 'owner' | '';
   sortOrder: 'asc' | 'desc';
   filterStatus: 'all' | 'OPERATIONAL' | 'NON_OPERATIONAL';
   filterProject: string; // 'all' or project ID
@@ -203,7 +210,7 @@ export const useVehiclesStore = create<VehiclesState>()(
         
         // Pagination & filtering settings (persisted)
         itemsPerPage: 12,
-        sortBy: 'created_at',
+        sortBy: '',
         sortOrder: 'desc',
         filterStatus: 'all',
         filterProject: 'all',
@@ -474,6 +481,7 @@ export const useVehiclesStore = create<VehiclesState>()(
         
         // Reset functions
         resetFilters: () => set({
+          sortBy: '',
           filterStatus: 'all',
           filterProject: 'all',
           filterType: 'all',
