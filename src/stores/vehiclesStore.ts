@@ -127,6 +127,10 @@ interface VehiclesState {
   isMobile: boolean;
   searchQuery: string;
   isPhotosCollapsed: boolean;
+  isDocumentsCollapsed: boolean;
+  
+  // Image viewer state
+  viewerImage: { url: string; title: string } | null;
   
   // Pagination & filtering settings (persisted to localStorage)
   itemsPerPage: number;
@@ -156,6 +160,8 @@ interface VehiclesState {
   setIsMobile: (isMobile: boolean) => void;
   setSearchQuery: (query: string) => void;
   setIsPhotosCollapsed: (collapsed: boolean) => void;
+  setIsDocumentsCollapsed: (collapsed: boolean) => void;
+  setViewerImage: (image: { url: string; title: string } | null) => void;
   
   // Filter & Sort Actions
   setSortBy: (sortBy: VehiclesState['sortBy']) => void;
@@ -210,6 +216,8 @@ export const useVehiclesStore = create<VehiclesState>()(
         isMobile: false,
         searchQuery: '',
         isPhotosCollapsed: false,
+        isDocumentsCollapsed: false,
+        viewerImage: null,
         
         // Pagination & filtering settings (persisted)
         itemsPerPage: 12,
@@ -239,6 +247,8 @@ export const useVehiclesStore = create<VehiclesState>()(
         setIsMobile: (isMobile) => set({ isMobile }),
         setSearchQuery: (query) => set({ searchQuery: query, currentPage: 1 }),
         setIsPhotosCollapsed: (collapsed) => set({ isPhotosCollapsed: collapsed }),
+        setIsDocumentsCollapsed: (collapsed) => set({ isDocumentsCollapsed: collapsed }),
+        setViewerImage: (image) => set({ viewerImage: image }),
         
         // Filter & Sort Actions
         setSortBy: (sortBy) => set({ sortBy, currentPage: 1 }),
@@ -535,6 +545,8 @@ export const selectCurrentPage = (state: VehiclesState) => state.currentPage;
 export const selectIsMobile = (state: VehiclesState) => state.isMobile;
 export const selectSearchQuery = (state: VehiclesState) => state.searchQuery;
 export const selectIsPhotosCollapsed = (state: VehiclesState) => state.isPhotosCollapsed;
+export const selectIsDocumentsCollapsed = (state: VehiclesState) => state.isDocumentsCollapsed;
+export const selectViewerImage = (state: VehiclesState) => state.viewerImage;
 export const selectItemsPerPage = (state: VehiclesState) => state.itemsPerPage;
 export const selectSortBy = (state: VehiclesState) => state.sortBy;
 export const selectSortOrder = (state: VehiclesState) => state.sortOrder;

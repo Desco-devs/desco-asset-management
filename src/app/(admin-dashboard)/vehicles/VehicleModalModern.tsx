@@ -38,8 +38,10 @@ import {
   Camera,
   ChevronDown,
   ChevronUp,
+  ZoomIn,
+  Download,
 } from "lucide-react";
-import { useVehiclesStore, selectSelectedVehicle, selectIsModalOpen, selectIsEditMode, selectIsMaintenanceModalOpen, selectSelectedMaintenanceReport, selectIsMobile, selectIsPhotosCollapsed } from "@/stores/vehiclesStore";
+import { useVehiclesStore, selectSelectedVehicle, selectIsModalOpen, selectIsEditMode, selectIsMaintenanceModalOpen, selectSelectedMaintenanceReport, selectIsMobile, selectIsPhotosCollapsed, selectIsDocumentsCollapsed, selectViewerImage } from "@/stores/vehiclesStore";
 import { useVehiclesWithReferenceData, useUpdateVehicle, useDeleteVehicle } from "@/hooks/useVehiclesQuery";
 import VehicleMaintenanceReportsEnhanced from "./VehicleMaintenanceReportsEnhanced";
 import CreateVehicleModalModern from "./CreateVehicleModalModern";
@@ -55,9 +57,14 @@ export default function VehicleModalModern() {
   const isEditMode = useVehiclesStore(selectIsEditMode);
   const isMobile = useVehiclesStore(selectIsMobile);
   const isPhotosCollapsed = useVehiclesStore(selectIsPhotosCollapsed);
+  const isDocumentsCollapsed = useVehiclesStore(selectIsDocumentsCollapsed);
+  const viewerImage = useVehiclesStore(selectViewerImage);
 
   // Custom tab state
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'maintenance'>('details');
+  
+  // Debug the viewerImage state
+  console.log('Current viewerImage state:', viewerImage, 'isMobile:', isMobile);
   
   // Get the most up-to-date vehicle data from TanStack Query cache
   const selectedVehicle = selectedVehicleFromStore 
@@ -71,6 +78,8 @@ export default function VehicleModalModern() {
     setSelectedVehicle,
     setIsMobile,
     setIsPhotosCollapsed,
+    setIsDocumentsCollapsed,
+    setViewerImage,
     closeAllModals
   } = useVehiclesStore();
 
@@ -164,8 +173,44 @@ export default function VehicleModalModern() {
     return imageExtensions.some((ext) => url.toLowerCase().includes(ext));
   };
 
-  const openFile = (url: string) => {
-    window.open(url, "_blank");
+  const openFile = (url: string, title: string = "Vehicle Image") => {
+    console.log('openFile called:', { url, title, isMobile, isImageFile: isImageFile(url) });
+    if (isImageFile(url)) {
+      // Set image viewer first, then handle mobile drawer
+      setViewerImage({ url, title });
+      console.log('Image viewer set to:', { url, title });
+      
+      if (isMobile) {
+        // On mobile, close the drawer after setting the image viewer
+        console.log('Mobile: closing drawer');
+        setIsModalOpen(false);
+      }
+    } else {
+      // For PDFs and other documents, open in new tab
+      console.log('Opening document in new tab');
+      window.open(url, "_blank");
+    }
+  };
+  
+  const closeImageViewer = () => {
+    console.log('Closing image viewer');
+    setViewerImage(null);
+    if (isMobile) {
+      // On mobile, reopen the drawer when closing image viewer
+      console.log('Mobile: reopening drawer');
+      setTimeout(() => {
+        setIsModalOpen(true);
+      }, 100);
+    }
+  };
+  
+  const downloadImage = (url: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const vehicleImages = (vehicle: any) => {
@@ -179,6 +224,18 @@ export default function VehicleModalModern() {
     ].filter((img) => img.url);
 
     return images;
+  };
+
+  // All vehicle image slots (including missing ones)
+  const allVehicleImageSlots = (vehicle: any) => {
+    if (!vehicle) return [];
+    
+    return [
+      { url: vehicle.front_img_url, label: "Front View" },
+      { url: vehicle.back_img_url, label: "Back View" },
+      { url: vehicle.side1_img_url, label: "Left Side" },
+      { url: vehicle.side2_img_url, label: "Right Side" },
+    ];
   };
 
   const handleEdit = () => {
@@ -424,7 +481,18 @@ export default function VehicleModalModern() {
                   {/* Vehicle Images Section */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-sm">Vehicle Images</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-sm">Vehicle Images</h4>
+                        {(() => {
+                          const imagesCount = vehicleImages(selectedVehicle).length;
+                          
+                          return imagesCount > 0 && isPhotosCollapsed ? (
+                            <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+                              {imagesCount}
+                            </span>
+                          ) : null;
+                        })()}
+                      </div>
                       <Button
                         type="button"
                         variant="ghost"
@@ -442,52 +510,104 @@ export default function VehicleModalModern() {
                     
                     {!isPhotosCollapsed && (
                       <>
-                        {vehicleImages(selectedVehicle).length > 0 ? (
-                          <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
-                            {vehicleImages(selectedVehicle).map((image, index) => (
-                              <div key={index} className="border rounded-lg p-2 space-y-2">
-                                <div className="aspect-video bg-white rounded-md overflow-hidden">
-                                  <img
-                                    src={image.url}
-                                    alt={`${selectedVehicle.brand} ${selectedVehicle.model} - ${image.label}`}
-                                    className="w-full h-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                                    onClick={() => openFile(image.url!)}
-                                  />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {allVehicleImageSlots(selectedVehicle).map((image, index) => (
+                            <div key={index} className="border rounded-lg p-4 space-y-2">
+                              <div className="flex items-center gap-2 justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Camera className="h-4 w-4 text-blue-500" />
+                                  <span className="font-medium text-sm">{image.label}</span>
                                 </div>
-                                <div className="text-center space-y-1">
-                                  <p className="text-xs font-medium text-muted-foreground">
-                                    {image.label}
-                                  </p>
+                                {!image.url && (
+                                  <span className="text-xs text-red-500 font-medium bg-red-50 px-2 py-1 rounded">Not Provided</span>
+                                )}
+                              </div>
+
+                              {image.url ? (
+                                <>
+                                  <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                                    <img
+                                      src={image.url}
+                                      alt={`${selectedVehicle.brand} ${selectedVehicle.model} - ${image.label}`}
+                                      className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                      onClick={() => openFile(image.url!, `${selectedVehicle.brand} ${selectedVehicle.model} - ${image.label}`)}
+                                    />
+                                  </div>
+
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="w-full text-xs h-7"
-                                    onClick={() => openFile(image.url!)}
+                                    className="w-full text-xs"
+                                    onClick={() => openFile(image.url!, `${selectedVehicle.brand} ${selectedVehicle.model} - ${image.label}`)}
                                   >
-                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    <ZoomIn className="h-3 w-3 mr-1" />
                                     View Full Size
                                   </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-8 bg-muted/20 rounded-lg border-2 border-dashed border-muted-foreground/25">
-                            <Camera className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                            <p className="text-sm text-muted-foreground">
-                              No vehicle images uploaded
-                            </p>
-                          </div>
-                        )}
+                                </>
+                              ) : (
+                                <>
+                                  <div className="aspect-video bg-muted/10 rounded-md border-2 border-dashed border-muted-foreground/25 flex items-center justify-center">
+                                    <div className="text-center">
+                                      <Camera className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                                      <p className="text-xs text-muted-foreground">No image uploaded</p>
+                                    </div>
+                                  </div>
+
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full text-xs"
+                                    disabled
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1 opacity-50" />
+                                    Not Available
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
                       </>
                     )}
                   </div>
 
                   {/* Documents Section */}
                   <div className="space-y-3">
-                    <h4 className="font-medium text-sm">Documents</h4>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-sm">Documents</h4>
+                        {(() => {
+                          const documentsCount = [
+                            selectedVehicle.original_receipt_url,
+                            selectedVehicle.car_registration_url,
+                            selectedVehicle.pgpc_inspection_image
+                          ].filter(Boolean).length;
+                          
+                          return documentsCount > 0 && isDocumentsCollapsed ? (
+                            <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+                              {documentsCount}
+                            </span>
+                          ) : null;
+                        })()}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsDocumentsCollapsed(!isDocumentsCollapsed)}
+                        className="h-8 w-8 p-0"
+                      >
+                        {isDocumentsCollapsed ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronUp className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {!isDocumentsCollapsed && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Original Receipt */}
                 {selectedVehicle.original_receipt_url && (
                   <div className="border rounded-lg p-4 space-y-2">
@@ -502,7 +622,7 @@ export default function VehicleModalModern() {
                           src={selectedVehicle.original_receipt_url}
                           alt="Original Receipt"
                           className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => openFile(selectedVehicle.original_receipt_url!)}
+                          onClick={() => openFile(selectedVehicle.original_receipt_url!, "Original Receipt")}
                         />
                       </div>
                     ) : (
@@ -520,7 +640,7 @@ export default function VehicleModalModern() {
                       variant="outline"
                       size="sm"
                       className="w-full text-xs"
-                      onClick={() => openFile(selectedVehicle.original_receipt_url!)}
+                      onClick={() => openFile(selectedVehicle.original_receipt_url!, "Original Receipt")}
                     >
                       <ExternalLink className="h-3 w-3 mr-1" />
                       Open Document
@@ -542,7 +662,7 @@ export default function VehicleModalModern() {
                           src={selectedVehicle.car_registration_url}
                           alt="Car Registration"
                           className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => openFile(selectedVehicle.car_registration_url!)}
+                          onClick={() => openFile(selectedVehicle.car_registration_url!, "Car Registration")}
                         />
                       </div>
                     ) : (
@@ -560,7 +680,7 @@ export default function VehicleModalModern() {
                       variant="outline"
                       size="sm"
                       className="w-full text-xs"
-                      onClick={() => openFile(selectedVehicle.car_registration_url!)}
+                      onClick={() => openFile(selectedVehicle.car_registration_url!, "Car Registration")}
                     >
                       <ExternalLink className="h-3 w-3 mr-1" />
                       Open Document
@@ -582,7 +702,7 @@ export default function VehicleModalModern() {
                           src={selectedVehicle.pgpc_inspection_image}
                           alt="PGPC Inspection"
                           className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => openFile(selectedVehicle.pgpc_inspection_image!)}
+                          onClick={() => openFile(selectedVehicle.pgpc_inspection_image!, "PGPC Inspection")}
                         />
                       </div>
                     ) : (
@@ -600,23 +720,32 @@ export default function VehicleModalModern() {
                       variant="outline"
                       size="sm"
                       className="w-full text-xs"
-                      onClick={() => openFile(selectedVehicle.pgpc_inspection_image!)}
+                      onClick={() => openFile(selectedVehicle.pgpc_inspection_image!, "PGPC Inspection")}
                     >
                       <ExternalLink className="h-3 w-3 mr-1" />
                       Open Document
                     </Button>
                   </div>
                 )}
-                    </div>
+                      </div>
+                    )}
 
-                  {vehicleImages(selectedVehicle).length === 0 && (
-                    <div className="text-center py-8">
-                      <Camera className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                      <p className="text-sm text-muted-foreground">
-                        No photos uploaded for this vehicle
-                      </p>
-                    </div>
-                  )}
+                    {!isDocumentsCollapsed && (
+                      <>
+                        {[
+                          selectedVehicle.original_receipt_url,
+                          selectedVehicle.car_registration_url,
+                          selectedVehicle.pgpc_inspection_image
+                        ].filter(Boolean).length === 0 && (
+                          <div className="text-center py-8 bg-muted/20 rounded-lg border-2 border-dashed border-muted-foreground/25">
+                            <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                            <p className="text-sm text-muted-foreground">
+                              No documents uploaded
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -644,38 +773,94 @@ export default function VehicleModalModern() {
     </>
   );
 
+
   // Mobile view - Drawer
   if (isMobile) {
     return (
-      <Drawer open={isModalOpen} onOpenChange={handleClose}>
-        <DrawerContent className="!max-h-[95vh]">
-          {/* Mobile Header */}
-          <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
-            <DrawerClose asChild>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="absolute right-4 top-4 rounded-full h-8 w-8 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </DrawerClose>
+      <>
+        <Drawer open={isModalOpen} onOpenChange={handleClose}>
+          <DrawerContent className="!max-h-[95vh]">
+            {/* Mobile Header */}
+            <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
+              <DrawerClose asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="absolute right-4 top-4 rounded-full h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </DrawerClose>
+              <div className="text-center space-y-3">
+                <DrawerTitle className="text-xl font-bold">
+                  {selectedVehicle.brand} {selectedVehicle.model}
+                </DrawerTitle>
+                <div className="flex justify-center">
+                  <Badge className={getStatusColor(selectedVehicle.status)}>
+                    {selectedVehicle.status === 'OPERATIONAL' ? 'Operational' : 'Non-Operational'}
+                  </Badge>
+                </div>
+              </div>
+            </DrawerHeader>
+            
+            <VehicleContent />
+            
+            {/* Mobile Footer */}
+            <DrawerFooter className="border-t bg-muted/30">
+              <div className="flex gap-2 w-full">
+                <Button 
+                  variant="outline" 
+                  onClick={handleDelete} 
+                  className="flex-1 gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+                >
+                  <X className="h-4 w-4" />
+                  Delete Vehicle
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleEdit} 
+                  className="flex-1 gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700"
+                >
+                  <Edit className="h-4 w-4" />
+                  Edit Vehicle
+                </Button>
+              </div>
+            </DrawerFooter>
+          </DrawerContent>
+          
+          {/* Edit Modal */}
+          {isEditMode && <EditVehicleModalModern />}
+        </Drawer>
+      </>
+    );
+  }
+
+  // Desktop view - Dialog
+  return (
+    <>
+      <Dialog open={isModalOpen} onOpenChange={handleClose}>
+        <DialogContent
+          className="max-w-[calc(100%-2rem)] sm:max-w-[calc(100%-4rem)] max-h-[90vh] flex flex-col p-4"
+          style={{ maxWidth: "1024px" }}
+        >
+          {/* Desktop Header */}
+          <DialogHeader className="p-4 pb-4 flex-shrink-0">
             <div className="text-center space-y-3">
-              <DrawerTitle className="text-xl font-bold">
+              <DialogTitle className="text-xl font-bold">
                 {selectedVehicle.brand} {selectedVehicle.model}
-              </DrawerTitle>
+              </DialogTitle>
               <div className="flex justify-center">
                 <Badge className={getStatusColor(selectedVehicle.status)}>
                   {selectedVehicle.status === 'OPERATIONAL' ? 'Operational' : 'Non-Operational'}
                 </Badge>
               </div>
             </div>
-          </DrawerHeader>
-          
+          </DialogHeader>
+
           <VehicleContent />
           
-          {/* Mobile Footer */}
-          <DrawerFooter className="border-t bg-muted/30">
+          {/* Desktop Footer */}
+          <DialogFooter className="p-4 border-t bg-muted/30">
             <div className="flex gap-2 w-full">
               <Button 
                 variant="outline" 
@@ -694,63 +879,12 @@ export default function VehicleModalModern() {
                 Edit Vehicle
               </Button>
             </div>
-          </DrawerFooter>
-        </DrawerContent>
+          </DialogFooter>
+        </DialogContent>
         
         {/* Edit Modal */}
         {isEditMode && <EditVehicleModalModern />}
-      </Drawer>
-    );
-  }
-
-  // Desktop view - Dialog
-  return (
-    <Dialog open={isModalOpen} onOpenChange={handleClose}>
-      <DialogContent
-        className="max-w-[calc(100%-2rem)] sm:max-w-[calc(100%-4rem)] max-h-[90vh] flex flex-col p-4"
-        style={{ maxWidth: "1024px" }}
-      >
-        {/* Desktop Header */}
-        <DialogHeader className="p-4 pb-4 flex-shrink-0">
-          <div className="text-center space-y-3">
-            <DialogTitle className="text-xl font-bold">
-              {selectedVehicle.brand} {selectedVehicle.model}
-            </DialogTitle>
-            <div className="flex justify-center">
-              <Badge className={getStatusColor(selectedVehicle.status)}>
-                {selectedVehicle.status === 'OPERATIONAL' ? 'Operational' : 'Non-Operational'}
-              </Badge>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <VehicleContent />
-        
-        {/* Desktop Footer */}
-        <DialogFooter className="p-4 border-t bg-muted/30">
-          <div className="flex gap-2 w-full">
-            <Button 
-              variant="outline" 
-              onClick={handleDelete} 
-              className="flex-1 gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
-            >
-              <X className="h-4 w-4" />
-              Delete Vehicle
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleEdit} 
-              className="flex-1 gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700"
-            >
-              <Edit className="h-4 w-4" />
-              Edit Vehicle
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-      
-      {/* Edit Modal */}
-      {isEditMode && <EditVehicleModalModern />}
-    </Dialog>
+      </Dialog>
+    </>
   );
 }

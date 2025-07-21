@@ -307,10 +307,28 @@ export async function updateVehicleAction(formData: FormData) {
         remarks: remarks || null,
         project: { connect: { id: projectId } },
       },
+      include: {
+        project: {
+          include: {
+            client: {
+              include: {
+                location: true
+              }
+            }
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            full_name: true
+          }
+        }
+      },
     });
 
-    // 🔥 HANDLE FILE UPLOADS (similar to create)
-    const fileUploads: Record<string, string> = {};
+    // 🔥 HANDLE FILE UPLOADS AND REMOVALS
+    const fileUploads: Record<string, string | null> = {};
     
     const fileFields = [
       { formKey: 'frontImg', prefix: 'front' },
@@ -324,8 +342,10 @@ export async function updateVehicleAction(formData: FormData) {
 
     for (const { formKey, prefix } of fileFields) {
       const file = formData.get(formKey) as File | null;
+      const shouldRemove = formData.get(`remove_${formKey}`) === 'true';
       
       if (file && file.size > 0) {
+        // Upload new file
         try {
           const uploadResult = await uploadFileToSupabase(
             file,
@@ -344,14 +364,60 @@ export async function updateVehicleAction(formData: FormData) {
           console.error(`❌ Failed to upload ${prefix}:`, error);
           // Continue with other files, don't fail the entire update
         }
+      } else if (shouldRemove) {
+        // Mark field for removal (set to null)
+        const fieldName = getFieldName(prefix);
+        fileUploads[fieldName] = null;
       }
     }
 
-    // Update vehicle with new file URLs if any were uploaded
+    // Update vehicle with new file URLs if any were uploaded and get final updated vehicle
+    let finalUpdatedVehicle = updatedVehicle;
     if (Object.keys(fileUploads).length > 0) {
-      await prisma.vehicle.update({
+      finalUpdatedVehicle = await prisma.vehicle.update({
         where: { id: vehicleId },
         data: fileUploads,
+        include: {
+          project: {
+            include: {
+              client: {
+                include: {
+                  location: true
+                }
+              }
+            }
+          },
+          user: {
+            select: {
+              id: true,
+              username: true,
+              full_name: true
+            }
+          }
+        },
+      });
+    } else {
+      // Get updated vehicle with all relations for consistency
+      finalUpdatedVehicle = await prisma.vehicle.findUnique({
+        where: { id: vehicleId },
+        include: {
+          project: {
+            include: {
+              client: {
+                include: {
+                  location: true
+                }
+              }
+            }
+          },
+          user: {
+            select: {
+              id: true,
+              username: true,
+              full_name: true
+            }
+          }
+        },
       });
     }
 
@@ -362,7 +428,8 @@ export async function updateVehicleAction(formData: FormData) {
     return { 
       success: true, 
       vehicleId: vehicleId,
-      filesUpdated: Object.keys(fileUploads).length
+      filesUpdated: Object.keys(fileUploads).length,
+      vehicle: finalUpdatedVehicle
     };
 
   } catch (error) {

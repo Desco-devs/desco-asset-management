@@ -2,19 +2,34 @@
 
 import { useFormStatus } from "react-dom";
 import { updateVehicleAction } from "./actions";
+import { useVehiclesStore } from "@/stores/vehiclesStore";
+import { useQueryClient } from "@tanstack/react-query";
+import { vehicleKeys } from "@/hooks/useVehiclesQuery";
+import { Button } from "@/components/ui/button";
+import { Loader2, Save, Check, X } from "lucide-react";
 
 // Submit button component that uses useFormStatus
 function SubmitButton() {
   const { pending } = useFormStatus();
   
   return (
-    <button 
+    <Button 
       type="submit" 
       disabled={pending}
-      className="w-full bg-blue-500 text-white py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
+      className="w-full"
     >
-      {pending ? "Updating Vehicle..." : "Update Vehicle"}
-    </button>
+      {pending ? (
+        <>
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          Updating Vehicle...
+        </>
+      ) : (
+        <>
+          <Save className="h-4 w-4 mr-2" />
+          Update Vehicle
+        </>
+      )}
+    </Button>
   );
 }
 
@@ -47,10 +62,29 @@ interface EditVehicleFormProps {
 }
 
 export default function EditVehicleForm({ vehicle, projects, onSuccess, onCancel }: EditVehicleFormProps) {
+  const { setSelectedVehicle } = useVehiclesStore();
+  const queryClient = useQueryClient();
   
   const handleAction = async (formData: FormData) => {
     try {
       const result = await updateVehicleAction(formData);
+      
+      // Update both Zustand store and TanStack Query cache when basic vehicle info is updated
+      if (result && result.vehicle) {
+        setSelectedVehicle(result.vehicle);
+        
+        // Also update TanStack Query cache to keep everything in sync
+        queryClient.setQueryData(vehicleKeys.vehicles(), (oldData: any) => {
+          if (!oldData) return [result.vehicle];
+          
+          // Find and update the vehicle in the array
+          const updatedData = oldData.map((existingVehicle: any) => 
+            existingVehicle.id === result.vehicle.id ? result.vehicle : existingVehicle
+          );
+          
+          return updatedData;
+        });
+      }
       
       // Show single success toast
       const { toast } = await import("sonner");
@@ -278,13 +312,15 @@ export default function EditVehicleForm({ vehicle, projects, onSuccess, onCancel
       {/* Action Buttons */}
       <div className="flex gap-2">
         {onCancel && (
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={onCancel}
-            className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded hover:bg-gray-300"
+            className="flex-1"
           >
+            <X className="h-4 w-4 mr-2" />
             Cancel
-          </button>
+          </Button>
         )}
         <div className="flex-1">
           <SubmitButton />

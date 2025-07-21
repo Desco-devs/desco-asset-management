@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -26,9 +26,14 @@ import {
   Upload,
   FileText,
   Shield,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Check,
 } from "lucide-react";
-import { useVehiclesStore, selectSelectedVehicle, selectIsEditMode, selectIsMobile, selectIsModalOpen } from "@/stores/vehiclesStore";
-import { useVehiclesWithReferenceData } from "@/hooks/useVehiclesQuery";
+import { useVehiclesStore, selectSelectedVehicle, selectIsEditMode, selectIsMobile, selectIsModalOpen, selectIsDocumentsCollapsed } from "@/stores/vehiclesStore";
+import { useVehiclesWithReferenceData, vehicleKeys } from "@/hooks/useVehiclesQuery";
+import { useQueryClient } from "@tanstack/react-query";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import EditVehicleForm from "./EditVehicleForm";
 
@@ -37,13 +42,24 @@ export default function EditVehicleModalModern() {
   const isEditMode = useVehiclesStore(selectIsEditMode);
   const isMobile = useVehiclesStore(selectIsMobile);
   const isModalOpen = useVehiclesStore(selectIsModalOpen);
-  const { setIsEditMode, setIsMobile, setIsModalOpen } = useVehiclesStore();
+  const isDocumentsCollapsed = useVehiclesStore(selectIsDocumentsCollapsed);
+  const { setIsEditMode, setIsMobile, setIsModalOpen, setIsDocumentsCollapsed, setSelectedVehicle } = useVehiclesStore();
+  
+  // Query client for cache invalidation
+  const queryClient = useQueryClient();
   
   // Get reference data
   const { projects } = useVehiclesWithReferenceData();
 
   // Custom tab state instead of using Tabs component
   const [activeTab, setActiveTab] = useState<'info' | 'photos'>('info');
+  
+  // Loading states for better UX
+  const [isUpdatingPhotos, setIsUpdatingPhotos] = useState(false);
+  const [updateSuccess, setUpdateSuccess] = useState(false);
+  
+  // Ref to maintain scroll position
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
 
   // Vehicle files state
   interface VehicleFilesState {
@@ -109,6 +125,7 @@ export default function EditVehicleModalModern() {
     // React Query cache will be invalidated by the mutation and realtime updates
   };
 
+
   const handleCancel = () => {
     setIsEditMode(false);
     // Reopen the details modal when cancelled
@@ -152,7 +169,14 @@ export default function EditVehicleModalModern() {
   const handlePgpcKeepChange = useCallback((keep: boolean) => updateFileState('pgpcInspection', { keep }), [updateFileState]);
 
   // Handle photo and document updates
-  const handlePhotosSubmit = async () => {
+  const handlePhotosSubmit = async (event?: React.MouseEvent<HTMLButtonElement>) => {
+    // Prevent any default behavior that might cause scrolling
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
+    setIsUpdatingPhotos(true);
     try {
       // Create FormData and add all required vehicle fields
       const formData = new FormData();
@@ -171,10 +195,14 @@ export default function EditVehicleModalModern() {
       formData.append('before', vehicleForForm.before.toString());
       formData.append('remarks', vehicleForForm.remarks || '');
       
-      // Add files if they exist and are not being kept
+      // Add files and removal flags
       Object.entries(files).forEach(([key, { file, keep }]) => {
-        if (file && !keep) {
+        if (file) {
+          // New file to upload
           formData.append(key, file);
+        } else if (!keep) {
+          // Mark for removal (no file and keep is false means user wants to remove it)
+          formData.append(`remove_${key}`, 'true');
         }
       });
       
@@ -182,18 +210,43 @@ export default function EditVehicleModalModern() {
       const { updateVehicleAction } = await import("./actions");
       const result = await updateVehicleAction(formData);
       
+      // Update the Zustand store's selectedVehicle with the fresh data
+      if (result && result.vehicle) {
+        setSelectedVehicle(result.vehicle);
+        
+        // Also update TanStack Query cache to keep everything in sync
+        queryClient.setQueryData(vehicleKeys.vehicles(), (oldData: any) => {
+          if (!oldData) return [result.vehicle];
+          
+          // Find and update the vehicle in the array
+          const updatedData = oldData.map((vehicle: any) => 
+            vehicle.id === result.vehicle.id ? result.vehicle : vehicle
+          );
+          
+          return updatedData;
+        });
+      }
+      
+      // Show success state briefly
+      setUpdateSuccess(true);
+      
       // Show success toast
       const { toast } = await import("sonner");
       toast.success("Photos & Documents updated successfully!");
       
-      // Close edit modal and reopen details modal after short delay
+      // Show success for a moment, then reset
       setTimeout(() => {
-        handleSuccess();
-      }, 100);
+        setUpdateSuccess(false);
+        setIsUpdatingPhotos(false);
+      }, 1500); // Show success for 1.5 seconds
     } catch (error) {
       console.error("Photo update error:", error);
       const { toast } = await import("sonner");
       toast.error("Error: " + (error instanceof Error ? error.message : "Failed to update photos"));
+    } finally {
+      if (!updateSuccess) {
+        setIsUpdatingPhotos(false);
+      }
     }
   };
 
@@ -332,48 +385,100 @@ export default function EditVehicleModalModern() {
 
                 {/* Documents Section */}
                 <div className="space-y-3">
-                  <h4 className="text-lg font-medium">Documents</h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FileUploadSectionSimple
-                      label="Original Receipt"
-                      accept=".pdf,image/*"
-                      currentFileUrl={selectedVehicle?.original_receipt_url}
-                      onFileChange={handleReceiptFileChange}
-                      onKeepExistingChange={handleReceiptKeepChange}
-                      selectedFile={files.originalReceipt.file}
-                      keepExisting={files.originalReceipt.keep}
-                      icon={<FileText className="h-4 w-4" />}
-                    />
-                    
-                    <FileUploadSectionSimple
-                      label="Car Registration"
-                      accept=".pdf,image/*"
-                      currentFileUrl={selectedVehicle?.car_registration_url}
-                      onFileChange={handleRegistrationFileChange}
-                      onKeepExistingChange={handleRegistrationKeepChange}
-                      selectedFile={files.carRegistration.file}
-                      keepExisting={files.carRegistration.keep}
-                      icon={<FileText className="h-4 w-4" />}
-                    />
-                    
-                    <FileUploadSectionSimple
-                      label="PGPC Inspection"
-                      accept="image/*"
-                      currentFileUrl={selectedVehicle?.pgpc_inspection_image}
-                      onFileChange={handlePgpcFileChange}
-                      onKeepExistingChange={handlePgpcKeepChange}
-                      selectedFile={files.pgpcInspection.file}
-                      keepExisting={files.pgpcInspection.keep}
-                      icon={<Shield className="h-4 w-4" />}
-                    />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-lg font-medium">Documents</h4>
+                      {(() => {
+                        const documentsCount = [
+                          selectedVehicle?.original_receipt_url || files.originalReceipt.file,
+                          selectedVehicle?.car_registration_url || files.carRegistration.file,
+                          selectedVehicle?.pgpc_inspection_image || files.pgpcInspection.file
+                        ].filter(Boolean).length;
+                        
+                        return documentsCount > 0 && isDocumentsCollapsed ? (
+                          <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+                            {documentsCount}
+                          </span>
+                        ) : null;
+                      })()}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsDocumentsCollapsed(!isDocumentsCollapsed)}
+                      className="h-8 w-8 p-0"
+                    >
+                      {isDocumentsCollapsed ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronUp className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
+                  
+                  {!isDocumentsCollapsed && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FileUploadSectionSimple
+                        label="Original Receipt (OR)"
+                        accept=".pdf,image/*"
+                        currentFileUrl={selectedVehicle?.original_receipt_url}
+                        onFileChange={handleReceiptFileChange}
+                        onKeepExistingChange={handleReceiptKeepChange}
+                        selectedFile={files.originalReceipt.file}
+                        keepExisting={files.originalReceipt.keep}
+                        icon={<FileText className="h-4 w-4" />}
+                      />
+                      
+                      <FileUploadSectionSimple
+                        label="Car Registration (CR)"
+                        accept=".pdf,image/*"
+                        currentFileUrl={selectedVehicle?.car_registration_url}
+                        onFileChange={handleRegistrationFileChange}
+                        onKeepExistingChange={handleRegistrationKeepChange}
+                        selectedFile={files.carRegistration.file}
+                        keepExisting={files.carRegistration.keep}
+                        icon={<FileText className="h-4 w-4" />}
+                      />
+                      
+                      <FileUploadSectionSimple
+                        label="PGPC Inspection"
+                        accept="image/*"
+                        currentFileUrl={selectedVehicle?.pgpc_inspection_image}
+                        onFileChange={handlePgpcFileChange}
+                        onKeepExistingChange={handlePgpcKeepChange}
+                        selectedFile={files.pgpcInspection.file}
+                        keepExisting={files.pgpcInspection.keep}
+                        icon={<Shield className="h-4 w-4" />}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Save Button */}
                 <div className="pt-4">
-                  <Button onClick={handlePhotosSubmit} className="w-full">
-                    Update Photos & Documents
+                  <Button 
+                    ref={saveButtonRef}
+                    onClick={handlePhotosSubmit} 
+                    className="w-full"
+                    disabled={isUpdatingPhotos || updateSuccess}
+                  >
+                    {updateSuccess ? (
+                      <>
+                        <Check className="h-4 w-4 mr-2 text-green-600" />
+                        Updated Successfully!
+                      </>
+                    ) : isUpdatingPhotos ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Update Photos & Documents
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
