@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { toast } from "sonner";
-import type { Vehicle, MaintenanceReport, Project, Client, Location, User } from "@/stores/vehiclesStore";
+import type { Vehicle, MaintenanceReport, Project, Client, Location, User, ExportFilters } from "@/stores/vehiclesStore";
 
 // Query keys for consistent cache management
 export const vehicleKeys = {
@@ -17,6 +17,7 @@ export const vehicleKeys = {
   users: () => ['users'] as const,
   maintenanceReports: () => ['maintenance-reports'] as const,
   vehicleMaintenanceReports: (vehicleId: string) => [...vehicleKeys.all, 'maintenance', vehicleId] as const,
+  exports: () => ['exports'] as const,
 };
 
 // API functions
@@ -779,3 +780,52 @@ export function useSupabaseRealtime() {
     isConnected,
   };
 }
+
+// Export hook using TanStack Query pattern
+export function useExportMaintenanceReports() {
+  return useMutation({
+    mutationFn: async (filters?: ExportFilters) => {
+      const params = new URLSearchParams();
+      if (filters?.format) params.append('format', filters.format);
+      if (filters?.reportType) params.append('reportType', filters.reportType);
+      if (filters?.vehicleId && filters.vehicleId !== 'ALL_VEHICLES') params.append('vehicleId', filters.vehicleId);
+      if (filters?.status && filters.status !== 'ALL_STATUS') params.append('status', filters.status);
+      if (filters?.priority && filters.priority !== 'ALL_PRIORITIES') params.append('priority', filters.priority);
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+
+      const response = await fetch(`/api/vehicles/maintenance-reports/export?${params.toString()}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Export failed' }));
+        throw new Error(errorData.error || 'Export failed');
+      }
+
+      return response;
+    },
+    onSuccess: async (response, filters) => {
+      // Get the filename from the response headers
+      const contentDisposition = response.headers.get('content-disposition');
+      const filename = contentDisposition 
+        ? contentDisposition.split('filename="')[1]?.split('"')[0]
+        : `vehicle-maintenance-reports-${new Date().toISOString().split('T')[0]}.${filters?.format || 'pdf'}`;
+
+      // Create blob and trigger download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success(`Reports exported successfully as ${filters?.format?.toUpperCase() || 'PDF'}`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Export failed: ${error.message}`);
+    }
+  });
+}
+

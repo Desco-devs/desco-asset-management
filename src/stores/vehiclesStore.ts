@@ -97,6 +97,16 @@ export interface User {
   role: string;
 }
 
+export interface ExportFilters {
+  format?: 'pdf' | 'excel';
+  reportType?: 'summary' | 'detailed';
+  vehicleId?: string;
+  status?: string;
+  priority?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 interface VehiclesState {
   // UI state (not persisted to localStorage)
   selectedVehicle: Vehicle | null;
@@ -105,6 +115,7 @@ interface VehiclesState {
   isEditMode: boolean;
   selectedMaintenanceReport: MaintenanceReport | null;
   isMaintenanceModalOpen: boolean;
+  isExportModalOpen: boolean;
   currentPage: number;
   isMobile: boolean;
   searchQuery: string;
@@ -132,6 +143,7 @@ interface VehiclesState {
   setIsEditMode: (isEdit: boolean) => void;
   setSelectedMaintenanceReport: (report: MaintenanceReport | null) => void;
   setIsMaintenanceModalOpen: (open: boolean) => void;
+  setIsExportModalOpen: (open: boolean) => void;
   setCurrentPage: (page: number) => void;
   setIsMobile: (isMobile: boolean) => void;
   setSearchQuery: (query: string) => void;
@@ -147,6 +159,11 @@ interface VehiclesState {
   setFilterExpiryDays: (days: number | null) => void;
   setFilterDateRange: (dateRange: VehiclesState['filterDateRange']) => void;
   setItemsPerPage: (count: number) => void;
+  
+  // Export Actions
+  exportMaintenanceReports: (filters?: ExportFilters) => Promise<void>;
+  isExporting: boolean;
+  setIsExporting: (exporting: boolean) => void;
   
   // Computed selectors (derived state - no re-renders)
   getFilteredVehicles: (vehicles: Vehicle[]) => Vehicle[];
@@ -179,6 +196,7 @@ export const useVehiclesStore = create<VehiclesState>()(
         isEditMode: false,
         selectedMaintenanceReport: null,
         isMaintenanceModalOpen: false,
+        isExportModalOpen: false,
         currentPage: 1,
         isMobile: false,
         searchQuery: '',
@@ -206,6 +224,7 @@ export const useVehiclesStore = create<VehiclesState>()(
         setIsEditMode: (isEdit) => set({ isEditMode: isEdit }),
         setSelectedMaintenanceReport: (report) => set({ selectedMaintenanceReport: report }),
         setIsMaintenanceModalOpen: (open) => set({ isMaintenanceModalOpen: open }),
+        setIsExportModalOpen: (open) => set({ isExportModalOpen: open }),
         setCurrentPage: (page) => set({ currentPage: page }),
         setIsMobile: (isMobile) => set({ isMobile }),
         setSearchQuery: (query) => set({ searchQuery: query, currentPage: 1 }),
@@ -221,6 +240,59 @@ export const useVehiclesStore = create<VehiclesState>()(
         setFilterExpiryDays: (days) => set({ filterExpiryDays: days, currentPage: 1 }),
         setFilterDateRange: (dateRange) => set({ filterDateRange: dateRange, currentPage: 1 }),
         setItemsPerPage: (count) => set({ itemsPerPage: count, currentPage: 1 }),
+        
+        // Export state
+        isExporting: false,
+        setIsExporting: (exporting) => set({ isExporting: exporting }),
+        
+        // Export function
+        exportMaintenanceReports: async (filters?: ExportFilters) => {
+          const { setIsExporting } = get();
+          
+          try {
+            setIsExporting(true);
+            
+            // Build query parameters
+            const params = new URLSearchParams();
+            if (filters?.format) params.append('format', filters.format);
+            if (filters?.reportType) params.append('reportType', filters.reportType);
+            if (filters?.vehicleId && filters.vehicleId !== 'ALL_VEHICLES') params.append('vehicleId', filters.vehicleId);
+            if (filters?.status && filters.status !== 'ALL_STATUS') params.append('status', filters.status);
+            if (filters?.priority && filters.priority !== 'ALL_PRIORITIES') params.append('priority', filters.priority);
+            if (filters?.startDate) params.append('startDate', filters.startDate);
+            if (filters?.endDate) params.append('endDate', filters.endDate);
+
+            const response = await fetch(`/api/vehicles/maintenance-reports/export?${params.toString()}`);
+            
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ error: 'Export failed' }));
+              throw new Error(errorData.error || 'Export failed');
+            }
+
+            // Get the filename from the response headers
+            const contentDisposition = response.headers.get('content-disposition');
+            const filename = contentDisposition 
+              ? contentDisposition.split('filename="')[1]?.split('"')[0]
+              : `vehicle-maintenance-reports-${new Date().toISOString().split('T')[0]}.${filters?.format || 'pdf'}`;
+
+            // Create blob and trigger download
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+          } catch (error) {
+            console.error('Export failed:', error);
+            throw error;
+          } finally {
+            setIsExporting(false);
+          }
+        },
         
         // Computed selectors (accept vehicles as parameter - no direct state access)
         getFilteredVehicles: (vehicles: Vehicle[], maintenanceReports: MaintenanceReport[] = []) => {
@@ -344,7 +416,7 @@ export const useVehiclesStore = create<VehiclesState>()(
           const filtered = get().getFilteredVehicles(vehicles);
           
           return [...filtered].sort((a, b) => {
-            let aValue: any, bValue: any;
+            let aValue: string | number | Date, bValue: string | number | Date;
             
             switch (sortBy) {
               case 'brand':
@@ -421,6 +493,7 @@ export const useVehiclesStore = create<VehiclesState>()(
           isModalOpen: false,
           isCreateModalOpen: false,
           isMaintenanceModalOpen: false,
+          isExportModalOpen: false,
           selectedVehicle: null,
           selectedMaintenanceReport: null,
           isEditMode: false

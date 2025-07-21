@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { Eye, Search, Filter, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Eye, Search, Filter, Plus, Download } from "lucide-react";
 import { useVehiclesStore, selectFilterInfo, selectIsMobile } from "@/stores/vehiclesStore";
 import { useVehiclesWithReferenceData, useSupabaseRealtime } from "@/hooks/useVehiclesQuery";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import LoadingSkeleton from "./LoadingSkeleton";
 import ErrorState from "./ErrorState";
 import VehicleFiltersAdvanced from "./components/VehicleFiltersAdvanced";
+import { ExportDialog } from "./components/ExportDialog";
 
 export default function VehiclesListModern() {
   // TanStack Query - Server state
@@ -23,6 +24,7 @@ export default function VehiclesListModern() {
   const searchQuery = useVehiclesStore(state => state.searchQuery);
   const filterStatus = useVehiclesStore(state => state.filterStatus);
   const isMobile = useVehiclesStore(state => state.isMobile);
+  const isExportModalOpen = useVehiclesStore(state => state.isExportModalOpen);
   
   // Get store functions once
   const getFilteredVehicles = useVehiclesStore(state => state.getFilteredVehicles);
@@ -83,6 +85,7 @@ export default function VehiclesListModern() {
     setSelectedVehicle,
     setIsModalOpen,
     setIsCreateModalOpen,
+    setIsExportModalOpen,
     setCurrentPage,
     setIsMobile,
     setSearchQuery,
@@ -138,10 +141,21 @@ export default function VehiclesListModern() {
           )}
         </div>
         
-        <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Vehicle
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsExportModalOpen(true)} 
+            className="gap-2"
+            disabled={vehicles.length === 0}
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add Vehicle
+          </Button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -295,6 +309,18 @@ export default function VehiclesListModern() {
           </Button>
         </div>
       )}
+
+      {/* Export Dialog */}
+      <ExportDialog
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        vehicles={vehicles.map(v => ({
+          id: v.id,
+          brand: v.brand,
+          model: v.model,
+          plate_number: v.plate_number
+        }))}
+      />
     </div>
   );
 }
