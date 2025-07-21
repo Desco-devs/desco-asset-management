@@ -5,7 +5,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { MessageWithRelations } from "@/types/chat-app";
 import {
   Check,
   CheckCheck,
@@ -15,6 +14,7 @@ import {
   Loader2,
   LoaderIcon,
 } from "lucide-react";
+import { MessageWithRelations } from "@/types/chat-app";
 
 interface MessagesListProps {
   messages: MessageWithRelations[];

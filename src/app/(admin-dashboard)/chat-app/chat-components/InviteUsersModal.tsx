@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -23,12 +24,9 @@ import {
 } from "@/components/ui/select";
 import { Search, X, Check, AtSign, Mail, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ChatUser, RoomListItem } from "@/types/chat-app";
-import {
-  useRoomInvitations,
-  ROOM_INVITATIONS_QUERY_KEYS,
-} from "@/hooks/chat-app/useRoomInvitations";
+import { useRoomInvitations, ROOM_INVITATIONS_QUERY_KEYS } from "@/hooks/chat-app/useRoomInvitations";
 import { useQueryClient } from "@tanstack/react-query";
+import { ChatUser, RoomListItem } from "@/types/chat-app";
 
 interface InviteUsersModalProps {
   isOpen: boolean;
@@ -172,12 +170,12 @@ const InviteUsersModal = ({
 
     try {
       await onInviteUsers(inviteData);
-
+      
       // Invalidate the room invitations cache for immediate UI update
       queryClient.invalidateQueries({
         queryKey: ROOM_INVITATIONS_QUERY_KEYS.invitations(currentRoom.id),
       });
-
+      
       handleClose();
     } catch (error) {
       console.error("Error inviting users:", error);
@@ -243,7 +241,7 @@ const InviteUsersModal = ({
               </Select>
             </div>
             <div className="space-y-2 w-full">
-              <Label className="ml-1">Search..</Label>
+              <Label className="ml-1">Test</Label>
               <div className="relative px-1">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
 

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Users, User, Clock, UserCheck, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { RoomListItem, RoomType, InvitationStatus } from "@/types/chat-app";
+import { RoomListItem, RoomType } from "@/types/chat-app";
 
 interface InvitationModalProps {
   isOpen: boolean;

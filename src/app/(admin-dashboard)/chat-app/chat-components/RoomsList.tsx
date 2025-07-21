@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +16,8 @@ import {
   ChartBar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { RoomListItem, RoomType, InvitationStatus } from "@/types/chat-app";
+import { useSocketContext } from "@/context/SocketContext";
+import { InvitationStatus, RoomListItem, RoomType } from "@/types/chat-app";
 
 interface RoomsListProps {
   rooms: RoomListItem[];
@@ -33,9 +35,7 @@ const RoomsList = ({
   currentUserId,
 }: RoomsListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // For now, we'll assume users are online (can be improved later with Supabase presence)
-  const isUserOnline = (userId: string) => false;
+  const { isUserOnline } = useSocketContext();
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -45,7 +45,7 @@ const RoomsList = ({
   const getOtherUserId = (room: RoomListItem) => {
     if (room.type === RoomType.DIRECT && room.members && currentUserId) {
       const otherMember = room.members.find(
-        member => (member.user?.id || member.user_id) !== currentUserId
+        (member) => (member.user?.id || member.user_id) !== currentUserId
       );
       return otherMember?.user?.id || otherMember?.user_id || null;
     }
@@ -93,7 +93,10 @@ const RoomsList = ({
                   </p>
                 </div>
                 {!searchQuery && onCreateRoom && (
-                  <Button onClick={onCreateRoom} className="mt-4 text-white bg-chart-3">
+                  <Button
+                    onClick={onCreateRoom}
+                    className="mt-4 text-white bg-chart-3"
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Start a conversation
                   </Button>
@@ -131,8 +134,8 @@ const RoomsList = ({
                             // Check if the other user in this DM is online
                             (() => {
                               const otherUserId = getOtherUserId(room);
-                              return otherUserId && isUserOnline(otherUserId) 
-                                ? "bg-green-500" 
+                              return otherUserId && isUserOnline(otherUserId)
+                                ? "bg-green-500"
                                 : "bg-gray-400";
                             })()
                           )}

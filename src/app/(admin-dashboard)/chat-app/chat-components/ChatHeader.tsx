@@ -34,12 +34,13 @@ import {
   ChartBar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { RoomListItem, RoomType, ChatUser } from "@/types/chat-app";
+import { useSocketContext } from "@/context/SocketContext";
 import RoomsList from "./RoomsList";
 import CreateRoomModal from "./CreateRoomModal";
 import InviteUsersModal from "./InviteUsersModal";
 import { DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { ChatUser, RoomListItem, RoomType } from "@/types/chat-app";
 
 interface ChatHeaderProps {
   currentRoom?: RoomListItem;
@@ -80,19 +81,16 @@ const ChatHeader = ({
   onDeleteRoom,
   onInviteUsers,
 }: ChatHeaderProps) => {
+  const { isUserOnline, getUserLastSeen } = useSocketContext();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  
-  // For now, we'll assume users are offline (can be improved later with Supabase presence)
-  const isUserOnline = (userId: string) => false;
-  const getUserLastSeen = (userId: string): Date | undefined => undefined;
 
   // For direct messages, we need to determine the other user
   const getOtherUserId = () => {
     if (currentRoom?.type === RoomType.DIRECT && currentRoom?.members) {
       // Find the other participant in the direct message room
       const otherMember = currentRoom.members.find(
-        member => (member.user?.id || member.user_id) !== currentUserId
+        (member) => (member.user?.id || member.user_id) !== currentUserId
       );
       return otherMember?.user?.id || otherMember?.user_id || null;
     }
@@ -108,7 +106,7 @@ const ChatHeader = ({
 
     if (isOnline) {
       return "Online";
-    } else if (lastSeen instanceof Date) {
+    } else if (lastSeen) {
       const now = new Date();
       const diffMs = now.getTime() - lastSeen.getTime();
       const diffMinutes = Math.floor(diffMs / (1000 * 60));
@@ -174,8 +172,8 @@ const ChatHeader = ({
     console.log("Permissions:");
     console.log(
       "- Should show dropdown menu:",
-      currentRoom?.type === RoomType.DIRECT || 
-      (currentRoom?.type === RoomType.GROUP && isRoomOwner)
+      currentRoom?.type === RoomType.DIRECT ||
+        (currentRoom?.type === RoomType.GROUP && isRoomOwner)
     );
     console.log(
       "- Should show Add Users:",
@@ -183,8 +181,8 @@ const ChatHeader = ({
     );
     console.log(
       "- Should show Delete Conversation:",
-      currentRoom?.type === RoomType.DIRECT || 
-      (currentRoom?.type === RoomType.GROUP && isRoomOwner)
+      currentRoom?.type === RoomType.DIRECT ||
+        (currentRoom?.type === RoomType.GROUP && isRoomOwner)
     );
   }
   return (

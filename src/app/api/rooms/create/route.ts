@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         });
         
         result.invitations.forEach((invitation) => {
-          global?.io?.to(`user:${invitation.invited_user}`).emit('room:created', {
+          global.io.to(`user:${invitation.invited_user}`).emit('room:created', {
             room: result.room,
             creatorId: ownerId,
           });

@@ -25,12 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Users, User, Search, X, Check, AtSign } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  ChatUser,
-  RoomType,
-  RoomListItem,
-  InvitationStatus,
-} from "@/types/chat-app";
+import { ChatUser, InvitationStatus, RoomListItem, RoomType } from "@/types/chat-app";
 
 interface CreateRoomModalProps {
   isOpen: boolean;

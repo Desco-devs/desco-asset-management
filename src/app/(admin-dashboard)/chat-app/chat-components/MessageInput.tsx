@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Paperclip, Smile } from "lucide-react";
-import { SendMessageData } from "@/types/chat-app";
 
 interface MessageInputProps {
   roomName?: string;
