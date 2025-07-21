@@ -5,9 +5,10 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = await createServerSupabaseClient();
     
     const { data: { user }, error } = await supabase.auth.getUser();
@@ -36,7 +37,7 @@ export async function GET(
 
     // Fetch single vehicle with relations
     const vehicle = await prisma.vehicle.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         project: {
           include: {
@@ -74,16 +75,17 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withResourcePermission('vehicles', 'update', async (req: NextRequest, user: AuthenticatedUser) => {
     try {
+      const { id } = await params;
       // Parse request body
       const body = await req.json();
 
       // Check if vehicle exists
       const existingVehicle = await prisma.vehicle.findUnique({
-        where: { id: params.id }
+        where: { id }
       });
 
       if (!existingVehicle) {
@@ -92,7 +94,7 @@ export async function PUT(
 
       // Update the vehicle
       const updatedVehicle = await prisma.vehicle.update({
-        where: { id: params.id },
+        where: { id },
         data: body,
         include: {
           project: {
@@ -128,13 +130,14 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withResourcePermission('vehicles', 'delete', async (req: NextRequest, user: AuthenticatedUser) => {
     try {
+      const { id } = await params;
       // Check if vehicle exists
       const existingVehicle = await prisma.vehicle.findUnique({
-        where: { id: params.id }
+        where: { id }
       });
 
       if (!existingVehicle) {
@@ -143,17 +146,17 @@ export async function DELETE(
 
       // First, delete all related maintenance reports for this vehicle
       await prisma.maintenance_vehicle_report.deleteMany({
-        where: { vehicle_id: params.id }
+        where: { vehicle_id: id }
       });
 
       // Then delete the vehicle
       await prisma.vehicle.delete({
-        where: { id: params.id }
+        where: { id }
       });
 
       return NextResponse.json({ 
         message: "Vehicle deleted successfully",
-        id: params.id 
+        id 
       });
 
     } catch (error) {

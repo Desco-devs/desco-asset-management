@@ -5,12 +5,13 @@ import { prisma } from '@/lib/prisma';
 // GET /api/vehicles/maintenance-reports/[id] - Get single vehicle maintenance report
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withResourcePermission('maintenance_reports', 'view', async (req: NextRequest, user: AuthenticatedUser) => {
     try {
+      const { id } = await params;
       const report = await prisma.maintenance_vehicle_report.findUnique({
-        where: { id: params.id },
+        where: { id },
         include: {
           vehicle: {
             include: {
@@ -61,15 +62,16 @@ export async function GET(
 // PUT /api/vehicles/maintenance-reports/[id] - Update vehicle maintenance report
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withResourcePermission('maintenance_reports', 'update', async (req: NextRequest, user: AuthenticatedUser) => {
     try {
+      const { id } = await params;
       const body = await req.json();
 
       // Check if report exists
       const existingReport = await prisma.maintenance_vehicle_report.findUnique({
-        where: { id: params.id }
+        where: { id }
       });
 
       if (!existingReport) {
@@ -115,7 +117,7 @@ export async function PUT(
 
       // Update the report
       const updatedReport = await prisma.maintenance_vehicle_report.update({
-        where: { id: params.id },
+        where: { id },
         data: updateData,
         include: {
           vehicle: {
@@ -163,15 +165,16 @@ export async function PUT(
 // DELETE /api/vehicles/maintenance-reports/[id] - Delete vehicle maintenance report
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   return withResourcePermission('maintenance_reports', 'delete', async (req: NextRequest, user: AuthenticatedUser) => {
     try {
-      console.log(`🗑️ Attempting to delete maintenance report: ${params.id}`);
+      const { id } = await params;
+      console.log(`🗑️ Attempting to delete maintenance report: ${id}`);
 
       // Check if report exists with full error logging
       const existingReport = await prisma.maintenance_vehicle_report.findUnique({
-        where: { id: params.id },
+        where: { id },
         include: {
           vehicle: true,
           location: true
@@ -181,7 +184,7 @@ export async function DELETE(
       console.log('🔍 Existing report check:', existingReport ? 'Found' : 'Not found');
 
       if (!existingReport) {
-        console.log(`❌ Report not found: ${params.id}`);
+        console.log(`❌ Report not found: ${id}`);
         return NextResponse.json({ error: 'Maintenance report not found' }, { status: 404 });
       }
 
@@ -196,18 +199,18 @@ export async function DELETE(
         console.log('🔄 Starting transaction to delete report...');
         
         const deleted = await tx.maintenance_vehicle_report.delete({
-          where: { id: params.id }
+          where: { id }
         });
         
         console.log('✅ Report deleted successfully in transaction:', deleted.id);
         return deleted;
       });
 
-      console.log(`✅ Successfully deleted maintenance report: ${params.id}`);
+      console.log(`✅ Successfully deleted maintenance report: ${id}`);
 
       return NextResponse.json({ 
         message: 'Maintenance report deleted successfully',
-        id: params.id 
+        id 
       });
     } catch (error) {
       console.error('❌ Error deleting maintenance report:', error);
@@ -215,7 +218,7 @@ export async function DELETE(
         name: error instanceof Error ? error.name : 'Unknown',
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
-        reportId: params.id,
+        reportId: id,
         // Additional Prisma-specific error details
         code: (error as any)?.code,
         meta: (error as any)?.meta,
