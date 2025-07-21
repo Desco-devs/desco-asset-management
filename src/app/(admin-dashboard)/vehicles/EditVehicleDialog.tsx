@@ -37,13 +37,15 @@ interface EditVehicleDialogProps {
     name: string;
   }>;
   trigger?: React.ReactNode;
+  onSuccess?: () => void;
 }
 
-export default function EditVehicleDialog({ vehicle, projects, trigger }: EditVehicleDialogProps) {
+export default function EditVehicleDialog({ vehicle, projects, trigger, onSuccess }: EditVehicleDialogProps) {
   const [open, setOpen] = useState(false);
 
   const handleSuccess = () => {
     setOpen(false);
+    onSuccess?.();
   };
 
   return (

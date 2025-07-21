@@ -64,7 +64,7 @@ export function getResourcePermissions(userRole: UserRole, resourceType: Resourc
           canView: true,
           canCreate: true,
           canUpdate: true,
-          canDelete: false,
+          canDelete: true,
         }
       }
       // VIEWER can only view

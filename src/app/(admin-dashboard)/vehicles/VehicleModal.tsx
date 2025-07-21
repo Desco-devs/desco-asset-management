@@ -25,6 +25,7 @@ import {
 import EditVehicleDialog from "./EditVehicleDialog";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
 import CreateMaintenanceReportDialog from "./CreateMaintenanceReportDialog";
 import EditMaintenanceReportDialog from "./EditMaintenanceReportDialog";
 import VehicleMaintenanceReportsList from "./VehicleMaintenanceReportsList";
@@ -92,6 +93,8 @@ interface VehicleModalProps {
 }
 
 const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects, locations = [], users = [], initialMaintenanceReports = [] }: VehicleModalProps) => {
+  const queryClient = useQueryClient();
+  
   // Real-time vehicle state - updates instantly when vehicle is edited
   const [currentVehicle, setCurrentVehicle] = useState<Vehicle | null>(vehicle);
   
@@ -315,6 +318,10 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects, locations = [],
                     Edit
                   </Button>
                 }
+                onSuccess={() => {
+                  // Invalidate React Query cache to refresh vehicle data
+                  queryClient.invalidateQueries({ queryKey: ['vehicles-optimized'] });
+                }}
               />
             )}
           </div>
@@ -713,8 +720,10 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects, locations = [],
                     full_name: user.full_name
                   }))}
                   onSuccess={() => {
-                    // Fallback: Force refresh if real-time doesn't work
+                    // Refresh maintenance reports and invalidate React Query cache
                     setMaintenanceRefreshTrigger(prev => prev + 1);
+                    // Invalidate vehicles cache to refresh the data
+                    queryClient.invalidateQueries({ queryKey: ['vehicles-optimized'] });
                   }}
                 />
               </div>
@@ -769,7 +778,9 @@ const VehicleModal = ({ isOpen, onOpenChange, vehicle, projects, locations = [],
             full_name: user.full_name
           }))}
           onSuccess={() => {
-            // No refresh needed - real-time subscription handles it!
+            // Refresh maintenance reports and invalidate React Query cache
+            setMaintenanceRefreshTrigger(prev => prev + 1);
+            queryClient.invalidateQueries({ queryKey: ['vehicles-optimized'] });
           }}
         />
       </DialogContent>

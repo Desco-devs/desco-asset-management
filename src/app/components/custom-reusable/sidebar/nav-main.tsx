@@ -2,7 +2,7 @@
 
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
-import Link from "next/link";
+import { NavLinkWithPrefetch } from "@/components/NavLinkWithPrefetch";
 
 import {
   Collapsible,
@@ -72,7 +72,7 @@ export function NavMain({
                       {item.items!.map((subItem) => (
                         <SidebarMenuSubItem key={subItem.title}>
                           <SidebarMenuSubButton asChild>
-                            <Link
+                            <NavLinkWithPrefetch
                               href={subItem.url}
                               className={`hover:bg-foreground/15 ${
                                 pathname === subItem.url
@@ -81,7 +81,7 @@ export function NavMain({
                               }`}
                             >
                               <span>{subItem.title}</span>
-                            </Link>
+                            </NavLinkWithPrefetch>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       ))}
@@ -102,10 +102,10 @@ export function NavMain({
                   pathname === item.url ? "bg-foreground/14 text-accent-foreground" : ""
                 }`}
               >
-                <Link href={item.url} className="flex items-center gap-2 w-full">
+                <NavLinkWithPrefetch href={item.url} className="flex items-center gap-2 w-full">
                   {item.icon && <item.icon />}
                   <span>{item.title}</span>
-                </Link>
+                </NavLinkWithPrefetch>
               </SidebarMenuButton>
             </SidebarMenuItem>
           )

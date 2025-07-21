@@ -24,9 +24,10 @@ interface CreateVehicleFormProps {
     name: string;
   }>;
   onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-export default function CreateVehicleForm({ projects, onSuccess }: CreateVehicleFormProps) {
+export default function CreateVehicleForm({ projects, onSuccess, onCancel }: CreateVehicleFormProps) {
   
   const handleAction = async (formData: FormData) => {
     try {
@@ -278,8 +279,21 @@ export default function CreateVehicleForm({ projects, onSuccess }: CreateVehicle
         </div>
       </div>
 
-      {/* Submit Button */}
-      <SubmitButton />
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+        )}
+        <div className="flex-1">
+          <SubmitButton />
+        </div>
+      </div>
     </form>
   );
 }

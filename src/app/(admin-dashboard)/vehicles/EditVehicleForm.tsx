@@ -43,27 +43,29 @@ interface EditVehicleFormProps {
     name: string;
   }>;
   onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-export default function EditVehicleForm({ vehicle, projects, onSuccess }: EditVehicleFormProps) {
+export default function EditVehicleForm({ vehicle, projects, onSuccess, onCancel }: EditVehicleFormProps) {
   
   const handleAction = async (formData: FormData) => {
     try {
       const result = await updateVehicleAction(formData);
       
-      // Show success message
-      if (result.filesUpdated > 0) {
-        alert(`✅ Vehicle updated successfully with ${result.filesUpdated} files updated!`);
-      } else {
-        alert("✅ Vehicle updated successfully!");
-      }
+      // Show single success toast
+      const { toast } = await import("sonner");
+      toast.success("Vehicle updated successfully!");
       
       if (onSuccess) {
-        onSuccess();
+        // Small delay to prevent focus issues when closing dialog
+        setTimeout(() => {
+          onSuccess();
+        }, 100);
       }
     } catch (error) {
       console.error("Form submission error:", error);
-      alert("❌ Error: " + (error instanceof Error ? error.message : "Failed to update vehicle"));
+      const { toast } = await import("sonner");
+      toast.error("Error: " + (error instanceof Error ? error.message : "Failed to update vehicle"));
     }
   };
 
@@ -320,8 +322,21 @@ export default function EditVehicleForm({ vehicle, projects, onSuccess }: EditVe
         </div>
       </div>
 
-      {/* Submit Button */}
-      <SubmitButton />
+      {/* Action Buttons */}
+      <div className="flex gap-2">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+        )}
+        <div className="flex-1">
+          <SubmitButton />
+        </div>
+      </div>
     </form>
   );
 }

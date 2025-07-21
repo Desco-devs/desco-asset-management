@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -20,11 +21,13 @@ interface CreateVehicleDialogProps {
 }
 
 export default function CreateVehicleDialog({ projects }: CreateVehicleDialogProps) {
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleSuccess = () => {
     setIsOpen(false);
-    // Form submission successful, dialog will close
+    // Invalidate React Query cache to refresh vehicle data
+    queryClient.invalidateQueries({ queryKey: ['vehicles-optimized'] });
   };
 
   return (

@@ -50,24 +50,27 @@ interface VehiclesListProps {
 }
 
 export default function VehiclesList({ 
-  initialVehicles, 
-  initialProjects, 
-  initialClients, 
-  initialLocations,
-  initialUsers,
-  initialMaintenanceReports,
+  initialVehicles = [], 
+  initialProjects = [], 
+  initialClients = [], 
+  initialLocations = [],
+  initialUsers = [],
+  initialMaintenanceReports = [],
   totalCount,
   itemsPerPage
 }: VehiclesListProps) {
 
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles || []);
-  const [currentPage, setCurrentPage] = useState(1);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  
-  const [dynamicTotalCount, setDynamicTotalCount] = useState(totalCount);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Update vehicles when prop changes
+  useEffect(() => {
+    setVehicles(initialVehicles || []);
+  }, [initialVehicles]);
 
   const handleVehicleClick = (vehicle: Vehicle) => {
     setSelectedVehicle(vehicle);
@@ -136,9 +139,6 @@ export default function VehiclesList({
       const cacheKey = `${isMobile ? 'mobile' : 'desktop'}-1`;
       setPageCache(new Map([[cacheKey, displayVehicles]]));
       setCurrentPage(1); // Reset to page 1 on mode change
-      
-      // Sync dynamic total count with server data
-      setDynamicTotalCount(totalCount);
       
       // Clear old localStorage cache when we have fresh server data
       if (typeof window !== 'undefined') {
@@ -268,8 +268,7 @@ export default function VehiclesList({
                 return newCache;
               });
             }
-            // Increment total count for pagination
-            setDynamicTotalCount(prev => prev + 1);
+            // Note: totalCount will be updated via React Query refetch
             
           } else if (payload.eventType === 'UPDATE') {
             setVehicles(prev => 
@@ -281,8 +280,7 @@ export default function VehiclesList({
           } else if (payload.eventType === 'DELETE') {
             setVehicles(prev => prev.filter(vehicle => vehicle.id !== payload.old.id));
             
-            // Decrement total count for pagination
-            setDynamicTotalCount(prev => Math.max(0, prev - 1));
+            // Note: totalCount will be updated via React Query refetch
           }
         }
       )
@@ -301,7 +299,7 @@ export default function VehiclesList({
     <div>
       <div className="mb-4 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <p className="text-gray-600">Total vehicles: {dynamicTotalCount}</p>
+          <p className="text-gray-600">Total vehicles: {totalCount}</p>
           <div className="flex items-center gap-2">
             <div 
               className={`w-2 h-2 rounded-full ${
@@ -316,7 +314,7 @@ export default function VehiclesList({
         
         {/* Add Vehicle Button */}
         <CreateVehicleDialog 
-          projects={initialProjects.map(p => ({
+          projects={(initialProjects || []).map(p => ({
             id: p.id,
             name: p.name
           }))}
@@ -432,10 +430,10 @@ export default function VehiclesList({
       )}
 
       {/* Responsive pagination controls */}
-      {!isLoadingPage && dynamicTotalCount > effectiveItemsPerPage && (
+      {!isLoadingPage && totalCount > effectiveItemsPerPage && (
         <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="text-sm text-gray-600 text-center md:text-left">
-            Showing {((currentPage - 1) * effectiveItemsPerPage) + 1} to {Math.min(currentPage * effectiveItemsPerPage, dynamicTotalCount)} of {dynamicTotalCount} vehicles
+            Showing {((currentPage - 1) * effectiveItemsPerPage) + 1} to {Math.min(currentPage * effectiveItemsPerPage, totalCount)} of {totalCount} vehicles
             {isMobile && <span className="block text-xs text-gray-400 mt-1">Mobile: 6 per page</span>}
           </div>
           
@@ -449,9 +447,9 @@ export default function VehiclesList({
             </button>
             
             {/* Page numbers - simplified for mobile */}
-            {Array.from({ length: Math.ceil(dynamicTotalCount / effectiveItemsPerPage) }, (_, i) => i + 1)
+            {Array.from({ length: Math.ceil(totalCount / effectiveItemsPerPage) }, (_, i) => i + 1)
               .filter(page => {
-                const totalPages = Math.ceil(dynamicTotalCount / effectiveItemsPerPage);
+                const totalPages = Math.ceil(totalCount / effectiveItemsPerPage);
                 if (isMobile) {
                   // Mobile: Show fewer page numbers
                   return page === 1 || 
@@ -488,7 +486,7 @@ export default function VehiclesList({
             
             <button
               onClick={() => loadPage(currentPage + 1)}
-              disabled={currentPage === Math.ceil(dynamicTotalCount / effectiveItemsPerPage)}
+              disabled={currentPage === Math.ceil(totalCount / effectiveItemsPerPage)}
               className="px-2 md:px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               {isMobile ? '→' : 'Next'}

@@ -66,7 +66,9 @@ export default function VehicleMaintenanceReportsList({
   initialMaintenanceReports = []
 }: VehicleMaintenanceReportsListProps) {
   // 🔥 MASTERPIECE PATTERN: Use pre-loaded data, filter by vehicleId
-  const vehicleReports = initialMaintenanceReports.filter(report => report.vehicle_id === vehicleId);
+  const vehicleReports = Array.isArray(initialMaintenanceReports) 
+    ? initialMaintenanceReports.filter(report => report.vehicle_id === vehicleId)
+    : [];
   const [reports, setReports] = useState<MaintenanceReport[]>(vehicleReports);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,7 +84,9 @@ export default function VehicleMaintenanceReportsList({
 
   // Sync with pre-loaded data when initialMaintenanceReports changes
   useEffect(() => {
-    const vehicleReports = initialMaintenanceReports.filter(report => report.vehicle_id === vehicleId);
+    const vehicleReports = Array.isArray(initialMaintenanceReports) 
+      ? initialMaintenanceReports.filter(report => report.vehicle_id === vehicleId)
+      : [];
     setReports(vehicleReports);
   }, [initialMaintenanceReports, vehicleId]);
 
