@@ -52,6 +52,21 @@ export interface MaintenanceReport {
   location_id?: string;
   created_at: string;
   updated_at: string;
+  // Related objects from API
+  location?: {
+    id: string;
+    address: string;
+  };
+  reported_user?: {
+    id: string;
+    username: string;
+    full_name: string;
+  };
+  repaired_user?: {
+    id: string;
+    username: string;
+    full_name: string;
+  };
 }
 
 export interface Project {

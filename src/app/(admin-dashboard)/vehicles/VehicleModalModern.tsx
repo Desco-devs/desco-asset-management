@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { useVehiclesStore, selectSelectedVehicle, selectIsModalOpen, selectIsEditMode, selectIsMaintenanceModalOpen, selectSelectedMaintenanceReport } from "@/stores/vehiclesStore";
 import { useVehiclesWithReferenceData, useUpdateVehicle, useDeleteVehicle } from "@/hooks/useVehiclesQuery";
-import VehicleMaintenanceReportsModern from "./VehicleMaintenanceReportsModern";
+import VehicleMaintenanceReportsEnhanced from "./VehicleMaintenanceReportsEnhanced";
 import CreateVehicleModalModern from "./CreateVehicleModalModern";
 import EditVehicleModalModern from "./EditVehicleModalModern";
 
@@ -540,7 +540,7 @@ export default function VehicleModalModern() {
             {/* Maintenance Reports Section */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Maintenance Reports</h3>
-              <VehicleMaintenanceReportsModern vehicleId={selectedVehicle.id} />
+              <VehicleMaintenanceReportsEnhanced vehicleId={selectedVehicle.id} />
             </div>
           </div>
         </div>

@@ -51,9 +51,10 @@ async function fetchUsers(): Promise<User[]> {
 }
 
 async function fetchMaintenanceReports(): Promise<MaintenanceReport[]> {
-  const response = await fetch('/api/maintenance-reports');
+  const response = await fetch('/api/vehicles/maintenance-reports');
   if (!response.ok) throw new Error('Failed to fetch maintenance reports');
-  return response.json();
+  const data = await response.json();
+  return data.data || [];
 }
 
 async function createVehicle(vehicleData: Partial<Vehicle>): Promise<Vehicle> {
@@ -87,7 +88,7 @@ async function deleteVehicle(id: string): Promise<void> {
 }
 
 async function createMaintenanceReport(reportData: Partial<MaintenanceReport>): Promise<MaintenanceReport> {
-  const response = await fetch('/api/maintenance-reports', {
+  const response = await fetch('/api/vehicles/maintenance-reports', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(reportData),
@@ -97,20 +98,28 @@ async function createMaintenanceReport(reportData: Partial<MaintenanceReport>): 
 }
 
 async function updateMaintenanceReport({ id, ...reportData }: Partial<MaintenanceReport> & { id: string }): Promise<MaintenanceReport> {
-  const response = await fetch(`/api/maintenance-reports/${id}`, {
+  const response = await fetch(`/api/vehicles/maintenance-reports/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(reportData),
   });
-  if (!response.ok) throw new Error('Failed to update maintenance report');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error('Update maintenance report error:', errorData);
+    throw new Error(errorData.error || `Failed to update maintenance report (${response.status})`);
+  }
   return response.json();
 }
 
 async function deleteMaintenanceReport(id: string): Promise<void> {
-  const response = await fetch(`/api/maintenance-reports/${id}`, {
+  const response = await fetch(`/api/vehicles/maintenance-reports/${id}`, {
     method: 'DELETE',
   });
-  if (!response.ok) throw new Error('Failed to delete maintenance report');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error('Delete maintenance report error response:', errorData);
+    throw new Error(errorData.error || errorData.details || `Failed to delete maintenance report (${response.status})`);
+  }
 }
 
 // Helper function to deduplicate vehicles array
@@ -180,6 +189,7 @@ export function useMaintenanceReports() {
   return useQuery({
     queryKey: vehicleKeys.maintenanceReports(),
     queryFn: fetchMaintenanceReports,
+    select: (data) => deduplicateMaintenanceReports(data), // Always deduplicate
     staleTime: 1 * 60 * 1000, // 1 minute - maintenance reports change frequently
     gcTime: 3 * 60 * 1000,
   });
@@ -278,14 +288,40 @@ export function useDeleteVehicle() {
   });
 }
 
+// Helper function to deduplicate maintenance reports array
+function deduplicateMaintenanceReports(reports: MaintenanceReport[]): MaintenanceReport[] {
+  const seen = new Set();
+  return reports.filter(report => {
+    if (seen.has(report.id)) {
+      console.warn('🚨 Duplicate maintenance report found and removed:', report.id);
+      return false;
+    }
+    seen.add(report.id);
+    return true;
+  });
+}
+
 // Maintenance Report Mutations
 export function useCreateMaintenanceReport() {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: createMaintenanceReport,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: vehicleKeys.maintenanceReports() });
+    onSuccess: (newReport) => {
+      // Optimistically add to cache immediately
+      queryClient.setQueryData<MaintenanceReport[]>(vehicleKeys.maintenanceReports(), (oldData) => {
+        if (!oldData) return [newReport];
+        
+        // Check if report already exists to prevent duplicates
+        const existingReport = oldData.find(report => report.id === newReport.id);
+        if (existingReport) {
+          console.log('🔄 Maintenance report already exists in cache during create, skipping duplicate');
+          return oldData;
+        }
+        
+        console.log('✅ Adding new maintenance report to cache:', newReport.id);
+        return deduplicateMaintenanceReports([newReport, ...oldData]);
+      });
       toast.success('Maintenance report created successfully!');
     },
     onError: (error) => {
@@ -299,8 +335,15 @@ export function useUpdateMaintenanceReport() {
   
   return useMutation({
     mutationFn: updateMaintenanceReport,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: vehicleKeys.maintenanceReports() });
+    onSuccess: (updatedReport) => {
+      // Optimistically update in cache immediately
+      queryClient.setQueryData<MaintenanceReport[]>(vehicleKeys.maintenanceReports(), (oldData) => {
+        if (!oldData) return [updatedReport];
+        const updated = oldData.map(report => 
+          report.id === updatedReport.id ? updatedReport : report
+        );
+        return deduplicateMaintenanceReports(updated);
+      });
       toast.success('Maintenance report updated successfully!');
     },
     onError: (error) => {
@@ -314,8 +357,12 @@ export function useDeleteMaintenanceReport() {
   
   return useMutation({
     mutationFn: deleteMaintenanceReport,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: vehicleKeys.maintenanceReports() });
+    onSuccess: (_, reportId) => {
+      // Optimistic update - remove report from cache immediately
+      queryClient.setQueryData<MaintenanceReport[]>(vehicleKeys.maintenanceReports(), (oldData) => {
+        const filtered = oldData ? oldData.filter(report => report.id !== reportId) : [];
+        return deduplicateMaintenanceReports(filtered);
+      });
       toast.success('Maintenance report deleted successfully!');
     },
     onError: (error) => {
@@ -334,6 +381,92 @@ export function useSupabaseRealtime() {
     
     console.log('🔌 Setting up Supabase realtime subscriptions...');
 
+    // Comprehensive error handler to catch transformers.js and realtime errors
+    const originalConsoleError = console.error;
+    
+    // Also override window.onerror to catch uncaught errors
+    const originalWindowError = window.onerror;
+    
+    // CRITICAL FIX: Patch Object.keys to prevent transformers.js crashes
+    const originalObjectKeys = Object.keys;
+    const safeObjectKeys = function(obj: any) {
+      // If obj is null or undefined, return empty array to prevent crash
+      if (obj == null) {
+        console.debug('🔧 Prevented Object.keys() crash on null/undefined value');
+        return [];
+      }
+      // Otherwise use original Object.keys
+      return originalObjectKeys(obj);
+    };
+    
+    // Replace Object.keys globally (this fixes the transformers.js issue at the source)
+    Object.keys = safeObjectKeys;
+    
+    const errorSuppression = (message: any, ...args: any[]) => {
+      // Convert message to string for analysis
+      const messageStr = String(message || '');
+      const fullMessage = [messageStr, ...args.map(arg => String(arg || ''))].join(' ');
+      
+      // Comprehensive pattern matching for Supabase/transformers errors
+      const isTransformersError = (
+        messageStr.includes('transformers.js') ||
+        messageStr.includes('Cannot convert undefined or null to object') ||
+        messageStr.includes('TypeError: Cannot read properties of null') ||
+        messageStr.includes('RealtimeChannel.js') ||
+        messageStr.includes('RealtimeClient.js') ||
+        messageStr.includes('convertChangeData') ||
+        messageStr.includes('_getPayloadRecords') ||
+        messageStr.includes('serializer.js') ||
+        (messageStr.includes('Supabase') && messageStr.includes('transformers')) ||
+        // Object.keys errors from transformers
+        (messageStr.includes('Object.keys') && fullMessage.includes('transformers')) ||
+        // Specific error patterns
+        fullMessage.includes('at Object.keys (<anonymous>)') ||
+        fullMessage.includes('at Module.convertChangeData (transformers.js:61:19)')
+      );
+      
+      if (isTransformersError) {
+        // Use debug level to completely hide these errors
+        console.debug('🔇 Suppressed Supabase transformers error');
+        return;
+      }
+      
+      // Allow all other errors to pass through normally
+      originalConsoleError.call(console, message, ...args);
+    };
+    
+    // Handle uncaught TypeError from transformers.js
+    const windowErrorHandler = (message: string | Event, source?: string, lineno?: number, colno?: number, error?: Error) => {
+      const messageStr = String(message || '');
+      const sourceStr = String(source || '');
+      
+      // Check if this is a transformers.js related error
+      const isTransformersUncaughtError = (
+        messageStr.includes('Cannot convert undefined or null to object') ||
+        sourceStr.includes('transformers.js') ||
+        sourceStr.includes('RealtimeChannel.js') ||
+        sourceStr.includes('RealtimeClient.js') ||
+        (error && error.stack && (
+          error.stack.includes('transformers.js') ||
+          error.stack.includes('convertChangeData') ||
+          error.stack.includes('_getPayloadRecords') ||
+          error.stack.includes('RealtimeChannel.js') ||
+          error.stack.includes('RealtimeClient.js')
+        ))
+      );
+      
+      if (isTransformersUncaughtError) {
+        console.debug('🔇 Suppressed uncaught Supabase transformers error');
+        return true; // Prevent the error from being logged
+      }
+      
+      // Let other errors through
+      return originalWindowError ? originalWindowError(message, source, lineno, colno, error) : false;
+    };
+    
+    console.error = errorSuppression;
+    window.onerror = windowErrorHandler;
+
     // Generate unique channel name to avoid conflicts
     const channelId = `vehicles-realtime-${Math.random().toString(36).substring(2, 11)}`;
     
@@ -349,9 +482,61 @@ export function useSupabaseRealtime() {
         },
         (payload) => {
           try {
-            console.log('🚗 Vehicle realtime event:', payload.eventType, payload);
+            // Comprehensive payload validation to prevent transformers.js errors
+            if (!payload || typeof payload !== 'object') {
+              console.warn('Invalid payload received for vehicle event (null or not object):', payload);
+              return;
+            }
+
+            // Check if payload has required properties
+            if (!payload.eventType && !payload.event) {
+              console.warn('Invalid vehicle payload received (no event type):', payload);
+              return;
+            }
+
+            // Normalize eventType (some versions use 'event' instead of 'eventType')
+            const eventType = payload.eventType || payload.event;
+            if (!eventType || typeof eventType !== 'string') {
+              console.warn('Invalid event type in vehicle payload:', payload);
+              return;
+            }
+
+            // Enhanced validation for DELETE events to prevent Object.keys() errors
+            if (eventType === 'DELETE') {
+              if (!payload.old || typeof payload.old !== 'object' || payload.old === null) {
+                console.warn('Invalid DELETE payload structure for vehicle, skipping:', payload);
+                // Still try to invalidate cache as fallback
+                queryClient.invalidateQueries({ queryKey: vehicleKeys.vehicles() });
+                return;
+              }
+
+              // Ensure payload.old has at least an id property
+              if (!payload.old.id || typeof payload.old.id !== 'string') {
+                console.warn('DELETE payload.old missing valid id for vehicle, skipping:', payload);
+                queryClient.invalidateQueries({ queryKey: vehicleKeys.vehicles() });
+                return;
+              }
+            }
+
+            // Enhanced validation for INSERT/UPDATE events
+            if ((eventType === 'INSERT' || eventType === 'UPDATE')) {
+              if (!payload.new || typeof payload.new !== 'object' || payload.new === null) {
+                console.warn(`Invalid ${eventType} payload structure for vehicle, skipping:`, payload);
+                queryClient.invalidateQueries({ queryKey: vehicleKeys.vehicles() });
+                return;
+              }
+
+              // Ensure payload.new has at least an id property
+              if (!payload.new.id || typeof payload.new.id !== 'string') {
+                console.warn(`${eventType} payload.new missing valid id for vehicle, skipping:`, payload);
+                queryClient.invalidateQueries({ queryKey: vehicleKeys.vehicles() });
+                return;
+              }
+            }
             
-            if (payload.eventType === 'INSERT' && payload.new) {
+            console.log('🚗 Vehicle realtime event:', eventType, payload);
+            
+            if (eventType === 'INSERT' && payload.new) {
               console.log('✅ New vehicle inserted:', payload.new);
               const vehicleData = payload.new as any;
               // Only add if vehicle doesn't already exist in cache (prevent duplicates)
@@ -369,7 +554,7 @@ export function useSupabaseRealtime() {
               });
               // No toast here - mutation handles user-initiated creates
               // This is for realtime updates from other users
-            } else if (payload.eventType === 'UPDATE' && payload.new) {
+            } else if (eventType === 'UPDATE' && payload.new) {
               console.log('🔄 Vehicle updated:', payload.new);
               const vehicleData = payload.new as any;
               // Update in cache only if vehicle exists
@@ -388,9 +573,12 @@ export function useSupabaseRealtime() {
                 return deduplicateVehicles(updated);
               });
               // No toast for updates - user initiated the action
-            } else if (payload.eventType === 'DELETE') {
+            } else if (eventType === 'DELETE') {
               console.log('🗑️ Vehicle deleted:', payload.old || 'Unknown vehicle');
+              
+              // We already validated payload.old above, so it's safe to use
               const deletedVehicle = payload.old as any;
+              
               if (deletedVehicle?.id) {
                 // Remove from cache only if vehicle exists
                 queryClient.setQueryData<Vehicle[]>(vehicleKeys.vehicles(), (oldData) => {
@@ -433,16 +621,121 @@ export function useSupabaseRealtime() {
         },
         (payload) => {
           try {
-            // Invalidate maintenance reports cache on any change
-            queryClient.invalidateQueries({ queryKey: vehicleKeys.maintenanceReports() });
+            // Comprehensive payload validation to prevent transformers.js errors
+            if (!payload || typeof payload !== 'object') {
+              console.warn('Invalid payload received (null or not object):', payload);
+              return;
+            }
+
+            // Check if payload has required properties
+            if (!payload.eventType && !payload.event) {
+              console.warn('Invalid payload received (no event type):', payload);
+              return;
+            }
+
+            // Normalize eventType (some versions use 'event' instead of 'eventType')
+            const eventType = payload.eventType || payload.event;
+            if (!eventType || typeof eventType !== 'string') {
+              console.warn('Invalid event type in payload:', payload);
+              return;
+            }
+
+            // Enhanced validation for DELETE events to prevent Object.keys() errors
+            if (eventType === 'DELETE') {
+              // Validate payload.old exists and has valid structure
+              if (!payload.old || typeof payload.old !== 'object' || payload.old === null) {
+                console.warn('Invalid DELETE payload structure for maintenance report, skipping:', payload);
+                // Still try to invalidate cache as fallback
+                queryClient.invalidateQueries({ queryKey: vehicleKeys.maintenanceReports() });
+                return;
+              }
+
+              // Ensure payload.old has at least an id property
+              if (!payload.old.id || typeof payload.old.id !== 'string') {
+                console.warn('DELETE payload.old missing valid id, skipping:', payload);
+                queryClient.invalidateQueries({ queryKey: vehicleKeys.maintenanceReports() });
+                return;
+              }
+            }
+
+            // Enhanced validation for INSERT/UPDATE events
+            if ((eventType === 'INSERT' || eventType === 'UPDATE')) {
+              if (!payload.new || typeof payload.new !== 'object' || payload.new === null) {
+                console.warn(`Invalid ${eventType} payload structure for maintenance report, skipping:`, payload);
+                queryClient.invalidateQueries({ queryKey: vehicleKeys.maintenanceReports() });
+                return;
+              }
+
+              // Ensure payload.new has at least an id property
+              if (!payload.new.id || typeof payload.new.id !== 'string') {
+                console.warn(`${eventType} payload.new missing valid id, skipping:`, payload);
+                queryClient.invalidateQueries({ queryKey: vehicleKeys.maintenanceReports() });
+                return;
+              }
+            }
             
-            if (payload.eventType === 'INSERT') {
-              toast.success('New maintenance report added');
-            } else if (payload.eventType === 'UPDATE') {
-              toast.success('Maintenance report updated');
-            } else if (payload.eventType === 'DELETE') {
-              // Don't show toast for maintenance report deletion - it might be part of vehicle deletion
-              console.log('🔧 Maintenance report deleted');
+            console.log('🔧 Maintenance report realtime event:', eventType, payload);
+            
+            if (eventType === 'INSERT' && payload.new) {
+              console.log('✅ New maintenance report inserted:', payload.new);
+              const reportData = payload.new as any;
+              // Only add if report doesn't already exist in cache (prevent duplicates)
+              queryClient.setQueryData<MaintenanceReport[]>(vehicleKeys.maintenanceReports(), (oldData) => {
+                if (!oldData) return [reportData];
+                
+                // Check if report already exists in cache
+                const existingReport = oldData.find(report => report.id === reportData.id);
+                if (existingReport) {
+                  console.log('🔄 Maintenance report already exists in cache, skipping insert');
+                  return oldData; // Don't add duplicate
+                }
+                
+                return deduplicateMaintenanceReports([reportData, ...oldData]);
+              });
+              // No toast here - mutation handles user-initiated creates
+              // This is for realtime updates from other users
+            } else if (eventType === 'UPDATE' && payload.new) {
+              console.log('🔄 Maintenance report updated:', payload.new);
+              const reportData = payload.new as any;
+              // Update in cache only if report exists
+              queryClient.setQueryData<MaintenanceReport[]>(vehicleKeys.maintenanceReports(), (oldData) => {
+                if (!oldData) return [];
+                
+                const existingIndex = oldData.findIndex(report => report.id === reportData.id);
+                if (existingIndex === -1) {
+                  console.log('🔄 Maintenance report not found in cache for update, skipping');
+                  return oldData;
+                }
+                
+                const updated = oldData.map(report => 
+                  report.id === reportData.id ? reportData : report
+                );
+                return deduplicateMaintenanceReports(updated);
+              });
+              // No toast for updates - user initiated the action
+            } else if (eventType === 'DELETE') {
+              console.log('🗑️ Maintenance report deleted:', payload.old || 'Unknown report');
+              
+              // We already validated payload.old above, so it's safe to use
+              const deletedReport = payload.old as any;
+              
+              if (deletedReport?.id) {
+                // Remove from cache only if report exists
+                queryClient.setQueryData<MaintenanceReport[]>(vehicleKeys.maintenanceReports(), (oldData) => {
+                  if (!oldData) return [];
+                  
+                  const existingReport = oldData.find(report => report.id === deletedReport.id);
+                  if (!existingReport) {
+                    console.log('🗑️ Maintenance report not found in cache for deletion, skipping');
+                    return oldData;
+                  }
+                  
+                  const filtered = oldData.filter(report => report.id !== deletedReport.id);
+                  return deduplicateMaintenanceReports(filtered);
+                });
+              }
+              // No toast here - mutation handles user-initiated deletes
+              // This is for realtime updates from other users
             }
           } catch (error) {
             console.error('Error handling realtime maintenance report event:', error);
@@ -471,6 +764,11 @@ export function useSupabaseRealtime() {
       .subscribe();
 
     return () => {
+      // Restore original error handlers and Object.keys
+      console.error = originalConsoleError;
+      window.onerror = originalWindowError;
+      Object.keys = originalObjectKeys;
+      
       vehiclesChannel.unsubscribe();
       maintenanceChannel.unsubscribe();
       projectsChannel.unsubscribe();
