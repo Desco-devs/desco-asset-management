@@ -8,99 +8,69 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Location, Client, Project, EquipmentFormData } from "@/types/equipment";
+import type { Project, EquipmentFormData } from "@/types/equipment";
 
 interface ProjectSelectionFieldsProps {
   formData: EquipmentFormData;
   setFormData: React.Dispatch<React.SetStateAction<EquipmentFormData>>;
-  locations: Location[];
-  filteredClients: Client[];
   filteredProjects: Project[];
 }
 
 export function ProjectSelectionFields({
   formData,
   setFormData,
-  locations,
-  filteredClients,
   filteredProjects,
 }: ProjectSelectionFieldsProps) {
-  const handleSelectionChange = (field: keyof EquipmentFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleProjectChange = (value: string) => {
+    setFormData(prev => ({ ...prev, projectId: value }));
   };
+
+  // Ensure unique projects by uid and filter out any invalid entries
+  const uniqueProjects = filteredProjects?.filter((project, index, self) => 
+    project?.uid && 
+    project.name && 
+    self.findIndex(p => p.uid === project.uid) === index
+  ) || [];
 
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-medium">Project Information</h3>
-      <div className="grid grid-cols-3 gap-4">
-      {/* Location Selection */}
+      
+      {/* Project Selection Only */}
       <div className="space-y-2">
-        <Label htmlFor="location">
-          Location <span className="text-red-500">*</span>
-        </Label>
-        <Select
-          value={formData.locationId}
-          onValueChange={(value) => handleSelectionChange('locationId', value)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select location" />
-          </SelectTrigger>
-          <SelectContent>
-            {locations.map((location) => (
-              <SelectItem key={location.uid} value={location.uid}>
-                {location.address}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Client Selection */}
-      <div className="space-y-2">
-        <Label htmlFor="client">
-          Client <span className="text-red-500">*</span>
-        </Label>
-        <Select
-          value={formData.clientId}
-          onValueChange={(value) => handleSelectionChange('clientId', value)}
-          disabled={!formData.locationId}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select client" />
-          </SelectTrigger>
-          <SelectContent>
-            {filteredClients.map((client) => (
-              <SelectItem key={client.uid} value={client.uid}>
-                {client.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Project Selection */}
-      <div className="space-y-2">
-        <Label htmlFor="project">
+        <Label htmlFor="project" className="text-foreground">
           Project <span className="text-red-500">*</span>
         </Label>
         <Select
           value={formData.projectId}
-          onValueChange={(value) => handleSelectionChange('projectId', value)}
-          disabled={!formData.clientId}
+          onValueChange={handleProjectChange}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Select project" />
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select a project" />
           </SelectTrigger>
-          <SelectContent>
-            {filteredProjects.map((project) => (
-              <SelectItem key={project.uid} value={project.uid}>
-                {project.name}
+          <SelectContent className="w-full">
+            {uniqueProjects.length === 0 ? (
+              <SelectItem value="no-projects" disabled>
+                No projects available
               </SelectItem>
-            ))}
+            ) : (
+              uniqueProjects.map((project, index) => (
+                <SelectItem 
+                  key={`${project.uid}-${index}`} 
+                  value={project.uid}
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium">{project.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {project.client?.name || 'Unknown Client'} • {project.client?.location?.address || 'Unknown Location'}
+                    </span>
+                  </div>
+                </SelectItem>
+              ))
+            )}
           </SelectContent>
         </Select>
       </div>
-    </div>
     </div>
   );
 }

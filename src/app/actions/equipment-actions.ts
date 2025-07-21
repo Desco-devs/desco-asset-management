@@ -406,6 +406,7 @@ export async function createEquipment(data: CreateEquipmentData) {
     // Revalidate multiple paths to update all dashboard components
     revalidatePath("/dashboard");
     revalidatePath("/equipments");
+    revalidatePath("/(admin-dashboard)/equipments");
     revalidatePath("/dashboard", "layout");
     revalidatePath("/", "layout");
 

@@ -116,7 +116,9 @@ export const useEquipmentSubmit = ({
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to ${isEditMode ? "update" : "create"} equipment`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error(`API Error Response:`, errorData);
+        throw new Error(errorData.details || errorData.error || `Failed to ${isEditMode ? "update" : "create"} equipment`);
       }
 
       toast.success(`Equipment ${isEditMode ? "updated" : "added"} successfully`);

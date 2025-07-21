@@ -196,3 +196,75 @@ export async function createVehicle(data: CreateVehicleData) {
     throw new Error(error instanceof Error ? error.message : "Failed to create vehicle");
   }
 }
+
+export async function getAllVehicles() {
+  try {
+    const supabase = await createServerSupabaseClient();
+    
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    if (error || !user) {
+      throw new Error("Unauthorized");
+    }
+
+    // Get user profile from database
+    const userProfile = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        role: true,
+        user_status: true,
+      },
+    });
+
+    if (!userProfile) {
+      throw new Error("User profile not found");
+    }
+
+    if (userProfile.user_status !== 'ACTIVE') {
+      throw new Error("Account is inactive");
+    }
+
+    // First check the total count
+    const vehicleCount = await prisma.vehicle.count();
+    console.log("🚗 getAllVehicles: Current vehicle count in DB:", vehicleCount);
+
+    // Fetch all vehicles with relations
+    const vehicles = await prisma.vehicle.findMany({
+      include: {
+        project: {
+          include: {
+            client: {
+              include: {
+                location: true
+              }
+            }
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            full_name: true
+          }
+        }
+      },
+      orderBy: {
+        created_at: 'desc'
+      }
+    });
+
+    console.log("🚗 getAllVehicles: Fetched vehicles count:", vehicles.length);
+    console.log("🚗 getAllVehicles: Vehicle IDs:", vehicles.map(v => v.id));
+
+    return {
+      success: true,
+      data: vehicles,
+      message: "Vehicles fetched successfully"
+    };
+
+  } catch (error) {
+    console.error("Error fetching vehicles:", error);
+    throw new Error(error instanceof Error ? error.message : "Failed to fetch vehicles");
+  }
+}

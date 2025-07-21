@@ -335,17 +335,17 @@ export const POST = withResourcePermission('equipment', 'create', async (request
       status,
       remarks,
       owner,
-      plateNumber: plateNum,
+      plate_number: plateNum,
       project: { connect: { id: projectId } },
-      equipmentParts: [], // Initialize empty array
+      equipment_parts: [], // Initialize empty array
       // only include `before` if provided
       ...(beforeStr !== '' ? { before: parseInt(beforeStr, 10) } : {}),
       // only include insurance date if provided
-      ...(insExp ? { insuranceExpirationDate: new Date(insExp) } : {})
+      ...(insExp ? { insurance_expiration_date: new Date(insExp) } : {})
     }
 
     if (inspDateStr) {
-      createData.inspectionDate = new Date(inspDateStr)
+      createData.inspection_date = new Date(inspDateStr)
     }
 
     const equipment = await prisma.equipment.create({ data: createData })
@@ -408,7 +408,7 @@ export const POST = withResourcePermission('equipment', 'create', async (request
           )
           partUrls.push(partUrl)
         }
-        updateData.equipmentParts = partUrls
+        updateData.equipment_parts = partUrls
       } catch (e) {
         console.error('Part upload error:', e)
         await prisma.equipment.delete({ where: { id: equipment.id } })
@@ -432,7 +432,10 @@ export const POST = withResourcePermission('equipment', 'create', async (request
     return NextResponse.json(result)
   } catch (err) {
     console.error('POST error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: err instanceof Error ? err.message : 'Unknown error' 
+    }, { status: 500 })
   }
 })
 
@@ -477,17 +480,17 @@ export const PUT = withResourcePermission('equipment', 'update', async (request:
       status,
       remarks,
       owner,
-      plateNumber: plateNum,
+      plate_number: plateNum,
       before: beforeStr !== '' ? parseInt(beforeStr, 10) : null,
-      project: { connect: { id: projectId } },
+      project_id: projectId,
       // Handle insurance date conditionally
-      ...(insExp ? { insuranceExpirationDate: new Date(insExp) } : { insuranceExpirationDate: null })
+      ...(insExp ? { insurance_expiration_date: new Date(insExp) } : { insurance_expiration_date: null })
     }
 
     if (inspDateStr) {
-      updateData.inspectionDate = new Date(inspDateStr)
+      updateData.inspection_date = new Date(inspDateStr)
     } else {
-      updateData.inspectionDate = null
+      updateData.inspection_date = null
     }
 
     // Rest of the PUT function remains the same...
@@ -503,25 +506,25 @@ export const PUT = withResourcePermission('equipment', 'update', async (request:
         newFile: formData.get('originalReceipt') as File | null,
         keep: formData.get('keepExistingReceipt') as string,
         existingUrl: existing.original_receipt_url,
-        prefix: 'receipt', field: 'originalReceiptUrl', tag: 'receipt'
+        prefix: 'receipt', field: 'original_receipt_url', tag: 'receipt'
       },
       {
         newFile: formData.get('equipmentRegistration') as File | null,
         keep: formData.get('keepExistingRegistration') as string,
         existingUrl: existing.equipment_registration_url,
-        prefix: 'registration', field: 'equipmentRegistrationUrl', tag: 'registration'
+        prefix: 'registration', field: 'equipment_registration_url', tag: 'registration'
       },
       {
         newFile: formData.get('thirdpartyInspection') as File | null,
         keep: formData.get('keepExistingThirdpartyInspection') as string,
         existingUrl: existing.thirdparty_inspection_image,
-        prefix: 'thirdparty_inspection', field: 'thirdpartyInspectionImage', tag: '3rd-party inspection'
+        prefix: 'thirdparty_inspection', field: 'thirdparty_inspection_image', tag: '3rd-party inspection'
       },
       {
         newFile: formData.get('pgpcInspection') as File | null,
         keep: formData.get('keepExistingPgpcInspection') as string,
         existingUrl: existing.pgpc_inspection_image,
-        prefix: 'pgpc_inspection', field: 'pgpcInspectionImage', tag: 'PGPC inspection'
+        prefix: 'pgpc_inspection', field: 'pgpc_inspection_image', tag: 'PGPC inspection'
       },
     ]
 
@@ -604,7 +607,7 @@ export const PUT = withResourcePermission('equipment', 'update', async (request:
     }
 
     // Update parts array
-    updateData.equipmentParts = newParts
+    updateData.equipment_parts = newParts
 
     if (fileJobs.length) {
       try {
@@ -633,7 +636,10 @@ export const PUT = withResourcePermission('equipment', 'update', async (request:
     return NextResponse.json(result)
   } catch (err) {
     console.error('PUT error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Internal server error', 
+      details: err instanceof Error ? err.message : 'Unknown error' 
+    }, { status: 500 })
   }
 })
 

@@ -1,3 +1,5 @@
+// COMMENTED OUT OLD IMPLEMENTATION FOR REFERENCE
+/*
 // app/vehicles/page.tsx
 "use client";
 
@@ -242,6 +244,24 @@ export default function VehiclePage() {
         locations={locations}
         onVehicleAdded={handleVehicleAdded}
       />
+    </div>
+  );
+}
+*/
+
+// NEW SIMPLE RAW IMPLEMENTATION
+import { Suspense } from "react";
+import VehiclesContainer from "./VehiclesContainer";
+import VehicleSkeleton from "./VehicleSkeleton";
+
+export default function VehiclePage() {
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-4">Vehicles</h1>
+      
+      <Suspense fallback={<VehicleSkeleton />}>
+        <VehiclesContainer />
+      </Suspense>
     </div>
   );
 }

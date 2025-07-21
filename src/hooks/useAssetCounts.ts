@@ -10,7 +10,7 @@ interface AssetCounts {
 
 // Singleton state
 let globalState: AssetCounts | null = null;
-let subscribers: Set<(state: AssetCounts) => void> = new Set();
+const subscribers: Set<(state: AssetCounts) => void> = new Set();
 let supabaseInstance: any = null;
 let equipmentChannel: any = null;
 let vehicleChannel: any = null;

@@ -24,6 +24,10 @@ export interface Project {
   client: {
     uid: string;
     name: string;
+    location: {
+      uid: string;
+      address: string;
+    };
   };
 }
 
@@ -70,8 +74,6 @@ export interface EquipmentFormData {
   owner: string;
   plateNumber: string;
   inspectionDate: Date | undefined;
-  locationId: string;
-  clientId: string;
   projectId: string;
 }
 
