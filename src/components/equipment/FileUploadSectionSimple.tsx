@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckCircle, Upload, X } from "lucide-react";
 import Image from "next/image";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 interface FileUploadSectionSimpleProps {
   label: string;
@@ -15,6 +15,9 @@ interface FileUploadSectionSimpleProps {
   onKeepExistingChange: (keep: boolean) => void;
   required?: boolean;
   icon?: React.ReactNode;
+  // Add props to make it controlled
+  selectedFile?: File | null;
+  keepExisting?: boolean;
 }
 
 export function FileUploadSectionSimple({
@@ -25,73 +28,166 @@ export function FileUploadSectionSimple({
   onKeepExistingChange,
   required = false,
   icon = <Upload className="h-4 w-4" />,
+  selectedFile: propSelectedFile,
+  keepExisting: propKeepExisting,
 }: FileUploadSectionSimpleProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // Use props if provided, otherwise fallback to local state
+  const [localSelectedFile, setLocalSelectedFile] = useState<File | null>(null);
+  const [localKeepExisting, setLocalKeepExisting] = useState(!!currentFileUrl);
+  
+  const selectedFile = propSelectedFile !== undefined ? propSelectedFile : localSelectedFile;
+  const keepExisting = propKeepExisting !== undefined ? propKeepExisting : localKeepExisting;
+  
   const [preview, setPreview] = useState<string | null>(currentFileUrl || null);
-  const [keepExisting, setKeepExisting] = useState(!!currentFileUrl);
+  
+  // Generate preview when selectedFile or keepExisting changes
+  useEffect(() => {
+    if (selectedFile) {
+      const newPreview = URL.createObjectURL(selectedFile);
+      setPreview(newPreview);
+      
+      return () => {
+        URL.revokeObjectURL(newPreview);
+      };
+    } else if (currentFileUrl && keepExisting) {
+      setPreview(currentFileUrl);
+    } else {
+      setPreview(null);
+    }
+  }, [selectedFile, currentFileUrl, keepExisting]);
 
-  const handleFileSelect = useCallback((file: File | null) => {
+  // Update preview when currentFileUrl changes - DISABLED FOR DEBUGGING
+  /*
+  useEffect(() => {
+    if (currentFileUrl && !selectedFile) {
+      setPreview(currentFileUrl);
+      if (propKeepExisting === undefined) setLocalKeepExisting(true);
+    }
+  }, [currentFileUrl, selectedFile, propKeepExisting]);
+  */
+
+  // Clean up preview URL on component unmount - DISABLED FOR DEBUGGING
+  /*
+  useEffect(() => {
+    return () => {
+      if (preview && !currentFileUrl && selectedFile) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview, currentFileUrl, selectedFile]);
+  */
+
+  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    // Stop all event propagation immediately
+    event.stopPropagation();
+    event.nativeEvent.stopImmediatePropagation();
+    
+    const file = event.target.files?.[0] || null;
+    
     if (file) {
       // Clean up previous preview if it was generated
-      if (preview && !currentFileUrl) {
+      if (preview && !currentFileUrl && selectedFile) {
         URL.revokeObjectURL(preview);
       }
       
       const newPreview = URL.createObjectURL(file);
-      setSelectedFile(file);
-      setPreview(newPreview);
-      setKeepExisting(false);
       
+      // Update all states together
+      if (propSelectedFile === undefined) setLocalSelectedFile(file);
+      setPreview(newPreview);
+      if (propKeepExisting === undefined) setLocalKeepExisting(false);
+      
+      
+      // Call callbacks
       onFileChange(file);
       onKeepExistingChange(false);
+      
+      // Reset the input value to allow re-selecting the same file
+      event.target.value = '';
     }
-  }, [preview, currentFileUrl, onFileChange, onKeepExistingChange]);
+  }, [preview, currentFileUrl, selectedFile, onFileChange, onKeepExistingChange, propSelectedFile, propKeepExisting]);
 
   const handleRemoveFile = useCallback(() => {
-    // Clean up preview if it was generated
-    if (preview && !currentFileUrl) {
+    // Clean up preview if it was generated from a selected file
+    if (preview && selectedFile && !currentFileUrl) {
       URL.revokeObjectURL(preview);
     }
     
-    setSelectedFile(null);
-    setPreview(null);
-    setKeepExisting(false);
-    
-    onFileChange(null);
-    onKeepExistingChange(false);
-  }, [preview, currentFileUrl, onFileChange, onKeepExistingChange]);
+    if (selectedFile) {
+      // User clicked "Cancel Change" or "Remove" on newly selected file
+      if (propSelectedFile === undefined) setLocalSelectedFile(null);
+      setPreview(currentFileUrl || null);
+      if (propKeepExisting === undefined) setLocalKeepExisting(!!currentFileUrl);
+      
+      onFileChange(null);
+      onKeepExistingChange(!!currentFileUrl);
+    } else {
+      // User clicked "Remove" on existing file
+      if (propSelectedFile === undefined) setLocalSelectedFile(null);
+      setPreview(null);
+      if (propKeepExisting === undefined) setLocalKeepExisting(false);
+      
+      onFileChange(null);
+      onKeepExistingChange(false);
+    }
+  }, [preview, selectedFile, currentFileUrl, onFileChange, onKeepExistingChange, propSelectedFile, propKeepExisting]);
 
   const handleKeepExisting = useCallback(() => {
-    setSelectedFile(null);
+    if (propSelectedFile === undefined) setLocalSelectedFile(null);
     setPreview(currentFileUrl || null);
-    setKeepExisting(true);
+    if (propKeepExisting === undefined) setLocalKeepExisting(true);
     
     onFileChange(null);
     onKeepExistingChange(true);
-  }, [currentFileUrl, onFileChange, onKeepExistingChange]);
+  }, [currentFileUrl, onFileChange, onKeepExistingChange, propSelectedFile, propKeepExisting]);
 
   const isImage = accept.includes("image");
   const hasFile = selectedFile || (keepExisting && currentFileUrl);
+  const showPreview = Boolean(preview);
+  
+  
+  
 
   return (
-    <div className="space-y-2">
+    <div 
+      className="space-y-2"
+      onClick={(e) => {
+        e.stopPropagation();
+        e.nativeEvent.stopImmediatePropagation();
+      }}
+    >
       <Label className="flex items-center gap-2">
         {icon}
         {label}
         {required && <span className="text-red-500">*</span>}
       </Label>
       
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-        {hasFile && preview ? (
+      {/* Always render the hidden file input */}
+      <Input
+        type="file"
+        accept={accept}
+        onChange={handleFileSelect}
+        className="hidden"
+        id={`file-${label.replace(/\s+/g, '-').toLowerCase()}`}
+      />
+      
+      <div 
+        className="border-2 border-dashed border-gray-300 rounded-lg p-4"
+        onClick={(e) => {
+          e.stopPropagation();
+          e.nativeEvent.stopImmediatePropagation();
+        }}
+      >
+        {showPreview ? (
           <div className="space-y-2">
             {isImage ? (
-              <div className="relative">
+              <div className="relative w-full max-w-[200px] mx-auto">
                 <Image
                   src={preview}
                   alt={label}
                   width={200}
                   height={200}
-                  className="object-cover rounded"
+                  className="w-full h-[200px] object-cover rounded"
                 />
               </div>
             ) : (
@@ -101,41 +197,73 @@ export function FileUploadSectionSimple({
               </div>
             )}
             
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleRemoveFile}
-              >
-                <X className="h-4 w-4 mr-1" />
-                Remove
-              </Button>
-              
-              {currentFileUrl && !selectedFile && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleKeepExisting}
-                >
-                  Keep Existing
-                </Button>
+            <div className="flex gap-2 justify-center">
+              {selectedFile ? (
+                // New file selected - show Remove and Change buttons
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Cancel change - revert to existing or clear
+                      if (currentFileUrl) {
+                        setPreview(currentFileUrl);
+                        onFileChange(null);
+                        onKeepExistingChange(true);
+                      } else {
+                        setPreview(null);
+                        onFileChange(null);
+                        onKeepExistingChange(false);
+                      }
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    {currentFileUrl ? 'Cancel Change' : 'Remove'}
+                  </Button>
+                </>
+              ) : (
+                // Existing file - show Change and Remove buttons
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Simple direct approach - just trigger the file input
+                      const fileInput = document.querySelector(`input[type="file"]#file-${label.replace(/\s+/g, '-').toLowerCase()}`) as HTMLInputElement;
+                      fileInput?.click();
+                    }}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    Change
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Update parent
+                      onFileChange(null);
+                      onKeepExistingChange(false);
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Remove
+                  </Button>
+                </>
               )}
             </div>
           </div>
         ) : (
           <div className="text-center">
-            <Input
-              type="file"
-              accept={accept}
-              onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
-              className="hidden"
-              id={`file-${label.replace(/\s+/g, '-').toLowerCase()}`}
-            />
             <Label
               htmlFor={`file-${label.replace(/\s+/g, '-').toLowerCase()}`}
               className="cursor-pointer flex flex-col items-center gap-2 p-4"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+              }}
             >
               {icon}
               <span>Click to upload {label.toLowerCase()}</span>

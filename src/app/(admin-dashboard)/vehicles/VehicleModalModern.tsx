@@ -1,14 +1,25 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerFooter,
+  DrawerClose,
+} from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   CalendarDays,
   User,
@@ -23,8 +34,12 @@ import {
   Edit,
   Wrench,
   X,
+  Settings,
+  Camera,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
-import { useVehiclesStore, selectSelectedVehicle, selectIsModalOpen, selectIsEditMode, selectIsMaintenanceModalOpen, selectSelectedMaintenanceReport } from "@/stores/vehiclesStore";
+import { useVehiclesStore, selectSelectedVehicle, selectIsModalOpen, selectIsEditMode, selectIsMaintenanceModalOpen, selectSelectedMaintenanceReport, selectIsMobile, selectIsPhotosCollapsed } from "@/stores/vehiclesStore";
 import { useVehiclesWithReferenceData, useUpdateVehicle, useDeleteVehicle } from "@/hooks/useVehiclesQuery";
 import VehicleMaintenanceReportsEnhanced from "./VehicleMaintenanceReportsEnhanced";
 import CreateVehicleModalModern from "./CreateVehicleModalModern";
@@ -38,6 +53,11 @@ export default function VehicleModalModern() {
   const selectedVehicleFromStore = useVehiclesStore(selectSelectedVehicle);
   const isModalOpen = useVehiclesStore(selectIsModalOpen);
   const isEditMode = useVehiclesStore(selectIsEditMode);
+  const isMobile = useVehiclesStore(selectIsMobile);
+  const isPhotosCollapsed = useVehiclesStore(selectIsPhotosCollapsed);
+
+  // Custom tab state
+  const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'maintenance'>('details');
   
   // Get the most up-to-date vehicle data from TanStack Query cache
   const selectedVehicle = selectedVehicleFromStore 
@@ -49,12 +69,29 @@ export default function VehicleModalModern() {
     setIsModalOpen, 
     setIsEditMode, 
     setSelectedVehicle,
+    setIsMobile,
+    setIsPhotosCollapsed,
     closeAllModals
   } = useVehiclesStore();
 
   // Mutations
   const updateVehicleMutation = useUpdateVehicle();
   const deleteVehicleMutation = useDeleteVehicle();
+
+  // Mobile detection using Zustand
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, [setIsMobile]);
+
 
   // Helper functions
   const formatDate = (dateString: string) => {
@@ -145,7 +182,11 @@ export default function VehicleModalModern() {
   };
 
   const handleEdit = () => {
-    setIsEditMode(true);
+    // Close current modal first, then open edit modal
+    setIsModalOpen(false);
+    setTimeout(() => {
+      setIsEditMode(true);
+    }, 100); // Small delay to ensure proper transition
   };
 
   const handleDelete = async () => {
@@ -168,129 +209,111 @@ export default function VehicleModalModern() {
 
   if (!selectedVehicle) return null;
 
-  return (
-    <Dialog open={isModalOpen} onOpenChange={handleClose}>
-      <DialogContent
-        className="max-w-[95%] max-h-[90vh] flex flex-col p-4"
-        style={{ maxWidth: "1024px" }}
-      >
-        {/* Fixed Header */}
-        <DialogHeader className="p-6 pb-0 flex-shrink-0 border-b">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <DialogTitle className="flex items-center gap-2">
-                <Car className="h-6 w-6" />
-                {selectedVehicle.brand} {selectedVehicle.model}
-                <Badge className={getStatusColor(selectedVehicle.status)}>
-                  {selectedVehicle.status}
-                </Badge>
-                <Badge variant="outline" className="flex items-center gap-1">
-                  <Car className="h-3 w-3" />
-                  {selectedVehicle.plate_number}
-                </Badge>
-              </DialogTitle>
-            </div>
-            
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleEdit} className="gap-2">
-                <Edit className="h-4 w-4" />
-                Edit
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDelete} className="gap-2 text-red-600 hover:text-red-700">
-                <X className="h-4 w-4" />
-                Delete
-              </Button>
-            </div>
+  // Shared content component
+  const VehicleContent = () => (
+    <>
+      {/* Custom Tabbed Content Area */}
+      <div className="flex-1 overflow-y-auto scroll-none p-4">
+        <div className="w-full">
+          {/* Custom Tab Buttons */}
+          <div className="grid w-full grid-cols-3 mb-4 bg-muted rounded-md p-1">
+            <Button
+              type="button"
+              variant={activeTab === 'details' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('details')}
+              className="flex items-center gap-2 text-xs sm:text-sm px-2 sm:px-4"
+            >
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Details</span>
+              <span className="sm:hidden">Info</span>
+            </Button>
+            <Button
+              type="button"
+              variant={activeTab === 'photos' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('photos')}
+              className="flex items-center gap-2 text-xs sm:text-sm px-2 sm:px-4"
+            >
+              <Camera className="h-4 w-4" />
+              Photos
+            </Button>
+            <Button
+              type="button"
+              variant={activeTab === 'maintenance' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('maintenance')}
+              className="flex items-center gap-2 text-xs sm:text-sm px-2 sm:px-4"
+            >
+              <Wrench className="h-4 w-4" />
+              <span className="hidden sm:inline">Maintenance</span>
+              <span className="sm:hidden">Reports</span>
+            </Button>
           </div>
-          <p className="text-muted-foreground">{selectedVehicle.type}</p>
-        </DialogHeader>
-
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto scroll-none p-6 pt-6">
-          <div className="space-y-6">
-            {/* Vehicle Images Grid */}
-            {vehicleImages(selectedVehicle).length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Vehicle Photos</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-                  {vehicleImages(selectedVehicle).map((image, index) => (
-                    <div key={index} className="border rounded-lg p-3 space-y-2">
-                      <div className="aspect-video bg-white rounded-md overflow-hidden">
-                        <img
-                          src={image.url}
-                          alt={`${selectedVehicle.brand} ${selectedVehicle.model} - ${image.label}`}
-                          className="w-full h-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => openFile(image.url!)}
-                        />
-                      </div>
-                      <div className="text-center space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">
-                          {image.label}
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full text-xs"
-                          onClick={() => openFile(image.url!)}
-                        >
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          View Full Size
-                        </Button>
-                      </div>
+            
+            
+          {/* Details Tab Content */}
+          {activeTab === 'details' && (
+            <div className="space-y-4 mt-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    Vehicle Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Basic Information */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Car className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Type:</span>
+                      <span>{selectedVehicle.type}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {/* Vehicle Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Vehicle Information</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Owner:</span>
-                    <span>{selectedVehicle.owner}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Client:</span>
-                    <span>{selectedVehicle.project?.client?.name || 'No client'}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Location:</span>
-                    <span>{selectedVehicle.project?.client?.location?.address || 'No location'}</span>
-                  </div>
-
-                  <div className="text-sm">
-                    <span className="font-medium">Project:</span>
-                    <span className="ml-2">{selectedVehicle.project?.name || 'No project'}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm">
-                    <Car className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Plate Number:</span>
-                    <span>{selectedVehicle.plate_number}</span>
-                  </div>
-
-                  {selectedVehicle.user && (
                     <div className="flex items-center gap-2 text-sm">
                       <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Added by:</span>
-                      <span>{selectedVehicle.user.full_name}</span>
+                      <span className="font-medium">Owner:</span>
+                      <span>{selectedVehicle.owner}</span>
                     </div>
-                  )}
-                </div>
-              </div>
 
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Dates & Inspection</h3>
-                <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Car className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Plate Number:</span>
+                      <span>{selectedVehicle.plate_number}</span>
+                    </div>
+
+                    <div className="text-sm">
+                      <span className="font-medium">Project:</span>
+                      <span className="ml-2">{selectedVehicle.project?.name || 'No project'}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Client:</span>
+                      <span>{selectedVehicle.project?.client?.name || 'No client'}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-sm">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Location:</span>
+                      <span>{selectedVehicle.project?.client?.location?.address || 'No location'}</span>
+                    </div>
+                  </div>
+
+
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4" />
+                    Dates & Inspection
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm">
                     <CalendarDays className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">Registration Expires:</span>
@@ -354,20 +377,117 @@ export default function VehicleModalModern() {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2 text-sm">
-                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Date Added:</span>
-                    <span>{formatDate(selectedVehicle.created_at)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Date Added:</span>
+                      <span>{formatDate(selectedVehicle.created_at)}</span>
+                    </div>
 
-            {/* Documents Section */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Documents & Files</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {selectedVehicle.user && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">Added by:</span>
+                        <span>{selectedVehicle.user.full_name}</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Remarks */}
+              {selectedVehicle.remarks && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Remarks</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground bg-muted/50 p-3 rounded-md text-sm">
+                      {selectedVehicle.remarks}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* Photos Tab Content */}
+          {activeTab === 'photos' && (
+            <div className="space-y-4 mt-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Camera className="h-4 w-4" />
+                    Vehicle Photos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Vehicle Images Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium text-sm">Vehicle Images</h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsPhotosCollapsed(!isPhotosCollapsed)}
+                        className="h-8 w-8 p-0"
+                      >
+                        {isPhotosCollapsed ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronUp className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    
+                    {!isPhotosCollapsed && (
+                      <>
+                        {vehicleImages(selectedVehicle).length > 0 ? (
+                          <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                            {vehicleImages(selectedVehicle).map((image, index) => (
+                              <div key={index} className="border rounded-lg p-2 space-y-2">
+                                <div className="aspect-video bg-white rounded-md overflow-hidden">
+                                  <img
+                                    src={image.url}
+                                    alt={`${selectedVehicle.brand} ${selectedVehicle.model} - ${image.label}`}
+                                    className="w-full h-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                                    onClick={() => openFile(image.url!)}
+                                  />
+                                </div>
+                                <div className="text-center space-y-1">
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    {image.label}
+                                  </p>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full text-xs h-7"
+                                    onClick={() => openFile(image.url!)}
+                                  >
+                                    <ExternalLink className="h-3 w-3 mr-1" />
+                                    View Full Size
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 bg-muted/20 rounded-lg border-2 border-dashed border-muted-foreground/25">
+                            <Camera className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                            <p className="text-sm text-muted-foreground">
+                              No vehicle images uploaded
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Documents Section */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm">Documents</h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Original Receipt */}
                 {selectedVehicle.original_receipt_url && (
                   <div className="border rounded-lg p-4 space-y-2">
@@ -487,63 +607,146 @@ export default function VehicleModalModern() {
                     </Button>
                   </div>
                 )}
-              </div>
+                    </div>
 
-              {/* Documents Summary */}
-              <div className="flex flex-wrap gap-2">
-                {selectedVehicle.original_receipt_url && (
-                  <Badge variant="outline" className="text-xs">
-                    <Receipt className="h-3 w-3 mr-1" />
-                    OR Available
-                  </Badge>
-                )}
-                {selectedVehicle.car_registration_url && (
-                  <Badge variant="outline" className="text-xs">
-                    <FileText className="h-3 w-3 mr-1" />
-                    CR Available
-                  </Badge>
-                )}
-                {selectedVehicle.pgpc_inspection_image && (
-                  <Badge variant="outline" className="text-xs">
-                    <Shield className="h-3 w-3 mr-1" />
-                    PGPC Available
-                  </Badge>
-                )}
-                {vehicleImages(selectedVehicle).length > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    <Image className="h-3 w-3 mr-1" />
-                    {vehicleImages(selectedVehicle).length} Photo
-                    {vehicleImages(selectedVehicle).length !== 1 ? "s" : ""}
-                  </Badge>
-                )}
-                {!selectedVehicle.original_receipt_url &&
-                  !selectedVehicle.car_registration_url &&
-                  !selectedVehicle.pgpc_inspection_image &&
-                  vehicleImages(selectedVehicle).length === 0 && (
-                    <span className="text-sm text-muted-foreground">
-                      No documents or photos uploaded
-                    </span>
+                  {vehicleImages(selectedVehicle).length === 0 && (
+                    <div className="text-center py-8">
+                      <Camera className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                      <p className="text-sm text-muted-foreground">
+                        No photos uploaded for this vehicle
+                      </p>
+                    </div>
                   )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Maintenance Tab Content */}
+          {activeTab === 'maintenance' && (
+            <div className="space-y-4 mt-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Wrench className="h-4 w-4" />
+                    Maintenance Reports
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <VehicleMaintenanceReportsEnhanced vehicleId={selectedVehicle.id} />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+
+  // Mobile view - Drawer
+  if (isMobile) {
+    return (
+      <Drawer open={isModalOpen} onOpenChange={handleClose}>
+        <DrawerContent className="!max-h-[95vh]">
+          {/* Mobile Header */}
+          <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
+            <DrawerClose asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="absolute right-4 top-4 rounded-full h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DrawerClose>
+            <div className="text-center space-y-3">
+              <DrawerTitle className="text-xl font-bold">
+                {selectedVehicle.brand} {selectedVehicle.model}
+              </DrawerTitle>
+              <div className="flex justify-center">
+                <Badge className={getStatusColor(selectedVehicle.status)}>
+                  {selectedVehicle.status === 'OPERATIONAL' ? 'Operational' : 'Non-Operational'}
+                </Badge>
               </div>
             </div>
+          </DrawerHeader>
+          
+          <VehicleContent />
+          
+          {/* Mobile Footer */}
+          <DrawerFooter className="border-t bg-muted/30">
+            <div className="flex gap-2 w-full">
+              <Button 
+                variant="outline" 
+                onClick={handleDelete} 
+                className="flex-1 gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+              >
+                <X className="h-4 w-4" />
+                Delete Vehicle
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleEdit} 
+                className="flex-1 gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700"
+              >
+                <Edit className="h-4 w-4" />
+                Edit Vehicle
+              </Button>
+            </div>
+          </DrawerFooter>
+        </DrawerContent>
+        
+        {/* Edit Modal */}
+        {isEditMode && <EditVehicleModalModern />}
+      </Drawer>
+    );
+  }
 
-            {/* Remarks */}
-            {selectedVehicle.remarks && (
-              <div className="space-y-3">
-                <h3 className="text-lg font-semibold">Remarks</h3>
-                <p className="text-muted-foreground bg-muted p-3 rounded-md">
-                  {selectedVehicle.remarks}
-                </p>
-              </div>
-            )}
-
-            {/* Maintenance Reports Section */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Maintenance Reports</h3>
-              <VehicleMaintenanceReportsEnhanced vehicleId={selectedVehicle.id} />
+  // Desktop view - Dialog
+  return (
+    <Dialog open={isModalOpen} onOpenChange={handleClose}>
+      <DialogContent
+        className="max-w-[calc(100%-2rem)] sm:max-w-[calc(100%-4rem)] max-h-[90vh] flex flex-col p-4"
+        style={{ maxWidth: "1024px" }}
+      >
+        {/* Desktop Header */}
+        <DialogHeader className="p-4 pb-4 flex-shrink-0">
+          <div className="text-center space-y-3">
+            <DialogTitle className="text-xl font-bold">
+              {selectedVehicle.brand} {selectedVehicle.model}
+            </DialogTitle>
+            <div className="flex justify-center">
+              <Badge className={getStatusColor(selectedVehicle.status)}>
+                {selectedVehicle.status === 'OPERATIONAL' ? 'Operational' : 'Non-Operational'}
+              </Badge>
             </div>
           </div>
-        </div>
+        </DialogHeader>
+
+        <VehicleContent />
+        
+        {/* Desktop Footer */}
+        <DialogFooter className="p-4 border-t bg-muted/30">
+          <div className="flex gap-2 w-full">
+            <Button 
+              variant="outline" 
+              onClick={handleDelete} 
+              className="flex-1 gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+            >
+              <X className="h-4 w-4" />
+              Delete Vehicle
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleEdit} 
+              className="flex-1 gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700"
+            >
+              <Edit className="h-4 w-4" />
+              Edit Vehicle
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
       
       {/* Edit Modal */}

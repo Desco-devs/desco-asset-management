@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Eye, Search, Filter, Plus, Download, Car, List, X } from "lucide-react";
 import { useVehiclesStore, selectFilterInfo, selectIsMobile } from "@/stores/vehiclesStore";
-import { useVehiclesWithReferenceData, useSupabaseRealtime } from "@/hooks/useVehiclesQuery";
+import { useVehiclesWithReferenceData } from "@/hooks/useVehiclesQuery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,8 +18,6 @@ export default function VehiclesListModern() {
   // TanStack Query - Server state
   const { vehicles, projects, maintenanceReports, isLoading, isError, error } = useVehiclesWithReferenceData();
   
-  // Supabase realtime integration
-  const { isConnected } = useSupabaseRealtime();
   
   // Use store state directly and compute results
   const currentPage = useVehiclesStore(state => state.currentPage);
@@ -134,43 +132,31 @@ export default function VehiclesListModern() {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      {/* Mobile-First Header */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Car className="h-7 w-7 text-primary" />
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Vehicle Management</h1>
-          </div>
-          
-          {/* Connection Status - Mobile Optimized */}
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="text-sm font-medium text-muted-foreground hidden sm:block">
-              {isConnected ? 'Live' : 'Offline'}
-            </span>
-          </div>
-        </div>
-
-        {/* Mobile Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-          <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2 flex-1 sm:flex-none font-semibold">
-            <Plus className="h-4 w-4" />
-            Add New Vehicle
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setIsExportModalOpen(true)} 
-            className="gap-2 flex-1 sm:flex-none font-medium"
-            disabled={vehicles.length === 0}
-          >
-            <Download className="h-4 w-4" />
-            Export Maintenance Report
-          </Button>
-        </div>
+    <div className="space-y-6 md:space-y-8">
+      {/* Page Title */}
+      <div className="flex items-center gap-3">
+        <Car className="h-7 w-7 text-primary" />
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Vehicle Management</h1>
       </div>
 
-      {/* Search Bar */}
+      {/* Action Buttons Section */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2 flex-1 sm:flex-none font-semibold">
+          <Plus className="h-4 w-4" />
+          Add New Vehicle
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={() => setIsExportModalOpen(true)} 
+          className="gap-2 flex-1 sm:flex-none font-medium"
+          disabled={vehicles.length === 0}
+        >
+          <Download className="h-4 w-4" />
+          Export Maintenance Report
+        </Button>
+      </div>
+
+      {/* Search, Filter & Sort Section */}
       <div className="space-y-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

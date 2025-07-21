@@ -126,6 +126,7 @@ interface VehiclesState {
   currentPage: number;
   isMobile: boolean;
   searchQuery: string;
+  isPhotosCollapsed: boolean;
   
   // Pagination & filtering settings (persisted to localStorage)
   itemsPerPage: number;
@@ -154,6 +155,7 @@ interface VehiclesState {
   setCurrentPage: (page: number) => void;
   setIsMobile: (isMobile: boolean) => void;
   setSearchQuery: (query: string) => void;
+  setIsPhotosCollapsed: (collapsed: boolean) => void;
   
   // Filter & Sort Actions
   setSortBy: (sortBy: VehiclesState['sortBy']) => void;
@@ -207,6 +209,7 @@ export const useVehiclesStore = create<VehiclesState>()(
         currentPage: 1,
         isMobile: false,
         searchQuery: '',
+        isPhotosCollapsed: false,
         
         // Pagination & filtering settings (persisted)
         itemsPerPage: 12,
@@ -235,6 +238,7 @@ export const useVehiclesStore = create<VehiclesState>()(
         setCurrentPage: (page) => set({ currentPage: page }),
         setIsMobile: (isMobile) => set({ isMobile }),
         setSearchQuery: (query) => set({ searchQuery: query, currentPage: 1 }),
+        setIsPhotosCollapsed: (collapsed) => set({ isPhotosCollapsed: collapsed }),
         
         // Filter & Sort Actions
         setSortBy: (sortBy) => set({ sortBy, currentPage: 1 }),
@@ -530,6 +534,7 @@ export const selectIsMaintenanceModalOpen = (state: VehiclesState) => state.isMa
 export const selectCurrentPage = (state: VehiclesState) => state.currentPage;
 export const selectIsMobile = (state: VehiclesState) => state.isMobile;
 export const selectSearchQuery = (state: VehiclesState) => state.searchQuery;
+export const selectIsPhotosCollapsed = (state: VehiclesState) => state.isPhotosCollapsed;
 export const selectItemsPerPage = (state: VehiclesState) => state.itemsPerPage;
 export const selectSortBy = (state: VehiclesState) => state.sortBy;
 export const selectSortOrder = (state: VehiclesState) => state.sortOrder;

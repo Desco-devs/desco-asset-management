@@ -233,53 +233,6 @@ export default function EditVehicleForm({ vehicle, projects, onSuccess, onCancel
         />
       </div>
 
-      {/* 🔥 VEHICLE IMAGES SECTION */}
-      <div className="border-t pt-4">
-        <h3 className="text-lg font-medium mb-3">Update Vehicle Images (Optional)</h3>
-        <p className="text-sm text-gray-600 mb-3">Select new files only if you want to replace existing images</p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Front View</label>
-            <input
-              type="file"
-              name="frontImg"
-              accept="image/*"
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Back View</label>
-            <input
-              type="file"
-              name="backImg"
-              accept="image/*"
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Side View 1</label>
-            <input
-              type="file"
-              name="side1Img"
-              accept="image/*"
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Side View 2</label>
-            <input
-              type="file"
-              name="side2Img"
-              accept="image/*"
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
-        </div>
-      </div>
 
       {/* 🔥 DOCUMENTS SECTION */}
       <div className="border-t pt-4">
