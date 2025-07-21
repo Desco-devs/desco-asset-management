@@ -115,6 +115,15 @@ interface VehiclesState {
   sortOrder: 'asc' | 'desc';
   filterStatus: 'all' | 'OPERATIONAL' | 'NON_OPERATIONAL';
   filterProject: string; // 'all' or project ID
+  filterType: string; // 'all' or vehicle type
+  filterOwner: string; // 'all' or owner name
+  filterMaintenance: 'all' | 'has_issues' | 'no_issues'; // filter by maintenance status
+  filterExpiryDays: number | null; // null or days (show vehicles expiring within X days)
+  filterDateRange: {
+    startDate: string | null;
+    endDate: string | null;
+    dateType: 'inspection' | 'expiry' | 'created';
+  };
   
   // UI Actions
   setSelectedVehicle: (vehicle: Vehicle | null) => void;
@@ -132,6 +141,11 @@ interface VehiclesState {
   setSortOrder: (order: VehiclesState['sortOrder']) => void;
   setFilterStatus: (status: VehiclesState['filterStatus']) => void;
   setFilterProject: (projectId: string) => void;
+  setFilterType: (type: string) => void;
+  setFilterOwner: (owner: string) => void;
+  setFilterMaintenance: (maintenance: VehiclesState['filterMaintenance']) => void;
+  setFilterExpiryDays: (days: number | null) => void;
+  setFilterDateRange: (dateRange: VehiclesState['filterDateRange']) => void;
   setItemsPerPage: (count: number) => void;
   
   // Computed selectors (derived state - no re-renders)
@@ -150,8 +164,7 @@ interface PersistedState {
   itemsPerPage: number;
   sortBy: VehiclesState['sortBy'];
   sortOrder: VehiclesState['sortOrder'];
-  filterStatus: VehiclesState['filterStatus'];
-  filterProject: string;
+  // Don't persist filters - always start fresh
 }
 
 export const useVehiclesStore = create<VehiclesState>()(
@@ -176,6 +189,15 @@ export const useVehiclesStore = create<VehiclesState>()(
         sortOrder: 'desc',
         filterStatus: 'all',
         filterProject: 'all',
+        filterType: 'all',
+        filterOwner: 'all',
+        filterMaintenance: 'all',
+        filterExpiryDays: null,
+        filterDateRange: {
+          startDate: null,
+          endDate: null,
+          dateType: 'created'
+        },
         
         // UI Actions
         setSelectedVehicle: (vehicle) => set({ selectedVehicle: vehicle }),
@@ -193,11 +215,26 @@ export const useVehiclesStore = create<VehiclesState>()(
         setSortOrder: (order) => set({ sortOrder: order }),
         setFilterStatus: (status) => set({ filterStatus: status, currentPage: 1 }),
         setFilterProject: (projectId) => set({ filterProject: projectId, currentPage: 1 }),
+        setFilterType: (type) => set({ filterType: type, currentPage: 1 }),
+        setFilterOwner: (owner) => set({ filterOwner: owner, currentPage: 1 }),
+        setFilterMaintenance: (maintenance) => set({ filterMaintenance: maintenance, currentPage: 1 }),
+        setFilterExpiryDays: (days) => set({ filterExpiryDays: days, currentPage: 1 }),
+        setFilterDateRange: (dateRange) => set({ filterDateRange: dateRange, currentPage: 1 }),
         setItemsPerPage: (count) => set({ itemsPerPage: count, currentPage: 1 }),
         
         // Computed selectors (accept vehicles as parameter - no direct state access)
-        getFilteredVehicles: (vehicles: Vehicle[]) => {
-          const { filterStatus, filterProject, searchQuery } = get();
+        getFilteredVehicles: (vehicles: Vehicle[], maintenanceReports: MaintenanceReport[] = []) => {
+          const { 
+            filterStatus, 
+            filterProject, 
+            filterType,
+            filterOwner,
+            filterMaintenance,
+            filterExpiryDays,
+            filterDateRange,
+            searchQuery 
+          } = get();
+          
           
           let filtered = vehicles;
           
@@ -211,7 +248,79 @@ export const useVehiclesStore = create<VehiclesState>()(
             filtered = filtered.filter(vehicle => vehicle.project.id === filterProject);
           }
           
-          // Filter by search query
+          // Filter by vehicle type
+          if (filterType !== 'all') {
+            filtered = filtered.filter(vehicle => vehicle.type === filterType);
+          }
+          
+          // Filter by owner
+          if (filterOwner !== 'all') {
+            filtered = filtered.filter(vehicle => vehicle.owner === filterOwner);
+          }
+          
+          // Filter by maintenance status
+          if (filterMaintenance !== 'all') {
+            filtered = filtered.filter(vehicle => {
+              const hasReports = maintenanceReports.some(report => report.vehicle_id === vehicle.id);
+              const hasOpenIssues = maintenanceReports.some(report => 
+                report.vehicle_id === vehicle.id && 
+                report.status && 
+                !['COMPLETED', 'RESOLVED'].includes(report.status.toUpperCase())
+              );
+              
+              if (filterMaintenance === 'has_issues') {
+                return hasReports && hasOpenIssues;
+              } else if (filterMaintenance === 'no_issues') {
+                return !hasReports || !hasOpenIssues;
+              }
+              return true;
+            });
+          }
+          
+          // Filter by expiry days (vehicles expiring within X days)
+          if (filterExpiryDays !== null && filterExpiryDays > 0) {
+            const now = new Date();
+            const targetDate = new Date(now.getTime() + (filterExpiryDays * 24 * 60 * 60 * 1000));
+            filtered = filtered.filter(vehicle => {
+              const expiryDate = new Date(vehicle.expiry_date);
+              return expiryDate >= now && expiryDate <= targetDate;
+            });
+          }
+          
+          // Filter by date range
+          if (filterDateRange.startDate || filterDateRange.endDate) {
+            filtered = filtered.filter(vehicle => {
+              let dateToCheck: Date;
+              switch (filterDateRange.dateType) {
+                case 'inspection':
+                  dateToCheck = new Date(vehicle.inspection_date);
+                  break;
+                case 'expiry':
+                  dateToCheck = new Date(vehicle.expiry_date);
+                  break;
+                case 'created':
+                default:
+                  dateToCheck = new Date(vehicle.created_at);
+                  break;
+              }
+              
+              if (filterDateRange.startDate && filterDateRange.endDate) {
+                const startDate = new Date(filterDateRange.startDate);
+                const endDate = new Date(filterDateRange.endDate);
+                return dateToCheck >= startDate && dateToCheck <= endDate;
+              } else if (filterDateRange.startDate) {
+                const startDate = new Date(filterDateRange.startDate);
+                return dateToCheck >= startDate;
+              } else if (filterDateRange.endDate) {
+                const endDate = new Date(filterDateRange.endDate);
+                return dateToCheck <= endDate;
+              }
+              
+              return true;
+            });
+          }
+          
+          // Filter by search query (enhanced to include client and location)
           if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(vehicle => 
@@ -219,9 +328,13 @@ export const useVehiclesStore = create<VehiclesState>()(
               vehicle.model.toLowerCase().includes(query) ||
               vehicle.plate_number.toLowerCase().includes(query) ||
               vehicle.owner.toLowerCase().includes(query) ||
-              vehicle.project.name.toLowerCase().includes(query)
+              vehicle.type.toLowerCase().includes(query) ||
+              vehicle.project.name.toLowerCase().includes(query) ||
+              vehicle.project.client.name.toLowerCase().includes(query) ||
+              vehicle.project.client.location.address.toLowerCase().includes(query)
             );
           }
+          
           
           return filtered;
         },
@@ -291,6 +404,15 @@ export const useVehiclesStore = create<VehiclesState>()(
         resetFilters: () => set({
           filterStatus: 'all',
           filterProject: 'all',
+          filterType: 'all',
+          filterOwner: 'all',
+          filterMaintenance: 'all',
+          filterExpiryDays: null,
+          filterDateRange: {
+            startDate: null,
+            endDate: null,
+            dateType: 'created'
+          },
           searchQuery: '',
           currentPage: 1
         }),
@@ -306,13 +428,11 @@ export const useVehiclesStore = create<VehiclesState>()(
       }),
       {
         name: 'vehicles-settings',
-        // Only persist user preferences, not the actual data or UI state
+        // Only persist user preferences, not filters (always start fresh)
         partialize: (state): PersistedState => ({
           itemsPerPage: state.itemsPerPage,
           sortBy: state.sortBy,
           sortOrder: state.sortOrder,
-          filterStatus: state.filterStatus,
-          filterProject: state.filterProject,
         }),
       }
     )
@@ -334,6 +454,11 @@ export const selectSortBy = (state: VehiclesState) => state.sortBy;
 export const selectSortOrder = (state: VehiclesState) => state.sortOrder;
 export const selectFilterStatus = (state: VehiclesState) => state.filterStatus;
 export const selectFilterProject = (state: VehiclesState) => state.filterProject;
+export const selectFilterType = (state: VehiclesState) => state.filterType;
+export const selectFilterOwner = (state: VehiclesState) => state.filterOwner;
+export const selectFilterMaintenance = (state: VehiclesState) => state.filterMaintenance;
+export const selectFilterExpiryDays = (state: VehiclesState) => state.filterExpiryDays;
+export const selectFilterDateRange = (state: VehiclesState) => state.filterDateRange;
 
 // Computed selectors that accept data as parameters
 export const selectFilteredVehicles = (vehicles: Vehicle[]) => (state: VehiclesState) => 
@@ -357,7 +482,26 @@ export const selectPaginationInfo = (vehicles: Vehicle[]) => (state: VehiclesSta
 export const selectFilterInfo = (state: VehiclesState) => ({
   status: state.filterStatus,
   project: state.filterProject,
+  type: state.filterType,
+  owner: state.filterOwner,
+  maintenance: state.filterMaintenance,
+  expiryDays: state.filterExpiryDays,
+  dateRange: state.filterDateRange,
   search: state.searchQuery,
   sortBy: state.sortBy,
   sortOrder: state.sortOrder
 });
+
+// Helper functions for getting active filter count
+export const selectActiveFilterCount = (state: VehiclesState) => {
+  let count = 0;
+  if (state.filterStatus !== 'all') count++;
+  if (state.filterProject !== 'all') count++;
+  if (state.filterType !== 'all') count++;
+  if (state.filterOwner !== 'all') count++;
+  if (state.filterMaintenance !== 'all') count++;
+  if (state.filterExpiryDays !== null) count++;
+  if (state.filterDateRange.startDate || state.filterDateRange.endDate) count++;
+  if (state.searchQuery.trim()) count++;
+  return count;
+};
