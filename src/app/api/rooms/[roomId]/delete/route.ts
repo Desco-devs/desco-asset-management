@@ -60,7 +60,7 @@ export async function DELETE(
 
     // Delete room and all related data (cascade should handle this)
     // Order matters due to foreign key constraints
-
+    
     // Delete messages first
     await prisma.message.deleteMany({
       where: { room_id: roomId },
@@ -85,7 +85,7 @@ export async function DELETE(
     if (global.io) {
       // Notify all room members about deletion
       roomMembers.forEach((member) => {
-        global?.io?.to(`user:${member.user_id}`).emit('room:deleted', {
+        global.io.to(`user:${member.user_id}`).emit('room:deleted', {
           roomId: roomId,
           deletedBy: userId,
         });

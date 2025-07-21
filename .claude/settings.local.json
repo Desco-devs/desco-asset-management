@@ -39,7 +39,8 @@
       "Bash(cd:*)",
       "Bash(rm:*)",
       "Bash(npm run lint:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }

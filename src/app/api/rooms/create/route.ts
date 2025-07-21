@@ -4,13 +4,13 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const {
-      name,
-      description,
-      type,
-      ownerId,
-      invitedUsers = [],
-      inviteUsername
+    const { 
+      name, 
+      description, 
+      type, 
+      ownerId, 
+      invitedUsers = [], 
+      inviteUsername 
     } = body;
 
     if (!name || !type || !ownerId) {
@@ -79,14 +79,34 @@ export async function POST(request: NextRequest) {
       return { room, invitations };
     });
 
-    // TODO: Emit socket event for real-time updates when socket is properly initialized
-    // if (global.io) {
-    //   global.io.emit('room:created', {
-    //     room: result.room,
-    //     invitations: result.invitations,
-    //     creatorId: ownerId,
-    //   });
-    // }
+    // Emit socket event for real-time updates
+    if (global.io) {
+      // For direct rooms, notify both participants
+      if (type === 'DIRECT' && result.invitations.length > 0) {
+        const invitedUserId = result.invitations[0].invited_user;
+        global.io.to(`user:${ownerId}`).emit('room:created', {
+          room: result.room,
+          creatorId: ownerId,
+        });
+        global.io.to(`user:${invitedUserId}`).emit('room:created', {
+          room: result.room,
+          creatorId: ownerId,
+        });
+      } else {
+        // For group rooms, notify creator and invited users
+        global.io.to(`user:${ownerId}`).emit('room:created', {
+          room: result.room,
+          creatorId: ownerId,
+        });
+        
+        result.invitations.forEach((invitation) => {
+          global.io.to(`user:${invitation.invited_user}`).emit('room:created', {
+            room: result.room,
+            creatorId: ownerId,
+          });
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,
