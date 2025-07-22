@@ -10,7 +10,7 @@ export default function SonnerToastProvider() {
   // Apply custom styling to individual toast types
   useEffect(() => {
     // Override default toast styles based on type
-    const originalToast = toast;
+    // const originalToast = toast;
     const originalSuccess = toast.success;
     const originalError = toast.error;
     const originalInfo = toast.info;

@@ -43,7 +43,7 @@ export async function PUT(request: Request) {
         }
 
         // Build update data
-        const updateData: any = {
+        const updateData: Record<string, unknown> = {
             equipment_id: equipmentId,
             location_id: locationId,
             reported_by: reportedBy,

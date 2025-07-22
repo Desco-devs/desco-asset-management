@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MessageWithRelations, RoomListItem } from '@/types/chat-app';
+import { RoomListItem } from '@/types/chat-app';
 
 const QUERY_KEYS = {
   rooms: (userId: string) => ['rooms', userId],
@@ -34,13 +34,13 @@ export const useRooms = ({ userId, enabled = true }: UseRoomsOptions) => {
   });
 };
 
-interface UseRoomMessagesOptions {
-  roomId?: string;
-  userId?: string;
-  enabled?: boolean;
-  limit?: number;
-  offset?: number;
-}
+// interface UseRoomMessagesOptions {
+//   roomId?: string;
+//   userId?: string;
+//   enabled?: boolean;
+//   limit?: number;
+//   offset?: number;
+// }
 
 // useRoomMessages removed - messages now handled directly in useChatApp via Socket.io
 // export const useRoomMessages = ({ 

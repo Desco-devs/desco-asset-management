@@ -8,7 +8,7 @@ import { getResourcePermissions } from '@/lib/auth/utils'
 const prisma = new PrismaClient()
 
 // GET /api/maintenance-reports - View all maintenance reports with proper role-based access control
-export const GET = withResourcePermission('maintenance_reports', 'view', async (request: NextRequest, user: AuthenticatedUser) => {
+export const GET = withResourcePermission('maintenance_reports', 'view', async (request: NextRequest, _user: AuthenticatedUser) => {
     try {
         const { searchParams } = new URL(request.url)
         const reportId = searchParams.get('reportId')
@@ -40,11 +40,11 @@ export const GET = withResourcePermission('maintenance_reports', 'view', async (
             }
 
             // Get user permissions for this resource
-            const permissions = getResourcePermissions(user.role, 'maintenance_reports')
+            const permissions = getResourcePermissions(_user.role, 'maintenance_reports')
 
             return NextResponse.json({
                 data: report,
-                user_role: user.role,
+                user_role: _user.role,
                 permissions: {
                     can_create: permissions.canCreate,
                     can_update: permissions.canUpdate,
@@ -87,12 +87,12 @@ export const GET = withResourcePermission('maintenance_reports', 'view', async (
         const total = await prisma.maintenance_equipment_report.count({ where })
 
         // Get user permissions for this resource
-        const permissions = getResourcePermissions(user.role, 'maintenance_reports')
+        const permissions = getResourcePermissions(_user.role, 'maintenance_reports')
 
         return NextResponse.json({
             data: reports,
             total,
-            user_role: user.role,
+            user_role: _user.role,
             permissions: {
                 can_create: permissions.canCreate,
                 can_update: permissions.canUpdate,

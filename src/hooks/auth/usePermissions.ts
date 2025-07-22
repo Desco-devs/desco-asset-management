@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { UserRole, ResourceType, RolePermissions } from '@/types/auth'
+import { UserRole, ResourceType } from '@/types/auth'
 import { getResourcePermissions, hasPermission } from '@/lib/auth/utils'
 import { useUserRole } from './useUserRole'
 

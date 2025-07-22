@@ -52,8 +52,8 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(route)
   );
 
-  // If authenticated user tries to access login or landing page, redirect based on role
-  if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/landing-page")) {
+  // If authenticated user tries to access public routes, redirect based on role
+  if (user && isPublicRoute && request.nextUrl.pathname !== "/assets") {
     if (userRole && userStatus === "ACTIVE") {
       const redirectPath = getDefaultRedirectPath(userRole);
       return NextResponse.redirect(new URL(redirectPath, request.url));

@@ -27,7 +27,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { createVehicle } from "@/app/actions/vehicle-actions";
 import { createClient } from "@supabase/supabase-js";
-import { useAuth } from "@/app/context/AuthContext";
+// import { useAuth } from "@/app/context/AuthContext";
 import { Separator } from "@/components/ui/separator";
 import type { 
   VehicleFormProps, 
@@ -42,7 +42,7 @@ export function VehicleForm({
   initialData,
   showFullFeatures = true
 }: VehicleFormProps) {
-  const { user } = useAuth();
+  // const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);

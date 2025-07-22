@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { fetchDashboardData } from "@/lib/dashboard-data";
 import {
   transformEquipmentCounts,
@@ -9,7 +9,7 @@ import {
   generateRecentActivity,
 } from "@/lib/dashboard-utils";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Fetch all data using organized data fetching functions
     const {

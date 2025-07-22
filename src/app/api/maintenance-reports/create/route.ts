@@ -133,7 +133,7 @@ export async function POST(request: Request) {
             try {
                 createData.dateRepaired = new Date(dateRepairedStr)
                 console.log('Date repaired set to:', createData.dateRepaired)
-            } catch (dateError) {
+            } catch {
                 console.error('Invalid date format:', dateRepairedStr)
                 return NextResponse.json({
                     error: 'Invalid date format for dateRepaired'

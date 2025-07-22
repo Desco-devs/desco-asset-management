@@ -1,12 +1,6 @@
 
-import VehiclesPageModern from "./VehiclesPageModern";
-import RealtimeTest from "./RealtimeTest";
+import VehiclesPageModern from "./components/VehiclesPageModern";
 
 export default function VehiclePage() {
-  return (
-    <div>
-      <VehiclesPageModern />
-      <RealtimeTest />
-    </div>
-  );
+  return <VehiclesPageModern />;
 }

@@ -1,7 +1,9 @@
-import { Vehicle } from "@/app/service/types";
+import { Vehicle } from "@/types/equipment";
 
 // Fetch vehicles by project ID
-export async function getVehiclesByProject(projectId: string): Promise<Vehicle[]> {
+export async function getVehiclesByProject(
+  projectId: string
+): Promise<Vehicle[]> {
   try {
     const response = await fetch(`/api/vehicles?projectId=${projectId}`, {
       method: "GET",
@@ -14,8 +16,8 @@ export async function getVehiclesByProject(projectId: string): Promise<Vehicle[]
     }
 
     return await response.json();
-  } catch (error: any) {
-    throw new Error(error.message || "Failed to fetch vehicles");
+  } catch (error: unknown) {
+    throw new Error(error instanceof Error ? error.message : "Failed to fetch vehicles");
   }
 }
 
@@ -33,8 +35,8 @@ export async function getVehicleByUid(uid: string): Promise<Vehicle> {
     }
 
     return await response.json();
-  } catch (error: any) {
-    throw new Error(error.message || "Failed to fetch vehicle");
+  } catch (error: unknown) {
+    throw new Error(error instanceof Error ? error.message : "Failed to fetch vehicle");
   }
 }
 
@@ -52,13 +54,16 @@ export async function createVehicle(formData: FormData): Promise<Vehicle> {
     }
 
     return await response.json();
-  } catch (error: any) {
-    throw new Error(error.message || "Failed to create vehicle");
+  } catch (error: unknown) {
+    throw new Error(error instanceof Error ? error.message : "Failed to create vehicle");
   }
 }
 
 // Update a vehicle
-export async function updateVehicle(uid: string, formData: FormData): Promise<Vehicle> {
+export async function updateVehicle(
+  uid: string,
+  formData: FormData
+): Promise<Vehicle> {
   try {
     const response = await fetch(`/api/vehicles/${uid}`, {
       method: "PATCH",
@@ -71,8 +76,8 @@ export async function updateVehicle(uid: string, formData: FormData): Promise<Ve
     }
 
     return await response.json();
-  } catch (error: any) {
-    throw new Error(error.message || "Failed to update vehicle");
+  } catch (error: unknown) {
+    throw new Error(error instanceof Error ? error.message : "Failed to update vehicle");
   }
 }
 
@@ -88,7 +93,7 @@ export async function deleteVehicle(uid: string): Promise<void> {
       const error = await response.json();
       throw new Error(error.error || "Failed to delete vehicle");
     }
-  } catch (error: any) {
-    throw new Error(error.message || "Failed to delete vehicle");
+  } catch (error: unknown) {
+    throw new Error(error instanceof Error ? error.message : "Failed to delete vehicle");
   }
 }

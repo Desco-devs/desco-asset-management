@@ -7,7 +7,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withResourcePermission('maintenance_reports', 'view', async (req: NextRequest, user: AuthenticatedUser) => {
+  return withResourcePermission('maintenance_reports', 'view', async (req: NextRequest, _user: AuthenticatedUser) => {
     try {
       const { id } = await params;
       const report = await prisma.maintenance_vehicle_report.findUnique({
@@ -64,7 +64,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withResourcePermission('maintenance_reports', 'update', async (req: NextRequest, user: AuthenticatedUser) => {
+  return withResourcePermission('maintenance_reports', 'update', async (req: NextRequest, _user: AuthenticatedUser) => {
     try {
       const { id } = await params;
       const body = await req.json();
@@ -167,9 +167,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withResourcePermission('maintenance_reports', 'delete', async (req: NextRequest, user: AuthenticatedUser) => {
+  return withResourcePermission('maintenance_reports', 'delete', async (req: NextRequest, _user: AuthenticatedUser) => {
+    const { id } = await params;
     try {
-      const { id } = await params;
       console.log(`🗑️ Attempting to delete maintenance report: ${id}`);
 
       // Check if report exists with full error logging

@@ -3,15 +3,15 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Triangle } from "lucide-react";
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 const HeroPage = () => {
-  const words = [
+  const words = useMemo(() => [
     "Trusted Company",
     "Business Solutions",
     "Digital Growth",
     "Success Partner",
-  ];
+  ], []);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [currentText, setCurrentText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);

@@ -27,7 +27,7 @@ export async function GET() {
 
     return NextResponse.json(locations);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching locations:", error);
     return NextResponse.json(
       { error: "Failed to fetch locations" },
@@ -111,10 +111,10 @@ export async function POST(request: NextRequest) {
       data: newLocation,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating location:", error);
     
-    if (error.code === "P2002") {
+    if (error instanceof Error && 'code' in error && error.code === "P2002") {
       return NextResponse.json(
         { error: "Location with this address already exists" },
         { status: 409 }
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: error.message || "Failed to create location" },
+      { error: error instanceof Error ? error.message : "Failed to create location" },
       { status: 500 }
     );
   }

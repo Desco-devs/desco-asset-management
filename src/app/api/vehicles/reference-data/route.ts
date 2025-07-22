@@ -37,17 +37,12 @@ export async function GET() {
           full_name: 'asc'
         }
       }),
-      prisma.maintenanceEquipmentReport.findMany({
+      prisma.maintenance_vehicle_report.findMany({
         select: {
           id: true,
           vehicle_id: true,
           status: true,
           created_at: true
-        },
-        where: {
-          vehicle_id: {
-            not: null
-          }
         },
         orderBy: {
           created_at: 'desc'

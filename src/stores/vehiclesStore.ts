@@ -188,7 +188,7 @@ interface VehiclesState {
   setIsExporting: (exporting: boolean) => void;
   
   // Computed selectors (derived state - no re-renders)
-  getFilteredVehicles: (vehicles: Vehicle[]) => Vehicle[];
+  getFilteredVehicles: (vehicles: Vehicle[], maintenanceReports?: MaintenanceReport[]) => Vehicle[];
   getSortedVehicles: (vehicles: Vehicle[]) => Vehicle[];
   getPaginatedVehicles: (vehicles: Vehicle[]) => Vehicle[];
   getTotalPages: (vehicles: Vehicle[]) => number;

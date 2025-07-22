@@ -3,8 +3,6 @@
 import * as React from "react";
 import {
   Frame,
-  PieChart,
-  Map,
   GalleryVerticalEnd,
   AudioWaveform,
   User,
@@ -19,7 +17,7 @@ import {
 } from "@/components/ui/sidebar";
 import { TeamSwitcher } from "./team-switcher";
 import { NavMain } from "./nav-main";
-import { NavProjects } from "./nav-projects";
+// import { NavProjects } from "./nav-projects";
 
 const data = {
   user: {

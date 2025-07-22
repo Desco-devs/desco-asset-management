@@ -1,11 +1,7 @@
 "use client";
 
-import Client from "./project-components/client";
+import { ProjectsManager } from "./components/ProjectsManager";
 
-export default function Proejects() {
-  return (
-    <div className="p-4">
-      <Client />
-    </div>
-  );
+export default function Projects() {
+  return <ProjectsManager />;
 }

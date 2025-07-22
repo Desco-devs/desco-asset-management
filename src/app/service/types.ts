@@ -1,17 +1,16 @@
 // File: app/service/types.ts
-import { user_status } from '@prisma/client'
 export type Status = "OPERATIONAL" | "NON_OPERATIONAL";
 
 export interface User {
-  uid?: string
-  username?: string
-  password?: string
-  fullname?: string
-  phone?: string | null
-  permissions?: string[]
-  userStatus?: string
-  created_at?: string
-  updated_at?: string
+  uid?: string;
+  username?: string;
+  password?: string;
+  fullname?: string;
+  phone?: string | null;
+  permissions?: string[];
+  userStatus?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /**
@@ -165,7 +164,7 @@ export interface VehicleDB {
 }
 
 /**
- * Vehicle model - Client format (camelCase)  
+ * Vehicle model - Client format (camelCase)
  */
 export interface Vehicle {
   uid: string;

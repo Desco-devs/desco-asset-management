@@ -6,15 +6,15 @@ import { useAuth } from '@/app/context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { ROOMS_QUERY_KEYS } from '@/hooks/chat-app/useRooms';
 import { useOnlineStatus } from '@/hooks/chat-app/useOnlineStatus';
-import { RoomListItem, RoomInvitationWithRelations } from '@/types/chat-app';
+import { RoomListItem } from '@/types/chat-app';
 
 interface SocketContextType {
   socket: ReturnType<typeof useSocket>['socket'];
   isConnected: boolean;
   connectionError: string | null;
-  emit: (event: string, ...args: any[]) => void;
-  on: (event: string, listener: (...args: any[]) => void) => void;
-  off: (event: string, listener?: (...args: any[]) => void) => void;
+  emit: (event: string, ...args: unknown[]) => void;
+  on: (event: string, listener: (...args: unknown[]) => void) => void;
+  off: (event: string, listener?: (...args: unknown[]) => void) => void;
   joinRoom: (roomId: string) => void;
   leaveRoom: (roomId: string) => void;
   isUserOnline: (userId: string) => boolean;
@@ -62,8 +62,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     // Handle room invitation received
     const handleInvitationReceived = (data: {
       room: RoomListItem;
-      invitation: any;
-      inviter: any;
+      invitation: unknown;
+      inviter: unknown;
     }) => {
       console.log('Invitation received:', data);
       
@@ -91,7 +91,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     const handleMemberJoined = (data: {
       roomId: string;
       userId: string;
-      user: any;
+      user: unknown;
     }) => {
       console.log('Member joined room:', data);
       
@@ -102,7 +102,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     };
 
     // Handle new messages
-    const handleNewMessage = (message: any) => {
+    const handleNewMessage = (message: unknown) => {
       console.log('New message received:', message);
       
       // Invalidate rooms query to update last message
@@ -128,12 +128,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     };
 
     // Handle initial online users list
-    const handleOnlineUsersList = (userIds: string[]) => {
-      console.log("Received online users list:", userIds);
-      userIds.forEach(userId => {
-        setUserOnline(userId);
-      });
-    };
+    // const handleOnlineUsersList = (userIds: string[]) => {
+    //   console.log("Received online users list:", userIds);
+    //   userIds.forEach(userId => {
+    //     setUserOnline(userId);
+    //   });
+    // };
 
     // Handle errors
     const handleError = (error: { message: string; code?: string }) => {

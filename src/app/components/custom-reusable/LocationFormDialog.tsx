@@ -39,7 +39,7 @@ export function LocationFormDialog({ trigger, onLocationAdded }: LocationFormDia
     setIsLoading(true);
     
     try {
-      const result = await createLocation(address.trim());
+      await createLocation(address.trim());
       
       toast.success("Location created successfully");
       setAddress("");

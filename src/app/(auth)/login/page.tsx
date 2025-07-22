@@ -8,6 +8,8 @@ import {
   CarouselItem,
 } from "@/components/ui/carousel";
 import { SignInForm } from "@/components/auth/forms/SignInForm";
+import Image from "next/image";
+import type { CarouselApi } from "@/components/ui/carousel";
 
 const carouselItems = [
   "/images/static/1.jpg",
@@ -19,17 +21,13 @@ const carouselItems = [
 ];
 
 const Auth = () => {
-  const [api, setApi] = useState<any>();
-  const [current, setCurrent] = useState(0);
+  const [api, setApi] = useState<CarouselApi>();
   const [authMode, setAuthMode] = useState<"signin" | "forgot">("signin");
 
   const goToForgotPassword = () => {
     setAuthMode("forgot");
   };
 
-  const goToSignIn = () => {
-    setAuthMode("signin");
-  };
 
   useEffect(() => {
     if (!api) return;
@@ -42,21 +40,7 @@ const Auth = () => {
     return () => clearInterval(interval);
   }, [api]);
 
-  // Handle slide changes
-  const handleSelect = () => {
-    if (!api) return;
-    setCurrent(api.selectedScrollSnap());
-  };
 
-  useEffect(() => {
-    if (!api) return;
-
-    api.on("select", handleSelect);
-
-    return () => {
-      api.off("select", handleSelect);
-    };
-  }, [api, handleSelect]);
 
   return (
     <div className="w-full h-screen flex flex-col md:flex-row dark:bg-chart-2 bg-gray-200">
@@ -79,12 +63,15 @@ const Auth = () => {
               <CarouselItem key={index} className="h-full w-full p-0">
                 <div className="h-full w-full">
                   <Card className="h-full w-full rounded-none border-0 p-0">
-                    <CardContent className="h-full w-full p-0 flex items-center justify-center">
+                    <CardContent className="h-full w-full p-0 flex items-center justify-center relative">
                       {/* Full background image */}
-                      <img
+                      <Image
                         src={item}
-                        className="h-full w-full object-cover"
+                        fill
+                        className="object-cover"
                         alt=""
+                        sizes="50vw"
+                        priority={index === 0}
                       />
                     </CardContent>
                   </Card>

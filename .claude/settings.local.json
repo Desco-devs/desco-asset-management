@@ -42,7 +42,10 @@
       "Bash(cd:*)",
       "Bash(npm install:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npm update:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }

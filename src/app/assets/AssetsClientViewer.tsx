@@ -11,8 +11,8 @@ import { createClient } from "@/lib/supabase";
 import { AssetsClientViewerProps, Equipment, Vehicle } from "@/types/assets";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import EquipmentClientViewer from "./asset-components/EquipmentsClient";
-import VehicleClientViewer from "./asset-components/VehiclesClient";
+import EquipmentClientViewer from "./components/EquipmentsClient";
+import VehicleClientViewer from "./components/VehiclesClient";
 
 const AssetsClientViewer = ({
   initialEquipment,

@@ -183,7 +183,7 @@ export function FileUploadSectionSimple({
             {isImage ? (
               <div className="relative w-full max-w-[200px] mx-auto">
                 <Image
-                  src={preview}
+                  src={preview || ""}
                   alt={label}
                   width={200}
                   height={200}

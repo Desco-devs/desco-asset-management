@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { RoomType, ChatUser, InvitationStatus, SendMessageData } from '@/types/chat-app';
+import { RoomType, ChatUser } from '@/types/chat-app';
 import { ROOMS_QUERY_KEYS } from './useRooms';
 
 interface CreateRoomData {
@@ -38,7 +38,7 @@ export const useChatMutations = (currentUserId?: string) => {
 
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       if (currentUserId) {
         // Invalidate and refetch rooms query immediately for instant updates
         queryClient.invalidateQueries({
@@ -67,7 +67,7 @@ export const useChatMutations = (currentUserId?: string) => {
 
       return response.json();
     },
-    onSuccess: (data, variables) => {
+    onSuccess: () => {
       if (currentUserId) {
         // Invalidate and refetch rooms query immediately for instant updates
         queryClient.invalidateQueries({
@@ -97,7 +97,7 @@ export const useChatMutations = (currentUserId?: string) => {
 
       return response.json();
     },
-    onSuccess: (data, roomId) => {
+    onSuccess: () => {
       // Update rooms list to clear unread count
       if (currentUserId) {
         queryClient.invalidateQueries({

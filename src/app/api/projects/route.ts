@@ -5,7 +5,7 @@ import { getResourcePermissions } from '@/lib/auth/utils'
 import { prisma } from "@/lib/prisma";
 
 // GET /api/projects - View all projects with proper role-based access control
-export const GET = withResourcePermission('projects', 'view', async (request: NextRequest, user: AuthenticatedUser) => {
+export const GET = withResourcePermission('projects', 'view', async (request: NextRequest, _user: AuthenticatedUser) => {
   try {
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get("clientId");
@@ -39,12 +39,12 @@ export const GET = withResourcePermission('projects', 'view', async (request: Ne
     const total = await prisma.project.count(clientId ? { where: { client_id: clientId } } : undefined);
 
     // Get user permissions for this resource
-    const permissions = getResourcePermissions(user.role, 'projects')
+    const permissions = getResourcePermissions(_user.role, 'projects')
 
     return NextResponse.json({
       data: projects,
       total,
-      user_role: user.role,
+      user_role: _user.role,
       permissions: {
         can_create: permissions.canCreate,
         can_update: permissions.canUpdate,
@@ -58,7 +58,7 @@ export const GET = withResourcePermission('projects', 'view', async (request: Ne
 })
 
 // POST /api/projects - Create a new project
-export const POST = withResourcePermission('projects', 'create', async (request: NextRequest, user: AuthenticatedUser) => {
+export const POST = withResourcePermission('projects', 'create', async (request: NextRequest, _user: AuthenticatedUser) => {
   try {
     const { name, clientId } = await request.json();
     
@@ -90,9 +90,9 @@ export const POST = withResourcePermission('projects', 'create', async (request:
     });
     
     return NextResponse.json(project, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating project:", error);
-    if (error.code === 'P2002') {
+    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
       return NextResponse.json({ error: 'Project with this name already exists for this client' }, { status: 400 })
     }
     return NextResponse.json({ error: "Failed to create project" }, { status: 500 });

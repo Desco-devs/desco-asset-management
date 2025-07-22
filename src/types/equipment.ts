@@ -1,5 +1,39 @@
 // Equipment-related types and interfaces
 
+export type Status = "OPERATIONAL" | "NON_OPERATIONAL";
+
+export interface Vehicle {
+  uid: string;
+  brand: string;
+  model: string;
+  type: string;
+  plateNumber: string;
+  inspectionDate: string;
+  before: number;
+  expiryDate: string;
+  status: Status;
+  remarks?: string;
+  owner: string;
+  frontImgUrl?: string;
+  backImgUrl?: string;
+  side1ImgUrl?: string;
+  side2ImgUrl?: string;
+  originalReceiptUrl?: string;
+  carRegistrationUrl?: string;
+  project: {
+    uid: string;
+    name: string;
+    client: {
+      uid: string;
+      name: string;
+      location: {
+        uid: string;
+        address: string;
+      };
+    };
+  };
+}
+
 export interface Location {
   uid: string;
   address: string;
@@ -10,8 +44,8 @@ export interface Location {
 export interface Client {
   uid: string;
   name: string;
-  locationId: string;
-  location: {
+  locationId?: string;
+  location?: {
     uid: string;
     address: string;
   };

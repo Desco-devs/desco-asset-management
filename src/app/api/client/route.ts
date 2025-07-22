@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth'
 import { getResourcePermissions } from '@/lib/auth/utils'
 
@@ -13,7 +13,7 @@ export const GET = withResourcePermission('clients', 'view', async (request: Nex
     const offset = searchParams.get('offset')
     const locationId = searchParams.get('locationId')
 
-    const queryOptions: any = {
+    const queryOptions: Prisma.clientFindManyArgs = {
       include: { location: true, projects: true },
       orderBy: { created_at: 'desc' },
     }
@@ -54,7 +54,7 @@ export const GET = withResourcePermission('clients', 'view', async (request: Nex
 })
 
 // POST /api/client - Create a new client
-export const POST = withResourcePermission('clients', 'create', async (request: NextRequest, user: AuthenticatedUser) => {
+export const POST = withResourcePermission('clients', 'create', async (request: NextRequest) => {
   try {
     const { name, locationId } = await request.json()
     
@@ -83,9 +83,9 @@ export const POST = withResourcePermission('clients', 'create', async (request: 
     })
 
     return NextResponse.json(newClient, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating client:', error)
-    if (error.code === 'P2002') {
+    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
       return NextResponse.json({ error: 'Client with this name already exists in this location' }, { status: 400 })
     }
     return NextResponse.json({ error: 'Failed to create client' }, { status: 500 })

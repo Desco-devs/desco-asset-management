@@ -16,7 +16,7 @@ interface FileDeletionStatus {
 }
 
 export async function DELETE(request: Request) {
-    let fileDeletionStatus: FileDeletionStatus = {
+    const fileDeletionStatus: FileDeletionStatus = {
       total: 0,
       successful: 0,
       failed: 0,
@@ -81,7 +81,7 @@ export async function DELETE(request: Request) {
             fileDeletionStatus.successful = filesToDelete.length
             console.log(`✅ Successfully deleted ${fileDeletionStatus.successful} files using bulk deletion`)
 
-          } catch (bulkError) {
+          } catch {
             // Fallback method: Individual file deletion
             console.log('🔄 Attempting individual file deletion as fallback...')
             fileDeletionStatus.method = 'fallback'

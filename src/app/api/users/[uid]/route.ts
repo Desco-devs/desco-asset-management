@@ -1,5 +1,6 @@
 import { PrismaClient, Role, user_status as UserStatusEnum } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
+import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth'
 
 // Type for user_status values
 type UserStatus = keyof typeof UserStatusEnum
@@ -49,10 +50,11 @@ export async function GET(
   }
 }
 
-export async function PUT(
+export const PUT = withResourcePermission('users', 'update', async (
   request: NextRequest,
+  user: AuthenticatedUser,
   context: { params: Promise<{ uid: string }> }
-) {
+) => {
   const { uid } = await context.params
 
   try {
@@ -103,22 +105,23 @@ export async function PUT(
     })
 
     return NextResponse.json(user)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating user:', error)
-    if (error.code === 'P2002') {
+    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
       return NextResponse.json({ error: 'Username already exists' }, { status: 400 })
     }
-    if (error.code === 'P2025') {
+    if (error instanceof Error && 'code' in error && error.code === 'P2025') {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+})
 
-export async function DELETE(
-  request: NextRequest,
+export const DELETE = withResourcePermission('users', 'delete', async (
+  request: NextRequest, 
+  user: AuthenticatedUser, 
   context: { params: Promise<{ uid: string }> }
-) {
+) => {
   const { uid } = await context.params
 
   try {
@@ -127,11 +130,11 @@ export async function DELETE(
     })
 
     return NextResponse.json({ message: 'User deleted successfully' })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting user:', error)
-    if (error.code === 'P2025') {
+    if (error instanceof Error && 'code' in error && error.code === 'P2025') {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+})

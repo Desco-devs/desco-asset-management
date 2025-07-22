@@ -492,13 +492,13 @@ export function useSupabaseRealtime() {
             }
 
             // Check if payload has required properties
-            if (!payload.eventType && !payload.event) {
+            if (!(payload as any).eventType && !(payload as any).event) {
               console.warn('Invalid vehicle payload received (no event type):', payload);
               return;
             }
 
             // Normalize eventType (some versions use 'event' instead of 'eventType')
-            const eventType = payload.eventType || payload.event;
+            const eventType = (payload as any).eventType || (payload as any).event;
             if (!eventType || typeof eventType !== 'string') {
               console.warn('Invalid event type in vehicle payload:', payload);
               return;
@@ -514,7 +514,7 @@ export function useSupabaseRealtime() {
               }
 
               // Ensure payload.old has at least an id property
-              if (!payload.old.id || typeof payload.old.id !== 'string') {
+              if (!(payload as any).old?.id || typeof (payload as any).old?.id !== 'string') {
                 console.warn('DELETE payload.old missing valid id for vehicle, skipping:', payload);
                 queryClient.invalidateQueries({ queryKey: vehicleKeys.vehicles() });
                 return;
@@ -530,7 +530,7 @@ export function useSupabaseRealtime() {
               }
 
               // Ensure payload.new has at least an id property
-              if (!payload.new.id || typeof payload.new.id !== 'string') {
+              if (!(payload as any).new?.id || typeof (payload as any).new?.id !== 'string') {
                 console.warn(`${eventType} payload.new missing valid id for vehicle, skipping:`, payload);
                 queryClient.invalidateQueries({ queryKey: vehicleKeys.vehicles() });
                 return;
@@ -653,13 +653,13 @@ export function useSupabaseRealtime() {
             }
 
             // Check if payload has required properties
-            if (!payload.eventType && !payload.event) {
+            if (!(payload as any).eventType && !(payload as any).event) {
               console.warn('Invalid payload received (no event type):', payload);
               return;
             }
 
             // Normalize eventType (some versions use 'event' instead of 'eventType')
-            const eventType = payload.eventType || payload.event;
+            const eventType = (payload as any).eventType || (payload as any).event;
             if (!eventType || typeof eventType !== 'string') {
               console.warn('Invalid event type in payload:', payload);
               return;
@@ -676,7 +676,7 @@ export function useSupabaseRealtime() {
               }
 
               // Ensure payload.old has at least an id property
-              if (!payload.old.id || typeof payload.old.id !== 'string') {
+              if (!(payload as any).old?.id || typeof (payload as any).old?.id !== 'string') {
                 console.warn('DELETE payload.old missing valid id, skipping:', payload);
                 queryClient.invalidateQueries({ queryKey: vehicleKeys.maintenanceReports() });
                 return;
@@ -692,7 +692,7 @@ export function useSupabaseRealtime() {
               }
 
               // Ensure payload.new has at least an id property
-              if (!payload.new.id || typeof payload.new.id !== 'string') {
+              if (!(payload as any).new?.id || typeof (payload as any).new?.id !== 'string') {
                 console.warn(`${eventType} payload.new missing valid id, skipping:`, payload);
                 queryClient.invalidateQueries({ queryKey: vehicleKeys.maintenanceReports() });
                 return;

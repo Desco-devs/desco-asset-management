@@ -1,7 +1,7 @@
 // File: app/api/equipments/[uid]/route.ts
 
 import { NextResponse } from 'next/server'
-import { status as EquipmentStatus } from '@prisma/client'
+import { status as EquipmentStatus, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 
@@ -132,19 +132,19 @@ export async function PATCH(
     }
 
     // build update payload
-    const updateData: any = {
+    const updateData: Prisma.equipmentUpdateInput = {
       brand,
       model,
       type,
-      expirationDate: new Date(expirationDate),
+      insurance_expiration_date: new Date(expirationDate),
       status,
       remarks,
       owner,
     }
     if (inspectionDateStr) {
-      updateData.inspectionDate = new Date(inspectionDateStr)
+      updateData.inspection_date = new Date(inspectionDateStr)
     } else {
-      updateData.inspectionDate = null
+      updateData.inspection_date = null
     }
 
     // update fields first

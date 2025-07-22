@@ -14,7 +14,8 @@ export const DASHBOARD_PROTECTED_ROUTES = [
   '/equipments',
   '/vehicles',
   '/locations',
-  '/projects'
+  '/projects',
+  '/chat-app'
 ]
 
 // Paths that should skip middleware to prevent redirect loops
@@ -28,7 +29,8 @@ export const SKIP_MIDDLEWARE_PATHS = [
 export const PUBLIC_ROUTES = [
   '/landing-page',
   '/login',
-  '/unauthorized'
+  '/unauthorized',
+  '/assets'
 ]
 
 // Role display names for UI

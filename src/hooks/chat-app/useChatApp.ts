@@ -1,10 +1,10 @@
 import { useState, useEffect, useReducer, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRooms, ROOMS_QUERY_KEYS, useInvalidateRooms } from './useRooms';
+import { useRooms, useInvalidateRooms } from './useRooms';
 import { useUsers } from './useUsers';
 import { useChatMutations } from './useChatMutations';
 import { useSocketContext } from '@/context/SocketContext';
-import { RoomListItem, InvitationStatus, MessageWithRelations, SendMessageData, MessageType } from '@/types/chat-app';
+import { RoomListItem, MessageWithRelations, MessageType, InvitationStatus } from '@/types/chat-app';
 
 interface UseChatAppOptions {
   userId?: string;

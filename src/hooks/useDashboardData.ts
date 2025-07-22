@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import type { ActivityItem } from "@/types/dashboard";
 
 export interface DashboardData {
   equipmentCounts: {
@@ -25,14 +26,7 @@ export interface DashboardData {
       newVehiclesThisWeek: number;
     };
   };
-  recentActivity: Array<{
-    id: string;
-    type: string;
-    title: string;
-    description: string;
-    timestamp: string;
-    status?: string;
-  }>;
+  recentActivity: ActivityItem[];
   detailedData: {
     locations: any[];
     clients: any[];

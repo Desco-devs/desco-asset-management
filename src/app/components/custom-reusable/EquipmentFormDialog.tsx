@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useActionState, useEffect, useState, startTransition, useCallback, useRef } from "react";
 import { useFormStatus } from "react-dom";
-import { Wrench, Upload, X, FileText, Image } from "lucide-react";
+import { Wrench, Upload, Image } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -470,6 +470,7 @@ export function EquipmentFormDialog({
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base flex items-center gap-2">
+                        {/* eslint-disable-next-line jsx-a11y/alt-text */}
                         <Image className="h-4 w-4" />
                         Equipment Parts Management
                       </CardTitle>

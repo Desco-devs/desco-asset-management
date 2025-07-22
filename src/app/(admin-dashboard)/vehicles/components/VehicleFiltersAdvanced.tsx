@@ -250,7 +250,7 @@ export default function VehicleFiltersAdvanced({
                 {/* Status Filter */}
                 <div className="space-y-2">
                   <Label htmlFor="status-filter">Status</Label>
-                  <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
                     <SelectTrigger className="h-11 w-full">
                       <SelectValue placeholder="Select Status" />
                     </SelectTrigger>

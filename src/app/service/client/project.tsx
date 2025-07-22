@@ -1,4 +1,4 @@
-import { Project } from '@/app/service/types'
+import { Project } from '@/types/equipment'
 
 const API_BASE = '/api/projects'
 

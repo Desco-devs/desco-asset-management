@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -14,7 +14,15 @@ export async function GET() {
       );
     }
 
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const location_id = searchParams.get('location_id');
+
+    // Build query conditions
+    const whereCondition = location_id ? { location_id } : {};
+
     const clients = await prisma.client.findMany({
+      where: whereCondition,
       include: {
         location: true,
         user: {
@@ -38,7 +46,7 @@ export async function GET() {
 
     return NextResponse.json(clients);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching clients:", error);
     return NextResponse.json(
       { error: "Failed to fetch clients" },
@@ -147,10 +155,10 @@ export async function POST(request: NextRequest) {
       message: "Client created successfully"
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating client:", error);
     
-    if (error.code === "P2002") {
+    if (error instanceof Error && 'code' in error && error.code === "P2002") {
       return NextResponse.json(
         { error: "Client with this name already exists in this location" },
         { status: 409 }
@@ -158,7 +166,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: error.message || "Failed to create client" },
+      { error: error instanceof Error ? error.message : "Failed to create client" },
       { status: 500 }
     );
   }

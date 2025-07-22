@@ -2,6 +2,7 @@
 "use client"
 
 import React from "react"
+import Image from "next/image"
 import {
   Dialog,
   DialogContent,
@@ -32,7 +33,16 @@ export default function ImagePreviewModal({
           <DialogTitle className="sr-only">Image Preview</DialogTitle>
         </DialogHeader>
         <div className="p-4">
-          <img src={src} alt="Preview" className="w-full h-auto rounded" />
+          <div className="relative w-full max-h-[70vh]">
+            <Image 
+              src={src} 
+              alt="Preview" 
+              width={800}
+              height={600}
+              className="w-full h-auto rounded object-contain"
+              style={{ maxHeight: '70vh' }}
+            />
+          </div>
         </div>
         <div className="p-4 text-right">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

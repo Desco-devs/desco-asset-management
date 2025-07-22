@@ -68,9 +68,9 @@ export const useEquipmentSubmit = ({
 
       // Add file uploads
       Object.entries(files).forEach(([key, fileState]) => {
-        if (fileState.file) {
+        if ((fileState as any).file) {
           const fieldName = getFileFieldName(key);
-          submitFormData.append(fieldName, fileState.file);
+          submitFormData.append(fieldName, (fileState as any).file);
         }
       });
 
@@ -105,7 +105,7 @@ export const useEquipmentSubmit = ({
       if (isEditMode) {
         Object.entries(files).forEach(([key, fileState]) => {
           const fieldName = getKeepExistingFieldName(key);
-          submitFormData.append(fieldName, fileState.keep.toString());
+          submitFormData.append(fieldName, ((fileState as any).keep ?? false).toString());
         });
       }
 

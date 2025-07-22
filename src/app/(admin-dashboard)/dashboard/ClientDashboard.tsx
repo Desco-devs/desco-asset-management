@@ -12,7 +12,7 @@ import {
   RecentActivity,
   VehiclesAndEquipments,
   VehiclesCount,
-} from "./dashboard-components";
+} from "./components";
 
 function DashboardSkeleton() {
   return (
@@ -73,6 +73,26 @@ function DashboardContent() {
     detailedData
   } = data || {};
 
+  // Default overview stats structure
+  const defaultOverviewStats = {
+    locations: 0,
+    clients: 0,
+    projects: 0,
+    vehicles: { total: 0, operational: 0, nonOperational: 0 },
+    equipment: { total: 0, operational: 0, nonOperational: 0 },
+    maintenanceReports: { total: 0, pending: 0, inProgress: 0 },
+    growth: { newClientsThisWeek: 0, newProjectsThisWeek: 0, newEquipmentThisWeek: 0, newVehiclesThisWeek: 0 }
+  };
+
+  const defaultDetailedData = {
+    locations: [],
+    clients: [],
+    projects: [],
+    equipment: [],
+    vehicles: [],
+    maintenanceReports: []
+  };
+
   return (
     <div className="min-h-screen py-6 px-6 space-y-6">
       {/* Page Header */}
@@ -89,8 +109,8 @@ function DashboardContent() {
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Overview</h2>
         <OverviewStats 
-          initialData={overviewStats} 
-          detailedData={detailedData}
+          initialData={overviewStats || defaultOverviewStats} 
+          detailedData={detailedData || defaultDetailedData}
         />
       </div>
 

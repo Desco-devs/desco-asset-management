@@ -68,13 +68,13 @@ export async function createLocation(address: string) {
       success: true,
       data: newLocation,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating location:", error);
     
-    if (error.code === "P2002") {
+    if (error instanceof Error && 'code' in error && error.code === "P2002") {
       throw new Error("Location with this address already exists");
     }
     
-    throw new Error(error.message || "Failed to create location");
+    throw new Error(error instanceof Error ? error.message : "Failed to create location");
   }
 }

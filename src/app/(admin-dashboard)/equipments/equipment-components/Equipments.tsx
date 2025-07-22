@@ -31,6 +31,7 @@ import {
   Shield,
   Trash2,
 } from "lucide-react";
+import NextImage from "next/image";
 import { toast } from "sonner";
 import EquipmentDeleteAlertDialog from "./AlertDialog";
 import EquipmentModal from "./EquipmentModal";
@@ -830,11 +831,13 @@ const EquipmentCards = ({
             <CardContent className="space-y-3">
               {/* Equipment Image */}
               {equipment.image_url && (
-                <div className="aspect-video bg-white rounded-md overflow-hidden">
-                  <img
+                <div className="aspect-video bg-white rounded-md overflow-hidden relative">
+                  <NextImage
                     src={equipment.image_url}
-                    alt={`${equipment.brand} ${equipment.model}`}
-                    className="w-full h-full object-contain object-center"
+                    alt={`${equipment.brand} ${equipment.model} equipment image`}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   />
                 </div>
               )}

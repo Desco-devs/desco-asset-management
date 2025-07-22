@@ -8,7 +8,7 @@ import type {
 } from "@/types/assets";
 import { Metadata } from "next";
 import AssetsClientViewer from "./AssetsClientViewer";
-import AssetsHeader from "./asset-components/AssetsHeader";
+import AssetsHeader from "./components/AssetsHeader";
 
 export const metadata: Metadata = {
   title: "Assets Viewer | Desco",

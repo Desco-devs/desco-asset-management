@@ -1,5 +1,7 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,22 +9,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import {
-  CalendarDays,
-  User,
   Building2,
-  MapPin,
-  Settings,
-  Image,
-  FileText,
-  Receipt,
+  CalendarDays,
   Car,
-  ExternalLink,
-  Shield,
   CheckCircle,
+  ExternalLink,
+  FileText,
+  Image as ImageIcon,
+  MapPin,
+  Receipt,
+  Settings,
+  Shield,
+  User,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import Image from "next/image";
 
 // Equipment interface (updated to include `before` and `equipmentParts`)
 interface Equipment {
@@ -60,7 +61,7 @@ interface Equipment {
 interface EquipmentModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  equipment: Equipment | null | '';
+  equipment: Equipment | null | "";
 }
 
 const EquipmentModal = ({
@@ -129,14 +130,15 @@ const EquipmentModal = ({
           {/* Image Preview */}
           {equipment.image_url && (
             <div className="flex justify-center">
-              <div className="w-full aspect-video rounded-md overflow-hidden relative">
-                <img
+              <div className="w-full aspect-video rounded-md overflow-hidden relative cursor-pointer" onClick={() => openFile(equipment.image_url!)}>
+                <Image
                   src={equipment.image_url}
-                  alt={`${equipment.brand} ${equipment.model}`}
-                  className="w-full h-full object-contain cursor-pointer"
-                  onClick={() => openFile(equipment.image_url!)}
+                  alt={`${equipment.brand} ${equipment.model} equipment image`}
+                  fill
+                  className="object-contain"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 60vw"
                 />
-                <p className="text-xs text-center text-muted-foreground mt-1 absolute top-0">
+                <p className="text-xs text-center text-muted-foreground mt-1 absolute top-2 left-2 bg-white/80 px-2 py-1 rounded">
                   Click to view full size
                 </p>
               </div>
@@ -225,15 +227,16 @@ const EquipmentModal = ({
               {equipment.image_url && (
                 <div className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-center gap-2">
-                    <Image className="h-4 w-4 text-blue-500" />
+                    <ImageIcon className="h-4 w-4 text-blue-500" />
                     <span className="font-medium text-sm">Equipment Image</span>
                   </div>
-                  <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                    <img
+                  <div className="aspect-video bg-gray-100 rounded-md overflow-hidden relative cursor-pointer hover:opacity-90 transition" onClick={() => openFile(equipment.image_url!)}>
+                    <Image
                       src={equipment.image_url}
-                      alt="Equipment"
-                      className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition"
-                      onClick={() => openFile(equipment.image_url!)}
+                      alt="Equipment image"
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, 33vw"
                     />
                   </div>
                   <Button
@@ -258,12 +261,13 @@ const EquipmentModal = ({
                     </span>
                   </div>
                   {isImage(equipment.originalReceiptUrl) ? (
-                    <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                      <img
+                    <div className="aspect-video bg-gray-100 rounded-md overflow-hidden relative cursor-pointer hover:opacity-90 transition" onClick={() => openFile(equipment.originalReceiptUrl!)}>
+                      <Image
                         src={equipment.originalReceiptUrl}
-                        alt="Receipt"
-                        className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition"
-                        onClick={() => openFile(equipment.originalReceiptUrl!)}
+                        alt="Original receipt document"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 33vw"
                       />
                     </div>
                   ) : (
@@ -294,14 +298,13 @@ const EquipmentModal = ({
                     <span className="font-medium text-sm">Registration</span>
                   </div>
                   {isImage(equipment.equipmentRegistrationUrl) ? (
-                    <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                      <img
+                    <div className="aspect-video bg-gray-100 rounded-md overflow-hidden relative cursor-pointer hover:opacity-90 transition" onClick={() => openFile(equipment.equipmentRegistrationUrl!)}>
+                      <Image
                         src={equipment.equipmentRegistrationUrl}
-                        alt="Registration"
-                        className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition"
-                        onClick={() =>
-                          openFile(equipment.equipmentRegistrationUrl!)
-                        }
+                        alt="Equipment registration document"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 33vw"
                       />
                     </div>
                   ) : (
@@ -336,14 +339,13 @@ const EquipmentModal = ({
                     </span>
                   </div>
                   {isImage(equipment.thirdpartyInspectionImage) ? (
-                    <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                      <img
+                    <div className="aspect-video bg-gray-100 rounded-md overflow-hidden relative cursor-pointer hover:opacity-90 transition" onClick={() => openFile(equipment.thirdpartyInspectionImage!)}>
+                      <Image
                         src={equipment.thirdpartyInspectionImage}
-                        alt="3rd Party"
-                        className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition"
-                        onClick={() =>
-                          openFile(equipment.thirdpartyInspectionImage!)
-                        }
+                        alt="Third-party inspection document"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 33vw"
                       />
                     </div>
                   ) : (
@@ -376,12 +378,13 @@ const EquipmentModal = ({
                     <span className="font-medium text-sm">PGPC Inspection</span>
                   </div>
                   {isImage(equipment.pgpcInspectionImage) ? (
-                    <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                      <img
+                    <div className="aspect-video bg-gray-100 rounded-md overflow-hidden relative cursor-pointer hover:opacity-90 transition" onClick={() => openFile(equipment.pgpcInspectionImage!)}>
+                      <Image
                         src={equipment.pgpcInspectionImage}
-                        alt="PGPC"
-                        className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition"
-                        onClick={() => openFile(equipment.pgpcInspectionImage!)}
+                        alt="PGPC inspection document"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 33vw"
                       />
                     </div>
                   ) : (
@@ -420,12 +423,13 @@ const EquipmentModal = ({
                           </span>
                         </div>
                         {isImage(partUrl) ? (
-                          <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                            <img
+                          <div className="aspect-video bg-gray-100 rounded-md overflow-hidden relative cursor-pointer hover:opacity-90 transition" onClick={() => openFile(partUrl)}>
+                            <Image
                               src={partUrl}
-                              alt={`Part ${index + 1}`}
-                              className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition"
-                              onClick={() => openFile(partUrl)}
+                              alt={`Equipment part ${index + 1} image`}
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 768px) 100vw, 33vw"
                             />
                           </div>
                         ) : (

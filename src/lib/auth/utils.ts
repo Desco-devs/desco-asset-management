@@ -39,7 +39,15 @@ export function getResourcePermissions(userRole: UserRole, resourceType: Resourc
           canDelete: true,
         }
       }
-      // ADMIN and VIEWER can only view users
+      if (userRole === 'ADMIN') {
+        return {
+          canView: true,
+          canCreate: true,
+          canUpdate: true,
+          canDelete: true,
+        }
+      }
+      // VIEWER can only view users
       return {
         ...basePermissions,
         canView: true,

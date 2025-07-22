@@ -92,13 +92,13 @@ const FolderGrid = ({
                     }`} />
                     
                     {totalParts > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs">
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs">
                         {totalParts > 99 ? '99+' : totalParts}
                       </span>
                     )}
                     
                     {folder.subfolders.length > 0 && (
-                      <span className="absolute -bottom-1 -left-1 bg-green-500 text-white text-xs rounded-full w-3 h-3 sm:w-4 sm:h-4 flex items-center justify-center">
+                      <span className="absolute -bottom-1 -left-1 bg-green-500 text-white rounded-full w-3 h-3 sm:w-4 sm:h-4 flex items-center justify-center text-xs">
                         {folder.subfolders.length > 9 ? '9+' : folder.subfolders.length}
                       </span>
                     )}

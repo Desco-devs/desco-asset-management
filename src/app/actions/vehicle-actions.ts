@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { status as VehicleStatus } from "@prisma/client";
 
 // Helper to upload files to Supabase with folder structure
+// Currently unused but kept for future use
+/* 
 const uploadFileToSupabase = async (
   file: File,
   projectId: string,
@@ -52,10 +54,13 @@ const uploadFileToSupabase = async (
     .from('vehicles')
     .getPublicUrl(uploadData.path);
 
-  return { field: getFieldName(prefix), url: urlData.publicUrl };
+  return { field: 'getFieldName(prefix)', url: urlData.publicUrl };
 };
+*/
 
 // Map file prefix to Prisma field name
+// Currently unused but kept for future use
+/*
 const getFieldName = (prefix: string): string => {
   switch (prefix) {
     case 'front': return 'front_img_url';
@@ -68,6 +73,7 @@ const getFieldName = (prefix: string): string => {
     default: throw new Error(`Unknown prefix: ${prefix}`);
   }
 };
+*/
 
 interface CreateVehicleData {
   brand: string;

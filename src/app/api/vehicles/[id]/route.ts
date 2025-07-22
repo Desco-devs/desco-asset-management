@@ -77,7 +77,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withResourcePermission('vehicles', 'update', async (req: NextRequest, user: AuthenticatedUser) => {
+  return withResourcePermission('vehicles', 'update', async (req: NextRequest, _user: AuthenticatedUser) => {
     try {
       const { id } = await params;
       // Parse request body
@@ -132,7 +132,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withResourcePermission('vehicles', 'delete', async (req: NextRequest, user: AuthenticatedUser) => {
+  return withResourcePermission('vehicles', 'delete', async (req: NextRequest, _user: AuthenticatedUser) => {
     try {
       const { id } = await params;
       // Check if vehicle exists

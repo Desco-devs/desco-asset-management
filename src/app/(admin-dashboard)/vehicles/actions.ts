@@ -142,7 +142,7 @@ export async function createVehicleAction(formData: FormData) {
         type,
         plate_number: plateNumber,
         owner,
-        status: status as any,
+        status: status as "OPERATIONAL" | "NON_OPERATIONAL",
         inspection_date: new Date(inspectionDate),
         expiry_date: new Date(expiryDate),
         before: parseInt(before),
@@ -300,7 +300,7 @@ export async function updateVehicleAction(formData: FormData) {
         type,
         plate_number: plateNumber,
         owner,
-        status: status as any,
+        status: status as "OPERATIONAL" | "NON_OPERATIONAL",
         inspection_date: new Date(inspectionDate),
         expiry_date: new Date(expiryDate),
         before: parseInt(before),
@@ -372,7 +372,7 @@ export async function updateVehicleAction(formData: FormData) {
     }
 
     // Update vehicle with new file URLs if any were uploaded and get final updated vehicle
-    let finalUpdatedVehicle = updatedVehicle;
+    let finalUpdatedVehicle: typeof updatedVehicle | null = updatedVehicle;
     if (Object.keys(fileUploads).length > 0) {
       finalUpdatedVehicle = await prisma.vehicle.update({
         where: { id: vehicleId },
@@ -419,6 +419,13 @@ export async function updateVehicleAction(formData: FormData) {
           }
         },
       });
+      
+      if (!finalUpdatedVehicle) {
+        return { 
+          success: false, 
+          error: "Vehicle not found after update" 
+        };
+      }
     }
 
     // Revalidate the vehicles page

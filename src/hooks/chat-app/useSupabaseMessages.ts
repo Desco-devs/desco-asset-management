@@ -21,6 +21,7 @@ interface MessageRecord {
 
 
 // Convert database record to MessageWithRelations
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const convertToMessageWithRelations = (record: any): MessageWithRelations => {
   return {
     id: record.id,

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
-import { status as EquipmentStatus } from "@prisma/client";
+import { status as EquipmentStatus, Prisma } from "@prisma/client";
 
 // Helper to upload files to Supabase with folder structure
 const uploadFileToSupabase = async (
@@ -289,7 +289,7 @@ export async function createEquipment(data: CreateEquipmentData) {
     const clientName = projectInfo.client.name;
 
     // Create equipment record first
-    const createData: Record<string, unknown> = {
+    const createData: Prisma.equipmentCreateInput = {
       brand: data.brand,
       model: data.model,
       type: data.type,
@@ -314,7 +314,7 @@ export async function createEquipment(data: CreateEquipmentData) {
       createData.insurance_expiration_date = new Date(data.insuranceExpirationDate);
     }
 
-    const equipment = await prisma.equipment.create({ data: createData as any });
+    const equipment = await prisma.equipment.create({ data: createData });
 
     // Handle file uploads if any
     const updateData: Record<string, unknown> = {};

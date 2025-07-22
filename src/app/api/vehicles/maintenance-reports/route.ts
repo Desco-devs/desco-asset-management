@@ -3,7 +3,7 @@ import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth';
 import { prisma } from '@/lib/prisma';
 
 // GET /api/vehicles/maintenance-reports - Get all vehicle maintenance reports
-export const GET = withResourcePermission('maintenance_reports', 'view', async (request: NextRequest, user: AuthenticatedUser) => {
+export const GET = withResourcePermission('maintenance_reports', 'view', async (request: NextRequest, _user: AuthenticatedUser) => {
   try {
     const { searchParams } = new URL(request.url);
     const vehicleId = searchParams.get('vehicleId');
@@ -69,11 +69,11 @@ export const GET = withResourcePermission('maintenance_reports', 'view', async (
     return NextResponse.json({
       data: reports,
       total,
-      user_role: user.role,
+      user_role: _user.role,
       permissions: {
-        can_create: user.role !== 'VIEWER',
-        can_update: user.role !== 'VIEWER',
-        can_delete: user.role === 'SUPERADMIN' || user.role === 'ADMIN'
+        can_create: _user.role !== 'VIEWER',
+        can_update: _user.role !== 'VIEWER',
+        can_delete: _user.role === 'SUPERADMIN' || _user.role === 'ADMIN'
       }
     });
   } catch (error) {
@@ -86,7 +86,7 @@ export const GET = withResourcePermission('maintenance_reports', 'view', async (
 });
 
 // POST /api/vehicles/maintenance-reports - Create new vehicle maintenance report
-export const POST = withResourcePermission('maintenance_reports', 'create', async (request: NextRequest, user: AuthenticatedUser) => {
+export const POST = withResourcePermission('maintenance_reports', 'create', async (request: NextRequest, _user: AuthenticatedUser) => {
   try {
     const body = await request.json();
     
@@ -124,7 +124,7 @@ export const POST = withResourcePermission('maintenance_reports', 'create', asyn
         status: status || 'REPORTED',
         downtime_hours: downtime_hours || null,
         attachment_urls: attachment_urls || [],
-        reported_by: user.id,
+        reported_by: _user.id,
         date_reported: new Date()
       },
       include: {

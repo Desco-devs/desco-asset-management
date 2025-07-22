@@ -551,6 +551,7 @@ export function EquipmentForm({
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
+                    {/* eslint-disable-next-line jsx-a11y/alt-text */}
                     <Image className="h-4 w-4" />
                     Equipment Parts Management
                   </CardTitle>

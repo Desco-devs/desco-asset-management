@@ -1,4 +1,4 @@
-import { Equipment, Status } from "../types";
+import { Equipment, Status } from "@/types/equipment";
 
 const API_BASE = "/api/equipments";
 

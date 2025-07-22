@@ -47,16 +47,16 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 
-export interface Column<T = any> {
+export interface Column<T = unknown> {
   key: string;
   title: string;
   sortable?: boolean;
-  render?: (value: any, record: T, index: number) => React.ReactNode;
+  render?: (value: unknown, record: T, index: number) => React.ReactNode;
   className?: string;
   width?: string;
 }
 
-export interface DataTableProps<T = any> {
+export interface DataTableProps<T = unknown> {
   data: T[];
   columns: Column<T>[];
 
@@ -135,7 +135,7 @@ export default function DataTable<T>({
     if (searchable && searchValue.trim()) {
       filtered = filtered.filter((record) =>
         columns.some((col) => {
-          const val = (record as any)[col.key];
+          const val = (record as Record<string, unknown>)[col.key];
           return val
             ?.toString()
             .toLowerCase()
@@ -145,15 +145,15 @@ export default function DataTable<T>({
     }
     if (sortable && sortConfig.key && sortConfig.direction) {
       filtered.sort((a, b) => {
-        const aVal = (a as any)[sortConfig.key];
-        const bVal = (b as any)[sortConfig.key];
+        const aVal = (a as Record<string, unknown>)[sortConfig.key];
+        const bVal = (b as Record<string, unknown>)[sortConfig.key];
         if (aVal === bVal) return 0;
         const comp = aVal < bVal ? -1 : 1;
         return sortConfig.direction === "asc" ? comp : -comp;
       });
     }
     return filtered;
-  }, [data, searchValue, columns, sortable, sortConfig]);
+  }, [data, searchValue, columns, sortable, sortConfig, searchable]);
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
@@ -183,7 +183,7 @@ export default function DataTable<T>({
 
   function getRowKey(record: T, idx: number) {
     if (typeof rowKey === "function") return rowKey(record);
-    return (record as any)[rowKey] ?? idx.toString();
+    return (record as Record<string, unknown>)[rowKey] ?? idx.toString();
   }
 
   function handlePageChange(newPage: number) {
@@ -346,8 +346,8 @@ export default function DataTable<T>({
                     {columns.map((col) => (
                       <TableCell key={col.key} className={col.className}>
                         {col.render
-                          ? col.render((record as any)[col.key], record, index)
-                          : (record as any)[col.key]}
+                          ? col.render((record as Record<string, unknown>)[col.key], record, index)
+                          : (record as Record<string, unknown>)[col.key]}
                       </TableCell>
                     ))}
                     {renderRowActions && (

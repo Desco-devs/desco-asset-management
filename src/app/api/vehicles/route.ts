@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 const supabase = createServiceRoleClient()
 
 // GET: Retrieve vehicles with proper role-based access control
-export const GET = withResourcePermission('vehicles', 'view', async (request: NextRequest, user: AuthenticatedUser) => {
+export const GET = withResourcePermission('vehicles', 'view', async (request: NextRequest, _user: AuthenticatedUser) => {
   try {
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('projectId')
@@ -68,7 +68,7 @@ export const GET = withResourcePermission('vehicles', 'view', async (request: Ne
 })
 
 // POST: Create a new vehicle with image uploads
-export const POST = withResourcePermission('vehicles', 'create', async (request: NextRequest, user: AuthenticatedUser) => {
+export const POST = withResourcePermission('vehicles', 'create', async (request: NextRequest, _user: AuthenticatedUser) => {
   try {
     const formData = await request.formData()
     const brand = formData.get('brand') as string
@@ -211,7 +211,7 @@ export const POST = withResourcePermission('vehicles', 'create', async (request:
 })
 
 
-export const PUT = withResourcePermission('vehicles', 'update', async (request: NextRequest, user: AuthenticatedUser) => {
+export const PUT = withResourcePermission('vehicles', 'update', async (request: NextRequest, _user: AuthenticatedUser) => {
   try {
     const formData = await request.formData()
     const vehicleId = formData.get('vehicleId') as string
@@ -346,7 +346,7 @@ export const PUT = withResourcePermission('vehicles', 'update', async (request: 
   }
 })
 
-export const DELETE = withResourcePermission('vehicles', 'delete', async (request: NextRequest, user: AuthenticatedUser) => {
+export const DELETE = withResourcePermission('vehicles', 'delete', async (request: NextRequest, _user: AuthenticatedUser) => {
   try {
     const { searchParams } = new URL(request.url)
     const vehicleId = searchParams.get('vehicleId')
