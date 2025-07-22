@@ -1,6 +1,8 @@
 "use client";
 
-import { useAuthGuard } from "@/hooks/useAuth";
+import { useAuth } from "@/app/context/AuthContext";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ClientAuthGuardProps {
@@ -9,9 +11,18 @@ interface ClientAuthGuardProps {
 }
 
 export default function ClientAuthGuard({ children, redirectTo = '/login' }: ClientAuthGuardProps) {
-  const { isAuthenticated, isLoading } = useAuthGuard(redirectTo);
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!loading && !user) {
+      // Silent redirect - no UI shown
+      router.replace(redirectTo);
+    }
+  }, [user, loading, router, redirectTo]);
+
+  // Show loading only when actually loading
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -22,15 +33,11 @@ export default function ClientAuthGuard({ children, redirectTo = '/login' }: Cli
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">Redirecting to login...</p>
-        </div>
-      </div>
-    );
+  // Show children only if user is authenticated
+  if (user) {
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  // If no user and not loading, show nothing (redirect will happen)
+  return null;
 }

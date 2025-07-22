@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useVehiclesStore, selectIsModalOpen, selectIsCreateModalOpen, selectIsMaintenanceModalOpen, selectIsEditMode, selectViewerImage, selectIsMobile, selectDeleteConfirmation } from "@/stores/vehiclesStore";
+import { useVehiclesStore, selectIsModalOpen, selectIsCreateModalOpen, selectIsEditMode, selectViewerImage, selectIsMobile, selectDeleteConfirmation } from "@/stores/vehiclesStore";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,6 @@ export default function VehiclesPageModern() {
   const isModalOpen = useVehiclesStore(selectIsModalOpen);
   const isCreateModalOpen = useVehiclesStore(selectIsCreateModalOpen);
   const isEditMode = useVehiclesStore(selectIsEditMode);
-  const isMaintenanceModalOpen = useVehiclesStore(selectIsMaintenanceModalOpen);
   const viewerImage = useVehiclesStore(selectViewerImage);
   const isMobile = useVehiclesStore(selectIsMobile);
   const deleteConfirmation = useVehiclesStore(selectDeleteConfirmation);
@@ -165,7 +164,8 @@ export default function VehiclesPageModern() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="w-[95vw] max-w-[425px] sm:max-w-[450px] md:max-w-[500px] lg:max-w-[550px] max-h-[90vh] mx-auto p-0 overflow-hidden">
+          <div className="p-6 flex flex-col h-full">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <X className="h-5 w-5" />
@@ -176,26 +176,29 @@ export default function VehiclesPageModern() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground mb-4">
+          <div className="py-4 space-y-4">
+            <p className="text-sm text-muted-foreground">
               Are you sure you want to delete this vehicle? This action cannot be undone.
             </p>
             
-            <div className="bg-muted/50 p-3 rounded-md">
-              <p className="font-medium text-sm">
-                {vehicle.brand} {vehicle.model}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Plate: {vehicle.plate_number}
-              </p>
+            <div className="bg-muted/50 p-4 rounded-lg border">
+              <div className="space-y-2">
+                <p className="font-medium text-sm md:text-base break-words">
+                  {vehicle.brand} {vehicle.model}
+                </p>
+                <p className="text-xs md:text-sm text-muted-foreground break-words">
+                  Plate: {vehicle.plate_number}
+                </p>
+              </div>
             </div>
           </div>
           
-          <DialogFooter>
+          <DialogFooter className="flex flex-col sm:flex-row gap-3 sm:gap-2 pt-4 mt-4 border-t">
             <Button 
               variant="outline" 
               onClick={handleDeleteCancel}
               disabled={deleteVehicleMutation.isPending}
+              className="w-full sm:w-auto order-2 sm:order-1"
             >
               Cancel
             </Button>
@@ -203,7 +206,7 @@ export default function VehiclesPageModern() {
               variant="destructive"
               onClick={handleDeleteConfirm}
               disabled={deleteVehicleMutation.isPending}
-              className="gap-2"
+              className="gap-2 w-full sm:w-auto order-1 sm:order-2"
             >
               {deleteVehicleMutation.isPending ? (
                 <>
@@ -218,10 +221,13 @@ export default function VehiclesPageModern() {
               )}
             </Button>
           </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     );
   });
+  
+  DeleteConfirmationModal.displayName = 'DeleteConfirmationModal';
 
   return (
     <div className="container mx-auto py-6 px-4">
@@ -244,8 +250,8 @@ export default function VehiclesPageModern() {
       {/* Global Image Viewer Modal - Always available */}
       <ImageViewerModal />
       
-      {/* Global Delete Confirmation Modal - Temporarily disabled for debugging */}
-      {/* <DeleteConfirmationModal /> */}
+      {/* Global Delete Confirmation Modal */}
+      <DeleteConfirmationModal />
     </div>
   );
 }

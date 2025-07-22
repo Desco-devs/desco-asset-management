@@ -26,11 +26,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const userData = await response.json();
         setUserState(userData);
+        
+        // Update Supabase user metadata with role for middleware access
+        if (userData.role) {
+          try {
+            await supabase.auth.updateUser({
+              data: { 
+                role: userData.role,
+                user_status: userData.user_status || 'ACTIVE',
+                full_name: userData.full_name
+              }
+            });
+          } catch (metadataError) {
+            console.error("Error updating user metadata:", metadataError);
+          }
+        }
       }
     } catch (error) {
       console.error("Error fetching user profile:", error);
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     // Get initial user with server verification
@@ -76,6 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    
+    // State will be cleared by onAuthStateChange event automatically
+    // This prevents race conditions with ClientAuthGuard
   };
 
   const setUser = (u: User | null) => setUserState(u);

@@ -1,4 +1,4 @@
-import { UserRole, RouteAccess } from '@/types/auth'
+import { UserRole } from '@/types/auth'
 
 // Role hierarchy for permission checking
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
@@ -21,8 +21,7 @@ export const DASHBOARD_PROTECTED_ROUTES = [
 export const SKIP_MIDDLEWARE_PATHS = [
   '/login',
   '/unauthorized', 
-  '/api/auth',
-  '/api/session' // Allow session API calls from middleware
+  '/api/auth'
 ]
 
 // Public routes that don't require authentication

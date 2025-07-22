@@ -17,7 +17,6 @@ import {
 import { toast } from 'sonner'
 import Image from 'next/image'
 import { SignInProps, SignInFormData } from '@/types/auth'
-import { getDefaultRedirectPath } from '@/lib/auth/utils'
 
 export function SignInForm({ onToggle, onForgotPassword }: SignInProps) {
   const router = useRouter()
@@ -65,33 +64,9 @@ export function SignInForm({ onToggle, onForgotPassword }: SignInProps) {
         // If there's a specific redirect, use it
         router.replace(redirectTo)
       } else {
-        // Wait a short moment for auth state to update, then get user profile
-        setTimeout(async () => {
-          // Get current user with server verification
-          const { createClient } = await import('@/lib/supabase')
-          const supabase = createClient()
-          const { data: { user }, error } = await supabase.auth.getUser()
-          
-          if (user && !error) {
-            try {
-              // Fetch user profile to get role
-              const response = await fetch(`/api/users/${user.id}`)
-              if (response.ok) {
-                const userData = await response.json()
-                const redirectPath = getDefaultRedirectPath(userData.role)
-                router.replace(redirectPath)
-              } else {
-                // Fallback to home if profile fetch fails
-                router.replace('/home')
-              }
-            } catch (error) {
-              console.error('Error fetching user profile:', error)
-              router.replace('/home')
-            }
-          } else {
-            router.replace('/')
-          }
-        }, 100) // Small delay to ensure auth state is updated
+        // The AuthContext will handle the redirect via onAuthStateChange
+        // Just redirect to root and let middleware handle role-based routing
+        router.replace('/')
       }
     } catch (err: any) {
       toast.error(err.message || 'Login failed')

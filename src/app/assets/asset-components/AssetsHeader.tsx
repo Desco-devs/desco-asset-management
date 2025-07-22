@@ -5,12 +5,10 @@ import { useAuth } from "@/app/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Loader2, LogOut } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function AssetsHeader() {
-  const router = useRouter();
   const { signOut } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -20,7 +18,8 @@ export default function AssetsHeader() {
       toast.loading("Logging out...", { id: "logout" });
       await signOut();
       toast.success("Logged out successfully!", { id: "logout" });
-      router.push("/login");
+      // Let middleware handle redirect - don't manually navigate
+      window.location.href = "/login";
     } catch (error) {
       console.error("Logout failed:", error);
       toast.error("Failed to logout. Please try again.", { id: "logout" });

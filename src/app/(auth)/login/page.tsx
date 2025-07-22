@@ -7,8 +7,7 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel";
-import SigninWrapper from "@/app/components/custom-reusable/auth-components/SigninForm";
-// import ForgotWrapper from "@/app/components/custom-reusable/auth-components/ForgotPassword";
+import { SignInForm } from "@/components/auth/forms/SignInForm";
 
 const carouselItems = [
   "/images/static/1.jpg",
@@ -99,13 +98,14 @@ const Auth = () => {
       {/* Right: Auth Section (Signin or Forgot Password) */}
       <div className="w-full h-full flex items-center justify-center">
         {authMode === "signin" ? (
-          <SigninWrapper
+          <SignInForm
             onForgotPassword={goToForgotPassword}
             onToggle={() => {}}
           />
         ) : (
-          // <ForgotWrapper onToggle={goToSignIn} />
-          <div></div>
+          <div className="flex items-center justify-center">
+            <p className="text-muted-foreground">Forgot password functionality coming soon...</p>
+          </div>
         )}
       </div>
     </div>

@@ -27,8 +27,8 @@ import {
 } from "@/components/ui/sidebar";
 import { useState } from "react";
 import { useAuth } from "@/app/context/AuthContext";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function NavUser({
   CurrentUser,
@@ -40,9 +40,9 @@ export function NavUser({
   };
 }) {
   const { isMobile } = useSidebar();
+  const router = useRouter();
   const { user, supabaseUser, signOut } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
-  const router = useRouter();
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -50,11 +50,11 @@ export function NavUser({
       toast.loading("Logging out...", { id: "logout" });
       await signOut();
       toast.success("Logged out successfully!", { id: "logout" });
-      router.push("/login");
+      // Smooth client-side navigation instead of full page reload
+      router.replace("/login");
     } catch (error) {
       console.error("Logout failed:", error);
       toast.error("Failed to logout. Please try again.", { id: "logout" });
-    } finally {
       setLoggingOut(false);
     }
   }
