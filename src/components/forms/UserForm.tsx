@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { User, CreateUserSchema, UpdateUserSchema, createUserSchema, updateUserSchema, USER_ROLES, USER_STATUSES, ROLE_COLORS, STATUS_COLORS } from '@/types/users'
+import { User, UserRole, UserStatus, CreateUserSchema, UpdateUserSchema, USER_ROLES, USER_STATUSES, ROLE_COLORS, STATUS_COLORS } from '@/types/users'
+import { createUserSchema, updateUserSchema } from '@/lib/validations/users'
 
 interface UserFormProps {
   user?: User
@@ -50,7 +51,7 @@ export function UserForm({ user, onSubmit, onCancel, loading = false, mode }: Us
   const selectedRole = watch('role')
   const selectedStatus = watch('user_status')
 
-  const handleFormSubmit = async (data: any) => {
+  const handleFormSubmit = async (data: CreateUserSchema | UpdateUserSchema) => {
     try {
       await onSubmit(data)
     } catch (error) {
@@ -60,227 +61,219 @@ export function UserForm({ user, onSubmit, onCancel, loading = false, mode }: Us
 
   if (isView) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>User Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Username</Label>
-                <p className="text-sm bg-gray-50 p-2 rounded">{user?.username}</p>
-              </div>
-              <div>
-                <Label>Full Name</Label>
-                <p className="text-sm bg-gray-50 p-2 rounded">{user?.full_name}</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Phone</Label>
-                <p className="text-sm bg-gray-50 p-2 rounded">{user?.phone || '—'}</p>
-              </div>
-              <div>
-                <Label>Role</Label>
-                <Badge className={ROLE_COLORS[user?.role || 'VIEWER']}>
-                  {USER_ROLES[user?.role || 'VIEWER']}
-                </Badge>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Status</Label>
-                <Badge className={STATUS_COLORS[user?.user_status || 'ACTIVE']}>
-                  {USER_STATUSES[user?.user_status || 'ACTIVE']}
-                </Badge>
-              </div>
-              <div>
-                <Label>Online Status</Label>
-                <div className="flex items-center gap-2">
-                  <span 
-                    className={`w-2 h-2 rounded-full ${
-                      user?.is_online ? 'bg-green-500' : 'bg-gray-400'
-                    }`}
-                  />
-                  <span className="text-sm">{user?.is_online ? 'Online' : 'Offline'}</span>
-                </div>
-              </div>
-            </div>
-            
+      <div className="space-y-4">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Username</Label>
+            <p className="text-sm bg-gray-50 p-3 rounded-md border w-full">{user?.username}</p>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Full Name</Label>
+            <p className="text-sm bg-gray-50 p-3 rounded-md border w-full">{user?.full_name}</p>
+          </div>
+        </div>
+        
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Phone</Label>
+            <p className="text-sm bg-gray-50 p-3 rounded-md border w-full">{user?.phone || '—'}</p>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Role</Label>
             <div>
-              <Label>Created At</Label>
-              <p className="text-sm bg-gray-50 p-2 rounded">
-                {user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
-              </p>
+              <Badge className={ROLE_COLORS[user?.role || 'VIEWER']}>
+                {USER_ROLES[user?.role || 'VIEWER']}
+              </Badge>
             </div>
           </div>
-          
-          <div className="flex gap-3 pt-6">
-            <Button 
-              onClick={onCancel}
-              variant="outline"
-              className="flex-1"
-            >
-              Close
-            </Button>
+        </div>
+        
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Status</Label>
+            <div>
+              <Badge className={STATUS_COLORS[user?.user_status || 'ACTIVE']}>
+                {USER_STATUSES[user?.user_status || 'ACTIVE']}
+              </Badge>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">Online Status</Label>
+            <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-md border w-full">
+              <span 
+                className={`w-3 h-3 rounded-full ${
+                  user?.is_online ? 'bg-green-500' : 'bg-gray-400'
+                }`}
+              />
+              <span className="text-sm">{user?.is_online ? 'Online' : 'Offline'}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-gray-700">Created At</Label>
+          <p className="text-sm bg-gray-50 p-3 rounded-md border w-full">
+            {user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
+          </p>
+        </div>
+      </div>
     )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{isEdit ? 'Edit User' : 'Create New User'}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-          {!isEdit && (
-            <>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  {...register('email')}
-                  placeholder="Enter email address"
-                  disabled={loading}
-                />
-                {errors.email && (
-                  <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  {...register('password')}
-                  placeholder="Enter password (min 8 characters)"
-                  disabled={loading}
-                />
-                {errors.password && (
-                  <p className="text-sm text-red-500 mt-1">{errors.password.message}</p>
-                )}
-              </div>
-            </>
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+      {!isEdit && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email Address *</Label>
+            <Input
+              id="email"
+              type="email"
+              {...register('email')}
+              placeholder="user@company.com"
+              disabled={loading}
+              className="w-full"
+            />
+            {errors.email && (
+              <p className="text-sm text-red-500">{errors.email.message}</p>
+            )}
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="password">Password *</Label>
+            <Input
+              id="password"
+              type="password"
+              {...register('password')}
+              placeholder="Minimum 8 characters"
+              disabled={loading}
+              className="w-full"
+            />
+            {errors.password && (
+              <p className="text-sm text-red-500">{errors.password.message}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="username">Username *</Label>
+          <Input
+            id="username"
+            {...register('username')}
+            placeholder="johndoe"
+            disabled={loading}
+            className="w-full"
+          />
+          {errors.username && (
+            <p className="text-sm text-red-500">{errors.username.message}</p>
           )}
+        </div>
 
-          <div>
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              {...register('username')}
-              placeholder="Enter username"
-              disabled={loading}
-            />
-            {errors.username && (
-              <p className="text-sm text-red-500 mt-1">{errors.username.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="full_name">Full Name</Label>
-            <Input
-              id="full_name"
-              {...register('full_name')}
-              placeholder="Enter full name"
-              disabled={loading}
-            />
-            {errors.full_name && (
-              <p className="text-sm text-red-500 mt-1">{errors.full_name.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              {...register('phone')}
-              placeholder="Enter phone number (optional)"
-              disabled={loading}
-            />
-            {errors.phone && (
-              <p className="text-sm text-red-500 mt-1">{errors.phone.message}</p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="role">Role</Label>
-            <Select
-              value={selectedRole}
-              onValueChange={(value) => setValue('role', value as any)}
-              disabled={loading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(USER_ROLES).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    <div className="flex items-center gap-2">
-                      <span>{label}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {key}
-                      </Badge>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.role && (
-              <p className="text-sm text-red-500 mt-1">{errors.role.message}</p>
-            )}
-          </div>
-
-          {isEdit && (
-            <div>
-              <Label htmlFor="user_status">Status</Label>
-              <Select
-                value={selectedStatus}
-                onValueChange={(value) => setValue('user_status', value as any)}
-                disabled={loading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(USER_STATUSES).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      <div className="flex items-center gap-2">
-                        <span>{label}</span>
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs ${key === 'ACTIVE' ? 'text-green-600' : 'text-red-600'}`}
-                        >
-                          {key}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.user_status && (
-                <p className="text-sm text-red-500 mt-1">{errors.user_status.message}</p>
-              )}
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="full_name">Full Name *</Label>
+          <Input
+            id="full_name"
+            {...register('full_name')}
+            placeholder="John Doe"
+            disabled={loading}
+            className="w-full"
+          />
+          {errors.full_name && (
+            <p className="text-sm text-red-500">{errors.full_name.message}</p>
           )}
+        </div>
+      </div>
 
-          <div className="flex gap-3 pt-4">
-            <Button type="submit" disabled={loading} className="flex-1">
-              {loading ? 'Saving...' : isEdit ? 'Update User' : 'Create User'}
-            </Button>
-            <Button type="button" variant="outline" onClick={onCancel} disabled={loading} className="flex-1">
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="phone">Phone Number</Label>
+          <Input
+            id="phone"
+            {...register('phone')}
+            placeholder="+1 (555) 000-0000"
+            disabled={loading}
+            className="w-full"
+          />
+          {errors.phone && (
+            <p className="text-sm text-red-500">{errors.phone.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="role">Role *</Label>
+          <Select
+            value={selectedRole || 'VIEWER'}
+            onValueChange={(value) => setValue('role', value as UserRole)}
+            disabled={loading}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select role" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(USER_ROLES).map(([key, label]) => (
+                <SelectItem key={key} value={key}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.role && (
+            <p className="text-sm text-red-500">{errors.role.message}</p>
+          )}
+        </div>
+      </div>
+
+      {isEdit && (
+        <div className="space-y-2">
+          <Label htmlFor="user_status">Account Status</Label>
+          <Select
+            value={selectedStatus || 'ACTIVE'}
+            onValueChange={(value) => setValue('user_status', value as UserStatus)}
+            disabled={loading}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(USER_STATUSES).map(([key, label]) => (
+                <SelectItem key={key} value={key}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.user_status && (
+            <p className="text-sm text-red-500">{errors.user_status.message}</p>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-col-reverse sm:flex-row gap-3 pt-6">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={onCancel} 
+          disabled={loading} 
+          className="flex-1"
+        >
+          Cancel
+        </Button>
+        <Button 
+          type="submit" 
+          disabled={loading}
+          className="flex-1"
+        >
+          {loading && (
+            <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          )}
+          {loading ? 'Creating...' : isEdit ? 'Update User' : 'Create User'}
+        </Button>
+      </div>
+    </form>
   )
 }

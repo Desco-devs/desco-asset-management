@@ -16,8 +16,7 @@ export function ProjectModal() {
   const isOpen = useProjectsStore(state => state.isProjectModalOpen)
   const editingId = useProjectsStore(state => state.editingProjectId)
   const setModal = useProjectsStore(state => state.setProjectModal)
-  const selectedClientId = useProjectsStore(state => state.selectedClientId)
-  const { data: projects } = useProjects(selectedClientId || undefined)
+  const { data: projects } = useProjects()
   
   const project = editingId ? projects?.find(p => p.id === editingId) : null
   const isEditing = !!editingId

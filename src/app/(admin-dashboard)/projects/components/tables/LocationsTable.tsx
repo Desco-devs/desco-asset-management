@@ -62,8 +62,6 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
   }
 
   const handleRowClick = (location: Location) => {
-    setSelectedLocation(location.id)
-    setCurrentView('clients')
     onSelectLocation?.(location)
   }
 

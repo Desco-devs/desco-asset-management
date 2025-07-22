@@ -73,8 +73,10 @@ async function createUser(data: CreateUserSchema): Promise<User> {
   })
   
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to create user')
+    const result = await response.json()
+    const error = new Error(result.error || 'Failed to create user')
+    error.name = 'CreateUserError'
+    throw error
   }
   
   return response.json()
@@ -230,14 +232,15 @@ export function useCreateUser() {
   
   return useMutation({
     mutationFn: createUser,
-    onSuccess: (newUser) => {
-      // Invalidate users list
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       toast.success('User created successfully')
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to create user')
     },
+    // Prevent React from logging mutation errors
+    throwOnError: false,
   })
 }
 

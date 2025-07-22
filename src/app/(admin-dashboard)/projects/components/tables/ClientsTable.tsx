@@ -13,12 +13,19 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Search, Plus, Edit, Trash2, ArrowLeft } from "lucide-react"
+import { MoreHorizontal, Search, Plus, Edit, Trash2 } from "lucide-react"
 import { useClients, useDeleteClient, useLocations } from '@/hooks/api/use-projects'
 import { useProjectsStore, useClientModal, useClientTable } from '@/stores/projects-store'
 import { formatDistanceToNow } from 'date-fns'
@@ -30,23 +37,23 @@ interface ClientsTableProps {
 }
 
 export function ClientsTable({ onSelectClient }: ClientsTableProps) {
-  const selectedLocationId = useProjectsStore(state => state.selectedLocationId)
-  const selectedClientId = useProjectsStore(state => state.selectedClientId)
-  const setSelectedClient = useProjectsStore(state => state.setSelectedClient)
-  const setCurrentView = useProjectsStore(state => state.setCurrentView)
   const setClientTable = useProjectsStore(state => state.setClientTable)
+  const setClientModal = useProjectsStore(state => state.setClientModal)
   
   const { data: locations } = useLocations()
-  const { data: clients, isLoading, error } = useClients(selectedLocationId || undefined)
+  const { data: clients, isLoading, error } = useClients()
   const { mutate: deleteClient, isPending: isDeleting } = useDeleteClient()
+
+  // Local filtering state
+  const [locationFilter, setLocationFilter] = React.useState<string>('all')
   const setModal = useProjectsStore(state => state.setClientModal)
   
   const clientTable = useClientTable()
 
-  const selectedLocation = selectedLocationId ? locations?.find(loc => loc.id === selectedLocationId) : null
+  // No longer need selectedLocation since we show all clients
 
   const handleEdit = (client: Client) => {
-    setModal(true, client.id)
+    setClientModal(true, client.id)
   }
 
   const handleDelete = (client: Client) => {
@@ -54,10 +61,6 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
       deleteClient(client.id, {
         onSuccess: () => {
           toast.success('Client deleted successfully')
-          // Clear selection if deleted client was selected
-          if (selectedClientId === client.id) {
-            setSelectedClient(null)
-          }
         },
         onError: (error) => {
           toast.error('Failed to delete client: ' + error.message)
@@ -67,8 +70,6 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
   }
 
   const handleRowClick = (client: Client) => {
-    setSelectedClient(client.id)
-    setCurrentView('projects')
     onSelectClient?.(client)
   }
 
@@ -81,20 +82,30 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
     setClientTable({ sortBy, sortOrder })
   }
 
-  const handleBack = () => {
-    setCurrentView('locations')
-  }
+  // Removed handleBack since no hierarchical navigation
 
-  // Filter clients based on search
+  // Filter clients based on search and location
   const filteredClients = React.useMemo(() => {
     if (!clients) return []
     
-    if (!clientTable.search) return clients
-    
-    return clients.filter(client =>
-      client.name.toLowerCase().includes(clientTable.search.toLowerCase())
-    )
-  }, [clients, clientTable.search])
+    let filtered = clients
+
+    // Apply search filter
+    if (clientTable.search) {
+      filtered = filtered.filter(client =>
+        client.name.toLowerCase().includes(clientTable.search.toLowerCase())
+      )
+    }
+
+    // Apply location filter
+    if (locationFilter !== 'all') {
+      filtered = filtered.filter(client => 
+        client.location_id === locationFilter
+      )
+    }
+
+    return filtered
+  }, [clients, clientTable.search, locationFilter])
 
   // Sort clients
   const sortedClients = React.useMemo(() => {
@@ -123,52 +134,58 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="sm" onClick={handleBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Locations
-          </Button>
-          <div>
-            <h2 className="text-2xl font-bold">
-              Clients
-              {selectedLocation && (
-                <span className="text-lg font-normal text-muted-foreground ml-2">
-                  in {selectedLocation.address}
-                </span>
-              )}
-            </h2>
-            <p className="text-muted-foreground">
-              Manage clients and view their projects
-            </p>
-          </div>
+        <div>
+          <h2 className="text-2xl font-bold">All Clients</h2>
+          <p className="text-muted-foreground">
+            Manage all clients across all locations
+          </p>
         </div>
-        <Button 
-          onClick={() => setModal(true)}
-          disabled={!selectedLocationId}
-        >
+        <Button onClick={() => setClientModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Client
         </Button>
       </div>
 
-      {/* Location context */}
-      {selectedLocation && (
-        <div className="bg-muted/50 rounded-lg p-3">
-          <div className="text-sm">
-            <span className="font-medium">Location:</span> {selectedLocation.address}
-          </div>
+      {/* Filters and Search */}
+      <div className="flex gap-4 items-center flex-wrap">
+        {/* Search */}
+        <div className="relative max-w-sm">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search clients..."
+            value={clientTable.search}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="pl-8"
+          />
         </div>
-      )}
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search clients..."
-          value={clientTable.search}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="pl-8"
-        />
+        {/* Location Filter */}
+        <div className="min-w-[180px]">
+          <Select value={locationFilter} onValueChange={setLocationFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by location" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {locations?.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.address}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Clear Filter */}
+        {locationFilter !== 'all' && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setLocationFilter('all')}
+          >
+            Clear Filter
+          </Button>
+        )}
       </div>
 
       {/* Table */}
@@ -187,6 +204,7 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
                   </span>
                 )}
               </TableHead>
+              <TableHead>Location</TableHead>
               <TableHead>Projects</TableHead>
               <TableHead 
                 className="cursor-pointer select-none"
@@ -205,19 +223,13 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
+                <TableCell colSpan={5} className="text-center py-8">
                   Loading clients...
-                </TableCell>
-              </TableRow>
-            ) : !selectedLocationId ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
-                  Please select a location to view clients
                 </TableCell>
               </TableRow>
             ) : sortedClients.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
+                <TableCell colSpan={5} className="text-center py-8">
                   {clientTable.search ? 'No clients found' : 'No clients yet'}
                 </TableCell>
               </TableRow>
@@ -225,18 +237,16 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
               sortedClients.map((client) => (
                 <TableRow 
                   key={client.id}
-                  className={`cursor-pointer hover:bg-muted/50 ${
-                    selectedClientId === client.id ? 'bg-muted' : ''
-                  }`}
+                  className="cursor-pointer hover:bg-muted/50"
                   onClick={() => handleRowClick(client)}
                 >
                   <TableCell className="font-medium">
                     {client.name}
-                    {selectedClientId === client.id && (
-                      <Badge variant="secondary" className="ml-2">
-                        Selected
-                      </Badge>
-                    )}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm">
+                      {client.location?.address || 'No location'}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">
@@ -290,6 +300,11 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
       {clients && (
         <div className="text-sm text-muted-foreground">
           Showing {sortedClients.length} of {clients.length} clients
+          {(locationFilter !== 'all' || clientTable.search) && (
+            <span className="ml-2">
+              (filtered)
+            </span>
+          )}
         </div>
       )}
     </div>

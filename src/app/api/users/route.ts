@@ -102,7 +102,7 @@ export const POST = withResourcePermission('users', 'create', async (request: Ne
     const { createServiceRoleClient } = await import('@/lib/supabase-server')
     const supabaseAdmin = createServiceRoleClient()
 
-    // Create user in Supabase Auth
+    // Create user in Supabase Auth with metadata
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -122,16 +122,12 @@ export const POST = withResourcePermission('users', 'create', async (request: Ne
       }, { status: 400 })
     }
 
-    // Create user profile in database
-    const newUser = await prisma.user.create({
-      data: {
-        id: authUser.user.id,
-        username,
-        full_name,
-        phone: phone || null,
-        role: userRole,
-        user_status: 'ACTIVE',
-      },
+    // Wait a bit for the trigger to create the public.users record
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    // Fetch the created user record from database (created by trigger with all fields)
+    const newUser = await prisma.user.findUnique({
+      where: { id: authUser.user.id },
       select: {
         id: true,
         username: true,
@@ -143,6 +139,12 @@ export const POST = withResourcePermission('users', 'create', async (request: Ne
         updated_at: true,
       },
     })
+
+    if (!newUser) {
+      return NextResponse.json({ 
+        error: 'User created in auth but profile not found in database' 
+      }, { status: 500 })
+    }
 
     return NextResponse.json(newUser, { status: 201 })
   } catch (error: unknown) {

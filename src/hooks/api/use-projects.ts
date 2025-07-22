@@ -169,7 +169,7 @@ export function useLocations() {
   return useQuery({
     queryKey: projectsKeys.locations(),
     queryFn: api.getLocations,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 0, // Always fresh for real-time updates
   })
 }
 
@@ -177,7 +177,7 @@ export function useClients(locationId?: string) {
   return useQuery({
     queryKey: locationId ? projectsKeys.clientsByLocation(locationId) : projectsKeys.clients(),
     queryFn: () => api.getClients(locationId),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0, // Always fresh for real-time updates
   })
 }
 
@@ -185,7 +185,7 @@ export function useProjects(clientId?: string) {
   return useQuery({
     queryKey: clientId ? projectsKeys.projectsByClient(clientId) : projectsKeys.projects(),
     queryFn: () => api.getProjects(clientId),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0, // Always fresh for real-time updates
   })
 }
 
@@ -196,7 +196,9 @@ export function useCreateLocation() {
   return useMutation({
     mutationFn: api.createLocation,
     onSuccess: () => {
+      // Invalidate all location-related queries
       queryClient.invalidateQueries({ queryKey: projectsKeys.locations() })
+      queryClient.refetchQueries({ queryKey: projectsKeys.locations() })
     },
   })
 }
@@ -230,7 +232,11 @@ export function useCreateClient() {
   return useMutation({
     mutationFn: api.createClient,
     onSuccess: () => {
+      // Invalidate all client-related queries
       queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
+      queryClient.refetchQueries({ queryKey: projectsKeys.clients() })
+      // Also invalidate specific location-based client queries
+      queryClient.invalidateQueries({ queryKey: [...projectsKeys.clients()] })
     },
   })
 }
@@ -264,7 +270,11 @@ export function useCreateProject() {
   return useMutation({
     mutationFn: api.createProject,
     onSuccess: () => {
+      // Invalidate all project-related queries
       queryClient.invalidateQueries({ queryKey: projectsKeys.projects() })
+      queryClient.refetchQueries({ queryKey: projectsKeys.projects() })
+      // Also invalidate specific client-based project queries
+      queryClient.invalidateQueries({ queryKey: [...projectsKeys.projects()] })
     },
   })
 }
