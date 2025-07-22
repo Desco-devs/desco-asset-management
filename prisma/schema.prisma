@@ -53,7 +53,7 @@ model room {
   messages    message[]
   invitations room_invitation[]
   members     room_member[]
-  owner       user              @relation("RoomOwner", fields: [owner_id], references: [id])
+  owner       user              @relation("RoomOwner", fields: [owner_id], references: [id], onDelete: Cascade)
 
   @@index([owner_id])
   @@index([type])
@@ -90,7 +90,7 @@ model message {
   reply_to    message?     @relation("MessageReply", fields: [reply_to_id], references: [id])
   replies     message[]    @relation("MessageReply")
   room        room         @relation(fields: [room_id], references: [id], onDelete: Cascade)
-  sender      user         @relation("MessageCreatedBy", fields: [sender_id], references: [id])
+  sender      user         @relation("MessageCreatedBy", fields: [sender_id], references: [id], onDelete: Cascade)
 
   @@index([room_id])
   @@index([sender_id])
@@ -108,8 +108,8 @@ model room_invitation {
   message      String?
   created_at   DateTime          @default(now())
   responded_at DateTime?
-  inviter      user              @relation("InvitationSentBy", fields: [invited_by], references: [id])
-  invitee      user              @relation("InvitationSentTo", fields: [invited_user], references: [id])
+  inviter      user              @relation("InvitationSentBy", fields: [invited_by], references: [id], onDelete: Cascade)
+  invitee      user              @relation("InvitationSentTo", fields: [invited_user], references: [id], onDelete: Cascade)
   room         room              @relation(fields: [room_id], references: [id], onDelete: Cascade)
 
   @@unique([room_id, invited_user])

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MoreHorizontal, Edit, Trash2, Eye, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +43,8 @@ interface UsersTableProps {
   canEdit?: boolean
   canDelete?: boolean
   canCreate?: boolean
+  deleteLoading?: boolean
+  currentUserRole?: 'SUPERADMIN' | 'ADMIN' | 'VIEWER'
 }
 
 export function UsersTable({
@@ -55,15 +57,40 @@ export function UsersTable({
   canEdit = false,
   canDelete = false,
   canCreate = false,
+  deleteLoading = false,
+  currentUserRole,
 }: UsersTableProps) {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null)
 
+  // Check if current user can delete this specific user
+  const canDeleteUser = (targetUser: User) => {
+    if (!canDelete) return false
+    
+    // Only SUPERADMIN can delete ADMIN accounts
+    if (targetUser.role === 'ADMIN' && currentUserRole !== 'SUPERADMIN') {
+      return false
+    }
+    
+    return true
+  }
+
   const handleDeleteConfirm = () => {
     if (deleteUserId) {
+      // Just call onDelete - don't close dialog here
       onDelete(deleteUserId)
-      setDeleteUserId(null)
     }
   }
+  
+  // Close dialog when delete completes successfully
+  useEffect(() => {
+    if (deleteUserId && !deleteLoading) {
+      // Wait a bit then close
+      const timer = setTimeout(() => {
+        setDeleteUserId(null)
+      }, 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [deleteUserId, deleteLoading])
 
   const formatLastSeen = (lastSeen: Date | null, isOnline: boolean) => {
     if (isOnline) return 'Online now'
@@ -166,7 +193,7 @@ export function UsersTable({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {canDelete && (
+                      {canDeleteUser(user) && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -197,7 +224,7 @@ export function UsersTable({
                             </DropdownMenuItem>
                           </>
                         )}
-                        {canDelete && (
+                        {canDeleteUser(user) && (
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem 
@@ -220,7 +247,15 @@ export function UsersTable({
         </Table>
       </div>
 
-      <AlertDialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
+      <AlertDialog 
+        open={!!deleteUserId} 
+        onOpenChange={() => {
+          // Block closing during loading
+          if (!deleteLoading) {
+            setDeleteUserId(null)
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete User</AlertDialogTitle>
@@ -230,13 +265,24 @@ export function UsersTable({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+            <Button 
               onClick={handleDeleteConfirm}
+              disabled={deleteLoading}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete User
-            </AlertDialogAction>
+              {deleteLoading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="m 4,12 a 8,8 0 0,1 8,-8 v 2 a 6,6 0 0,0 -6,6 z" />
+                  </svg>
+                  Deleting...
+                </>
+              ) : (
+                'Delete User'
+              )}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

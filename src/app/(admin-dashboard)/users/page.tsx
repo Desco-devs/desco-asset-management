@@ -6,6 +6,7 @@ import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/a
 import { useUsersStore } from '@/stores/users-store'
 import { CreateUserSchema, UpdateUserSchema } from '@/types/users'
 import { parseUserRole, parseUserStatus } from '@/lib/constants/users'
+import { useAuth } from '@/app/context/AuthContext'
 
 // Page-specific components
 import { UserHeader } from './components/UserHeader'
@@ -14,6 +15,9 @@ import { UserFilters } from './components/UserFilters'
 import { UserTableSection } from './components/UserTableSection'
 
 export default function UsersPage() {
+  // Get current authenticated user
+  const { user: currentUser } = useAuth()
+  
   // Zustand store for client state management
   const {
     modalState,
@@ -27,8 +31,8 @@ export default function UsersPage() {
     clearFilters,
   } = useUsersStore()
 
-  // TanStack Query with Supabase realtime
-  const { data: usersData, isLoading, error } = useUsers(filters)
+  // TanStack Query with Supabase realtime - filter out current user
+  const { data: usersData, isLoading, error } = useUsers(filters, currentUser?.id)
   const createUserMutation = useCreateUser()
   const updateUserMutation = useUpdateUser()
   const deleteUserMutation = useDeleteUser()
@@ -58,7 +62,8 @@ export default function UsersPage() {
   }
 
   const handleDeleteUser = async (userId: string) => {
-    await deleteUserMutation.mutateAsync(userId)
+    // Use mutateAsync which will throw on error, allowing the modal to stay open on failure
+    return deleteUserMutation.mutateAsync(userId)
   }
 
   const handleModalSubmit = async (data: CreateUserSchema | UpdateUserSchema) => {
@@ -128,6 +133,8 @@ export default function UsersPage() {
         onDelete={handleDeleteUser}
         onView={openViewModal}
         onCreateNew={openCreateModal}
+        deleteLoading={deleteUserMutation.isPending}
+        currentUserRole={currentUser?.role}
       />
 
       {/* User Modal */}

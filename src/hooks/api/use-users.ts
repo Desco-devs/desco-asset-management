@@ -25,8 +25,13 @@ async function fetchAllUsers(): Promise<UsersApiResponse> {
   return response.json()
 }
 
-function filterUsersClientSide(users: User[], filters: UserFiltersSchema): User[] {
+function filterUsersClientSide(users: User[], filters: UserFiltersSchema, currentUserId?: string): User[] {
   let filteredUsers = [...users]
+  
+  // Filter out current user
+  if (currentUserId) {
+    filteredUsers = filteredUsers.filter(user => user.id !== currentUserId)
+  }
   
   // Search filter
   if (filters.search) {
@@ -108,7 +113,7 @@ async function deleteUser(id: string): Promise<void> {
   }
 }
 
-export function useUsers(filters?: UserFiltersSchema) {
+export function useUsers(filters?: UserFiltersSchema, currentUserId?: string) {
   const queryClient = useQueryClient()
 
   const query = useQuery({
@@ -116,7 +121,7 @@ export function useUsers(filters?: UserFiltersSchema) {
     queryFn: fetchAllUsers,
     staleTime: 1000 * 60 * 5, // 5 minutes
     select: (data: UsersApiResponse) => {
-      const filteredUsers = filterUsersClientSide(data.data, filters || {})
+      const filteredUsers = filterUsersClientSide(data.data, filters || {}, currentUserId)
       return {
         ...data,
         data: filteredUsers,
@@ -204,7 +209,7 @@ export function useUsers(filters?: UserFiltersSchema) {
             
             // Remove from individual user cache
             queryClient.removeQueries({ queryKey: ['users', deletedUser.id] })
-            toast.success(`User "${deletedUser.full_name}" was deleted`)
+            // Don't show toast here - let the mutation handle it
           }
         }
       )

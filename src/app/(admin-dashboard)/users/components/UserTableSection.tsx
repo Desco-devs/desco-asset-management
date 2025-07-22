@@ -11,6 +11,8 @@ interface UserTableSectionProps {
   onDelete: (userId: string) => void
   onView: (user: User) => void
   onCreateNew: () => void
+  deleteLoading?: boolean
+  currentUserRole?: 'SUPERADMIN' | 'ADMIN' | 'VIEWER'
 }
 
 export function UserTableSection({
@@ -20,6 +22,8 @@ export function UserTableSection({
   onDelete,
   onView,
   onCreateNew,
+  deleteLoading = false,
+  currentUserRole,
 }: UserTableSectionProps) {
   return (
     <Card>
@@ -34,6 +38,8 @@ export function UserTableSection({
           canEdit={usersData?.permissions.can_update}
           canDelete={usersData?.permissions.can_delete}
           canCreate={usersData?.permissions.can_create}
+          deleteLoading={deleteLoading}
+          currentUserRole={currentUserRole}
         />
       </CardContent>
     </Card>
