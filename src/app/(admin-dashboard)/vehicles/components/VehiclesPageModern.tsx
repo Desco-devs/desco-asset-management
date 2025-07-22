@@ -20,7 +20,7 @@ import {
   selectViewerImage,
   useVehiclesStore,
 } from "@/stores/vehiclesStore";
-import { Download, Loader2, X } from "lucide-react";
+import { Download, Loader2, X, Trash2 } from "lucide-react";
 import React from "react";
 import CreateVehicleModalModern from "./modals/CreateVehicleModalModern";
 import EditVehicleModalModern from "./modals/EditVehicleModalModern";
@@ -180,17 +180,13 @@ export default function VehiclesPageModern() {
     return (
       <Dialog
         open={deleteConfirmation.isOpen}
-        onOpenChange={(open) => {
-          if (!open && !deleteVehicleMutation.isPending) {
-            handleDeleteCancel();
-          }
-        }}
+        onOpenChange={!deleteVehicleMutation.isPending ? (open) => !open && handleDeleteCancel() : undefined}
       >
         <DialogContent className="w-[95vw] max-w-[425px] sm:max-w-[450px] md:max-w-[500px] lg:max-w-[550px] max-h-[90vh] mx-auto p-0 overflow-hidden">
           <div className="p-6 flex flex-col h-full">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-red-600">
-                <X className="h-5 w-5" />
+              <DialogTitle className="flex items-center gap-2">
+                <Trash2 className="h-5 w-5 text-destructive" />
                 Delete Vehicle
               </DialogTitle>
               <DialogDescription>
@@ -238,7 +234,7 @@ export default function VehiclesPageModern() {
                   </>
                 ) : (
                   <>
-                    <X className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4" />
                     Delete Vehicle
                   </>
                 )}

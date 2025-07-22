@@ -9,9 +9,13 @@ import { LocationModal } from './modals/LocationModal'
 import { ClientModal } from './modals/ClientModal'
 import { ProjectModal } from './modals/ProjectModal'
 import { useProjectsStore } from '@/stores/projects-store'
+import { useProjectsRealtime } from '@/hooks/api/use-projects-realtime'
 
 export function ProjectsManager() {
   const [activeTab, setActiveTab] = React.useState('projects')
+  
+  // Setup realtime subscriptions for instant updates
+  useProjectsRealtime()
 
   return (
     <div className="container mx-auto py-6 space-y-6">

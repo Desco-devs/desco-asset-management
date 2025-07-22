@@ -31,6 +31,7 @@ import { useProjectsStore, useClientModal, useClientTable } from '@/stores/proje
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 import type { Client } from '@/types/projects'
+import { DeleteConfirmationModal } from '@/components/modals/DeleteConfirmationModal'
 
 interface ClientsTableProps {
   onSelectClient?: (client: Client) => void
@@ -46,8 +47,12 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
 
   // Local filtering state
   const [locationFilter, setLocationFilter] = React.useState<string>('all')
-  const setModal = useProjectsStore(state => state.setClientModal)
   
+  // Delete confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false)
+  const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null)
+  
+  const setModal = useProjectsStore(state => state.setClientModal)
   const clientTable = useClientTable()
 
   // No longer need selectedLocation since we show all clients
@@ -57,16 +62,23 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
   }
 
   const handleDelete = (client: Client) => {
-    if (confirm(`Are you sure you want to delete "${client.name}"?`)) {
-      deleteClient(client.id, {
-        onSuccess: () => {
-          toast.success('Client deleted successfully')
-        },
-        onError: (error) => {
-          toast.error('Failed to delete client: ' + error.message)
-        }
-      })
-    }
+    setClientToDelete(client)
+    setDeleteModalOpen(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (!clientToDelete) return
+    
+    deleteClient(clientToDelete.id, {
+      onSuccess: () => {
+        toast.success('Client deleted successfully')
+        setDeleteModalOpen(false)
+        setClientToDelete(null)
+      },
+      onError: (error) => {
+        toast.error('Failed to delete client: ' + error.message)
+      }
+    })
   }
 
   const handleRowClick = (client: Client) => {
@@ -234,9 +246,9 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              sortedClients.map((client) => (
+              sortedClients.map((client, index) => (
                 <TableRow 
-                  key={client.id}
+                  key={client.id || `client-${index}`}
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => handleRowClick(client)}
                 >
@@ -254,7 +266,16 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {formatDistanceToNow(new Date(client.created_at), { addSuffix: true })}
+                    {client.created_at ? (
+                      (() => {
+                        try {
+                          const date = new Date(client.created_at)
+                          return isNaN(date.getTime()) ? 'Just now' : formatDistanceToNow(date, { addSuffix: true })
+                        } catch {
+                          return 'Just now'
+                        }
+                      })()
+                    ) : 'Just now'}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -278,6 +299,7 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
                         <DropdownMenuItem 
                           className="text-red-600"
                           onClick={(e) => {
+                            e.preventDefault()
                             e.stopPropagation()
                             handleDelete(client)
                           }}
@@ -307,6 +329,18 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
           )}
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        title="Delete Client"
+        description="Are you sure you want to delete this client? This action cannot be undone and will remove all associated projects and data."
+        itemName={clientToDelete?.name}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleting}
+        confirmText="Delete Client"
+      />
     </div>
   )
 }

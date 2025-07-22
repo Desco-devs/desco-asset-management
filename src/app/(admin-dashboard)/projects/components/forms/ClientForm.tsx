@@ -136,7 +136,7 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
               <FormLabel>Location</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isPending}>
                 <FormControl>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a location..." />
                   </SelectTrigger>
                 </FormControl>
@@ -147,7 +147,7 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
                     </SelectItem>
                   ) : locations?.length ? (
                     locations.map((location) => (
-                      <SelectItem key={location.uid} value={location.uid}>
+                      <SelectItem key={location.id} value={location.id}>
                         {location.address}
                       </SelectItem>
                     ))

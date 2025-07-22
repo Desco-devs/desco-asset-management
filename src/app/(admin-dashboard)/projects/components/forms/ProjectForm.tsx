@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useCreateProject, useUpdateProject, useProjects, useClients, useLocations } from '@/hooks/api/use-projects'
+import { useCreateProject, useUpdateProject, useProjects, useClients } from '@/hooks/api/use-projects'
 import { useProjectsStore } from '@/stores/projects-store'
 import { toast } from 'sonner'
 import type { Project } from '@/types/projects'
@@ -29,7 +29,6 @@ import type { Project } from '@/types/projects'
 const projectSchema = z.object({
   name: z.string().min(1, "Project name is required").max(100, "Name too long"),
   clientId: z.string().min(1, "Client is required"),
-  locationId: z.string().min(1, "Location is required"),
 })
 
 type ProjectFormData = z.infer<typeof projectSchema>
@@ -45,7 +44,6 @@ export function ProjectForm({ project, onSuccess, onCancel }: ProjectFormProps) 
   const { mutate: updateProject, isPending: isUpdating } = useUpdateProject()
   const { data: projects } = useProjects()
   const { data: clients, isLoading: clientsLoading } = useClients()
-  const { data: locations, isLoading: locationsLoading } = useLocations()
   
   const isEditing = !!project
   const isPending = isCreating || isUpdating
@@ -55,16 +53,10 @@ export function ProjectForm({ project, onSuccess, onCancel }: ProjectFormProps) 
     defaultValues: {
       name: project?.name || '',
       clientId: project?.client_id || '',
-      locationId: project?.client?.location_id || '',
     },
   })
 
-  // Filter clients by selected location
-  const selectedLocationId = form.watch('locationId')
-  const filteredClients = React.useMemo(() => {
-    if (!clients || !selectedLocationId) return clients || []
-    return clients.filter(client => client.location_id === selectedLocationId)
-  }, [clients, selectedLocationId])
+  // No need to filter clients since we removed location selection
 
   // Check for duplicate project names within same client
   const isDuplicateProject = (name: string, clientId: string): boolean => {
@@ -145,7 +137,7 @@ export function ProjectForm({ project, onSuccess, onCancel }: ProjectFormProps) 
               <FormLabel>Client</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isPending}>
                 <FormControl>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a client..." />
                   </SelectTrigger>
                 </FormControl>
@@ -154,8 +146,8 @@ export function ProjectForm({ project, onSuccess, onCancel }: ProjectFormProps) 
                     <SelectItem value="" disabled>
                       Loading clients...
                     </SelectItem>
-                  ) : filteredClients?.length ? (
-                    filteredClients.map((client) => (
+                  ) : clients?.length ? (
+                    clients.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.name}
                         {client.location && (
@@ -167,7 +159,7 @@ export function ProjectForm({ project, onSuccess, onCancel }: ProjectFormProps) 
                     ))
                   ) : (
                     <SelectItem value="" disabled>
-                      {selectedLocationId ? 'No clients available for selected location' : 'No clients available'}
+                      No clients available
                     </SelectItem>
                   )}
                 </SelectContent>
@@ -177,40 +169,6 @@ export function ProjectForm({ project, onSuccess, onCancel }: ProjectFormProps) 
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="locationId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Location</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isPending}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a location..." />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {locationsLoading ? (
-                    <SelectItem value="" disabled>
-                      Loading locations...
-                    </SelectItem>
-                  ) : locations?.length ? (
-                    locations.map((location) => (
-                      <SelectItem key={location.id} value={location.id}>
-                        {location.address}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="" disabled>
-                      No locations available
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <div className="flex justify-end space-x-2 pt-4">
           {onCancel && (

@@ -21,6 +21,12 @@ export interface AuthResult {
   response?: NextResponse
 }
 
+// UUID validation helper
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
 /**
  * Authenticate user from request headers/cookies
  */
@@ -35,6 +41,27 @@ export async function authenticateRequest(request: NextRequest): Promise<AuthRes
         success: false,
         error: 'Not authenticated',
         response: NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      }
+    }
+
+    // Validate user ID format before querying database
+    if (!isValidUUID(user.id)) {
+      console.error('Invalid user ID format from Supabase auth:', user.id, 'Length:', user.id.length, 'Type:', typeof user.id)
+      
+      // For debugging: log the first few characters to identify the pattern
+      console.error('First 10 characters:', user.id.substring(0, 10))
+      
+      return {
+        success: false,
+        error: 'Invalid user ID format',
+        response: NextResponse.json({ 
+          error: 'Invalid user ID format',
+          debug: process.env.NODE_ENV === 'development' ? {
+            userId: user.id,
+            length: user.id.length,
+            firstChars: user.id.substring(0, 10)
+          } : undefined
+        }, { status: 400 })
       }
     }
 
@@ -72,6 +99,16 @@ export async function authenticateRequest(request: NextRequest): Promise<AuthRes
     }
   } catch (error) {
     console.error('Authentication error:', error)
+    
+    // Handle Prisma UUID validation errors
+    if (error instanceof Error && 'code' in error && error.code === 'P2023') {
+      return {
+        success: false,
+        error: 'Invalid user ID format',
+        response: NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 })
+      }
+    }
+    
     return {
       success: false,
       error: 'Authentication failed',

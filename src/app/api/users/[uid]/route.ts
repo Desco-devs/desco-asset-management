@@ -16,12 +16,23 @@ interface UpdateUserBody {
 
 const prisma = new PrismaClient()
 
+// UUID validation helper
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
 // GET: Retrieve user by ID
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ uid: string }> }
 ) {
   const { uid } = await context.params
+  
+  // Validate UUID format
+  if (!isValidUUID(uid)) {
+    return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 })
+  }
   
   try {
     const user = await prisma.user.findUnique({
@@ -57,6 +68,12 @@ export async function PUT(
   return withResourcePermission('users', 'update', async (req: NextRequest, user: AuthenticatedUser) => {
     try {
       const { uid } = await context.params
+      
+      // Validate UUID format
+      if (!isValidUUID(uid)) {
+        return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 })
+      }
+      
       const body = (await req.json()) as UpdateUserBody
       const { username, full_name, phone, role, user_status } = body
 
@@ -124,6 +141,11 @@ export async function DELETE(
   return withResourcePermission('users', 'delete', async (req: NextRequest, user: AuthenticatedUser) => {
     try {
       const { uid } = await context.params
+      
+      // Validate UUID format
+      if (!isValidUUID(uid)) {
+        return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 })
+      }
 
       // Prevent self-deletion
       if (uid === user.id) {

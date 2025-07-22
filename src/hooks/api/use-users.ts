@@ -13,6 +13,20 @@ import {
   UsersApiResponse 
 } from '@/types/users'
 
+// Custom error class for validation errors that shouldn't log to console
+class UserValidationError extends Error {
+  constructor(message: string, public isValidationError: boolean = true) {
+    super(message)
+    this.name = 'UserValidationError'
+    // Prevent this error from showing in console
+    Object.defineProperty(this, 'stack', {
+      get() {
+        return undefined
+      }
+    })
+  }
+}
+
 const API_BASE = '/api/users'
 
 async function fetchAllUsers(): Promise<UsersApiResponse> {
@@ -79,9 +93,24 @@ async function createUser(data: CreateUserSchema): Promise<User> {
   
   if (!response.ok) {
     const result = await response.json()
-    const error = new Error(result.error || 'Failed to create user')
-    error.name = 'CreateUserError'
-    throw error
+    const errorMessage = result.error || 'Failed to create user'
+    
+    // Check if it's a validation error (400 status) that shouldn't show in console
+    const isValidationError = response.status === 400 && (
+      errorMessage.includes('email address has already been registered') ||
+      errorMessage.includes('Username already exists') ||
+      errorMessage.includes('Missing required fields') ||
+      errorMessage.includes('Invalid')
+    )
+    
+    if (isValidationError) {
+      throw new UserValidationError(errorMessage)
+    } else {
+      // For actual server errors, use regular Error
+      const error = new Error(errorMessage)
+      error.name = 'CreateUserError'
+      throw error
+    }
   }
   
   return response.json()
@@ -95,8 +124,21 @@ async function updateUser(id: string, data: UpdateUserSchema): Promise<User> {
   })
   
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to update user')
+    const result = await response.json()
+    const errorMessage = result.error || 'Failed to update user'
+    
+    // Check if it's a validation error (400 status)
+    const isValidationError = response.status === 400 && (
+      errorMessage.includes('Username already exists') ||
+      errorMessage.includes('Invalid user ID format') ||
+      errorMessage.includes('Invalid')
+    )
+    
+    if (isValidationError) {
+      throw new UserValidationError(errorMessage)
+    } else {
+      throw new Error(errorMessage)
+    }
   }
   
   return response.json()
@@ -108,8 +150,21 @@ async function deleteUser(id: string): Promise<void> {
   })
   
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to delete user')
+    const result = await response.json()
+    const errorMessage = result.error || 'Failed to delete user'
+    
+    // Check if it's a validation error (400/403 status)
+    const isValidationError = (response.status === 400 || response.status === 403) && (
+      errorMessage.includes('Invalid user ID format') ||
+      errorMessage.includes('cannot delete your own account') ||
+      errorMessage.includes('Only Super Admin can delete')
+    )
+    
+    if (isValidationError) {
+      throw new UserValidationError(errorMessage)
+    } else {
+      throw new Error(errorMessage)
+    }
   }
 }
 
@@ -263,6 +318,8 @@ export function useUpdateUser() {
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to update user')
     },
+    // Prevent React from logging mutation errors
+    throwOnError: false,
   })
 }
 
@@ -279,5 +336,7 @@ export function useDeleteUser() {
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to delete user')
     },
+    // Prevent React from logging mutation errors
+    throwOnError: false,
   })
 }

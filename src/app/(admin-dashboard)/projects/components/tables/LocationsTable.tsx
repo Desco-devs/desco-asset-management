@@ -24,6 +24,7 @@ import { useProjectsStore, useLocationModal, useLocationTable } from '@/stores/p
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 import type { Location } from '@/types/projects'
+import { DeleteConfirmationModal } from '@/components/modals/DeleteConfirmationModal'
 
 interface LocationsTableProps {
   onSelectLocation?: (location: Location) => void
@@ -33,8 +34,11 @@ interface LocationsTableProps {
 export function LocationsTable({ onSelectLocation, selectedLocationId }: LocationsTableProps) {
   const { data: locations, isLoading, error } = useLocations()
   const { mutate: deleteLocation, isPending: isDeleting } = useDeleteLocation()
+  // Delete confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false)
+  const [locationToDelete, setLocationToDelete] = React.useState<Location | null>(null)
+
   const setModal = useProjectsStore(state => state.setLocationModal)
-  
   const locationTable = useLocationTable()
   const setLocationTable = useProjectsStore(state => state.setLocationTable)
   const setCurrentView = useProjectsStore(state => state.setCurrentView) 
@@ -45,20 +49,27 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
   }
 
   const handleDelete = (location: Location) => {
-    if (confirm(`Are you sure you want to delete "${location.address}"?`)) {
-      deleteLocation(location.id, {
-        onSuccess: () => {
-          toast.success('Location deleted successfully')
-          // Clear selection if deleted location was selected
-          if (selectedLocationId === location.id) {
-            setSelectedLocation(null)
-          }
-        },
-        onError: (error) => {
-          toast.error('Failed to delete location: ' + error.message)
+    setLocationToDelete(location)
+    setDeleteModalOpen(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (!locationToDelete) return
+    
+    deleteLocation(locationToDelete.id, {
+      onSuccess: () => {
+        toast.success('Location deleted successfully')
+        // Clear selection if deleted location was selected
+        if (selectedLocationId === locationToDelete.id) {
+          setSelectedLocation(null)
         }
-      })
-    }
+        setDeleteModalOpen(false)
+        setLocationToDelete(null)
+      },
+      onError: (error) => {
+        toast.error('Failed to delete location: ' + error.message)
+      }
+    })
   }
 
   const handleRowClick = (location: Location) => {
@@ -179,9 +190,9 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
                 </TableCell>
               </TableRow>
             ) : (
-              sortedLocations.map((location) => (
+              sortedLocations.map((location, index) => (
                 <TableRow 
-                  key={location.id}
+                  key={location.id || `location-${index}`}
                   className={`cursor-pointer hover:bg-muted/50 ${
                     selectedLocationId === location.id ? 'bg-muted' : ''
                   }`}
@@ -196,7 +207,16 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
                     )}
                   </TableCell>
                   <TableCell>
-                    {formatDistanceToNow(new Date(location.created_at), { addSuffix: true })}
+                    {location.created_at ? (
+                      (() => {
+                        try {
+                          const date = new Date(location.created_at)
+                          return isNaN(date.getTime()) ? 'Just now' : formatDistanceToNow(date, { addSuffix: true })
+                        } catch {
+                          return 'Just now'
+                        }
+                      })()
+                    ) : 'Just now'}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -220,6 +240,7 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
                         <DropdownMenuItem 
                           className="text-red-600"
                           onClick={(e) => {
+                            e.preventDefault()
                             e.stopPropagation()
                             handleDelete(location)
                           }}
@@ -244,6 +265,18 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
           Showing {sortedLocations.length} of {locations.length} locations
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        title="Delete Location"
+        description="Are you sure you want to delete this location? This action cannot be undone and will remove all associated clients, projects, and data."
+        itemName={locationToDelete?.address}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleting}
+        confirmText="Delete Location"
+      />
     </div>
   )
 }

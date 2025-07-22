@@ -82,21 +82,24 @@ const api = {
     const response = await fetch('/api/clients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        name: data.name,
+        locationId: data.location_id
+      }),
     })
     if (!response.ok) {
       const error = await response.json()
       throw new Error(error.error || 'Failed to create client')
     }
     const result = await response.json()
-    return result.data || result
+    return result.client || result.data || result
   },
 
   async updateClient(data: UpdateClientData): Promise<Client> {
     const response = await fetch(`/api/clients/${data.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: data.name, location_id: data.location_id }),
+      body: JSON.stringify({ name: data.name, locationId: data.location_id }),
     })
     if (!response.ok) {
       const error = await response.json()
@@ -129,7 +132,10 @@ const api = {
     const response = await fetch('/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        name: data.name,
+        clientId: data.client_id
+      }),
     })
     if (!response.ok) {
       const error = await response.json()
@@ -141,9 +147,9 @@ const api = {
 
   async updateProject(data: UpdateProjectData): Promise<Project> {
     const response = await fetch(`/api/projects/${data.id}`, {
-      method: 'PUT',
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: data.name, client_id: data.client_id }),
+      body: JSON.stringify({ name: data.name, clientId: data.client_id }),
     })
     if (!response.ok) {
       const error = await response.json()
@@ -169,7 +175,8 @@ export function useLocations() {
   return useQuery({
     queryKey: projectsKeys.locations(),
     queryFn: api.getLocations,
-    staleTime: 0, // Always fresh for real-time updates
+    staleTime: 30 * 1000, // 30 seconds - rely on realtime for updates
+    gcTime: 5 * 60 * 1000, // 5 minutes
   })
 }
 
@@ -177,7 +184,8 @@ export function useClients(locationId?: string) {
   return useQuery({
     queryKey: locationId ? projectsKeys.clientsByLocation(locationId) : projectsKeys.clients(),
     queryFn: () => api.getClients(locationId),
-    staleTime: 0, // Always fresh for real-time updates
+    staleTime: 30 * 1000, // 30 seconds - rely on realtime for updates
+    gcTime: 5 * 60 * 1000, // 5 minutes
   })
 }
 
@@ -185,7 +193,8 @@ export function useProjects(clientId?: string) {
   return useQuery({
     queryKey: clientId ? projectsKeys.projectsByClient(clientId) : projectsKeys.projects(),
     queryFn: () => api.getProjects(clientId),
-    staleTime: 0, // Always fresh for real-time updates
+    staleTime: 30 * 1000, // 30 seconds - rely on realtime for updates
+    gcTime: 5 * 60 * 1000, // 5 minutes
   })
 }
 
@@ -195,10 +204,15 @@ export function useCreateLocation() {
   
   return useMutation({
     mutationFn: api.createLocation,
-    onSuccess: () => {
-      // Invalidate all location-related queries
-      queryClient.invalidateQueries({ queryKey: projectsKeys.locations() })
-      queryClient.refetchQueries({ queryKey: projectsKeys.locations() })
+    onSuccess: (newLocation) => {
+      // Optimistically add to cache immediately, checking for duplicates
+      queryClient.setQueryData<Location[]>(projectsKeys.locations(), (oldData) => {
+        if (!oldData) return [newLocation]
+        // Check if location already exists to prevent duplicates
+        const exists = oldData.some(location => location.id === newLocation.id)
+        if (exists) return oldData
+        return [newLocation, ...oldData]
+      })
     },
   })
 }
@@ -208,8 +222,18 @@ export function useUpdateLocation() {
   
   return useMutation({
     mutationFn: api.updateLocation,
-    onSuccess: () => {
+    onSuccess: (updatedLocation) => {
+      // Optimistically update in cache immediately
+      queryClient.setQueryData<Location[]>(projectsKeys.locations(), (oldData) => {
+        if (!oldData) return [updatedLocation]
+        return oldData.map(location => 
+          location.id === updatedLocation.id ? updatedLocation : location
+        )
+      })
+      // Invalidate locations cache to ensure fresh data
       queryClient.invalidateQueries({ queryKey: projectsKeys.locations() })
+      // Also invalidate clients cache since client location data might be affected
+      queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
     },
   })
 }
@@ -219,8 +243,12 @@ export function useDeleteLocation() {
   
   return useMutation({
     mutationFn: api.deleteLocation,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectsKeys.locations() })
+    onSuccess: (_, locationId) => {
+      // Optimistically remove from cache immediately
+      queryClient.setQueryData<Location[]>(projectsKeys.locations(), (oldData) => {
+        return oldData ? oldData.filter(location => location.id !== locationId) : []
+      })
+      // Also invalidate dependent data
       queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
     },
   })
@@ -231,12 +259,23 @@ export function useCreateClient() {
   
   return useMutation({
     mutationFn: api.createClient,
-    onSuccess: () => {
-      // Invalidate all client-related queries
-      queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
-      queryClient.refetchQueries({ queryKey: projectsKeys.clients() })
-      // Also invalidate specific location-based client queries
-      queryClient.invalidateQueries({ queryKey: [...projectsKeys.clients()] })
+    onSuccess: (newClient) => {
+      // Optimistically add to cache immediately, checking for duplicates
+      queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
+        if (!oldData) return [newClient]
+        // Check if client already exists to prevent duplicates
+        const exists = oldData.some(client => client.id === newClient.id)
+        if (exists) return oldData
+        return [newClient, ...oldData]
+      })
+      // Also update location-specific queries if applicable
+      queryClient.setQueryData<Client[]>(projectsKeys.clientsByLocation(newClient.location_id), (oldData) => {
+        if (!oldData) return [newClient]
+        // Check if client already exists to prevent duplicates
+        const exists = oldData.some(client => client.id === newClient.id)
+        if (exists) return oldData
+        return [newClient, ...oldData]
+      })
     },
   })
 }
@@ -246,8 +285,25 @@ export function useUpdateClient() {
   
   return useMutation({
     mutationFn: api.updateClient,
-    onSuccess: () => {
+    onSuccess: (updatedClient) => {
+      // Optimistically update in cache immediately
+      queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
+        if (!oldData) return [updatedClient]
+        return oldData.map(client => 
+          client.id === updatedClient.id ? updatedClient : client
+        )
+      })
+      // Update location-specific queries
+      queryClient.setQueryData<Client[]>(projectsKeys.clientsByLocation(updatedClient.location_id), (oldData) => {
+        if (!oldData) return [updatedClient]
+        return oldData.map(client => 
+          client.id === updatedClient.id ? updatedClient : client
+        )
+      })
+      // Invalidate clients cache to ensure fresh data
       queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
+      // Also invalidate projects cache since project client data might be affected
+      queryClient.invalidateQueries({ queryKey: projectsKeys.projects() })
     },
   })
 }
@@ -257,8 +313,12 @@ export function useDeleteClient() {
   
   return useMutation({
     mutationFn: api.deleteClient,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
+    onSuccess: (_, clientId) => {
+      // Optimistically remove from cache immediately
+      queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
+        return oldData ? oldData.filter(client => client.id !== clientId) : []
+      })
+      // Also invalidate dependent data
       queryClient.invalidateQueries({ queryKey: projectsKeys.projects() })
     },
   })
@@ -269,12 +329,40 @@ export function useCreateProject() {
   
   return useMutation({
     mutationFn: api.createProject,
-    onSuccess: () => {
-      // Invalidate all project-related queries
-      queryClient.invalidateQueries({ queryKey: projectsKeys.projects() })
-      queryClient.refetchQueries({ queryKey: projectsKeys.projects() })
-      // Also invalidate specific client-based project queries
-      queryClient.invalidateQueries({ queryKey: [...projectsKeys.projects()] })
+    onSuccess: (newProject) => {
+      // Optimistically add to cache immediately, checking for duplicates
+      queryClient.setQueryData<Project[]>(projectsKeys.projects(), (oldData) => {
+        if (!oldData) return [newProject]
+        // Check if project already exists to prevent duplicates
+        const exists = oldData.some(project => project.id === newProject.id)
+        if (exists) return oldData
+        return [newProject, ...oldData]
+      })
+      // Also update client-specific queries if applicable
+      queryClient.setQueryData<Project[]>(projectsKeys.projectsByClient(newProject.client_id), (oldData) => {
+        if (!oldData) return [newProject]
+        // Check if project already exists to prevent duplicates
+        const exists = oldData.some(project => project.id === newProject.id)
+        if (exists) return oldData
+        return [newProject, ...oldData]
+      })
+      
+      // Update clients cache to reflect new project count
+      queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
+        if (!oldData) return oldData
+        return oldData.map(client => {
+          if (client.id === newProject.client_id) {
+            return {
+              ...client,
+              projects: client.projects ? [...client.projects, { id: newProject.id, name: newProject.name }] : [{ id: newProject.id, name: newProject.name }]
+            }
+          }
+          return client
+        })
+      })
+      
+      // Also invalidate clients queries to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
     },
   })
 }
@@ -284,8 +372,21 @@ export function useUpdateProject() {
   
   return useMutation({
     mutationFn: api.updateProject,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectsKeys.projects() })
+    onSuccess: (updatedProject) => {
+      // Optimistically update in cache immediately
+      queryClient.setQueryData<Project[]>(projectsKeys.projects(), (oldData) => {
+        if (!oldData) return [updatedProject]
+        return oldData.map(project => 
+          project.id === updatedProject.id ? updatedProject : project
+        )
+      })
+      // Update client-specific queries
+      queryClient.setQueryData<Project[]>(projectsKeys.projectsByClient(updatedProject.client_id), (oldData) => {
+        if (!oldData) return [updatedProject]
+        return oldData.map(project => 
+          project.id === updatedProject.id ? updatedProject : project
+        )
+      })
     },
   })
 }
@@ -295,8 +396,34 @@ export function useDeleteProject() {
   
   return useMutation({
     mutationFn: api.deleteProject,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectsKeys.projects() })
+    onSuccess: (_, projectId) => {
+      // Get the project that was deleted to update client cache
+      const projectsData = queryClient.getQueryData<Project[]>(projectsKeys.projects())
+      const deletedProject = projectsData?.find(p => p.id === projectId)
+      
+      // Optimistically remove from cache immediately
+      queryClient.setQueryData<Project[]>(projectsKeys.projects(), (oldData) => {
+        return oldData ? oldData.filter(project => project.id !== projectId) : []
+      })
+      
+      // Update clients cache to reflect removed project
+      if (deletedProject) {
+        queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
+          if (!oldData) return oldData
+          return oldData.map(client => {
+            if (client.id === deletedProject.client_id) {
+              return {
+                ...client,
+                projects: client.projects ? client.projects.filter(p => p.id !== projectId) : []
+              }
+            }
+            return client
+          })
+        })
+        
+        // Also invalidate clients queries to ensure fresh data
+        queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
+      }
     },
   })
 }

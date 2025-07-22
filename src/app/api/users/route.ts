@@ -63,8 +63,36 @@ export const GET = withResourcePermission('users', 'view', async (request: NextR
       queryOptions.skip = parseInt(offset, 10)
     }
 
-    const users = await prisma.user.findMany(queryOptions)
-    const total = await prisma.user.count({ where: queryOptions.where })
+    // Use raw query to handle invalid UUIDs more gracefully
+    let users = []
+    let total = 0
+    
+    try {
+      users = await prisma.user.findMany(queryOptions)
+      total = await prisma.user.count({ where: queryOptions.where })
+    } catch (prismaError) {
+      // If there's a UUID validation error, try to get valid users only
+      if (prismaError instanceof Error && 'code' in prismaError && prismaError.code === 'P2023') {
+        console.warn('UUID validation error in user query, filtering out invalid records')
+        
+        // Use raw query to filter out invalid UUIDs
+        const limitClause = queryOptions.take ? `LIMIT ${queryOptions.take}` : ''
+        const offsetClause = queryOptions.skip ? `OFFSET ${queryOptions.skip}` : ''
+        
+        const validUsers = await prisma.$queryRaw`
+          SELECT id, username, full_name, phone, user_profile, role, user_status, 
+                 is_online, last_seen, created_at, updated_at
+          FROM "user" 
+          WHERE id::text ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+          ORDER BY created_at DESC
+        `
+        
+        users = validUsers as any[]
+        total = users.length
+      } else {
+        throw prismaError
+      }
+    }
 
     return NextResponse.json({
       data: users,
@@ -78,6 +106,14 @@ export const GET = withResourcePermission('users', 'view', async (request: NextR
     })
   } catch (error: unknown) {
     console.error('Error fetching users:', error)
+    
+    // Handle Prisma UUID validation errors
+    if (error instanceof Error && 'code' in error && error.code === 'P2023') {
+      return NextResponse.json({ 
+        error: 'Database contains invalid user ID format. Please contact administrator.' 
+      }, { status: 500 })
+    }
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 })

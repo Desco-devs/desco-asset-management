@@ -17,13 +17,20 @@ interface NextApiResponseServerIO extends NextApiResponse {
 }
 
 const SocketHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
+  // If custom server is running, don't initialize Socket.IO here
+  if (process.env.CUSTOM_SERVER === 'true') {
+    console.log('Custom server is running - Socket.io API route disabled');
+    res.status(200).json({ message: 'Socket.io handled by custom server' });
+    return;
+  }
+
   if (res.socket.server.io) {
     console.log('Socket.io already initialized');
     res.end();
     return;
   }
 
-  console.log('Initializing Socket.io server...');
+  console.log('Initializing Socket.io server via API route...');
 
   const io = new ServerIO(res.socket.server, {
     path: '/api/socket',

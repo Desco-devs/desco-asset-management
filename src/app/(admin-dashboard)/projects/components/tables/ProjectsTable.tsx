@@ -31,6 +31,7 @@ import { useProjectsStore, useProjectModal, useProjectTable } from '@/stores/pro
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 import type { Project } from '@/types/projects'
+import { DeleteConfirmationModal } from '@/components/modals/DeleteConfirmationModal'
 
 export function ProjectsTable() {
   const setProjectTable = useProjectsStore(state => state.setProjectTable)
@@ -47,6 +48,10 @@ export function ProjectsTable() {
   const [locationFilter, setLocationFilter] = React.useState<string>('all')
   const [clientFilter, setClientFilter] = React.useState<string>('all')
   
+  // Delete confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false)
+  const [projectToDelete, setProjectToDelete] = React.useState<Project | null>(null)
+  
   const projectTable = useProjectTable()
 
   // No longer need selectedClient since we show all projects
@@ -56,16 +61,23 @@ export function ProjectsTable() {
   }
 
   const handleDelete = (project: Project) => {
-    if (confirm(`Are you sure you want to delete "${project.name}"?`)) {
-      deleteProject(project.id, {
-        onSuccess: () => {
-          toast.success('Project deleted successfully')
-        },
-        onError: (error) => {
-          toast.error('Failed to delete project: ' + error.message)
-        }
-      })
-    }
+    setProjectToDelete(project)
+    setDeleteModalOpen(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (!projectToDelete) return
+    
+    deleteProject(projectToDelete.id, {
+      onSuccess: () => {
+        toast.success('Project deleted successfully')
+        setDeleteModalOpen(false)
+        setProjectToDelete(null)
+      },
+      onError: (error) => {
+        toast.error('Failed to delete project: ' + error.message)
+      }
+    })
   }
 
   const handleSearch = (value: string) => {
@@ -290,8 +302,8 @@ export function ProjectsTable() {
                 </TableCell>
               </TableRow>
             ) : (
-              sortedProjects.map((project) => (
-                <TableRow key={project.id}>
+              sortedProjects.map((project, index) => (
+                <TableRow key={project.id || `project-${index}`}>
                   <TableCell className="font-medium">
                     {project.name}
                   </TableCell>
@@ -316,7 +328,16 @@ export function ProjectsTable() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}
+                    {project.created_at ? (
+                      (() => {
+                        try {
+                          const date = new Date(project.created_at)
+                          return isNaN(date.getTime()) ? 'Just now' : formatDistanceToNow(date, { addSuffix: true })
+                        } catch {
+                          return 'Just now'
+                        }
+                      })()
+                    ) : 'Just now'}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -326,13 +347,23 @@ export function ProjectsTable() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(project)}>
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleEdit(project)
+                          }}
+                        >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           className="text-red-600"
-                          onClick={() => handleDelete(project)}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDelete(project)
+                          }}
                           disabled={isDeleting}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
@@ -359,6 +390,18 @@ export function ProjectsTable() {
           )}
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        title="Delete Project"
+        description="Are you sure you want to delete this project? This action cannot be undone and will remove all associated data."
+        itemName={projectToDelete?.name}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleting}
+        confirmText="Delete Project"
+      />
     </div>
   )
 }
