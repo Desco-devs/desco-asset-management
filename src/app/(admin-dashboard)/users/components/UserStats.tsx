@@ -1,17 +1,22 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { User } from '@/types/users'
+import { User, UsersApiResponse } from '@/types/users'
 
 interface UserStatsProps {
-  users: User[]
-  total: number
+  usersData: UsersApiResponse & { data: User[], originalTotal: number, originalData: User[] }
+  currentUserId?: string
 }
 
-export function UserStats({ users, total }: UserStatsProps) {
-  const onlineCount = users.filter(u => u.is_online).length
-  const activeCount = users.filter(u => u.user_status === 'ACTIVE').length
-  const adminCount = users.filter(u => u.role === 'ADMIN' || u.role === 'SUPERADMIN').length
+export function UserStats({ usersData, currentUserId }: UserStatsProps) {
+  // Use original unfiltered data for stats (not affected by filters)
+  const originalData = usersData.originalData || []
+  const allUsersExceptCurrent = originalData.filter((u: User) => u.id !== currentUserId)
+  
+  const total = usersData.originalTotal || usersData.total
+  const onlineCount = allUsersExceptCurrent.filter((u: User) => u.is_online).length
+  const activeCount = allUsersExceptCurrent.filter((u: User) => u.user_status === 'ACTIVE').length
+  const adminCount = allUsersExceptCurrent.filter((u: User) => u.role === 'ADMIN' || u.role === 'SUPERADMIN').length
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

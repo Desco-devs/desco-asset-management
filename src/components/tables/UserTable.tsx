@@ -183,7 +183,16 @@ export function UserTable({
                     {formatLastSeen(user.last_seen, user.is_online)}
                   </TableCell>
                   <TableCell className="text-sm text-gray-600">
-                    {formatDistanceToNow(new Date(user.created_at))} ago
+                    {user.created_at ? (
+                      (() => {
+                        try {
+                          const date = new Date(user.created_at)
+                          return isNaN(date.getTime()) ? 'Just now' : formatDistanceToNow(date, { addSuffix: true })
+                        } catch {
+                          return 'Just now'
+                        }
+                      })()
+                    ) : 'Just now'}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">

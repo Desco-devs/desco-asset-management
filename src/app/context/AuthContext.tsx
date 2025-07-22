@@ -11,6 +11,7 @@ import React, {
 import { createClient } from "@/lib/supabase";
 import { User, AuthContextType } from "@/types/auth";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { useOnlineHeartbeat, useSetOffline } from "@/hooks/api/use-online-status";
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -19,6 +20,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const setOffline = useSetOffline();
+
+  // Use heartbeat system for online status
+  useOnlineHeartbeat(!!user);
 
   const fetchUserProfile = useCallback(async (userId: string) => {
     try {
@@ -71,6 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await fetchUserProfile(user.id);
           }
         } else if (event === 'SIGNED_OUT') {
+          // Set user offline before clearing state
+          setOffline();
           setSupabaseUser(null);
           setUserState(null);
         }
@@ -79,6 +86,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, [fetchUserProfile]);
+
+  // Handle page unload for online status
+  useEffect(() => {
+    if (!user) return;
+
+    const handleBeforeUnload = () => {
+      // User is closing/refreshing the page - set offline
+      // Use sendBeacon for reliability during page unload
+      const blob = new Blob([JSON.stringify({ is_online: false })], {
+        type: 'application/json'
+      });
+      navigator.sendBeacon('/api/users/online-status', blob);
+    };
+
+    // Add event listener
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [user]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -89,6 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Set user offline before signing out
+    setOffline();
+    
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     

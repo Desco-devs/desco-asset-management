@@ -108,10 +108,10 @@ export default function UsersPage() {
       <UserHeader total={usersData?.originalTotal || usersData?.total} />
 
       {/* Stats Cards */}
-      {usersData?.data && (
+      {usersData && (
         <UserStats 
-          users={usersData.data} 
-          total={usersData.originalTotal || usersData.total} 
+          usersData={usersData}
+          currentUserId={currentUser?.id}
         />
       )}
 

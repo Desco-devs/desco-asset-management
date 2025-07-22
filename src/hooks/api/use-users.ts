@@ -174,7 +174,7 @@ export function useUsers(filters?: UserFiltersSchema, currentUserId?: string) {
   const query = useQuery({
     queryKey: ['users'],
     queryFn: fetchAllUsers,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 30, // 30 seconds for real-time updates
     select: (data: UsersApiResponse) => {
       const filteredUsers = filterUsersClientSide(data.data, filters || {}, currentUserId)
       return {
@@ -182,6 +182,7 @@ export function useUsers(filters?: UserFiltersSchema, currentUserId?: string) {
         data: filteredUsers,
         total: filteredUsers.length,
         originalTotal: data.total,
+        originalData: data.data, // Keep original unfiltered data for stats
       }
     },
   })
@@ -211,7 +212,7 @@ export function useUsers(filters?: UserFiltersSchema, currentUserId?: string) {
                 total: oldData.total + 1,
               }
             })
-            toast.success(`New user "${newUser.full_name}" was created`)
+            // Don't show toast here - let the mutation handle it to avoid duplicates
           }
         }
       )
