@@ -237,9 +237,8 @@ export function useUsers(filters?: UserFiltersSchema, currentUserId?: string) {
               }
             })
             
-            // Update individual user cache
+            // Update individual user cache - No toast needed for real-time updates
             queryClient.setQueryData(['users', updatedUser.id], updatedUser)
-            toast.success(`User "${updatedUser.full_name}" was updated`)
           }
         }
       )

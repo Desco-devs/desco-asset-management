@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, CardContent } from '@/components/ui/card'
-import { UsersTable } from '@/components/tables/UsersTable'
+import { UsersCards } from '@/components/tables/UsersCards'
 import { User, UsersApiResponse } from '@/types/users'
 
 interface UserTableSectionProps {
@@ -13,6 +13,7 @@ interface UserTableSectionProps {
   onCreateNew: () => void
   deleteLoading?: boolean
   currentUserRole?: 'SUPERADMIN' | 'ADMIN' | 'VIEWER'
+  isModalOpen?: boolean
 }
 
 export function UserTableSection({
@@ -24,24 +25,24 @@ export function UserTableSection({
   onCreateNew,
   deleteLoading = false,
   currentUserRole,
+  isModalOpen = false,
 }: UserTableSectionProps) {
   return (
-    <Card>
-      <CardContent className="p-0">
-        <UsersTable
-          users={usersData?.data || []}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onView={onView}
-          onCreateNew={onCreateNew}
-          loading={isLoading}
-          canEdit={usersData?.permissions.can_update}
-          canDelete={usersData?.permissions.can_delete}
-          canCreate={usersData?.permissions.can_create}
-          deleteLoading={deleteLoading}
-          currentUserRole={currentUserRole}
-        />
-      </CardContent>
-    </Card>
+    <div>
+      <UsersCards
+        users={usersData?.data || []}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onView={onView}
+        onCreateNew={onCreateNew}
+        loading={isLoading}
+        canEdit={usersData?.permissions.can_update}
+        canDelete={usersData?.permissions.can_delete}
+        canCreate={usersData?.permissions.can_create}
+        deleteLoading={deleteLoading}
+        currentUserRole={currentUserRole}
+        isModalOpen={isModalOpen}
+      />
+    </div>
   )
 }

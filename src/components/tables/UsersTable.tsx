@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MoreHorizontal, Edit, Trash2, Eye, UserPlus } from 'lucide-react'
+import { MoreHorizontal, Edit, Trash2, Eye, UserPlus, Phone, Mail, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,13 +24,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { User, ROLE_COLORS, STATUS_COLORS, USER_ROLES, USER_STATUSES } from '@/types/users'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -119,16 +120,6 @@ export function UsersTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Users Management</h2>
-        {canCreate && (
-          <Button onClick={onCreateNew}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add User
-          </Button>
-        )}
-      </div>
-
       <div className="border rounded-lg">
         <Table>
           <TableHeader>

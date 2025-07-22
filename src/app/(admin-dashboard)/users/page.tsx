@@ -52,9 +52,11 @@ export default function UsersPage() {
   const handleUpdateUser = async (data: UpdateUserSchema) => {
     if (!modalState.user) return
     try {
-      await updateUserMutation.mutateAsync({ id: modalState.user.id, data })
-      // Only close modal on success
+      const updatedUser = await updateUserMutation.mutateAsync({ id: modalState.user.id, data })
+      // Close modal on success
       closeModal()
+      // Note: The UsersCards component will handle reopening the drawer with updated data
+      // via the userBeingEdited state and modal close detection
     } catch (error) {
       // Error occurred - don't close modal, let user fix and retry
       console.error('Error updating user:', error)
@@ -103,9 +105,13 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <UserHeader total={usersData?.originalTotal || usersData?.total} />
+      <UserHeader 
+        total={usersData?.originalTotal || usersData?.total}
+        onCreateNew={openCreateModal}
+        canCreate={usersData?.permissions.can_create}
+      />
 
       {/* Stats Cards */}
       {usersData && (
@@ -135,6 +141,7 @@ export default function UsersPage() {
         onCreateNew={openCreateModal}
         deleteLoading={deleteUserMutation.isPending}
         currentUserRole={currentUser?.role}
+        isModalOpen={modalState.isOpen}
       />
 
       {/* User Modal */}
