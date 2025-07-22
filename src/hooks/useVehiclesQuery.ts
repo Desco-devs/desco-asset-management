@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { toast } from "sonner";
 import type { Vehicle, MaintenanceReport, Project, Client, Location, User, ExportFilters } from "@/stores/vehiclesStore";
@@ -239,7 +239,7 @@ export function useCreateVehicle() {
         console.log('✅ Adding new vehicle to cache:', newVehicle.id);
         return deduplicateVehicles([newVehicle, ...oldData]);
       });
-      toast.success('Vehicle created successfully!');
+      // Toast moved to realtime listener to show for all vehicle creations
     },
     onError: (error) => {
       toast.error('Failed to create vehicle: ' + error.message);
@@ -261,7 +261,7 @@ export function useUpdateVehicle() {
         );
         return deduplicateVehicles(updated);
       });
-      toast.success('Vehicle updated successfully!');
+      // Toast moved to realtime listener for unified notification system
     },
     onError: (error) => {
       toast.error('Failed to update vehicle: ' + error.message);
@@ -280,8 +280,7 @@ export function useDeleteVehicle() {
         const filtered = oldData ? oldData.filter(vehicle => vehicle.id !== vehicleId) : [];
         return deduplicateVehicles(filtered);
       });
-      // Show success toast immediately 
-      toast.success('Vehicle deleted successfully!');
+      // Toast moved to realtime listener for unified notification system
     },
     onError: (error) => {
       toast.error('Failed to delete vehicle: ' + error.message);
@@ -376,6 +375,9 @@ export function useDeleteMaintenanceReport() {
 export function useSupabaseRealtime() {
   const queryClient = useQueryClient();
   const [isConnected, setIsConnected] = useState(false);
+  
+  // Simple duplicate prevention for individual toasts
+  const processedEvents = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const supabase = createClient();
@@ -553,8 +555,19 @@ export function useSupabaseRealtime() {
                 
                 return deduplicateVehicles([vehicleData, ...oldData]);
               });
-              // No toast here - mutation handles user-initiated creates
-              // This is for realtime updates from other users
+              
+              // Simple individual toast with duplicate prevention
+              const eventKey = `insert-${vehicleData.id}`;
+              if (!processedEvents.current.has(eventKey)) {
+                processedEvents.current.add(eventKey);
+                toast.success(`Vehicle "${vehicleData.brand} ${vehicleData.model}" created successfully!`);
+                
+                // Clean up old events (keep only last 100 to prevent memory leak)
+                if (processedEvents.current.size > 100) {
+                  const oldEvents = Array.from(processedEvents.current).slice(0, 50);
+                  oldEvents.forEach(event => processedEvents.current.delete(event));
+                }
+              }
             } else if (eventType === 'UPDATE' && payload.new) {
               console.log('🔄 Vehicle updated:', payload.new);
               const vehicleData = payload.new as any;
@@ -573,7 +586,13 @@ export function useSupabaseRealtime() {
                 );
                 return deduplicateVehicles(updated);
               });
-              // No toast for updates - user initiated the action
+              
+              // Simple individual toast with duplicate prevention
+              const eventKey = `update-${vehicleData.id}`;
+              if (!processedEvents.current.has(eventKey)) {
+                processedEvents.current.add(eventKey);
+                toast.success(`Vehicle "${vehicleData.brand} ${vehicleData.model}" updated successfully!`);
+              }
             } else if (eventType === 'DELETE') {
               console.log('🗑️ Vehicle deleted:', payload.old || 'Unknown vehicle');
               
@@ -594,9 +613,14 @@ export function useSupabaseRealtime() {
                   const filtered = oldData.filter(vehicle => vehicle.id !== deletedVehicle.id);
                   return deduplicateVehicles(filtered);
                 });
+                
+                // Simple individual toast with duplicate prevention
+                const eventKey = `delete-${deletedVehicle.id}`;
+                if (!processedEvents.current.has(eventKey)) {
+                  processedEvents.current.add(eventKey);
+                  toast.success(`Vehicle "${deletedVehicle.brand} ${deletedVehicle.model}" deleted successfully!`);
+                }
               }
-              // No toast here - mutation handles user-initiated deletes
-              // This is for realtime updates from other users
             }
           } catch (error) {
             console.error('Error handling realtime vehicle event:', error);
@@ -769,6 +793,9 @@ export function useSupabaseRealtime() {
       console.error = originalConsoleError;
       window.onerror = originalWindowError;
       Object.keys = originalObjectKeys;
+      
+      // Clear processed events
+      processedEvents.current.clear();
       
       vehiclesChannel.unsubscribe();
       maintenanceChannel.unsubscribe();

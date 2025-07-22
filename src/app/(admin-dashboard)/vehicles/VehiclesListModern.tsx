@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Eye, Search, Filter, Plus, Download, Car, List, X } from "lucide-react";
 import { useVehiclesStore, selectFilterInfo, selectIsMobile } from "@/stores/vehiclesStore";
-import { useVehiclesWithReferenceData } from "@/hooks/useVehiclesQuery";
+import { useVehiclesWithReferenceData, useSupabaseRealtime } from "@/hooks/useVehiclesQuery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,6 +17,9 @@ import { ExportDialog } from "./components/ExportDialog";
 export default function VehiclesListModern() {
   // TanStack Query - Server state
   const { vehicles, projects, maintenanceReports, isLoading, isError, error } = useVehiclesWithReferenceData();
+  
+  // Supabase Realtime - Live updates
+  const { isConnected } = useSupabaseRealtime();
   
   
   // Use store state directly and compute results
@@ -134,9 +137,19 @@ export default function VehiclesListModern() {
   return (
     <div className="space-y-6 md:space-y-8">
       {/* Page Title */}
-      <div className="flex items-center gap-3">
-        <Car className="h-7 w-7 text-primary" />
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Vehicle Management</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Car className="h-7 w-7 text-primary" />
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Vehicle Management</h1>
+        </div>
+        
+        {/* Realtime Status Indicator */}
+        <div className="flex items-center gap-2">
+          <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+          <span className="text-xs text-muted-foreground">
+            {isConnected ? 'Live' : 'Offline'}
+          </span>
+        </div>
       </div>
 
       {/* Action Buttons Section */}
@@ -275,27 +288,67 @@ export default function VehiclesListModern() {
           {/* Sort Button */}
           <Select value={(() => {
             // Return compound value to match dropdown options
-            if (!sortBy) return '';
-            if (sortBy === 'created_at') return sortOrder === 'desc' ? 'created_at' : 'created_at_old';
-            if (sortBy === 'expiry_date') return sortOrder === 'asc' ? 'expiry_date' : 'expiry_date_late';
-            if (sortBy === 'status') return sortOrder === 'asc' ? 'status' : 'status_issues';
-            if (sortOrder === 'desc') return `${sortBy}_desc`;
+            if (!sortBy) return 'clear-sort';
+            
+            // Handle special cases with specific value mappings
+            if (sortBy === 'created_at') {
+              return sortOrder === 'desc' ? 'created_at' : 'created_at_old';
+            }
+            if (sortBy === 'expiry_date') {
+              return sortOrder === 'asc' ? 'expiry_date' : 'expiry_date_late';
+            }
+            if (sortBy === 'status') {
+              return sortOrder === 'asc' ? 'status' : 'status_issues';
+            }
+            
+            // Handle other fields with _desc suffix
+            if (sortOrder === 'desc') {
+              return `${sortBy}_desc`;
+            }
+            
             return sortBy;
           })()} onValueChange={(value) => {
+            console.log('🔄 Sort selection changed to:', value);
+            
+            // Handle clear sort
+            if (value === 'clear-sort') {
+              setSortBy('');
+              setSortOrder('asc');
+              return;
+            }
+            
             // Handle sort with direction
-            if (value === 'created_at_old') {
+            if (value === 'created_at') {
+              // Newest added (desc)
+              setSortBy('created_at');
+              setSortOrder('desc');
+            } else if (value === 'created_at_old') {
+              // Oldest added (asc)
               setSortBy('created_at');
               setSortOrder('asc');
+            } else if (value === 'expiry_date') {
+              // Expiring soon (asc)
+              setSortBy('expiry_date');
+              setSortOrder('asc');
             } else if (value === 'expiry_date_late') {
+              // Expiring later (desc)
               setSortBy('expiry_date');
               setSortOrder('desc');
-            } else if (value === 'status_issues') {
+            } else if (value === 'status') {
+              // Operational first (asc)
               setSortBy('status');
-              setSortOrder('desc'); // NON_OPERATIONAL first
+              setSortOrder('asc');
+            } else if (value === 'status_issues') {
+              // Issues first (desc)
+              setSortBy('status');
+              setSortOrder('desc');
             } else if (value.includes('_desc')) {
-              setSortBy(value.replace('_desc', '') as any);
+              // Generic desc handling
+              const field = value.replace('_desc', '');
+              setSortBy(field as any);
               setSortOrder('desc');
             } else {
+              // Default asc handling
               setSortBy(value as any);
               setSortOrder('asc');
             }
@@ -327,6 +380,10 @@ export default function VehiclesListModern() {
                 <SelectItem value="plate_number_desc">Plate Z-A</SelectItem>
                 <SelectItem value="owner">Owner A-Z</SelectItem>
                 <SelectItem value="owner_desc">Owner Z-A</SelectItem>
+                
+                <div className="border-t my-2"></div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">Quick Actions</div>
+                <SelectItem value="clear-sort">Clear Sort</SelectItem>
               </div>
             </SelectContent>
           </Select>

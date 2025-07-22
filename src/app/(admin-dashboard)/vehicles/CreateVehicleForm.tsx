@@ -2,10 +2,18 @@
 
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
+import { format } from "date-fns";
 import { createVehicleAction } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Camera, FileText, Upload } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { Settings, Camera, FileText, Upload, CalendarIcon, User, Building2, Car, Hash, Shield, Loader2 } from "lucide-react";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 
 // Submit button component that uses useFormStatus
@@ -13,13 +21,15 @@ function SubmitButton() {
   const { pending } = useFormStatus();
   
   return (
-    <button 
+    <Button 
       type="submit" 
       disabled={pending}
-      className="w-full bg-blue-500 text-white py-2 px-4 rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
+      className="w-full"
+      size="lg"
     >
+      {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
       {pending ? "Creating Vehicle..." : "Create Vehicle"}
-    </button>
+    </Button>
   );
 }
 
@@ -37,6 +47,16 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
   // Tab state for mobile
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'documents'>('details');
   
+  // Form state for select fields and dates
+  const [formData, setFormData] = useState({
+    type: '',
+    projectId: '',
+    status: 'OPERATIONAL',
+    before: '6',
+    inspectionDate: new Date(),
+    expiryDate: undefined as Date | undefined
+  });
+  
   // File state for images and documents
   const [files, setFiles] = useState({
     frontImg: null as File | null,
@@ -53,23 +73,33 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
     setFiles(prev => ({ ...prev, [fieldName]: file }));
   };
 
-  const handleAction = async (formData: FormData) => {
+  const handleAction = async (formDataFromForm: FormData) => {
     try {
       // Add all the files to formData
       Object.entries(files).forEach(([key, file]) => {
         if (file) {
-          formData.append(key, file);
+          formDataFromForm.append(key, file);
         }
       });
       
-      const result = await createVehicleAction(formData);
+      // Add select field values to formData
+      formDataFromForm.append('type', formData.type);
+      formDataFromForm.append('projectId', formData.projectId);
+      formDataFromForm.append('status', formData.status);
+      formDataFromForm.append('before', formData.before);
       
-      // Show success message
-      if (result.filesUploaded > 0) {
-        alert(`✅ Vehicle created successfully with ${result.filesUploaded} files uploaded!`);
-      } else {
-        alert("✅ Vehicle created successfully!");
+      // Add date values to formData
+      if (formData.inspectionDate) {
+        formDataFromForm.append('inspectionDate', format(formData.inspectionDate, 'yyyy-MM-dd'));
       }
+      if (formData.expiryDate) {
+        formDataFromForm.append('expiryDate', format(formData.expiryDate, 'yyyy-MM-dd'));
+      }
+      
+      await createVehicleAction(formDataFromForm);
+      
+      // Success message will be shown by the mutation hook's toast
+      // No need for alert here since realtime updates will show the vehicle immediately
       
       // Form will reset automatically after successful submission
       if (onSuccess) {
@@ -77,7 +107,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
       }
     } catch (error) {
       console.error("Form submission error:", error);
-      alert("❌ Error: " + (error instanceof Error ? error.message : "Failed to create vehicle"));
+      // Error will be handled by the mutation hook's toast
     }
   };
 
@@ -108,148 +138,245 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
 
       {/* Details Tab */}
       {(!isMobile || activeTab === 'details') && (
-        <div className="space-y-4">
-          {isMobile && <h3 className="text-lg font-medium mb-3">Vehicle Details</h3>}
-          
-          {/* Basic Vehicle Info */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Brand *</label>
-            <input
-              type="text"
-              name="brand"
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              placeholder="e.g. Toyota, Caterpillar"
-            />
-          </div>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Vehicle Information
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Enter the basic information about your vehicle
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Vehicle Identity Section */}
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="brand" className="flex items-center gap-2">
+                    <Car className="h-4 w-4" />
+                    Brand *
+                  </Label>
+                  <Input
+                    id="brand"
+                    name="brand"
+                    required
+                    placeholder="e.g. Toyota, Ford, Caterpillar"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Model *</label>
-            <input
-              type="text"
-              name="model"
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              placeholder="e.g. Hilux, 320D"
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="model" className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Model *
+                  </Label>
+                  <Input
+                    id="model"
+                    name="model"
+                    required
+                    placeholder="e.g. Hilux, F-150, 320D"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Type *</label>
-            <select
-              name="type"
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">Select type</option>
-              <option value="Truck">Truck</option>
-              <option value="Car">Car</option>
-              <option value="Motorcycle">Motorcycle</option>
-              <option value="Heavy Equipment">Heavy Equipment</option>
-              <option value="Van">Van</option>
-              <option value="Bus">Bus</option>
-            </select>
-          </div>
+                <div className="space-y-2">
+                  <Label>Vehicle Type *</Label>
+                  <Select value={formData.type} onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}>
+                    <SelectTrigger className="w-full transition-all duration-200 focus:ring-2 focus:ring-blue-500">
+                      <SelectValue placeholder="Select vehicle type" />
+                    </SelectTrigger>
+                    <SelectContent className="w-full">
+                      <SelectItem value="Truck">Truck</SelectItem>
+                      <SelectItem value="Car">Car</SelectItem>
+                      <SelectItem value="Motorcycle">Motorcycle</SelectItem>
+                      <SelectItem value="Heavy Equipment">Heavy Equipment</SelectItem>
+                      <SelectItem value="Van">Van</SelectItem>
+                      <SelectItem value="Bus">Bus</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Plate Number *</label>
-            <input
-              type="text"
-              name="plateNumber"
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              placeholder="e.g. ABC-1234"
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="plateNumber" className="flex items-center gap-2">
+                    <Hash className="h-4 w-4" />
+                    Plate Number *
+                  </Label>
+                  <Input
+                    id="plateNumber"
+                    name="plateNumber"
+                    required
+                    placeholder="e.g. ABC-1234"
+                    className="font-mono transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Owner *</label>
-            <input
-              type="text"
-              name="owner"
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              placeholder="Owner name"
-            />
-          </div>
+              {/* Ownership & Project Section */}
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="owner" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Owner *
+                  </Label>
+                  <Input
+                    id="owner"
+                    name="owner"
+                    required
+                    placeholder="Owner name or company"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-          {/* Project Selection */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Project *</label>
-            <select
-              name="projectId"
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            >
-              <option value="">Select project</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
+                <div className="space-y-2">
+                  <Label>Assigned Project *</Label>
+                  <Select value={formData.projectId} onValueChange={(value) => setFormData(prev => ({ ...prev, projectId: value }))}>
+                    <SelectTrigger className="w-full transition-all duration-200 focus:ring-2 focus:ring-blue-500">
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent className="w-full max-h-[200px] overflow-y-auto">
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Status *</label>
-            <select
-              name="status"
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              defaultValue="OPERATIONAL"
-            >
-              <option value="OPERATIONAL">Operational</option>
-              <option value="NON_OPERATIONAL">Non-Operational</option>
-            </select>
-          </div>
+              {/* Status */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Operational Status *
+                </Label>
+                <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}>
+                  <SelectTrigger className="w-full transition-all duration-200 focus:ring-2 focus:ring-blue-500">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent className="w-full">
+                    <SelectItem value="OPERATIONAL">Operational</SelectItem>
+                    <SelectItem value="NON_OPERATIONAL">Non-Operational</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Dates */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Inspection Date *</label>
-            <input
-              type="date"
-              name="inspectionDate"
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              defaultValue={new Date().toISOString().split('T')[0]}
-            />
-          </div>
+          {/* Inspection & Compliance Card */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                Inspection & Compliance
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Set up inspection schedules and compliance dates
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label>Last Inspection Date *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal transition-all duration-200 focus:ring-2 focus:ring-blue-500",
+                          !formData.inspectionDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.inspectionDate ? (
+                          format(formData.inspectionDate, "PPP")
+                        ) : (
+                          <span>Pick inspection date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={formData.inspectionDate}
+                        onSelect={(date) => setFormData(prev => ({ ...prev, inspectionDate: date || new Date() }))}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Expiry Date *</label>
-            <input
-              type="date"
-              name="expiryDate"
-              required
-              className="w-full border border-gray-300 rounded px-3 py-2"
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label>Next Inspection Due *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal transition-all duration-200 focus:ring-2 focus:ring-blue-500",
+                          !formData.expiryDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.expiryDate ? (
+                          format(formData.expiryDate, "PPP")
+                        ) : (
+                          <span>Pick expiry date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={formData.expiryDate}
+                        onSelect={(date) => setFormData(prev => ({ ...prev, expiryDate: date }))}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Inspection Frequency (months) *</label>
-            <input
-              type="number"
-              name="before"
-              required
-              min="1"
-              max="12"
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              placeholder="6"
-              defaultValue="6"
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label>Inspection Frequency *</Label>
+                  <Select value={formData.before} onValueChange={(value) => setFormData(prev => ({ ...prev, before: value }))}>
+                    <SelectTrigger className="w-full transition-all duration-200 focus:ring-2 focus:ring-blue-500">
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent className="w-full">
+                      <SelectItem value="1">Monthly</SelectItem>
+                      <SelectItem value="2">Every 2 months</SelectItem>
+                      <SelectItem value="3">Quarterly</SelectItem>
+                      <SelectItem value="6">Every 6 months</SelectItem>
+                      <SelectItem value="12">Annually</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Optional Remarks */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Remarks</label>
-            <textarea
-              name="remarks"
-              rows={3}
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              placeholder="Optional remarks or notes"
-            />
-          </div>
+          {/* Additional Notes Card */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base">Additional Notes</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Add any additional information or special notes about this vehicle
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="remarks">Remarks (Optional)</Label>
+                <Textarea
+                  id="remarks"
+                  name="remarks"
+                  rows={3}
+                  placeholder="Enter any special notes, conditions, or important information about this vehicle..."
+                  className="resize-none transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -269,7 +396,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <p className="text-xs text-muted-foreground">
-                  💡 <strong>Tip:</strong> Take photos in good lighting and ensure license plates and identification numbers are visible.
+                  <strong>Tip:</strong> Take photos in good lighting and ensure license plates and identification numbers are visible.
                 </p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -332,7 +459,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
               <div className="space-y-4">
                 <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                   <p className="text-xs text-blue-700">
-                    📋 <strong>Document Requirements:</strong> Ensure all documents are clear, legible, and up-to-date. 
+                    <strong>Document Requirements:</strong> Ensure all documents are clear, legible, and up-to-date. 
                     Blurred or expired documents may not be accepted for regulatory compliance.
                   </p>
                 </div>
@@ -383,13 +510,15 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
       {/* Action Buttons */}
       <div className="flex gap-2">
         {onCancel && (
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={onCancel}
-            className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded hover:bg-gray-300"
+            className="flex-1"
+            size="lg"
           >
             Cancel
-          </button>
+          </Button>
         )}
         <div className="flex-1">
           <SubmitButton />

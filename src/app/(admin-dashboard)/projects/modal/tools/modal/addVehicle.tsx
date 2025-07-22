@@ -169,7 +169,7 @@ export default function AddVehicleModal({
 
     try {
       await createVehicle(data);
-      toast.success("Vehicle created successfully");
+      // toast.success("Vehicle created successfully"); // Removed - handled by realtime listener
       onCreated();
 
       // Reset form and images & previews

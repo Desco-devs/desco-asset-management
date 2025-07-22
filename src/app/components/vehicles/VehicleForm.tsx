@@ -321,7 +321,7 @@ export function VehicleForm({
       const result = await createVehicle(vehicleData);
       
       if (result.success) {
-        toast.success("Vehicle created successfully");
+        // toast.success("Vehicle created successfully"); // Removed - handled by realtime listener
         resetForm();
         setUploadProgress({});
         
