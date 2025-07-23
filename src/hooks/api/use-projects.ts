@@ -348,9 +348,9 @@ export function useCreateProject() {
       })
       
       // Update clients cache to reflect new project count
-      queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
+      queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData: any) => {
         if (!oldData) return oldData
-        return oldData.map(client => {
+        return oldData.map((client: any) => {
           if (client.id === newProject.client_id) {
             return {
               ...client,

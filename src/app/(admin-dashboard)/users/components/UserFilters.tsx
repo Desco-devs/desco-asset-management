@@ -42,14 +42,14 @@ export function UserFilters({
 
   // Get current grouped filter value
   const getGroupedFilterValue = () => {
-    if (filters.role && filters.role !== 'all') return `role-${filters.role}`
-    if (filters.status && filters.status !== 'all') return `status-${filters.status}`
+    if (filters.role && filters.role !== ('all' as any)) return `role-${filters.role}`
+    if (filters.status && filters.status !== ('all' as any)) return `status-${filters.status}`
     return 'all'
   }
 
   // Get display text for current filter
   const getFilterDisplayText = () => {
-    if (filters.role && filters.role !== 'all') {
+    if (filters.role && filters.role !== ('all' as any)) {
       const roleMap = {
         'SUPERADMIN': 'Super Admin',
         'ADMIN': 'Admin', 
@@ -57,7 +57,7 @@ export function UserFilters({
       }
       return roleMap[filters.role as keyof typeof roleMap] || filters.role
     }
-    if (filters.status && filters.status !== 'all') {
+    if (filters.status && filters.status !== ('all' as any)) {
       return filters.status === 'ACTIVE' ? 'Active' : 'Inactive'
     }
     return 'All Users'

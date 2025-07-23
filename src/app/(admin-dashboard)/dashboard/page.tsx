@@ -1,10 +1,5 @@
-import { Suspense } from "react";
-import ClientDashboard from "./ClientDashboard";
+import DashboardContainer from "./components/DashboardContainer";
 
 export default function Dashboard() {
-  return (
-    <Suspense>
-      <ClientDashboard />
-    </Suspense>
-  );
+  return <DashboardContainer />;
 }

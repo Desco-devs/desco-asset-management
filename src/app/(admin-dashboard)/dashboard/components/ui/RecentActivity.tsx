@@ -54,6 +54,7 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
               title: `${newEquipment.brand} ${newEquipment.model}`,
               description: `New ${newEquipment.type} added`,
               timestamp: new Date().toISOString(), // Use current local time for realtime events
+              user: 'System',
               status: newEquipment.status || 'OPERATIONAL'
             };
             
@@ -88,6 +89,7 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
             title: title,
             description: `Vehicle ${newVehicle.plate_number || 'Unknown'} registered`,
             timestamp: new Date().toISOString(),
+            user: 'System',
             status: newVehicle.status || 'OPERATIONAL'
           };
           
@@ -106,6 +108,7 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
           const newActivity: ActivityItem = {
             id: newProject.id,
             type: 'project',
+            user: 'System',
             action: 'created',
             title: newProject.name || 'New Project',
             description: 'New project created',
@@ -130,7 +133,8 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
             action: 'created',
             title: newClient.name || 'New Client',
             description: 'New client registered',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            user: 'System'
           };
           
           setActivities(prev => [newActivity, ...prev].slice(0, 10));
@@ -149,6 +153,7 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
           const newActivity: ActivityItem = {
             id: newMaintenance.id,
             type: 'maintenance',
+            user: 'System',
             action: 'reported',
             title: 'Maintenance Report',
             description: issueDescription.length > 50 ? issueDescription.substring(0, 50) + '...' : issueDescription,
@@ -175,7 +180,8 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
             action: 'created',
             title: newLocation.address || 'New Location',
             description: 'New location added',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            user: 'System'
           };
           
           setActivities(prev => [newActivity, ...prev].slice(0, 10));

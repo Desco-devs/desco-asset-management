@@ -1,3 +1,22 @@
+// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
+
+import { NextApiRequest, NextApiResponse } from 'next';
+// import { Server as ServerIO } from 'socket.io';
+// import { Server as NetServer } from 'http';
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+const SocketHandler = (req: NextApiRequest, res: NextApiResponse) => {
+  res.status(503).json({ error: 'Chat app temporarily disabled' });
+};
+
+export default SocketHandler;
+
+/*
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Server as ServerIO } from 'socket.io';
 import { Server as NetServer } from 'http';
@@ -216,3 +235,4 @@ const SocketHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
 };
 
 export default SocketHandler;
+*/

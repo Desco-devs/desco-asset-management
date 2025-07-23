@@ -145,7 +145,7 @@ export function UsersCards({
       .slice(0, 2)
   }
 
-  const formatLastSeen = (lastSeen: string | null, isOnline: boolean) => {
+  const formatLastSeen = (lastSeen: string | Date | null, isOnline: boolean) => {
     if (isOnline) return 'Online now'
     if (!lastSeen) return 'Never'
     

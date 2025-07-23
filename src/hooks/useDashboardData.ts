@@ -1,7 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import type { ActivityItem } from "@/types/dashboard";
+import { useDashboardDataSync } from "@/hooks/api/use-dashboard-realtime";
 
 export interface DashboardData {
   equipmentCounts: {
@@ -53,16 +55,33 @@ async function fetchDashboardData(): Promise<DashboardData> {
 }
 
 export function useDashboardData() {
-  return useQuery({
+  const syncData = useDashboardDataSync();
+  
+  const query = useQuery({
     queryKey: ['dashboard-data'],
     queryFn: fetchDashboardData,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: false, // Disable refetch on focus - rely on real-time
+    refetchInterval: false, // Disable polling - use only real-time
     retry: 2,
   });
+
+  // Sync data with Zustand store whenever query data changes
+  // Use a ref to store the previous data to avoid infinite loops
+  const prevDataRef = useRef(query.data);
+  
+  useEffect(() => {
+    if (query.data && query.data !== prevDataRef.current) {
+      prevDataRef.current = query.data;
+      syncData(query.data);
+    }
+  }, [query.data]); // Remove syncData from dependencies to prevent circular dependency
+
+  return query;
 }
 
+// Legacy hooks for backward compatibility (now use Zustand store directly)
 export function useEquipmentCounts() {
   const { data } = useDashboardData();
   return data?.equipmentCounts || { OPERATIONAL: 0, NON_OPERATIONAL: 0 };

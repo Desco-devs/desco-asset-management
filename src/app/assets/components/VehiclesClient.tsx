@@ -194,17 +194,8 @@ export default function VehicleClientViewer({
       )}
 
       {/* Vehicle Modal */}
-      {selectedVehicle && (
-        <VehicleModal
-          vehicle={selectedVehicle}
-          isOpen={isModalOpen}
-          onOpenChange={(open) => {
-            setIsModalOpen(open);
-            if (!open) {
-              setSelectedVehicle(null);
-            }
-          }}
-        />
+      {selectedVehicle && isModalOpen && (
+        <VehicleModal />
       )}
     </div>
   );
