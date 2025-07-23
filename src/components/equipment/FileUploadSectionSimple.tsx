@@ -296,41 +296,30 @@ export function FileUploadSectionSimple({
         )}
       </div>
 
-      {/* Image Viewer Modal */}
+      {/* Image Viewer Modal - Exact same as PartsFolderManager */}
       {showImageViewer && preview && isImage && (
         <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
-          <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 border-0">
-            <DialogHeader className="p-4 bg-black/80 text-white relative z-10">
-              <DialogTitle className="flex items-center justify-between">
-                <span className="text-white truncate pr-4">{label}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowImageViewer(false)}
-                  className="text-white hover:bg-white/20 shrink-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-center">
+                {label}
               </DialogTitle>
             </DialogHeader>
-            <div className="flex-1 flex items-center justify-center bg-black min-h-[70vh]">
-              {preview && (
-                <img
-                  src={preview}
-                  alt={label}
-                  className="max-w-full max-h-[80vh] object-contain"
-                  onClick={(e) => e.stopPropagation()}
-                  onError={(e) => {
-                    console.error('Image failed to load:', preview);
-                    console.error('Error details:', e);
-                  }}
-                  onLoad={() => {
-                    console.log('Image loaded successfully:', preview);
-                  }}
-                />
-              )}
+            <div className="flex items-center justify-center">
+              <img
+                src={preview}
+                alt={label}
+                className="max-w-full max-h-[70vh] object-contain"
+                onClick={(e) => e.stopPropagation()}
+                onError={(e) => {
+                  console.error('Image failed to load:', preview);
+                  console.error('Error details:', e);
+                }}
+                onLoad={() => {
+                  console.log('Image loaded successfully:', preview);
+                }}
+              />
             </div>
-            <div className="absolute inset-0 bg-black" onClick={() => setShowImageViewer(false)} />
           </DialogContent>
         </Dialog>
       )}

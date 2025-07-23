@@ -458,10 +458,6 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <p className="text-xs text-muted-foreground">
-                  <strong>Tip:</strong> Take photos in good lighting and ensure serial numbers and identification marks are visible.
-                </p>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FileUploadSectionSimple
                     label="Equipment Image"
@@ -511,13 +507,6 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <p className="text-xs text-blue-700">
-                    <strong>Document Requirements:</strong> Ensure all documents are clear, legible, and up-to-date. 
-                    Blurred or expired documents may not be accepted for regulatory compliance.
-                  </p>
-                </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <FileUploadSectionSimple

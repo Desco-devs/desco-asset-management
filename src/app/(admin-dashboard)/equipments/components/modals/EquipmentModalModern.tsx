@@ -78,7 +78,6 @@ export default function EquipmentModalModern() {
     setSelectedEquipment,
     setIsPhotosCollapsed,
     setIsDocumentsCollapsed,
-    setViewerImage,
     setDeleteConfirmation,
   } = useEquipmentsStore();
 
@@ -568,32 +567,23 @@ export default function EquipmentModalModern() {
         </Dialog>
       )}
       
-      {/* Inline Image Viewer Modal - Same pattern as PartsFolderManager */}
+      {/* Image Viewer Modal - Exact same as PartsFolderManager */}
       {showImageViewer && viewerImageData && (
         <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
-          <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 border-0">
-            <DialogHeader className="p-4 bg-black/80 text-white relative z-10">
-              <DialogTitle className="flex items-center justify-between">
-                <span className="text-white truncate pr-4">{viewerImageData.title}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowImageViewer(false)}
-                  className="text-white hover:bg-white/20 shrink-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-center">
+                {viewerImageData.title}
               </DialogTitle>
             </DialogHeader>
-            <div className="flex-1 flex items-center justify-center bg-black min-h-[70vh]">
+            <div className="flex items-center justify-center">
               <img
                 src={viewerImageData.url}
                 alt={viewerImageData.title}
-                className="max-w-full max-h-[80vh] object-contain"
+                className="max-w-full max-h-[70vh] object-contain"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
-            <div className="absolute inset-0 bg-black" onClick={() => setShowImageViewer(false)} />
           </DialogContent>
         </Dialog>
       )}
