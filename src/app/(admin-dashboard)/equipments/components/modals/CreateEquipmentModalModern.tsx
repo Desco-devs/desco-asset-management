@@ -1,0 +1,114 @@
+"use client";
+
+import { useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerClose,
+} from "@/components/ui/drawer";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
+import { useEquipmentsStore, selectIsCreateModalOpen, selectIsMobile } from "@/stores/equipmentsStore";
+import { useEquipmentsWithReferenceData } from "@/hooks/useEquipmentsQuery";
+import CreateEquipmentForm from "../forms/CreateEquipmentForm";
+
+export default function CreateEquipmentModalModern() {
+  const isCreateModalOpen = useEquipmentsStore(selectIsCreateModalOpen);
+  const isMobile = useEquipmentsStore(selectIsMobile);
+  const { setIsCreateModalOpen, setIsMobile } = useEquipmentsStore();
+  
+  // Mobile detection using Zustand
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, [setIsMobile]);
+
+  // Get reference data
+  const { projects } = useEquipmentsWithReferenceData();
+
+  const handleSuccess = () => {
+    setIsCreateModalOpen(false);
+    // React Query cache will be invalidated by the mutation
+  };
+
+  const handleClose = () => {
+    setIsCreateModalOpen(false);
+  };
+
+  // Mobile drawer implementation
+  if (isMobile) {
+    return (
+      <Drawer open={isCreateModalOpen} onOpenChange={handleClose}>
+        <DrawerContent className="!max-h-[95vh]">
+          {/* Mobile Header */}
+          <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
+            <DrawerClose asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="absolute right-4 top-4 rounded-full h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DrawerClose>
+            <div className="text-center space-y-2">
+              <DrawerTitle className="text-xl font-bold">
+                Create New Equipment
+              </DrawerTitle>
+              <p className="text-sm text-muted-foreground">
+                Add new equipment to your inventory
+              </p>
+            </div>
+          </DrawerHeader>
+          
+          {/* Mobile Content */}
+          <div className="flex-1 overflow-y-auto p-4">
+            <CreateEquipmentForm 
+              projects={projects.map(p => ({
+                id: p.uid,
+                name: p.name
+              }))} 
+              onSuccess={handleSuccess}
+              onCancel={handleClose}
+              isMobile={true}
+            />
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  // Desktop dialog implementation
+  return (
+    <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Equipment</DialogTitle>
+        </DialogHeader>
+        
+        <div className="py-4">
+          <CreateEquipmentForm 
+            projects={projects.map(p => ({
+              id: p.uid,
+              name: p.name
+            }))} 
+            onSuccess={handleSuccess}
+            onCancel={() => setIsCreateModalOpen(false)}
+            isMobile={false}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

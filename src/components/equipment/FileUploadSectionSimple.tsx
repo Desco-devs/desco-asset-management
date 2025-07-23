@@ -3,7 +3,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Upload, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CheckCircle, Upload, X, Eye } from "lucide-react";
 import Image from "next/image";
 import { useState, useCallback, useEffect } from "react";
 
@@ -34,6 +40,7 @@ export function FileUploadSectionSimple({
   // Use props if provided, otherwise fallback to local state
   const [localSelectedFile, setLocalSelectedFile] = useState<File | null>(null);
   const [localKeepExisting, setLocalKeepExisting] = useState(!!currentFileUrl);
+  const [showImageViewer, setShowImageViewer] = useState(false);
   
   const selectedFile = propSelectedFile !== undefined ? propSelectedFile : localSelectedFile;
   const keepExisting = propKeepExisting !== undefined ? propKeepExisting : localKeepExisting;
@@ -181,14 +188,22 @@ export function FileUploadSectionSimple({
         {showPreview ? (
           <div className="space-y-2">
             {isImage ? (
-              <div className="relative w-full max-w-[200px] mx-auto">
-                <Image
-                  src={preview || ""}
-                  alt={label}
-                  width={200}
-                  height={200}
-                  className="w-full h-[200px] object-cover rounded"
-                />
+              <div className="relative w-full max-w-[200px] mx-auto group">
+                <div 
+                  className="relative cursor-pointer"
+                  onClick={() => setShowImageViewer(true)}
+                >
+                  <Image
+                    src={preview || ""}
+                    alt={label}
+                    width={200}
+                    height={200}
+                    className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
+                    <Eye className="h-6 w-6 text-white" />
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 p-2 bg-gray-100 rounded">
@@ -205,7 +220,8 @@ export function FileUploadSectionSimple({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       // Cancel change - revert to existing or clear
                       if (currentFileUrl) {
                         setPreview(currentFileUrl);
@@ -229,7 +245,8 @@ export function FileUploadSectionSimple({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       // Simple direct approach - just trigger the file input
                       const fileInput = document.querySelector(`input[type="file"]#file-${label.replace(/\s+/g, '-').toLowerCase()}`) as HTMLInputElement;
                       fileInput?.click();
@@ -242,7 +259,8 @@ export function FileUploadSectionSimple({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       // Update parent
                       onFileChange(null);
                       onKeepExistingChange(false);
@@ -274,6 +292,36 @@ export function FileUploadSectionSimple({
           </div>
         )}
       </div>
+
+      {/* Image Viewer Modal */}
+      {showImageViewer && preview && isImage && (
+        <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 border-0">
+            <DialogHeader className="p-4 bg-black/80 text-white relative z-10">
+              <DialogTitle className="flex items-center justify-between">
+                <span className="text-white truncate pr-4">{label}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowImageViewer(false)}
+                  className="text-white hover:bg-white/20 shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 flex items-center justify-center bg-black min-h-[70vh]">
+              <img
+                src={preview}
+                alt={label}
+                className="max-w-full max-h-[80vh] object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+            <div className="absolute inset-0 bg-black" onClick={() => setShowImageViewer(false)} />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

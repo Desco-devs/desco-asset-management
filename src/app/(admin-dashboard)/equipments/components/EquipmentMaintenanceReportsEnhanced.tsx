@@ -9,10 +9,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  useDeleteMaintenanceReport,
-  useMaintenanceReports,
-} from "@/hooks/useVehiclesQuery";
-import { useVehiclesStore, type MaintenanceReport } from "@/stores/vehiclesStore";
+  useDeleteEquipmentMaintenanceReport,
+  useEquipmentMaintenanceReports,
+} from "@/hooks/useEquipmentsQuery";
+import { useEquipmentsStore, type EquipmentMaintenanceReport } from "@/stores/equipmentsStore";
 import {
   Calendar,
   Clock,
@@ -25,24 +25,24 @@ import {
   User,
   Wrench,
 } from "lucide-react";
-import CreateMaintenanceReportModal from "./modals/CreateMaintenanceReportModal";
-import EditMaintenanceReportModal from "./modals/EditMaintenanceReportModal";
+import CreateEquipmentMaintenanceReportModal from "./modals/CreateEquipmentMaintenanceReportModal";
+import EditEquipmentMaintenanceReportModal from "./modals/EditEquipmentMaintenanceReportModal";
 
-interface VehicleMaintenanceReportsEnhancedProps {
-  vehicleId: string;
+interface EquipmentMaintenanceReportsEnhancedProps {
+  equipmentId: string;
 }
 
-export default function VehicleMaintenanceReportsEnhanced({
-  vehicleId,
-}: VehicleMaintenanceReportsEnhancedProps) {
-  const { data: maintenanceReports = [], isLoading } = useMaintenanceReports();
-  const { setIsMaintenanceModalOpen, setSelectedMaintenanceReport } =
-    useVehiclesStore();
-  const deleteMaintenanceReportMutation = useDeleteMaintenanceReport();
+export default function EquipmentMaintenanceReportsEnhanced({
+  equipmentId,
+}: EquipmentMaintenanceReportsEnhancedProps) {
+  const { data: maintenanceReports = [], isLoading } = useEquipmentMaintenanceReports();
+  const { setIsEquipmentMaintenanceModalOpen, setSelectedEquipmentMaintenanceReport } =
+    useEquipmentsStore();
+  const deleteMaintenanceReportMutation = useDeleteEquipmentMaintenanceReport();
 
-  // Filter reports for this specific vehicle
-  const vehicleReports = Array.isArray(maintenanceReports)
-    ? maintenanceReports.filter((report) => report.vehicle_id === vehicleId)
+  // Filter reports for this specific equipment
+  const equipmentReports = Array.isArray(maintenanceReports)
+    ? maintenanceReports.filter((report) => report.equipment_id === equipmentId)
     : [];
 
   const getStatusColor = (status?: string) => {
@@ -99,8 +99,8 @@ export default function VehicleMaintenanceReportsEnhanced({
     }
   };
 
-  const handleEdit = (report: MaintenanceReport) => {
-    setSelectedMaintenanceReport(report);
+  const handleEdit = (report: EquipmentMaintenanceReport) => {
+    setSelectedEquipmentMaintenanceReport(report);
   };
 
   if (isLoading) {
@@ -133,12 +133,12 @@ export default function VehicleMaintenanceReportsEnhanced({
           <div className="flex items-center gap-2">
             <Wrench className="h-5 w-5 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              {vehicleReports.length} maintenance report
-              {vehicleReports.length !== 1 ? "s" : ""} found
+              {equipmentReports.length} maintenance report
+              {equipmentReports.length !== 1 ? "s" : ""} found
             </p>
           </div>
           <Button
-            onClick={() => setIsMaintenanceModalOpen(true)}
+            onClick={() => setIsEquipmentMaintenanceModalOpen(true)}
             className="gap-2"
           >
             <Plus className="h-4 w-4" />
@@ -146,18 +146,18 @@ export default function VehicleMaintenanceReportsEnhanced({
           </Button>
         </div>
 
-        {vehicleReports.length === 0 ? (
+        {equipmentReports.length === 0 ? (
           <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
             <Wrench className="h-12 w-12 mx-auto text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               No maintenance reports yet
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Track vehicle maintenance, repairs, and inspections by creating
+              Track equipment maintenance, repairs, and inspections by creating
               your first report
             </p>
             <Button
-              onClick={() => setIsMaintenanceModalOpen(true)}
+              onClick={() => setIsEquipmentMaintenanceModalOpen(true)}
               className="gap-2"
             >
               <Plus className="h-4 w-4" />
@@ -166,7 +166,7 @@ export default function VehicleMaintenanceReportsEnhanced({
           </div>
         ) : (
           <div className="space-y-4">
-            {vehicleReports.map((report) => (
+            {equipmentReports.map((report) => (
               <div
                 key={report.id}
                 className="border rounded-lg p-6 hover:shadow-md transition-shadow bg-card"
@@ -340,10 +340,10 @@ export default function VehicleMaintenanceReportsEnhanced({
       </div>
 
       {/* Create Modal */}
-      <CreateMaintenanceReportModal vehicleId={vehicleId} />
+      <CreateEquipmentMaintenanceReportModal equipmentId={equipmentId} />
 
       {/* Edit Modal */}
-      <EditMaintenanceReportModal />
+      <EditEquipmentMaintenanceReportModal />
     </>
   );
 }

@@ -62,7 +62,7 @@ export function ProjectsTable() {
   const { data: locations } = useLocations();
   const { data: projectsResult, isLoading, error } = useProjects();
   const projects = (projectsResult?.data || projectsResult || []) as Project[];
-  const permissions = projectsResult?.permissions;
+
   const { mutate: deleteProject, isPending: isDeleting } = useDeleteProject();
 
   // Local filtering state
@@ -323,7 +323,6 @@ export function ProjectsTable() {
             value={(() => {
               if (!projectTable.sortBy) return "clear-sort";
 
-
               if (projectTable.sortBy === "created_at") {
                 return projectTable.sortOrder === "desc"
                   ? "created_at"
@@ -333,7 +332,6 @@ export function ProjectsTable() {
                 return projectTable.sortOrder === "asc" ? "name" : "name_desc";
               }
 
-
               return projectTable.sortBy;
             })()}
             onValueChange={(value) => {
@@ -341,7 +339,6 @@ export function ProjectsTable() {
                 handleSort("name"); // Reset to default
                 return;
               }
-
 
               if (value === "created_at") {
                 setProjectTable({ sortBy: "created_at", sortOrder: "desc" });
@@ -713,7 +710,6 @@ export function ProjectsTable() {
                     </Badge>
                   </div>
 
-
                   {/* Client name */}
                   <p className="text-sm text-gray-600 font-medium">
                     {project.client?.name}
@@ -725,7 +721,6 @@ export function ProjectsTable() {
                       📍 {project.client.location.address}
                     </p>
                   )}
-
 
                   {/* Created time */}
                   <div className="text-xs text-gray-400">
@@ -819,4 +814,3 @@ export function ProjectsTable() {
     </div>
   );
 }
-

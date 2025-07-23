@@ -3,14 +3,16 @@
 import { useAuth } from "@/app/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
 
 interface ClientAuthGuardProps {
   children: React.ReactNode;
   redirectTo?: string;
 }
 
-export default function ClientAuthGuard({ children, redirectTo = '/login' }: ClientAuthGuardProps) {
+export default function ClientAuthGuard({
+  children,
+  redirectTo = "/login",
+}: ClientAuthGuardProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
