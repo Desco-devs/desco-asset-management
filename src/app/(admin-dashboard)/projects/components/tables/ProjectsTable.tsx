@@ -1,5 +1,23 @@
 "use client";
+"use client";
 
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+} from "@/components/ui/table";
 import {
   useClients,
   useDeleteProject,
@@ -34,7 +53,28 @@ import {
 import { useProjectsStore, useProjectTable } from "@/stores/projects-store";
 import type { Project } from "@/types/projects";
 import { formatDistanceToNow } from "date-fns";
+  useClients,
+  useDeleteProject,
+  useLocations,
+  useProjects,
+} from "@/hooks/api/use-projects";
+import { useProjectsStore, useProjectTable } from "@/stores/projects-store";
+import type { Project } from "@/types/projects";
+import { formatDistanceToNow } from "date-fns";
 import {
+  ChevronLeft,
+  ChevronRight,
+  Edit,
+  Filter,
+  List,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import React from "react";
+import { toast } from "sonner";
   ChevronLeft,
   ChevronRight,
   Edit,
@@ -69,7 +109,16 @@ export function ProjectsTable() {
   const [locationFilter, setLocationFilter] = React.useState<string>("all");
   const [clientFilter, setClientFilter] = React.useState<string>("all");
 
+  const [locationFilter, setLocationFilter] = React.useState<string>("all");
+  const [clientFilter, setClientFilter] = React.useState<string>("all");
+
   // Delete confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
+  const [projectToDelete, setProjectToDelete] = React.useState<Project | null>(
+    null
+  );
+
+  const projectTable = useProjectTable();
   const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
   const [projectToDelete, setProjectToDelete] = React.useState<Project | null>(
     null
@@ -87,8 +136,17 @@ export function ProjectsTable() {
     window.addEventListener("resize", checkIsMobile);
     return () => window.removeEventListener("resize", checkIsMobile);
   }, [setIsMobile]);
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, [setIsMobile]);
 
   const handleEdit = (project: Project) => {
+    setProjectModal(true, project.id);
+  };
     setProjectModal(true, project.id);
   };
 
@@ -96,12 +154,20 @@ export function ProjectsTable() {
     setProjectToDelete(project);
     setDeleteModalOpen(true);
   };
+    setProjectToDelete(project);
+    setDeleteModalOpen(true);
+  };
 
   const handleConfirmDelete = () => {
     if (!projectToDelete) return;
 
+    if (!projectToDelete) return;
+
     deleteProject(projectToDelete.id, {
       onSuccess: () => {
+        toast.success("Project deleted successfully");
+        setDeleteModalOpen(false);
+        setProjectToDelete(null);
         toast.success("Project deleted successfully");
         setDeleteModalOpen(false);
         setProjectToDelete(null);
@@ -111,12 +177,24 @@ export function ProjectsTable() {
       },
     });
   };
+        toast.error("Failed to delete project: " + error.message);
+      },
+    });
+  };
 
   const handleSearch = (value: string) => {
     setProjectTable({ search: value, page: 1 });
   };
+    setProjectTable({ search: value, page: 1 });
+  };
 
   const handleSort = (sortBy: typeof projectTable.sortBy) => {
+    const sortOrder =
+      projectTable.sortBy === sortBy && projectTable.sortOrder === "asc"
+        ? "desc"
+        : "asc";
+    setProjectTable({ sortBy, sortOrder });
+  };
     const sortOrder =
       projectTable.sortBy === sortBy && projectTable.sortOrder === "asc"
         ? "desc"
@@ -129,9 +207,15 @@ export function ProjectsTable() {
     if (!clients || locationFilter === "all") return clients || [];
     return clients.filter((client) => client.location_id === locationFilter);
   }, [clients, locationFilter]);
+    if (!clients || locationFilter === "all") return clients || [];
+    return clients.filter((client) => client.location_id === locationFilter);
+  }, [clients, locationFilter]);
 
   // Filter projects based on search and filters
   const filteredProjects = React.useMemo(() => {
+    if (!projects) return [];
+
+    let filtered = projects;
     if (!projects) return [];
 
     let filtered = projects;
@@ -139,11 +223,17 @@ export function ProjectsTable() {
     // Apply search filter
     if (projectTable.search) {
       filtered = filtered.filter((project) =>
+      filtered = filtered.filter((project) =>
         project.name.toLowerCase().includes(projectTable.search.toLowerCase())
+      );
       );
     }
 
     // Apply location filter
+    if (locationFilter !== "all") {
+      filtered = filtered.filter(
+        (project) => project.client?.location_id === locationFilter
+      );
     if (locationFilter !== "all") {
       filtered = filtered.filter(
         (project) => project.client?.location_id === locationFilter
@@ -155,8 +245,14 @@ export function ProjectsTable() {
       filtered = filtered.filter(
         (project) => project.client_id === clientFilter
       );
+    if (clientFilter !== "all") {
+      filtered = filtered.filter(
+        (project) => project.client_id === clientFilter
+      );
     }
 
+    return filtered;
+  }, [projects, projectTable.search, locationFilter, clientFilter]);
     return filtered;
   }, [projects, projectTable.search, locationFilter, clientFilter]);
 
@@ -164,7 +260,14 @@ export function ProjectsTable() {
   const sortedProjects = React.useMemo(() => {
     if (!filteredProjects.length) return [];
 
+    if (!filteredProjects.length) return [];
+
     return [...filteredProjects].sort((a, b) => {
+      const aValue = a[projectTable.sortBy];
+      const bValue = b[projectTable.sortBy];
+
+      if (projectTable.sortOrder === "asc") {
+        return aValue > bValue ? 1 : -1;
       const aValue = a[projectTable.sortBy];
       const bValue = b[projectTable.sortBy];
 
@@ -174,9 +277,20 @@ export function ProjectsTable() {
       return aValue < bValue ? 1 : -1;
     });
   }, [filteredProjects, projectTable.sortBy, projectTable.sortOrder]);
+      return aValue < bValue ? 1 : -1;
+    });
+  }, [filteredProjects, projectTable.sortBy, projectTable.sortOrder]);
 
   // Pagination logic
   const paginationData = React.useMemo(() => {
+    const itemsPerPage = getEffectiveProjectItemsPerPage();
+    const startIndex = (projectTable.page - 1) * itemsPerPage;
+    const paginatedProjects = sortedProjects.slice(
+      startIndex,
+      startIndex + itemsPerPage
+    );
+    const totalPages = Math.ceil(sortedProjects.length / itemsPerPage);
+
     const itemsPerPage = getEffectiveProjectItemsPerPage();
     const startIndex = (projectTable.page - 1) * itemsPerPage;
     const paginatedProjects = sortedProjects.slice(
@@ -192,9 +306,14 @@ export function ProjectsTable() {
       currentPage: projectTable.page,
     };
   }, [sortedProjects, projectTable.page, getEffectiveProjectItemsPerPage]);
+      currentPage: projectTable.page,
+    };
+  }, [sortedProjects, projectTable.page, getEffectiveProjectItemsPerPage]);
 
   // Pagination handlers
   const handlePageChange = (newPage: number) => {
+    setProjectTable({ page: newPage });
+  };
     setProjectTable({ page: newPage });
   };
 
@@ -203,6 +322,7 @@ export function ProjectsTable() {
       <div className="text-center py-8 text-red-600">
         Error loading projects: {error.message}
       </div>
+    );
     );
   }
 
@@ -237,10 +357,14 @@ export function ProjectsTable() {
             value={(() => {
               if (locationFilter !== "all") return `location-${locationFilter}`;
               if (clientFilter !== "all") return `client-${clientFilter}`;
+              if (locationFilter !== "all") return `location-${locationFilter}`;
+              if (clientFilter !== "all") return `client-${clientFilter}`;
               return "";
             })()}
             onValueChange={(value) => {
               if (value === "clear-all") {
+                setLocationFilter("all");
+                setClientFilter("all");
                 setLocationFilter("all");
                 setClientFilter("all");
               }
@@ -249,11 +373,13 @@ export function ProjectsTable() {
                 const locationId = value.replace("location-", "");
                 setLocationFilter(locationId);
                 setClientFilter("all"); // Reset client filter
+                setClientFilter("all"); // Reset client filter
               }
               // Client filters
               else if (value.startsWith("client-")) {
                 const clientId = value.replace("client-", "");
                 setClientFilter(clientId);
+                setLocationFilter("all"); // Reset location filter
                 setLocationFilter("all"); // Reset location filter
               }
             }}
@@ -266,7 +392,12 @@ export function ProjectsTable() {
               <div className="p-3 max-h-96 overflow-y-auto">
                 {/* Clear Filters */}
                 {(locationFilter !== "all" || clientFilter !== "all") && (
+                {(locationFilter !== "all" || clientFilter !== "all") && (
                   <div className="mb-4">
+                    <SelectItem
+                      value="clear-all"
+                      className="text-red-600 font-medium"
+                    >
                     <SelectItem
                       value="clear-all"
                       className="text-red-600 font-medium"
@@ -304,7 +435,13 @@ export function ProjectsTable() {
                       : filteredClientsForDropdown
                     )?.map((client) => (
                       <SelectItem key={client.id} value={`client-${client.id}`}>
+                    {(locationFilter === "all"
+                      ? clients
+                      : filteredClientsForDropdown
+                    )?.map((client) => (
+                      <SelectItem key={client.id} value={`client-${client.id}`}>
                         {client.name}
+                        {locationFilter === "all" && client.location && (
                         {locationFilter === "all" && client.location && (
                           <span className="text-muted-foreground ml-2">
                             ({client.location.address})
@@ -323,7 +460,11 @@ export function ProjectsTable() {
             value={(() => {
               if (!projectTable.sortBy) return "clear-sort";
 
+
               if (projectTable.sortBy === "created_at") {
+                return projectTable.sortOrder === "desc"
+                  ? "created_at"
+                  : "created_at_old";
                 return projectTable.sortOrder === "desc"
                   ? "created_at"
                   : "created_at_old";
@@ -332,13 +473,16 @@ export function ProjectsTable() {
                 return projectTable.sortOrder === "asc" ? "name" : "name_desc";
               }
 
+
               return projectTable.sortBy;
             })()}
             onValueChange={(value) => {
               if (value === "clear-sort") {
                 handleSort("name"); // Reset to default
+                handleSort("name"); // Reset to default
                 return;
               }
+
 
               if (value === "created_at") {
                 setProjectTable({ sortBy: "created_at", sortOrder: "desc" });
@@ -385,17 +529,29 @@ export function ProjectsTable() {
           clientFilter !== "all" ||
           projectTable.search ||
           projectTable.sortBy) && (
+        {(locationFilter !== "all" ||
+          clientFilter !== "all" ||
+          projectTable.search ||
+          projectTable.sortBy) && (
           <div className="flex flex-wrap gap-2">
             {/* Sort Badge */}
             {projectTable.sortBy && (
               <Badge variant="secondary" className="gap-1 pr-1">
                 Sort:{" "}
                 {(() => {
+                Sort:{" "}
+                {(() => {
                   if (projectTable.sortBy === "created_at")
                     return projectTable.sortOrder === "desc"
                       ? "Newest Added"
                       : "Oldest Added";
+                    return projectTable.sortOrder === "desc"
+                      ? "Newest Added"
+                      : "Oldest Added";
                   if (projectTable.sortBy === "name")
+                    return projectTable.sortOrder === "asc"
+                      ? "Project A-Z"
+                      : "Project Z-A";
                     return projectTable.sortOrder === "asc"
                       ? "Project A-Z"
                       : "Project Z-A";
@@ -408,6 +564,9 @@ export function ProjectsTable() {
                   onClick={() =>
                     setProjectTable({ sortBy: undefined, sortOrder: "asc" })
                   }
+                  onClick={() =>
+                    setProjectTable({ sortBy: undefined, sortOrder: "asc" })
+                  }
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -417,10 +576,12 @@ export function ProjectsTable() {
             {projectTable.search && (
               <Badge variant="secondary" className="gap-1 pr-1">
                 Search: {projectTable.search}
+                Search: {projectTable.search}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => handleSearch("")}
                   onClick={() => handleSearch("")}
                 >
                   <X className="h-3 w-3" />
@@ -430,7 +591,11 @@ export function ProjectsTable() {
 
             {/* Location Filter Badge */}
             {locationFilter !== "all" && (
+            {locationFilter !== "all" && (
               <Badge variant="secondary" className="gap-1 pr-1">
+                Location:{" "}
+                {locations?.find((l) => l.id === locationFilter)?.address ||
+                  locationFilter}
                 Location:{" "}
                 {locations?.find((l) => l.id === locationFilter)?.address ||
                   locationFilter}
@@ -438,6 +603,7 @@ export function ProjectsTable() {
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => setLocationFilter("all")}
                   onClick={() => setLocationFilter("all")}
                 >
                   <X className="h-3 w-3" />
@@ -447,7 +613,11 @@ export function ProjectsTable() {
 
             {/* Client Filter Badge */}
             {clientFilter !== "all" && (
+            {clientFilter !== "all" && (
               <Badge variant="secondary" className="gap-1 pr-1">
+                Client:{" "}
+                {clients?.find((c) => c.id === clientFilter)?.name ||
+                  clientFilter}
                 Client:{" "}
                 {clients?.find((c) => c.id === clientFilter)?.name ||
                   clientFilter}
@@ -455,6 +625,7 @@ export function ProjectsTable() {
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => setClientFilter("all")}
                   onClick={() => setClientFilter("all")}
                 >
                   <X className="h-3 w-3" />
@@ -467,6 +638,10 @@ export function ProjectsTable() {
               variant="outline"
               size="sm"
               onClick={() => {
+                setLocationFilter("all");
+                setClientFilter("all");
+                handleSearch("");
+                setProjectTable({ sortBy: undefined, sortOrder: "asc" });
                 setLocationFilter("all");
                 setClientFilter("all");
                 handleSearch("");
@@ -486,12 +661,16 @@ export function ProjectsTable() {
           <TableHeader>
             <TableRow>
               <TableHead
+              <TableHead
                 className="cursor-pointer select-none"
+                onClick={() => handleSort("name")}
                 onClick={() => handleSort("name")}
               >
                 Project Name
                 {projectTable.sortBy === "name" && (
+                {projectTable.sortBy === "name" && (
                   <span className="ml-1">
+                    {projectTable.sortOrder === "asc" ? "↑" : "↓"}
                     {projectTable.sortOrder === "asc" ? "↑" : "↓"}
                   </span>
                 )}
@@ -501,12 +680,16 @@ export function ProjectsTable() {
               <TableHead>Equipment</TableHead>
               <TableHead>Vehicles</TableHead>
               <TableHead
+              <TableHead
                 className="cursor-pointer select-none"
+                onClick={() => handleSort("created_at")}
                 onClick={() => handleSort("created_at")}
               >
                 Created
                 {projectTable.sortBy === "created_at" && (
+                {projectTable.sortBy === "created_at" && (
                   <span className="ml-1">
+                    {projectTable.sortOrder === "asc" ? "↑" : "↓"}
                     {projectTable.sortOrder === "asc" ? "↑" : "↓"}
                   </span>
                 )}
@@ -527,14 +710,21 @@ export function ProjectsTable() {
                   {projectTable.search
                     ? "No projects found"
                     : "No projects yet"}
+                  {projectTable.search
+                    ? "No projects found"
+                    : "No projects yet"}
                 </TableCell>
               </TableRow>
             ) : (
               paginationData.paginatedProjects.map((project, index) => (
                 <TableRow key={project.id || `project-${index}`}>
                   <TableCell className="font-medium">{project.name}</TableCell>
+                  <TableCell className="font-medium">{project.name}</TableCell>
                   <TableCell>
                     <div className="flex flex-col">
+                      <span className="font-medium">
+                        {project.client?.name}
+                      </span>
                       <span className="font-medium">
                         {project.client?.name}
                       </span>
@@ -542,6 +732,9 @@ export function ProjectsTable() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
+                      <span className="text-sm">
+                        {project.client?.location?.address}
+                      </span>
                       <span className="text-sm">
                         {project.client?.location?.address}
                       </span>
@@ -570,6 +763,18 @@ export function ProjectsTable() {
                           }
                         })()
                       : "Just now"}
+                    {project.created_at
+                      ? (() => {
+                          try {
+                            const date = new Date(project.created_at);
+                            return isNaN(date.getTime())
+                              ? "Just now"
+                              : formatDistanceToNow(date, { addSuffix: true });
+                          } catch {
+                            return "Just now";
+                          }
+                        })()
+                      : "Just now"}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -580,7 +785,11 @@ export function ProjectsTable() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
+                        <DropdownMenuItem
                           onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleEdit(project);
                             e.preventDefault();
                             e.stopPropagation();
                             handleEdit(project);
@@ -590,8 +799,12 @@ export function ProjectsTable() {
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                        <DropdownMenuItem
                           className="text-red-600"
                           onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDelete(project);
                             e.preventDefault();
                             e.stopPropagation();
                             handleDelete(project);
@@ -638,10 +851,14 @@ export function ProjectsTable() {
           <Card>
             <CardContent className="p-6 text-center">
               {projectTable.search ? "No projects found" : "No projects yet"}
+              {projectTable.search ? "No projects found" : "No projects yet"}
             </CardContent>
           </Card>
         ) : (
           paginationData.paginatedProjects.map((project, index) => (
+            <Card
+              key={project.id || `project-${index}`}
+              className="hover:shadow-md transition-all duration-200"
             <Card
               key={project.id || `project-${index}`}
               className="hover:shadow-md transition-all duration-200"
@@ -654,10 +871,15 @@ export function ProjectsTable() {
                       <h3 className="font-semibold text-base leading-tight">
                         {project.name}
                       </h3>
+                      <h3 className="font-semibold text-base leading-tight">
+                        {project.name}
+                      </h3>
                     </div>
                     {/* Actions dropdown */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
                         <Button
                           variant="ghost"
                           className="h-8 w-8 p-0"
@@ -668,7 +890,11 @@ export function ProjectsTable() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
+                        <DropdownMenuItem
                           onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleEdit(project);
                             e.preventDefault();
                             e.stopPropagation();
                             handleEdit(project);
@@ -678,8 +904,12 @@ export function ProjectsTable() {
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                        <DropdownMenuItem
                           className="text-red-600"
                           onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDelete(project);
                             e.preventDefault();
                             e.stopPropagation();
                             handleDelete(project);
@@ -696,14 +926,21 @@ export function ProjectsTable() {
                   {/* Equipment and Vehicle badges */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs">
                       {project.equipments?.length || 0} equipment
                     </Badge>
+                    <Badge variant="outline" className="text-xs">
                     <Badge variant="outline" className="text-xs">
                       {project.vehicles?.length || 0} vehicles
                     </Badge>
                   </div>
 
+
                   {/* Client name */}
+                  <p className="text-sm text-gray-600 font-medium">
+                    {project.client?.name}
+                  </p>
+
                   <p className="text-sm text-gray-600 font-medium">
                     {project.client?.name}
                   </p>
@@ -715,8 +952,21 @@ export function ProjectsTable() {
                     </p>
                   )}
 
+
                   {/* Created time */}
                   <div className="text-xs text-gray-400">
+                    {project.created_at
+                      ? (() => {
+                          try {
+                            const date = new Date(project.created_at);
+                            return isNaN(date.getTime())
+                              ? "Just now"
+                              : formatDistanceToNow(date, { addSuffix: true });
+                          } catch {
+                            return "Just now";
+                          }
+                        })()
+                      : "Just now"}
                     {project.created_at
                       ? (() => {
                           try {
@@ -780,6 +1030,8 @@ export function ProjectsTable() {
         <div className="text-sm text-muted-foreground">
           Showing {paginationData.paginatedProjects.length} of{" "}
           {sortedProjects.length} projects
+          Showing {paginationData.paginatedProjects.length} of{" "}
+          {sortedProjects.length} projects
           {sortedProjects.length < projects.length && (
             <span className="ml-2">
               (filtered from {projects.length} total)
@@ -806,4 +1058,6 @@ export function ProjectsTable() {
       />
     </div>
   );
+  );
 }
+

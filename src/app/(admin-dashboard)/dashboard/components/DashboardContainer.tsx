@@ -12,10 +12,10 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 
 // Import new components
 import { OverviewStatsGrid } from "./stats/OverviewStatsGrid";
-import { 
-  EquipmentStatusChart, 
-  VehicleStatusChart, 
-  CombinedAssetStatusChart 
+import {
+  EquipmentStatusChart,
+  VehicleStatusChart,
+  CombinedAssetStatusChart,
 } from "./charts/AssetStatusChart";
 import { MaintenanceAlertsPanel } from "./alerts/MaintenanceAlertsPanel";
 import { RecentActivityFeed } from "./activity/RecentActivityFeed";
@@ -30,7 +30,7 @@ function DashboardSkeleton() {
           <Skeleton className="h-5 w-80" />
         </div>
       </div>
-      
+
       {/* Overview Stats Skeleton */}
       <div className="space-y-4">
         <Skeleton className="h-7 w-24" />
@@ -47,7 +47,7 @@ function DashboardSkeleton() {
           ))}
         </div>
       </div>
-      
+
       {/* Charts and Activities Skeleton */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -72,7 +72,7 @@ function DashboardSkeleton() {
             </CardContent>
           </Card>
         </div>
-        
+
         <div className="space-y-6">
           {Array.from({ length: 2 }).map((_, i) => (
             <Card key={i}>
@@ -90,7 +90,13 @@ function DashboardSkeleton() {
   );
 }
 
-function DashboardErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+function DashboardErrorBoundary({
+  error,
+  retry,
+}: {
+  error: Error;
+  retry: () => void;
+}) {
   return (
     <div className="min-h-screen py-6 px-6 flex items-center justify-center">
       <div className="max-w-md w-full">
@@ -119,26 +125,31 @@ function DashboardErrorBoundary({ error, retry }: { error: Error; retry: () => v
 function DashboardContent() {
   const { isLoading, error, refetch, data, isFetching } = useDashboardData();
   const manualRefresh = useManualDashboardRefresh();
-  
+
   // Use global real-time context (no local setup needed)
   const { isConnected } = useDashboardRealtimeContext();
 
-  console.log('🎯 Dashboard render state:', { isLoading, error: !!error, hasData: !!data, isFetching });
+  console.log("🎯 Dashboard render state:", {
+    isLoading,
+    error: !!error,
+    hasData: !!data,
+    isFetching,
+  });
 
   // Show error immediately if there's an error
   if (error && !data) {
-    console.log('❌ Dashboard showing error boundary');
+    console.log("❌ Dashboard showing error boundary");
     return <DashboardErrorBoundary error={error as Error} retry={refetch} />;
   }
 
   // Show skeleton only if we're loading AND have no data
   if (isLoading && !data) {
-    console.log('⏳ Dashboard showing skeleton');
+    console.log("⏳ Dashboard showing skeleton");
     return <DashboardSkeleton />;
   }
 
   // If we have data, show it even if we're refetching
-  console.log('✅ Dashboard showing content');
+  console.log("✅ Dashboard showing content");
 
   return (
     <div className="min-h-screen py-6 px-6 space-y-6">
@@ -147,18 +158,21 @@ function DashboardContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome to your admin dashboard. Monitor and manage your fleet operations.
+            Welcome to your admin dashboard. Monitor and manage your fleet
+            operations.
           </p>
         </div>
-        <Button 
-          onClick={manualRefresh} 
-          variant="outline" 
+        <Button
+          onClick={manualRefresh}
+          variant="outline"
           size="sm"
           className="gap-2"
           disabled={isFetching}
         >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          {isFetching ? 'Refreshing...' : 'Refresh Data'}
+          <RefreshCw
+            className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+          />
+          {isFetching ? "Refreshing..." : "Refresh Data"}
         </Button>
       </div>
 
@@ -179,7 +193,7 @@ function DashboardContent() {
           </div>
 
           {/* Combined Assets Overview */}
-          <CombinedAssetStatusChart 
+          <CombinedAssetStatusChart
             title="Fleet Assets Overview"
             className="w-full"
           />

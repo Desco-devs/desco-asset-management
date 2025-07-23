@@ -1,9 +1,9 @@
 "use client";
 
+import { useDashboardDataSync } from "@/hooks/api/use-dashboard-realtime";
+import type { ActivityItem } from "@/types/dashboard";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import type { ActivityItem } from "@/types/dashboard";
-import { useDashboardDataSync } from "@/hooks/api/use-dashboard-realtime";
 
 export interface DashboardData {
   equipmentCounts: {
@@ -40,15 +40,15 @@ export interface DashboardData {
 }
 
 async function fetchDashboardData(): Promise<DashboardData> {
-  const response = await fetch('/api/dashboard/data', {
-    method: 'GET',
+  const response = await fetch("/api/dashboard/data", {
+    method: "GET",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
   });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch dashboard data');
+    throw new Error("Failed to fetch dashboard data");
   }
 
   return response.json();
@@ -56,17 +56,17 @@ async function fetchDashboardData(): Promise<DashboardData> {
 
 export function useDashboardData() {
   const syncData = useDashboardDataSync();
-  
+
   const query = useQuery({
-    queryKey: ['dashboard-data'],
+    queryKey: ["dashboard-data"],
     queryFn: async () => {
       try {
-        console.log('🔄 Fetching dashboard data...');
+        console.log("🔄 Fetching dashboard data...");
         const data = await fetchDashboardData();
-        console.log('✅ Dashboard data fetched successfully:', data);
+        console.log("✅ Dashboard data fetched successfully:", data);
         return data;
       } catch (error) {
-        console.error('❌ Dashboard data fetch failed:', error);
+        console.error("❌ Dashboard data fetch failed:", error);
         // Return empty data structure instead of throwing
         return {
           equipmentCounts: { OPERATIONAL: 0, NON_OPERATIONAL: 0 },
@@ -93,8 +93,8 @@ export function useDashboardData() {
               newClientsThisWeek: 0,
               newProjectsThisWeek: 0,
               newEquipmentThisWeek: 0,
-              newVehiclesThisWeek: 0
-            }
+              newVehiclesThisWeek: 0,
+            },
           },
           recentActivity: [],
           detailedData: {
@@ -119,7 +119,7 @@ export function useDashboardData() {
   // Sync data with Zustand store whenever query data changes
   // Use a ref to store the previous data to avoid infinite loops
   const prevDataRef = useRef(query.data);
-  
+
   useEffect(() => {
     if (query.data && query.data !== prevDataRef.current) {
       prevDataRef.current = query.data;
@@ -143,20 +143,22 @@ export function useVehicleCounts() {
 
 export function useOverviewStats() {
   const { data } = useDashboardData();
-  return data?.overviewStats || {
-    locations: 0,
-    clients: 0,
-    projects: 0,
-    vehicles: { total: 0, operational: 0, nonOperational: 0 },
-    equipment: { total: 0, operational: 0, nonOperational: 0 },
-    maintenanceReports: { total: 0, pending: 0, inProgress: 0 },
-    growth: {
-      newClientsThisWeek: 0,
-      newProjectsThisWeek: 0,
-      newEquipmentThisWeek: 0,
-      newVehiclesThisWeek: 0
+  return (
+    data?.overviewStats || {
+      locations: 0,
+      clients: 0,
+      projects: 0,
+      vehicles: { total: 0, operational: 0, nonOperational: 0 },
+      equipment: { total: 0, operational: 0, nonOperational: 0 },
+      maintenanceReports: { total: 0, pending: 0, inProgress: 0 },
+      growth: {
+        newClientsThisWeek: 0,
+        newProjectsThisWeek: 0,
+        newEquipmentThisWeek: 0,
+        newVehiclesThisWeek: 0,
+      },
     }
-  };
+  );
 }
 
 export function useRecentActivity() {
@@ -166,12 +168,14 @@ export function useRecentActivity() {
 
 export function useDetailedData() {
   const { data } = useDashboardData();
-  return data?.detailedData || {
-    locations: [],
-    clients: [],
-    projects: [],
-    equipment: [],
-    vehicles: [],
-    maintenanceReports: [],
-  };
+  return (
+    data?.detailedData || {
+      locations: [],
+      clients: [],
+      projects: [],
+      equipment: [],
+      vehicles: [],
+      maintenanceReports: [],
+    }
+  );
 }

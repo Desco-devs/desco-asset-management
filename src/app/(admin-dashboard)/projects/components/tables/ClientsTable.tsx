@@ -1,5 +1,23 @@
 "use client";
+"use client";
 
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +43,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+} from "@/components/ui/table";
 import {
+  useClients,
+  useDeleteClient,
+  useLocations,
+} from "@/hooks/api/use-projects";
+import { useClientTable, useProjectsStore } from "@/stores/projects-store";
+import type { Client } from "@/types/projects";
+import { formatDistanceToNow } from "date-fns";
   useClients,
   useDeleteClient,
   useLocations,
@@ -47,7 +73,28 @@ import {
 } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
+  ChevronLeft,
+  ChevronRight,
+  Edit,
+  Filter,
+  List,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import React from "react";
+import { toast } from "sonner";
 
+export function ClientsTable() {
+  const setClientTable = useProjectsStore((state) => state.setClientTable);
+  const setClientModal = useProjectsStore((state) => state.setClientModal);
+
+  const setIsMobile = useProjectsStore((state) => state.setIsMobile);
+  const getEffectiveClientItemsPerPage = useProjectsStore(
+    (state) => state.getEffectiveClientItemsPerPage
+  );
 export function ClientsTable() {
   const setClientTable = useProjectsStore((state) => state.setClientTable);
   const setClientModal = useProjectsStore((state) => state.setClientModal);
@@ -71,11 +118,30 @@ export function ClientsTable() {
   const { data: locations } = useLocations();
   const { data: clients, isLoading, error } = useClients();
   const { mutate: deleteClient, isPending: isDeleting } = useDeleteClient();
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, [setIsMobile]);
+
+  const { data: locations } = useLocations();
+  const { data: clients, isLoading, error } = useClients();
+  const { mutate: deleteClient, isPending: isDeleting } = useDeleteClient();
 
   // Local filtering state
   const [locationFilter, setLocationFilter] = React.useState<string>("all");
 
+  const [locationFilter, setLocationFilter] = React.useState<string>("all");
+
   // Delete confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
+  const [clientToDelete, setClientToDelete] = React.useState<Client | null>(
+    null
+  );
+
+  const clientTable = useClientTable();
   const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
   const [clientToDelete, setClientToDelete] = React.useState<Client | null>(
     null
@@ -86,8 +152,13 @@ export function ClientsTable() {
   const handleEdit = (client: Client) => {
     setClientModal(true, client.id);
   };
+    setClientModal(true, client.id);
+  };
 
   const handleDelete = (client: Client) => {
+    setClientToDelete(client);
+    setDeleteModalOpen(true);
+  };
     setClientToDelete(client);
     setDeleteModalOpen(true);
   };
@@ -95,8 +166,13 @@ export function ClientsTable() {
   const handleConfirmDelete = () => {
     if (!clientToDelete) return;
 
+    if (!clientToDelete) return;
+
     deleteClient(clientToDelete.id, {
       onSuccess: () => {
+        toast.success("Client deleted successfully");
+        setDeleteModalOpen(false);
+        setClientToDelete(null);
         toast.success("Client deleted successfully");
         setDeleteModalOpen(false);
         setClientToDelete(null);
@@ -106,8 +182,14 @@ export function ClientsTable() {
       },
     });
   };
+        toast.error("Failed to delete client: " + error.message);
+      },
+    });
+  };
 
   const handleSearch = (value: string) => {
+    setClientTable({ search: value, page: 1 });
+  };
     setClientTable({ search: value, page: 1 });
   };
 
@@ -125,11 +207,16 @@ export function ClientsTable() {
     if (!clients) return [];
 
     let filtered = clients;
+    if (!clients) return [];
+
+    let filtered = clients;
 
     // Apply search filter
     if (clientTable.search) {
       filtered = filtered.filter((client) =>
+      filtered = filtered.filter((client) =>
         client.name.toLowerCase().includes(clientTable.search.toLowerCase())
+      );
       );
     }
 
@@ -138,8 +225,14 @@ export function ClientsTable() {
       filtered = filtered.filter(
         (client) => client.location_id === locationFilter
       );
+    if (locationFilter !== "all") {
+      filtered = filtered.filter(
+        (client) => client.location_id === locationFilter
+      );
     }
 
+    return filtered;
+  }, [clients, clientTable.search, locationFilter]);
     return filtered;
   }, [clients, clientTable.search, locationFilter]);
 
@@ -147,7 +240,14 @@ export function ClientsTable() {
   const sortedClients = React.useMemo(() => {
     if (!filteredClients.length) return [];
 
+    if (!filteredClients.length) return [];
+
     return [...filteredClients].sort((a, b) => {
+      const aValue = a[clientTable.sortBy];
+      const bValue = b[clientTable.sortBy];
+
+      if (clientTable.sortOrder === "asc") {
+        return aValue > bValue ? 1 : -1;
       const aValue = a[clientTable.sortBy];
       const bValue = b[clientTable.sortBy];
 
@@ -157,9 +257,20 @@ export function ClientsTable() {
       return aValue < bValue ? 1 : -1;
     });
   }, [filteredClients, clientTable.sortBy, clientTable.sortOrder]);
+      return aValue < bValue ? 1 : -1;
+    });
+  }, [filteredClients, clientTable.sortBy, clientTable.sortOrder]);
 
   // Pagination logic
   const paginationData = React.useMemo(() => {
+    const itemsPerPage = getEffectiveClientItemsPerPage();
+    const startIndex = (clientTable.page - 1) * itemsPerPage;
+    const paginatedClients = sortedClients.slice(
+      startIndex,
+      startIndex + itemsPerPage
+    );
+    const totalPages = Math.ceil(sortedClients.length / itemsPerPage);
+
     const itemsPerPage = getEffectiveClientItemsPerPage();
     const startIndex = (clientTable.page - 1) * itemsPerPage;
     const paginatedClients = sortedClients.slice(
@@ -175,9 +286,14 @@ export function ClientsTable() {
       currentPage: clientTable.page,
     };
   }, [sortedClients, clientTable.page, getEffectiveClientItemsPerPage]);
+      currentPage: clientTable.page,
+    };
+  }, [sortedClients, clientTable.page, getEffectiveClientItemsPerPage]);
 
   // Pagination handlers
   const handlePageChange = (newPage: number) => {
+    setClientTable({ page: newPage });
+  };
     setClientTable({ page: newPage });
   };
 
@@ -186,6 +302,7 @@ export function ClientsTable() {
       <div className="text-center py-8 text-red-600">
         Error loading clients: {error.message}
       </div>
+    );
     );
   }
 
@@ -218,8 +335,10 @@ export function ClientsTable() {
         <div className="flex flex-row gap-3">
           <Select
             value={locationFilter !== "all" ? `location-${locationFilter}` : ""}
+            value={locationFilter !== "all" ? `location-${locationFilter}` : ""}
             onValueChange={(value) => {
               if (value === "clear-all") {
+                setLocationFilter("all");
                 setLocationFilter("all");
               }
               // Location filters
@@ -237,7 +356,12 @@ export function ClientsTable() {
               <div className="p-3 max-h-96 overflow-y-auto">
                 {/* Clear Filters */}
                 {locationFilter !== "all" && (
+                {locationFilter !== "all" && (
                   <div className="mb-4">
+                    <SelectItem
+                      value="clear-all"
+                      className="text-red-600 font-medium"
+                    >
                     <SelectItem
                       value="clear-all"
                       className="text-red-600 font-medium"
@@ -272,7 +396,11 @@ export function ClientsTable() {
             value={(() => {
               if (!clientTable.sortBy) return "clear-sort";
 
+
               if (clientTable.sortBy === "created_at") {
+                return clientTable.sortOrder === "desc"
+                  ? "created_at"
+                  : "created_at_old";
                 return clientTable.sortOrder === "desc"
                   ? "created_at"
                   : "created_at_old";
@@ -281,13 +409,16 @@ export function ClientsTable() {
                 return clientTable.sortOrder === "asc" ? "name" : "name_desc";
               }
 
+
               return clientTable.sortBy;
             })()}
             onValueChange={(value) => {
               if (value === "clear-sort") {
                 handleSort("name"); // Reset to default
+                handleSort("name"); // Reset to default
                 return;
               }
+
 
               if (value === "created_at") {
                 setClientTable({ sortBy: "created_at", sortOrder: "desc" });
@@ -333,17 +464,28 @@ export function ClientsTable() {
         {(locationFilter !== "all" ||
           clientTable.search ||
           clientTable.sortBy) && (
+        {(locationFilter !== "all" ||
+          clientTable.search ||
+          clientTable.sortBy) && (
           <div className="flex flex-wrap gap-2">
             {/* Sort Badge */}
             {clientTable.sortBy && (
               <Badge variant="secondary" className="gap-1 pr-1">
                 Sort:{" "}
                 {(() => {
+                Sort:{" "}
+                {(() => {
                   if (clientTable.sortBy === "created_at")
                     return clientTable.sortOrder === "desc"
                       ? "Newest Added"
                       : "Oldest Added";
+                    return clientTable.sortOrder === "desc"
+                      ? "Newest Added"
+                      : "Oldest Added";
                   if (clientTable.sortBy === "name")
+                    return clientTable.sortOrder === "asc"
+                      ? "Client A-Z"
+                      : "Client Z-A";
                     return clientTable.sortOrder === "asc"
                       ? "Client A-Z"
                       : "Client Z-A";
@@ -356,6 +498,9 @@ export function ClientsTable() {
                   onClick={() =>
                     setClientTable({ sortBy: undefined, sortOrder: "asc" })
                   }
+                  onClick={() =>
+                    setClientTable({ sortBy: undefined, sortOrder: "asc" })
+                  }
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -365,10 +510,12 @@ export function ClientsTable() {
             {clientTable.search && (
               <Badge variant="secondary" className="gap-1 pr-1">
                 Search: {clientTable.search}
+                Search: {clientTable.search}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => handleSearch("")}
                   onClick={() => handleSearch("")}
                 >
                   <X className="h-3 w-3" />
@@ -378,7 +525,11 @@ export function ClientsTable() {
 
             {/* Location Filter Badge */}
             {locationFilter !== "all" && (
+            {locationFilter !== "all" && (
               <Badge variant="secondary" className="gap-1 pr-1">
+                Location:{" "}
+                {locations?.find((l) => l.id === locationFilter)?.address ||
+                  locationFilter}
                 Location:{" "}
                 {locations?.find((l) => l.id === locationFilter)?.address ||
                   locationFilter}
@@ -386,6 +537,7 @@ export function ClientsTable() {
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => setLocationFilter("all")}
                   onClick={() => setLocationFilter("all")}
                 >
                   <X className="h-3 w-3" />
@@ -398,6 +550,9 @@ export function ClientsTable() {
               variant="outline"
               size="sm"
               onClick={() => {
+                setLocationFilter("all");
+                handleSearch("");
+                setClientTable({ sortBy: undefined, sortOrder: "asc" });
                 setLocationFilter("all");
                 handleSearch("");
                 setClientTable({ sortBy: undefined, sortOrder: "asc" });
@@ -416,12 +571,16 @@ export function ClientsTable() {
           <TableHeader>
             <TableRow>
               <TableHead
+              <TableHead
                 className="cursor-pointer select-none"
+                onClick={() => handleSort("name")}
                 onClick={() => handleSort("name")}
               >
                 Client Name
                 {clientTable.sortBy === "name" && (
+                {clientTable.sortBy === "name" && (
                   <span className="ml-1">
+                    {clientTable.sortOrder === "asc" ? "↑" : "↓"}
                     {clientTable.sortOrder === "asc" ? "↑" : "↓"}
                   </span>
                 )}
@@ -429,12 +588,16 @@ export function ClientsTable() {
               <TableHead>Location</TableHead>
               <TableHead>Projects</TableHead>
               <TableHead
+              <TableHead
                 className="cursor-pointer select-none"
+                onClick={() => handleSort("created_at")}
                 onClick={() => handleSort("created_at")}
               >
                 Created
                 {clientTable.sortBy === "created_at" && (
+                {clientTable.sortBy === "created_at" && (
                   <span className="ml-1">
+                    {clientTable.sortOrder === "asc" ? "↑" : "↓"}
                     {clientTable.sortOrder === "asc" ? "↑" : "↓"}
                   </span>
                 )}
@@ -453,17 +616,22 @@ export function ClientsTable() {
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-8">
                   {clientTable.search ? "No clients found" : "No clients yet"}
+                  {clientTable.search ? "No clients found" : "No clients yet"}
                 </TableCell>
               </TableRow>
             ) : (
               paginationData.paginatedClients.map((client, index) => (
                 <TableRow
+                <TableRow
                   key={client.id || `client-${index}`}
+                  className="hover:bg-muted/50"
                   className="hover:bg-muted/50"
                 >
                   <TableCell className="font-medium">{client.name}</TableCell>
+                  <TableCell className="font-medium">{client.name}</TableCell>
                   <TableCell>
                     <span className="text-sm">
+                      {client.location?.address || "No location"}
                       {client.location?.address || "No location"}
                     </span>
                   </TableCell>
@@ -485,10 +653,24 @@ export function ClientsTable() {
                           }
                         })()
                       : "Just now"}
+                    {client.created_at
+                      ? (() => {
+                          try {
+                            const date = new Date(client.created_at);
+                            return isNaN(date.getTime())
+                              ? "Just now"
+                              : formatDistanceToNow(date, { addSuffix: true });
+                          } catch {
+                            return "Just now";
+                          }
+                        })()
+                      : "Just now"}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
                         <Button
                           variant="ghost"
                           className="h-8 w-8 p-0"
@@ -504,12 +686,22 @@ export function ClientsTable() {
                             handleEdit(client);
                           }}
                         >
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(client);
+                          }}
+                        >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                        <DropdownMenuItem
                           className="text-red-600"
                           onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDelete(client);
                             e.preventDefault();
                             e.stopPropagation();
                             handleDelete(client);
@@ -550,10 +742,14 @@ export function ClientsTable() {
           <Card>
             <CardContent className="p-6 text-center">
               {clientTable.search ? "No clients found" : "No clients yet"}
+              {clientTable.search ? "No clients found" : "No clients yet"}
             </CardContent>
           </Card>
         ) : (
           paginationData.paginatedClients.map((client, index) => (
+            <Card
+              key={client.id || `client-${index}`}
+              className="hover:shadow-md transition-all duration-200"
             <Card
               key={client.id || `client-${index}`}
               className="hover:shadow-md transition-all duration-200"
@@ -566,10 +762,15 @@ export function ClientsTable() {
                       <h3 className="font-semibold text-base leading-tight">
                         {client.name}
                       </h3>
+                      <h3 className="font-semibold text-base leading-tight">
+                        {client.name}
+                      </h3>
                     </div>
                     {/* Actions dropdown */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
                         <Button
                           variant="ghost"
                           className="h-8 w-8 p-0"
@@ -580,7 +781,11 @@ export function ClientsTable() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
+                        <DropdownMenuItem
                           onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleEdit(client);
                             e.preventDefault();
                             e.stopPropagation();
                             handleEdit(client);
@@ -590,8 +795,12 @@ export function ClientsTable() {
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                        <DropdownMenuItem
                           className="text-red-600"
                           onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDelete(client);
                             e.preventDefault();
                             e.stopPropagation();
                             handleDelete(client);
@@ -612,13 +821,32 @@ export function ClientsTable() {
                     </Badge>
                   </div>
 
+
                   {/* Location */}
+                  <p className="text-sm text-gray-600 font-medium">
+                    {client.location?.address}
+                  </p>
+
                   <p className="text-sm text-gray-600 font-medium">
                     {client.location?.address}
                   </p>
 
                   {/* Created time */}
                   <div className="text-xs text-gray-400">
+                    {client.created_at
+                      ? (() => {
+                          try {
+                            const date = new Date(client.created_at);
+                            return isNaN(date.getTime())
+                              ? "Just now"
+                              : `Created ${formatDistanceToNow(date, {
+                                  addSuffix: true,
+                                })}`;
+                          } catch {
+                            return "Just now";
+                          }
+                        })()
+                      : "Just now"}
                     {client.created_at
                       ? (() => {
                           try {
@@ -684,7 +912,10 @@ export function ClientsTable() {
         <div className="text-sm text-muted-foreground">
           Showing {paginationData.paginatedClients.length} of{" "}
           {sortedClients.length} clients
+          Showing {paginationData.paginatedClients.length} of{" "}
+          {sortedClients.length} clients
           {sortedClients.length < clients.length && (
+            <span className="ml-2">(filtered from {clients.length} total)</span>
             <span className="ml-2">(filtered from {clients.length} total)</span>
           )}
           {paginationData.totalPages > 1 && (
@@ -708,4 +939,6 @@ export function ClientsTable() {
       />
     </div>
   );
+  );
 }
+
