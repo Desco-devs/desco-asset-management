@@ -24,6 +24,7 @@ interface ProjectsUIState {
   
   // UI State
   currentView: 'locations' | 'clients' | 'projects'
+  isMobile: boolean
   
   // Actions
   setLocationTable: (state: Partial<LocationTableState>) => void
@@ -39,11 +40,17 @@ interface ProjectsUIState {
   setSelectedClient: (clientId: string | null) => void
   
   setCurrentView: (view: 'locations' | 'clients' | 'projects') => void
+  setIsMobile: (isMobile: boolean) => void
   
   // Computed getters
   getFilteredLocationTable: () => LocationTableState
   getFilteredClientTable: () => ClientTableState
   getFilteredProjectTable: () => ProjectTableState
+  
+  // Pagination helpers
+  getEffectiveLocationItemsPerPage: () => number
+  getEffectiveClientItemsPerPage: () => number
+  getEffectiveProjectItemsPerPage: () => number
   
   // Reset functions
   resetLocationTable: () => void
@@ -98,6 +105,7 @@ export const useProjectsStore = create<ProjectsUIState>()(
       selectedLocationId: null,
       selectedClientId: null,
       currentView: 'locations',
+      isMobile: false,
       
       // Location Actions
       setLocationTable: (state) =>
@@ -169,6 +177,9 @@ export const useProjectsStore = create<ProjectsUIState>()(
       setCurrentView: (view) =>
         set({ currentView: view }, false, 'setCurrentView'),
       
+      setIsMobile: (isMobile) =>
+        set({ isMobile }, false, 'setIsMobile'),
+      
       // Computed getters
       getFilteredLocationTable: () => {
         const state = get()
@@ -189,6 +200,22 @@ export const useProjectsStore = create<ProjectsUIState>()(
           ...state.projectTable,
           client_id: state.selectedClientId || state.projectTable.client_id,
         }
+      },
+      
+      // Pagination helpers
+      getEffectiveLocationItemsPerPage: () => {
+        const { isMobile, locationTable } = get()
+        return isMobile ? 6 : locationTable.limit
+      },
+      
+      getEffectiveClientItemsPerPage: () => {
+        const { isMobile, clientTable } = get()
+        return isMobile ? 6 : clientTable.limit
+      },
+      
+      getEffectiveProjectItemsPerPage: () => {
+        const { isMobile, projectTable } = get()
+        return isMobile ? 6 : projectTable.limit
       },
       
       // Reset functions

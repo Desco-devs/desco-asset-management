@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Search, Plus, Edit, Trash2 } from "lucide-react"
+import { MoreHorizontal, Search, Plus, Edit, Trash2, Eye, X, List, ChevronLeft, ChevronRight } from "lucide-react"
 import { useLocations, useDeleteLocation } from '@/hooks/api/use-projects'
 import { useProjectsStore, useLocationModal, useLocationTable } from '@/stores/projects-store'
 import { formatDistanceToNow } from 'date-fns'
@@ -44,6 +44,20 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
   const setLocationTable = useProjectsStore(state => state.setLocationTable)
   const setCurrentView = useProjectsStore(state => state.setCurrentView) 
   const setSelectedLocation = useProjectsStore(state => state.setSelectedLocation)
+  const isMobile = useProjectsStore(state => state.isMobile)
+  const setIsMobile = useProjectsStore(state => state.setIsMobile)
+  const getEffectiveLocationItemsPerPage = useProjectsStore(state => state.getEffectiveLocationItemsPerPage)
+
+  // Mobile detection
+  React.useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkIsMobile()
+    window.addEventListener('resize', checkIsMobile)
+    return () => window.removeEventListener('resize', checkIsMobile)
+  }, [setIsMobile])
 
   const handleEdit = (location: Location) => {
     setModal(true, location.id)
@@ -112,6 +126,26 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
     })
   }, [filteredLocations, locationTable.sortBy, locationTable.sortOrder])
 
+  // Pagination logic
+  const paginationData = React.useMemo(() => {
+    const itemsPerPage = getEffectiveLocationItemsPerPage()
+    const startIndex = (locationTable.page - 1) * itemsPerPage
+    const paginatedLocations = sortedLocations.slice(startIndex, startIndex + itemsPerPage)
+    const totalPages = Math.ceil(sortedLocations.length / itemsPerPage)
+    
+    return {
+      paginatedLocations,
+      totalPages,
+      itemsPerPage,
+      currentPage: locationTable.page
+    }
+  }, [sortedLocations, locationTable.page, getEffectiveLocationItemsPerPage])
+
+  // Pagination handlers
+  const handlePageChange = (newPage: number) => {
+    setLocationTable({ page: newPage })
+  }
+
   if (error) {
     return (
       <div className="text-center py-8 text-red-600">
@@ -122,36 +156,132 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col space-y-4">
-        <div>
-          <h2 className="text-2xl font-bold">Locations</h2>
-          <p className="text-muted-foreground">
-            Manage your locations and view associated clients
-          </p>
-        </div>
-        
-        {/* Action Button Section - Mobile First */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button 
-            onClick={() => setModal(true)}
-            className="gap-2 flex-1 sm:flex-none font-semibold"
-          >
-            <Plus className="h-4 w-4" />
-            Add Location
-          </Button>
-        </div>
-      </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search locations..."
-          value={locationTable.search}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="pl-8"
-        />
+      {/* Search and Sort Section */}
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search locations by address..."
+            value={locationTable.search}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="pl-9 h-11"
+          />
+        </div>
+
+        {/* Sort Button */}
+        <div className="flex gap-3">
+          <Select
+            value={(() => {
+              if (!locationTable.sortBy) return "clear-sort";
+              
+              if (locationTable.sortBy === "created_at") {
+                return locationTable.sortOrder === "desc" ? "created_at" : "created_at_old";
+              }
+              if (locationTable.sortBy === "address") {
+                return locationTable.sortOrder === "asc" ? "address" : "address_desc";
+              }
+              
+              return locationTable.sortBy;
+            })()}
+            onValueChange={(value) => {
+              if (value === "clear-sort") {
+                handleSort('address'); // Reset to default
+                return;
+              }
+              
+              if (value === "created_at") {
+                setLocationTable({ sortBy: "created_at", sortOrder: "desc" });
+              } else if (value === "created_at_old") {
+                setLocationTable({ sortBy: "created_at", sortOrder: "asc" });
+              } else if (value === "address") {
+                setLocationTable({ sortBy: "address", sortOrder: "asc" });
+              } else if (value === "address_desc") {
+                setLocationTable({ sortBy: "address", sortOrder: "desc" });
+              }
+            }}
+          >
+            <SelectTrigger className="h-11 flex-1">
+              <List className="h-4 w-4 mr-2" />
+              <span>Sort</span>
+            </SelectTrigger>
+            <SelectContent>
+              <div className="p-1">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
+                  Most Recent
+                </div>
+                <SelectItem value="created_at">Newest Added</SelectItem>
+                <SelectItem value="created_at_old">Oldest Added</SelectItem>
+
+                <div className="border-t my-2"></div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
+                  Alphabetical
+                </div>
+                <SelectItem value="address">Address A-Z</SelectItem>
+                <SelectItem value="address_desc">Address Z-A</SelectItem>
+
+                <div className="border-t my-2"></div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
+                  Quick Actions
+                </div>
+                <SelectItem value="clear-sort">Clear Sort</SelectItem>
+              </div>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Active Filter Badges */}
+        {(locationTable.search || locationTable.sortBy) && (
+          <div className="flex flex-wrap gap-2">
+            {/* Sort Badge */}
+            {locationTable.sortBy && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                Sort: {(() => {
+                  if (locationTable.sortBy === "created_at")
+                    return locationTable.sortOrder === "desc" ? "Newest Added" : "Oldest Added";
+                  if (locationTable.sortBy === "address")
+                    return locationTable.sortOrder === "asc" ? "Address A-Z" : "Address Z-A";
+                  return locationTable.sortBy;
+                })()}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => setLocationTable({ sortBy: "", sortOrder: "asc" })}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+            {/* Search Badge */}
+            {locationTable.search && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                Search: "{locationTable.search}"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => handleSearch('')}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+
+            {/* Clear All Badge */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                handleSearch('');
+                setLocationTable({ sortBy: "", sortOrder: "asc" });
+              }}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+            >
+              Clear All
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Desktop Table View */}
@@ -191,14 +321,14 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
                   Loading locations...
                 </TableCell>
               </TableRow>
-            ) : sortedLocations.length === 0 ? (
+            ) : paginationData.paginatedLocations.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={3} className="text-center py-8">
                   {locationTable.search ? 'No locations found' : 'No locations yet'}
                 </TableCell>
               </TableRow>
             ) : (
-              sortedLocations.map((location, index) => (
+              paginationData.paginatedLocations.map((location, index) => (
                 <TableRow 
                   key={location.id || `location-${index}`}
                   className={`cursor-pointer hover:bg-muted/50 ${
@@ -283,14 +413,14 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
               </CardContent>
             </Card>
           ))
-        ) : sortedLocations.length === 0 ? (
+        ) : paginationData.paginatedLocations.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
               {locationTable.search ? 'No locations found' : 'No locations yet'}
             </CardContent>
           </Card>
         ) : (
-          sortedLocations.map((location, index) => (
+          paginationData.paginatedLocations.map((location, index) => (
             <Card 
               key={location.id || `location-${index}`} 
               className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-[1.02] ${
@@ -299,74 +429,35 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
               onClick={() => handleRowClick(location)}
             >
               <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  {/* Location Icon */}
-                  <div className="relative">
-                    <div className="h-12 w-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-semibold">
-                      📍
+                <div className="flex flex-col space-y-3">
+                  {/* Header with title and eye icon */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base leading-tight">{location.address}</h3>
                     </div>
+                    {/* Eye icon - Visual indicator for clickable card */}
+                    <Eye className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   </div>
+
+                  {/* Selected badge */}
+                  {selectedLocationId === location.id && (
+                    <Badge variant="secondary" className="text-xs w-fit">
+                      Selected
+                    </Badge>
+                  )}
                   
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-sm">{location.address}</h3>
-                        {selectedLocationId === location.id && (
-                          <Badge variant="secondary" className="text-xs">
-                            Selected
-                          </Badge>
-                        )}
-                      </div>
-                      {/* Action Menu */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation()
-                            handleEdit(location)
-                          }}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-red-600"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleDelete(location)
-                            }}
-                            disabled={isDeleting}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    
-                    <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-                      <span>
-                        {location.created_at ? (
-                          (() => {
-                            try {
-                              const date = new Date(location.created_at)
-                              return isNaN(date.getTime()) ? 'Just now' : `Created ${formatDistanceToNow(date, { addSuffix: true })}`
-                            } catch {
-                              return 'Just now'
-                            }
-                          })()
-                        ) : 'Just now'}
-                      </span>
-                    </div>
+                  {/* Created time */}
+                  <div className="text-xs text-gray-400">
+                    {location.created_at ? (
+                      (() => {
+                        try {
+                          const date = new Date(location.created_at)
+                          return isNaN(date.getTime()) ? 'Just now' : `Created ${formatDistanceToNow(date, { addSuffix: true })}`
+                        } catch {
+                          return 'Just now'
+                        }
+                      })()
+                    ) : 'Just now'}
                   </div>
                 </div>
               </CardContent>
@@ -375,10 +466,58 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
         )}
       </div>
 
+      {/* Mobile-Optimized Pagination */}
+      {paginationData.totalPages > 1 && (
+        <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(paginationData.currentPage - 1)}
+            disabled={paginationData.currentPage === 1}
+            className="gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Previous</span>
+            <span className="sm:hidden">Prev</span>
+          </Button>
+
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="font-mono">
+              {paginationData.currentPage}/{paginationData.totalPages}
+            </Badge>
+            <span className="text-xs text-muted-foreground hidden sm:block">
+              of {sortedLocations.length} locations
+            </span>
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(paginationData.currentPage + 1)}
+            disabled={paginationData.currentPage === paginationData.totalPages}
+            className="gap-1"
+          >
+            <span className="hidden sm:inline">Next</span>
+            <span className="sm:hidden">Next</span>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       {/* Results count */}
       {locations && (
         <div className="text-sm text-muted-foreground">
-          Showing {sortedLocations.length} of {locations.length} locations
+          Showing {paginationData.paginatedLocations.length} of {sortedLocations.length} locations
+          {sortedLocations.length < locations.length && (
+            <span className="ml-2">
+              (filtered from {locations.length} total)
+            </span>
+          )}
+          {paginationData.totalPages > 1 && (
+            <span className="ml-2">
+              • Page {paginationData.currentPage} of {paginationData.totalPages}
+            </span>
+          )}
         </div>
       )}
 

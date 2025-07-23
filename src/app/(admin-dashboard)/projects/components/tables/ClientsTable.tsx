@@ -26,7 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Search, Plus, Edit, Trash2 } from "lucide-react"
+import { MoreHorizontal, Search, Plus, Edit, Trash2, Eye, Filter, X, List, ChevronLeft, ChevronRight } from "lucide-react"
 import { useClients, useDeleteClient, useLocations } from '@/hooks/api/use-projects'
 import { useProjectsStore, useClientModal, useClientTable } from '@/stores/projects-store'
 import { formatDistanceToNow } from 'date-fns'
@@ -41,6 +41,20 @@ interface ClientsTableProps {
 export function ClientsTable({ onSelectClient }: ClientsTableProps) {
   const setClientTable = useProjectsStore(state => state.setClientTable)
   const setClientModal = useProjectsStore(state => state.setClientModal)
+  const isMobile = useProjectsStore(state => state.isMobile)
+  const setIsMobile = useProjectsStore(state => state.setIsMobile)
+  const getEffectiveClientItemsPerPage = useProjectsStore(state => state.getEffectiveClientItemsPerPage)
+
+  // Mobile detection
+  React.useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkIsMobile()
+    window.addEventListener('resize', checkIsMobile)
+    return () => window.removeEventListener('resize', checkIsMobile)
+  }, [setIsMobile])
   
   const { data: locations } = useLocations()
   const { data: clients, isLoading, error } = useClients()
@@ -145,66 +159,196 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col space-y-4">
-        <div>
-          <h2 className="text-2xl font-bold">All Clients</h2>
-          <p className="text-muted-foreground">
-            Manage all clients across all locations
-          </p>
-        </div>
-        
-        {/* Action Button Section - Mobile First */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button 
-            onClick={() => setClientModal(true)}
-            className="gap-2 flex-1 sm:flex-none font-semibold"
-          >
-            <Plus className="h-4 w-4" />
-            Add Client
-          </Button>
-        </div>
-      </div>
 
-      {/* Filters and Search */}
-      <div className="flex gap-4 items-center flex-wrap">
-        {/* Search */}
-        <div className="relative max-w-sm">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+      {/* Search, Filter & Sort Section */}
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search clients..."
+            placeholder="Search clients by name..."
             value={clientTable.search}
             onChange={(e) => handleSearch(e.target.value)}
-            className="pl-8"
+            className="pl-9 h-11"
           />
         </div>
 
-        {/* Location Filter */}
-        <div className="min-w-[180px]">
-          <Select value={locationFilter} onValueChange={setLocationFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by location" />
+        {/* Filter and Sort Buttons */}
+        <div className="flex gap-3">
+          <Select
+            value={locationFilter !== 'all' ? `location-${locationFilter}` : ""}
+            onValueChange={(value) => {
+              if (value === "clear-all") {
+                setLocationFilter('all');
+              }
+              // Location filters
+              else if (value.startsWith("location-")) {
+                const locationId = value.replace("location-", "");
+                setLocationFilter(locationId);
+              }
+            }}
+          >
+            <SelectTrigger className="h-11 flex-1">
+              <Filter className="h-4 w-4 mr-2" />
+              <span>Filter</span>
+            </SelectTrigger>
+            <SelectContent className="w-80">
+              <div className="p-3 max-h-96 overflow-y-auto">
+                {/* Clear Filters */}
+                {locationFilter !== 'all' && (
+                  <div className="mb-4">
+                    <SelectItem value="clear-all" className="text-red-600 font-medium">
+                      Clear All Filters
+                    </SelectItem>
+                  </div>
+                )}
+
+                {/* Location Filter */}
+                <div className="mb-4">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    Locations
+                  </div>
+                  <div className="space-y-1">
+                    {locations?.map((location) => (
+                      <SelectItem
+                        key={location.id}
+                        value={`location-${location.id}`}
+                      >
+                        {location.address}
+                      </SelectItem>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </SelectContent>
+          </Select>
+
+          {/* Sort Button */}
+          <Select
+            value={(() => {
+              if (!clientTable.sortBy) return "clear-sort";
+              
+              if (clientTable.sortBy === "created_at") {
+                return clientTable.sortOrder === "desc" ? "created_at" : "created_at_old";
+              }
+              if (clientTable.sortBy === "name") {
+                return clientTable.sortOrder === "asc" ? "name" : "name_desc";
+              }
+              
+              return clientTable.sortBy;
+            })()}
+            onValueChange={(value) => {
+              if (value === "clear-sort") {
+                handleSort('name'); // Reset to default
+                return;
+              }
+              
+              if (value === "created_at") {
+                setClientTable({ sortBy: "created_at", sortOrder: "desc" });
+              } else if (value === "created_at_old") {
+                setClientTable({ sortBy: "created_at", sortOrder: "asc" });
+              } else if (value === "name") {
+                setClientTable({ sortBy: "name", sortOrder: "asc" });
+              } else if (value === "name_desc") {
+                setClientTable({ sortBy: "name", sortOrder: "desc" });
+              }
+            }}
+          >
+            <SelectTrigger className="h-11 flex-1">
+              <List className="h-4 w-4 mr-2" />
+              <span>Sort</span>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations?.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.address}
-                </SelectItem>
-              ))}
+              <div className="p-1">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
+                  Most Recent
+                </div>
+                <SelectItem value="created_at">Newest Added</SelectItem>
+                <SelectItem value="created_at_old">Oldest Added</SelectItem>
+
+                <div className="border-t my-2"></div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
+                  Alphabetical
+                </div>
+                <SelectItem value="name">Client A-Z</SelectItem>
+                <SelectItem value="name_desc">Client Z-A</SelectItem>
+
+                <div className="border-t my-2"></div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
+                  Quick Actions
+                </div>
+                <SelectItem value="clear-sort">Clear Sort</SelectItem>
+              </div>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Clear Filter */}
-        {locationFilter !== 'all' && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setLocationFilter('all')}
-          >
-            Clear Filter
-          </Button>
+        {/* Active Filter Badges */}
+        {(locationFilter !== 'all' || clientTable.search || clientTable.sortBy) && (
+          <div className="flex flex-wrap gap-2">
+            {/* Sort Badge */}
+            {clientTable.sortBy && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                Sort: {(() => {
+                  if (clientTable.sortBy === "created_at")
+                    return clientTable.sortOrder === "desc" ? "Newest Added" : "Oldest Added";
+                  if (clientTable.sortBy === "name")
+                    return clientTable.sortOrder === "asc" ? "Client A-Z" : "Client Z-A";
+                  return clientTable.sortBy;
+                })()}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => setClientTable({ sortBy: "", sortOrder: "asc" })}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+            {/* Search Badge */}
+            {clientTable.search && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                Search: "{clientTable.search}"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => handleSearch('')}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+
+            {/* Location Filter Badge */}
+            {locationFilter !== 'all' && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                Location: {locations?.find(l => l.id === locationFilter)?.address || locationFilter}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => setLocationFilter('all')}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+
+            {/* Clear All Badge */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setLocationFilter('all');
+                handleSearch('');
+                setClientTable({ sortBy: "", sortOrder: "asc" });
+              }}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+            >
+              Clear All
+            </Button>
+          </div>
         )}
       </div>
 
@@ -357,74 +501,38 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
               onClick={() => handleRowClick(client)}
             >
               <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  {/* Client Icon */}
-                  <div className="relative">
-                    <div className="h-12 w-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-semibold">
-                      {client.name.charAt(0).toUpperCase()}
+                <div className="flex flex-col space-y-3">
+                  {/* Header with title and eye icon */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base leading-tight">{client.name}</h3>
                     </div>
+                    {/* Eye icon - Visual indicator for clickable card */}
+                    <Eye className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  </div>
+
+                  {/* Projects badge */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="text-xs">
+                      {client.projects?.length || 0} projects
+                    </Badge>
                   </div>
                   
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-sm">{client.name}</h3>
-                        <Badge variant="outline" className="text-xs">
-                          {client.projects?.length || 0} projects
-                        </Badge>
-                      </div>
-                      {/* Action Menu */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation()
-                            handleEdit(client)
-                          }}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-red-600"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleDelete(client)
-                            }}
-                            disabled={isDeleting}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    
-                    <p className="text-xs text-gray-500 mb-1">{client.location?.address}</p>
-                    
-                    <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-                      <span>
-                        {client.created_at ? (
-                          (() => {
-                            try {
-                              const date = new Date(client.created_at)
-                              return isNaN(date.getTime()) ? 'Just now' : `Created ${formatDistanceToNow(date, { addSuffix: true })}`
-                            } catch {
-                              return 'Just now'
-                            }
-                          })()
-                        ) : 'Just now'}
-                      </span>
-                    </div>
+                  {/* Location */}
+                  <p className="text-sm text-gray-600 font-medium">{client.location?.address}</p>
+                  
+                  {/* Created time */}
+                  <div className="text-xs text-gray-400">
+                    {client.created_at ? (
+                      (() => {
+                        try {
+                          const date = new Date(client.created_at)
+                          return isNaN(date.getTime()) ? 'Just now' : `Created ${formatDistanceToNow(date, { addSuffix: true })}`
+                        } catch {
+                          return 'Just now'
+                        }
+                      })()
+                    ) : 'Just now'}
                   </div>
                 </div>
               </CardContent>

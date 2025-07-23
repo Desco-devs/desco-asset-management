@@ -26,7 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Search, Plus, Edit, Trash2, Filter } from "lucide-react"
+import { MoreHorizontal, Search, Plus, Edit, Trash2, Filter, Eye, X, ChevronLeft, ChevronRight, List } from "lucide-react"
 import { useProjects, useDeleteProject, useClients, useLocations } from '@/hooks/api/use-projects'
 import { useProjectsStore, useProjectModal, useProjectTable } from '@/stores/projects-store'
 import { formatDistanceToNow } from 'date-fns'
@@ -39,6 +39,9 @@ export function ProjectsTable() {
   const setProjectModal = useProjectsStore(state => state.setProjectModal)
   const setLocationModal = useProjectsStore(state => state.setLocationModal)
   const setClientModal = useProjectsStore(state => state.setClientModal)
+  const isMobile = useProjectsStore(state => state.isMobile)
+  const setIsMobile = useProjectsStore(state => state.setIsMobile)
+  const getEffectiveProjectItemsPerPage = useProjectsStore(state => state.getEffectiveProjectItemsPerPage)
   
   const { data: clients } = useClients()
   const { data: locations } = useLocations()
@@ -54,6 +57,17 @@ export function ProjectsTable() {
   const [projectToDelete, setProjectToDelete] = React.useState<Project | null>(null)
   
   const projectTable = useProjectTable()
+
+  // Mobile detection
+  React.useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkIsMobile()
+    window.addEventListener('resize', checkIsMobile)
+    return () => window.removeEventListener('resize', checkIsMobile)
+  }, [setIsMobile])
 
   // No longer need selectedClient since we show all projects
 
@@ -143,6 +157,26 @@ export function ProjectsTable() {
     })
   }, [filteredProjects, projectTable.sortBy, projectTable.sortOrder])
 
+  // Pagination logic
+  const paginationData = React.useMemo(() => {
+    const itemsPerPage = getEffectiveProjectItemsPerPage()
+    const startIndex = (projectTable.page - 1) * itemsPerPage
+    const paginatedProjects = sortedProjects.slice(startIndex, startIndex + itemsPerPage)
+    const totalPages = Math.ceil(sortedProjects.length / itemsPerPage)
+    
+    return {
+      paginatedProjects,
+      totalPages,
+      itemsPerPage,
+      currentPage: projectTable.page
+    }
+  }, [sortedProjects, projectTable.page, getEffectiveProjectItemsPerPage])
+
+  // Pagination handlers
+  const handlePageChange = (newPage: number) => {
+    setProjectTable({ page: newPage })
+  }
+
   if (error) {
     return (
       <div className="text-center py-8 text-red-600">
@@ -153,112 +187,246 @@ export function ProjectsTable() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col space-y-4">
-        <div>
-          <h2 className="text-2xl font-bold">All Projects</h2>
-          <p className="text-muted-foreground">
-            Manage all projects with their clients, locations, equipment & vehicles
-          </p>
-        </div>
-        
-        {/* Action Buttons Section - Mobile First */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button 
-            onClick={() => setProjectModal(true)}
-            className="gap-2 flex-1 sm:flex-none font-semibold"
-          >
-            <Plus className="h-4 w-4" />
-            Add Project
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setClientModal(true)}
-            className="gap-2 flex-1 sm:flex-none font-medium"
-          >
-            <Plus className="h-4 w-4" />
-            Add Client
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setLocationModal(true)}
-            className="gap-2 flex-1 sm:flex-none font-medium"
-          >
-            <Plus className="h-4 w-4" />
-            Add Location
-          </Button>
-        </div>
-      </div>
 
-      {/* Filters and Search */}
-      <div className="flex gap-4 items-center flex-wrap">
-        {/* Search */}
-        <div className="relative max-w-sm">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+      {/* Search, Filter & Sort Section */}
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search projects..."
+            placeholder="Search projects by name, client, location..."
             value={projectTable.search}
             onChange={(e) => handleSearch(e.target.value)}
-            className="pl-8"
+            className="pl-9 h-11"
           />
         </div>
 
-        {/* Location Filter */}
-        <div className="min-w-[180px]">
-          <Select value={locationFilter} onValueChange={(value) => {
-            setLocationFilter(value)
-            if (value !== 'all') {
-              setClientFilter('all') // Reset client filter when location changes
-            }
-          }}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by location" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations?.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.address}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Client Filter */}
-        <div className="min-w-[180px]">
-          <Select value={clientFilter} onValueChange={setClientFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by client" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Clients</SelectItem>
-              {(locationFilter === 'all' ? clients : filteredClientsForDropdown)?.map((client) => (
-                <SelectItem key={client.id} value={client.id}>
-                  {client.name}
-                  {locationFilter === 'all' && client.location && (
-                    <span className="text-muted-foreground ml-2">
-                      ({client.location.address})
-                    </span>
-                  )}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Clear Filters */}
-        {(locationFilter !== 'all' || clientFilter !== 'all') && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => {
-              setLocationFilter('all')
-              setClientFilter('all')
+        {/* Filter and Sort Buttons */}
+        <div className="flex gap-3">
+          <Select
+            value={(() => {
+              if (locationFilter !== 'all') return `location-${locationFilter}`;
+              if (clientFilter !== 'all') return `client-${clientFilter}`;
+              return "";
+            })()}
+            onValueChange={(value) => {
+              if (value === "clear-all") {
+                setLocationFilter('all');
+                setClientFilter('all');
+              }
+              // Location filters
+              else if (value.startsWith("location-")) {
+                const locationId = value.replace("location-", "");
+                setLocationFilter(locationId);
+                setClientFilter('all'); // Reset client filter
+              }
+              // Client filters
+              else if (value.startsWith("client-")) {
+                const clientId = value.replace("client-", "");
+                setClientFilter(clientId);
+                setLocationFilter('all'); // Reset location filter
+              }
             }}
           >
-            Clear Filters
-          </Button>
+            <SelectTrigger className="h-11 flex-1">
+              <Filter className="h-4 w-4 mr-2" />
+              <span>Filter</span>
+            </SelectTrigger>
+            <SelectContent className="w-80">
+              <div className="p-3 max-h-96 overflow-y-auto">
+                {/* Clear Filters */}
+                {(locationFilter !== 'all' || clientFilter !== 'all') && (
+                  <div className="mb-4">
+                    <SelectItem value="clear-all" className="text-red-600 font-medium">
+                      Clear All Filters
+                    </SelectItem>
+                  </div>
+                )}
+
+                {/* Location Filter */}
+                <div className="mb-4">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    Locations
+                  </div>
+                  <div className="space-y-1">
+                    {locations?.map((location) => (
+                      <SelectItem
+                        key={location.id}
+                        value={`location-${location.id}`}
+                      >
+                        {location.address}
+                      </SelectItem>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Client Filter */}
+                <div className="mb-4">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    Clients
+                  </div>
+                  <div className="space-y-1">
+                    {(locationFilter === 'all' ? clients : filteredClientsForDropdown)?.map((client) => (
+                      <SelectItem
+                        key={client.id}
+                        value={`client-${client.id}`}
+                      >
+                        {client.name}
+                        {locationFilter === 'all' && client.location && (
+                          <span className="text-muted-foreground ml-2">
+                            ({client.location.address})
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </SelectContent>
+          </Select>
+
+          {/* Sort Button */}
+          <Select
+            value={(() => {
+              if (!projectTable.sortBy) return "clear-sort";
+              
+              if (projectTable.sortBy === "created_at") {
+                return projectTable.sortOrder === "desc" ? "created_at" : "created_at_old";
+              }
+              if (projectTable.sortBy === "name") {
+                return projectTable.sortOrder === "asc" ? "name" : "name_desc";
+              }
+              
+              return projectTable.sortBy;
+            })()}
+            onValueChange={(value) => {
+              if (value === "clear-sort") {
+                handleSort('name'); // Reset to default
+                return;
+              }
+              
+              if (value === "created_at") {
+                setProjectTable({ sortBy: "created_at", sortOrder: "desc" });
+              } else if (value === "created_at_old") {
+                setProjectTable({ sortBy: "created_at", sortOrder: "asc" });
+              } else if (value === "name") {
+                setProjectTable({ sortBy: "name", sortOrder: "asc" });
+              } else if (value === "name_desc") {
+                setProjectTable({ sortBy: "name", sortOrder: "desc" });
+              }
+            }}
+          >
+            <SelectTrigger className="h-11 flex-1">
+              <List className="h-4 w-4 mr-2" />
+              <span>Sort</span>
+            </SelectTrigger>
+            <SelectContent>
+              <div className="p-1">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
+                  Most Recent
+                </div>
+                <SelectItem value="created_at">Newest Added</SelectItem>
+                <SelectItem value="created_at_old">Oldest Added</SelectItem>
+
+                <div className="border-t my-2"></div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
+                  Alphabetical
+                </div>
+                <SelectItem value="name">Project A-Z</SelectItem>
+                <SelectItem value="name_desc">Project Z-A</SelectItem>
+
+                <div className="border-t my-2"></div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
+                  Quick Actions
+                </div>
+                <SelectItem value="clear-sort">Clear Sort</SelectItem>
+              </div>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Active Filter Badges */}
+        {(locationFilter !== 'all' || clientFilter !== 'all' || projectTable.search || projectTable.sortBy) && (
+          <div className="flex flex-wrap gap-2">
+            {/* Sort Badge */}
+            {projectTable.sortBy && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                Sort: {(() => {
+                  if (projectTable.sortBy === "created_at")
+                    return projectTable.sortOrder === "desc" ? "Newest Added" : "Oldest Added";
+                  if (projectTable.sortBy === "name")
+                    return projectTable.sortOrder === "asc" ? "Project A-Z" : "Project Z-A";
+                  return projectTable.sortBy;
+                })()}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => setProjectTable({ sortBy: "", sortOrder: "asc" })}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+            {/* Search Badge */}
+            {projectTable.search && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                Search: "{projectTable.search}"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => handleSearch('')}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+
+            {/* Location Filter Badge */}
+            {locationFilter !== 'all' && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                Location: {locations?.find(l => l.id === locationFilter)?.address || locationFilter}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => setLocationFilter('all')}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+
+            {/* Client Filter Badge */}
+            {clientFilter !== 'all' && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                Client: {clients?.find(c => c.id === clientFilter)?.name || clientFilter}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
+                  onClick={() => setClientFilter('all')}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </Badge>
+            )}
+
+            {/* Clear All Badge */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setLocationFilter('all');
+                setClientFilter('all');
+                handleSearch('');
+                setProjectTable({ sortBy: "", sortOrder: "asc" });
+              }}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+            >
+              Clear All
+            </Button>
+          </div>
         )}
       </div>
 
@@ -303,14 +471,14 @@ export function ProjectsTable() {
                   Loading projects...
                 </TableCell>
               </TableRow>
-            ) : sortedProjects.length === 0 ? (
+            ) : paginationData.paginatedProjects.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8">
                   {projectTable.search ? 'No projects found' : 'No projects yet'}
                 </TableCell>
               </TableRow>
             ) : (
-              sortedProjects.map((project, index) => (
+              paginationData.paginatedProjects.map((project, index) => (
                 <TableRow key={project.id || `project-${index}`}>
                   <TableCell className="font-medium">
                     {project.name}
@@ -410,92 +578,67 @@ export function ProjectsTable() {
               </CardContent>
             </Card>
           ))
-        ) : sortedProjects.length === 0 ? (
+        ) : paginationData.paginatedProjects.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
               {projectTable.search ? 'No projects found' : 'No projects yet'}
             </CardContent>
           </Card>
         ) : (
-          sortedProjects.map((project, index) => (
+          paginationData.paginatedProjects.map((project, index) => (
             <Card 
               key={project.id || `project-${index}`} 
               className="cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-[1.02]"
             >
               <CardContent className="p-4">
                 <div className="flex flex-col space-y-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-sm">{project.name}</h3>
-                        <Badge 
-                          variant="outline"
-                          className="text-xs"
-                        >
-                          {project.equipments?.length || 0} equipment
-                        </Badge>
-                        <Badge 
-                          variant="outline"
-                          className="text-xs"
-                        >
-                          {project.vehicles?.length || 0} vehicles
-                        </Badge>
-                      </div>
-                      {/* Action Menu */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleEdit(project)
-                            }}
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-red-600"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleDelete(project)
-                            }}
-                            disabled={isDeleting}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                  {/* Header with title and eye icon */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base leading-tight">{project.name}</h3>
                     </div>
-                    
-                    <p className="text-xs text-gray-500 mb-1">{project.client?.name}</p>
-                    {project.client?.location?.address && (
-                      <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
-                        📍 {project.client.location.address}
-                      </p>
-                    )}
-                    
-                    <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-                      <span>
-                        {project.created_at ? (
-                          (() => {
-                            try {
-                              const date = new Date(project.created_at)
-                              return isNaN(date.getTime()) ? 'Just now' : formatDistanceToNow(date, { addSuffix: true })
-                            } catch {
-                              return 'Just now'
-                            }
-                          })()
-                        ) : 'Just now'}
-                      </span>
-                    </div>
+                    {/* Eye icon - Visual indicator for clickable card */}
+                    <Eye className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  </div>
+
+                  {/* Equipment and Vehicle badges */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge 
+                      variant="outline"
+                      className="text-xs"
+                    >
+                      {project.equipments?.length || 0} equipment
+                    </Badge>
+                    <Badge 
+                      variant="outline"
+                      className="text-xs"
+                    >
+                      {project.vehicles?.length || 0} vehicles
+                    </Badge>
+                  </div>
+                  
+                  {/* Client name */}
+                  <p className="text-sm text-gray-600 font-medium">{project.client?.name}</p>
+                  
+                  {/* Location */}
+                  {project.client?.location?.address && (
+                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                      📍 {project.client.location.address}
+                    </p>
+                  )}
+                  
+                  {/* Created time */}
+                  <div className="text-xs text-gray-400">
+                    {project.created_at ? (
+                      (() => {
+                        try {
+                          const date = new Date(project.created_at)
+                          return isNaN(date.getTime()) ? 'Just now' : formatDistanceToNow(date, { addSuffix: true })
+                        } catch {
+                          return 'Just now'
+                        }
+                      })()
+                    ) : 'Just now'}
                   </div>
                 </div>
               </CardContent>
@@ -504,13 +647,56 @@ export function ProjectsTable() {
         )}
       </div>
 
+      {/* Mobile-Optimized Pagination */}
+      {paginationData.totalPages > 1 && (
+        <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(paginationData.currentPage - 1)}
+            disabled={paginationData.currentPage === 1}
+            className="gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Previous</span>
+            <span className="sm:hidden">Prev</span>
+          </Button>
+
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="font-mono">
+              {paginationData.currentPage}/{paginationData.totalPages}
+            </Badge>
+            <span className="text-xs text-muted-foreground hidden sm:block">
+              of {sortedProjects.length} projects
+            </span>
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(paginationData.currentPage + 1)}
+            disabled={paginationData.currentPage === paginationData.totalPages}
+            className="gap-1"
+          >
+            <span className="hidden sm:inline">Next</span>
+            <span className="sm:hidden">Next</span>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       {/* Results count */}
       {projects && (
         <div className="text-sm text-muted-foreground">
-          Showing {sortedProjects.length} of {projects.length} projects
-          {(locationFilter !== 'all' || clientFilter !== 'all' || projectTable.search) && (
+          Showing {paginationData.paginatedProjects.length} of {sortedProjects.length} projects
+          {sortedProjects.length < projects.length && (
             <span className="ml-2">
-              (filtered)
+              (filtered from {projects.length} total)
+            </span>
+          )}
+          {paginationData.totalPages > 1 && (
+            <span className="ml-2">
+              • Page {paginationData.currentPage} of {paginationData.totalPages}
             </span>
           )}
         </div>
