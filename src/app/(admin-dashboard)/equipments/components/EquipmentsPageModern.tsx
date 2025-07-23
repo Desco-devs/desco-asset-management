@@ -18,6 +18,8 @@ import {
   selectIsMobile,
   selectIsModalOpen,
   selectViewerImage,
+  selectSelectedEquipment,
+  selectIsEquipmentMaintenanceModalOpen,
   useEquipmentsStore,
 } from "@/stores/equipmentsStore";
 import { Download, Loader2, X, Trash2 } from "lucide-react";
@@ -27,6 +29,7 @@ import EquipmentsListModern from "./EquipmentsListModern";
 import CreateEquipmentModalModern from "./modals/CreateEquipmentModalModern";
 import EditEquipmentModalModern from "./modals/EditEquipmentModalModern";
 import EquipmentModalModern from "./modals/EquipmentModalModern";
+import CreateEquipmentMaintenanceReportModal from "./modals/CreateEquipmentMaintenanceReportModal";
 
 export default function EquipmentsPageModern() {
   // Client state from Zustand (using optimized selectors)
@@ -36,6 +39,8 @@ export default function EquipmentsPageModern() {
   const viewerImage = useEquipmentsStore(selectViewerImage);
   const isMobile = useEquipmentsStore(selectIsMobile);
   const deleteConfirmation = useEquipmentsStore(selectDeleteConfirmation);
+  const selectedEquipment = useEquipmentsStore(selectSelectedEquipment);
+  const isEquipmentMaintenanceModalOpen = useEquipmentsStore(selectIsEquipmentMaintenanceModalOpen);
 
   // Actions
   const {
@@ -268,7 +273,10 @@ export default function EquipmentsPageModern() {
       {/* Edit Equipment Modal */}
       {isEditMode && <EditEquipmentModalModern />}
 
-      {/* Maintenance Modal will be added in future iteration */}
+      {/* Equipment Maintenance Report Modal */}
+      {isEquipmentMaintenanceModalOpen && selectedEquipment && (
+        <CreateEquipmentMaintenanceReportModal equipmentId={selectedEquipment.uid} />
+      )}
 
       {/* Global Image Viewer Modal - Always available */}
       <ImageViewerModal />

@@ -12,6 +12,7 @@ import {
   Drawer,
   DrawerClose,
   DrawerContent,
+  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
@@ -87,7 +88,7 @@ export default function CreateEquipmentMaintenanceReportModal({
       parts_replaced: [""],
       attachment_urls: [""],
     });
-    // Reopen the detail drawer
+    // Reopen detail drawer
     setIsModalOpen(true);
   };
 
@@ -156,25 +157,7 @@ export default function CreateEquipmentMaintenanceReportModal({
 
     try {
       await createMaintenanceReportMutation.mutateAsync(reportData);
-      setIsEquipmentMaintenanceModalOpen(false);
-      // Reset all states
-      setActiveTab('details');
-      setPartsFiles([]);
-      setAttachmentFiles([]);
-      setFormData({
-        issue_description: "",
-        remarks: "",
-        inspection_details: "",
-        action_taken: "",
-        priority: "MEDIUM",
-        status: "REPORTED",
-        downtime_hours: "",
-        location_id: "",
-        parts_replaced: [""],
-        attachment_urls: [""],
-      });
-      // Reopen the detail drawer
-      setIsModalOpen(true);
+      handleClose();
     } catch (error) {
       console.error("Error creating maintenance report:", error);
     }
@@ -552,59 +535,66 @@ export default function CreateEquipmentMaintenanceReportModal({
           </div>
         )}
 
-        {/* Submit Buttons - Fixed at bottom */}
-        <div className="flex justify-end gap-3 pt-6 border-t bg-background">
-          <Button type="button" variant="outline" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={createMaintenanceReportMutation.isPending}
-          >
-            {createMaintenanceReportMutation.isPending ? "Creating..." : "Create Report"}
-          </Button>
-        </div>
+        {/* Submit Buttons - Desktop only (mobile has drawer footer) */}
+        {!isMobile && (
+          <div className="flex justify-end gap-3 pt-6 border-t bg-background">
+            <Button type="button" variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={createMaintenanceReportMutation.isPending}
+            >
+              {createMaintenanceReportMutation.isPending ? "Creating..." : "Create Report"}
+            </Button>
+          </div>
+        )}
       </div>
   );
 
-  // Mobile drawer implementation
+  // Use responsive pattern: Drawer for mobile, Dialog for desktop
   if (isMobile) {
     return (
       <Drawer open={isOpen} onOpenChange={handleClose}>
         <DrawerContent className="!max-h-[95vh]">
           <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
             <DrawerClose asChild>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="absolute right-4 top-4 rounded-full h-8 w-8 p-0"
-              >
+              <Button variant="ghost" size="sm" className="absolute right-4 top-4 rounded-full h-8 w-8 p-0">
                 <X className="h-4 w-4" />
               </Button>
             </DrawerClose>
-            <div className="text-center space-y-2">
-              <DrawerTitle className="text-xl font-bold">
-                Create Maintenance Report
-              </DrawerTitle>
-              <p className="text-sm text-muted-foreground">
-                Add a new maintenance report for this equipment
-              </p>
-            </div>
+            <DrawerTitle className="text-xl font-bold">
+              Create Equipment Maintenance Report
+            </DrawerTitle>
           </DrawerHeader>
-          
           <div className="flex-1 overflow-y-auto p-4">
             <FormContent />
           </div>
+          <DrawerFooter className="p-4 pt-2 border-t bg-background">
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={createMaintenanceReportMutation.isPending}
+                className="flex-1"
+              >
+                {createMaintenanceReportMutation.isPending ? "Creating..." : "Create Report"}
+              </Button>
+            </div>
+          </DrawerFooter>
         </DrawerContent>
       </Drawer>
     );
   }
 
-  // Desktop dialog implementation
+  // Desktop: Use Dialog
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto !z-[100]">
         <DialogHeader>
           <DialogTitle>Create Equipment Maintenance Report</DialogTitle>
         </DialogHeader>

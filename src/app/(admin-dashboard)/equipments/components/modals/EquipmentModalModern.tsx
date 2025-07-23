@@ -41,7 +41,6 @@ import {
   ChevronUp,
   Edit,
   Eye,
-  ExternalLink,
   FileText,
   Hash,
   Loader2,
@@ -199,20 +198,6 @@ export default function EquipmentModalModern() {
                   <Eye className="h-6 w-6 text-white" />
                 </div>
               </div>
-            </div>
-            
-            <div className="flex gap-2 justify-center">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                asChild
-              >
-                <a href={url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4 mr-1" />
-                  View
-                </a>
-              </Button>
             </div>
           </div>
         </div>
@@ -631,6 +616,12 @@ export default function EquipmentModalModern() {
       {/* Parts Tab */}
       {activeTab === 'parts' && (
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold">Equipment Parts</h3>
+            <p className="text-sm text-muted-foreground">
+              View and browse parts documentation organized in folders.
+            </p>
+          </div>
           <EquipmentPartsViewer equipmentParts={selectedEquipment.equipmentParts} />
         </div>
       )}

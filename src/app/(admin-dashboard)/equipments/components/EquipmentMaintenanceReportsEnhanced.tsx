@@ -25,7 +25,6 @@ import {
   User,
   Wrench,
 } from "lucide-react";
-import CreateEquipmentMaintenanceReportModal from "./modals/CreateEquipmentMaintenanceReportModal";
 import EditEquipmentMaintenanceReportModal from "./modals/EditEquipmentMaintenanceReportModal";
 
 interface EquipmentMaintenanceReportsEnhancedProps {
@@ -344,9 +343,6 @@ export default function EquipmentMaintenanceReportsEnhanced({
           </div>
         )}
       </div>
-
-      {/* Create Modal */}
-      <CreateEquipmentMaintenanceReportModal equipmentId={equipmentId} />
 
       {/* Edit Modal */}
       <EditEquipmentMaintenanceReportModal />
