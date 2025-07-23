@@ -42,6 +42,7 @@ import {
 import { useEffect } from "react";
 import ErrorState from "./ui/ErrorState";
 import LoadingSkeleton from "./ui/LoadingSkeleton";
+import ExportDialog from "./ExportDialog";
 
 export default function EquipmentsListModern() {
   // TanStack Query - Server state
@@ -60,6 +61,7 @@ export default function EquipmentsListModern() {
   const filterOwner = useEquipmentsStore(selectFilterOwner);
   const filterMaintenance = useEquipmentsStore(selectFilterMaintenance);
   const isMobile = useEquipmentsStore(selectIsMobile);
+  const isExportModalOpen = useEquipmentsStore((state) => state.isExportModalOpen);
 
   // Get store functions once
   const getFilteredEquipments = useEquipmentsStore(
@@ -858,6 +860,18 @@ export default function EquipmentsListModern() {
           </Button>
         </div>
       )}
+
+      {/* Export Dialog */}
+      <ExportDialog
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        equipments={equipments.map((e) => ({
+          id: e.uid,
+          brand: e.brand,
+          model: e.model,
+          plate_number: e.plateNumber
+        }))}
+      />
     </div>
   );
 }

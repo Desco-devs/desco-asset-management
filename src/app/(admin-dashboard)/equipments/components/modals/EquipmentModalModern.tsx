@@ -39,6 +39,7 @@ import {
   ChevronDown,
   ChevronUp,
   Edit,
+  Eye,
   ExternalLink,
   FileText,
   Loader2,
@@ -70,6 +71,9 @@ export default function EquipmentModalModern() {
 
   // Custom tab state
   const [activeTab, setActiveTab] = useState<"details" | "maintenance" | "parts">("details");
+  const [viewerImage, setViewerImage] = useState<{ url: string; title: string } | null>(null);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [viewerImageData, setViewerImageData] = useState<{ url: string; title: string } | null>(null);
 
   // Actions
   const {

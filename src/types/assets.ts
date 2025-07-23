@@ -66,7 +66,7 @@ export interface Client {
   location: {
     uid: string;
     address: string;
-  };
+  } | null;
 }
 
 export interface Location {
@@ -111,4 +111,78 @@ export interface AssetsClientViewerProps {
   initialProjects: Project[];
   totalEquipmentCount: number;
   totalVehicleCount: number;
+}
+
+export interface AssetsPageData {
+  equipment: EquipmentWithRelations[];
+  vehicles: VehicleWithRelations[];
+  locations: Location[];
+  clients: Client[];
+  projects: Project[];
+  equipmentCount: number;
+  vehicleCount: number;
+}
+
+export interface EquipmentWithRelations {
+  id: string;
+  brand: string;
+  model: string;
+  type: string;
+  status: "OPERATIONAL" | "NON_OPERATIONAL";
+  serialNumber?: string;
+  category?: string;
+  owner: string;
+  createdAt: string;
+  updatedAt: string;
+  project?: {
+    id: string;
+    name: string;
+    createdAt: string;
+    updatedAt: string;
+    client?: {
+      id: string;
+      name: string;
+      createdAt: string;
+      updatedAt: string;
+      location?: {
+        id: string;
+        address: string;
+        createdAt: string;
+        updatedAt: string;
+      } | null;
+    } | null;
+  } | null;
+}
+
+export interface VehicleWithRelations {
+  id: string;
+  make?: string;
+  brand: string;
+  model: string;
+  category?: string;
+  type: string;
+  licensePlate?: string;
+  plate_number: string;
+  status: "OPERATIONAL" | "NON_OPERATIONAL";
+  owner: string;
+  createdAt: string;
+  updatedAt: string;
+  project?: {
+    id: string;
+    name: string;
+    createdAt: string;
+    updatedAt: string;
+    client?: {
+      id: string;
+      name: string;
+      createdAt: string;
+      updatedAt: string;
+      location?: {
+        id: string;
+        address: string;
+        createdAt: string;
+        updatedAt: string;
+      } | null;
+    } | null;
+  } | null;
 }

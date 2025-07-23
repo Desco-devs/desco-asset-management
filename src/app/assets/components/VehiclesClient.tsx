@@ -13,76 +13,75 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
-import { filterVehicles, hasActiveFilters } from "@/components/assets/utils/filterUtils";
-import { useFilterState } from "@/hooks/assets/useFilterState";
-import { useServerPagination } from "@/hooks/useServerPagination";
-import type { Vehicle, Client, Location, Project } from "@/types/assets";
+import type { Client, Location, Project } from "@/types/assets";
 import { useMemo, useState } from "react";
+import { useAssetsStore } from "../stores/assetsStore";
+import { useVehiclesList } from "../hooks/useAssetsQueries";
 
 interface VehicleClientViewerProps {
-  vehicles: Vehicle[];
   clients: Client[];
   locations: Location[];
   projects: Project[];
-  newItemIds: Set<string>;
   totalVehicleCount: number;
 }
 
 export default function VehicleClientViewer({
-  vehicles,
   clients,
   locations,
   projects,
-  newItemIds,
   totalVehicleCount,
 }: VehicleClientViewerProps) {
-  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Filter state management
-  const { filterState, updateFilter, clearFilters } = useFilterState();
-
-  // Filter vehicles based on selected filters and search query
-  const filteredVehicles = useMemo(() => {
-    return filterVehicles(vehicles, filterState);
-  }, [vehicles, filterState]);
-
-  // Server-side pagination hook
+  // Zustand store for client state
   const {
-    data: paginatedVehicles,
-    loading: paginationLoading,
-    currentPage,
-    totalPages,
-    hasNextPage,
-    hasPreviousPage,
-    goToPage,
-    nextPage,
-    previousPage,
-  } = useServerPagination<Vehicle>({
-    initialData: filteredVehicles,
-    totalCount: totalVehicleCount,
-    itemsPerPage: 12,
-    apiEndpoint: "/api/vehicles/paginated",
-    externalData: filteredVehicles,
-  });
+    filters,
+    setFilters,
+    resetFilters,
+    hasActiveFilters,
+    getFilteredParams,
+    ui: { currentPage, newItemIds },
+    setCurrentPage,
+  } = useAssetsStore();
+
+  // TanStack Query for server state
+  const {
+    data: vehicleData,
+    isLoading,
+    isFetching,
+    error,
+  } = useVehiclesList(getFilteredParams(), currentPage);
 
   // Get projects filtered by selected client and location
   const availableProjects = useMemo(() => {
     return projects.filter((project) => {
       const matchesClient =
-        filterState.selectedClient === "all" ||
-        project.client.uid === filterState.selectedClient;
+        filters.clientId === "" ||
+        project.client.uid === filters.clientId;
       const projectClient = clients.find((c) => c.uid === project.client.uid);
       const matchesLocation =
-        filterState.selectedLocation === "all" ||
-        (projectClient && projectClient.location.uid === filterState.selectedLocation);
+        filters.locationId === "" ||
+        (projectClient && projectClient.location.uid === filters.locationId);
 
       return matchesClient && matchesLocation;
     });
-  }, [projects, clients, filterState.selectedClient, filterState.selectedLocation]);
+  }, [projects, clients, filters.clientId, filters.locationId]);
 
-  // Check if any filters are active
-  const activeFilters = hasActiveFilters(filterState);
+  // Vehicle data with fallbacks
+  const vehicles = vehicleData?.vehicles || [];
+  const totalPages = vehicleData?.totalPages || 1;
+  const totalCount = vehicleData?.totalCount || totalVehicleCount;
+
+  // Handle filter changes
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters({ [key]: value });
+  };
+
+  // Handle pagination
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   return (
     <div className="space-y-6">
@@ -91,27 +90,80 @@ export default function VehicleClientViewer({
         clients={clients}
         locations={locations}
         projects={availableProjects}
-        filterState={filterState}
-        onFilterChange={updateFilter}
-        onClearFilters={clearFilters}
-        hasActiveFilters={activeFilters}
-        resultsCount={filteredVehicles.length}
-        totalCount={totalVehicleCount}
+        filterState={{
+          searchQuery: filters.search,
+          selectedLocation: filters.locationId || "all",
+          selectedClient: filters.clientId || "all",
+          selectedProject: filters.projectId || "all",
+          selectedStatus: filters.status,
+        }}
+        onFilterChange={handleFilterChange}
+        onClearFilters={resetFilters}
+        hasActiveFilters={hasActiveFilters()}
+        resultsCount={vehicles.length}
+        totalCount={totalCount}
       />
 
       {/* Vehicle Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {paginationLoading ? (
+        {isLoading || isFetching ? (
           // Show skeleton cards while loading
           Array.from({ length: 12 }).map((_, index) => (
             <VehicleCardSkeleton key={`skeleton-${index}`} />
           ))
         ) : (
-          paginatedVehicles.map((vehicle, index) => (
+          vehicles.map((vehicle, index) => (
             <VehicleCard
-              key={vehicle.uid || `vehicle-${index}`}
-              vehicle={vehicle}
-              isNew={newItemIds.has(vehicle.uid)}
+              key={vehicle.id || `vehicle-${index}`}
+              vehicle={{
+                uid: vehicle.id,
+                brand: vehicle.make || "Unknown",
+                model: vehicle.model || "Unknown Model",
+                type: vehicle.category || "Unknown Type",
+                plateNumber: vehicle.licensePlate || "",
+                status: vehicle.status,
+                owner: "Unknown Owner",
+                project: vehicle.project
+                  ? {
+                      uid: vehicle.project.id,
+                      name: vehicle.project.name,
+                      client: vehicle.project.client
+                        ? {
+                            uid: vehicle.project.client.id,
+                            name: vehicle.project.client.name,
+                            location: vehicle.project.client.location
+                              ? {
+                                  uid: vehicle.project.client.location.id,
+                                  address: vehicle.project.client.location.name,
+                                }
+                              : {
+                                  uid: "unknown",
+                                  address: "Unknown Location",
+                                },
+                          }
+                        : {
+                            uid: "unknown",
+                            name: "Unknown Client",
+                            location: {
+                              uid: "unknown",
+                              address: "Unknown Location",
+                            },
+                          },
+                    }
+                  : {
+                      uid: "unknown",
+                      name: "Unknown Project",
+                      client: {
+                        uid: "unknown",
+                        name: "Unknown Client",
+                        location: {
+                          uid: "unknown",
+                          address: "Unknown Location",
+                        },
+                      },
+                    },
+              }}
+              isNew={newItemIds.has(vehicle.id)}
               onClick={() => {
                 setSelectedVehicle(vehicle);
                 setIsModalOpen(true);
@@ -121,28 +173,37 @@ export default function VehicleClientViewer({
         )}
       </div>
 
-      {filteredVehicles.length === 0 && (
+      {vehicles.length === 0 && !isLoading && (
         <div className="p-8">
           <div className="text-center text-muted-foreground">
             <p className="text-lg font-medium mb-2">No vehicles found</p>
             <p className="text-sm">
-              {filterState.searchQuery
-                ? `No vehicles match your search "${filterState.searchQuery}"`
+              {filters.search
+                ? `No vehicles match your search "${filters.search}"`
                 : "No vehicles available to display"}
             </p>
           </div>
         </div>
       )}
 
+      {error && (
+        <div className="p-8">
+          <div className="text-center text-destructive">
+            <p className="text-lg font-medium mb-2">Error loading vehicles</p>
+            <p className="text-sm">Please try again later.</p>
+          </div>
+        </div>
+      )}
+
       {/* Pagination */}
-      {totalVehicleCount > 0 && totalPages > 1 && (
+      {totalCount > 0 && totalPages > 1 && (
         <div className="flex flex-col items-center gap-4">
           <Pagination>
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious 
-                  onClick={() => previousPage()}
-                  className={!hasPreviousPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                 />
               </PaginationItem>
               
@@ -155,7 +216,7 @@ export default function VehicleClientViewer({
                   return (
                     <PaginationItem key={page}>
                       <PaginationLink
-                        onClick={() => goToPage(page)}
+                        onClick={() => handlePageChange(page)}
                         isActive={currentPage === page}
                         className="cursor-pointer"
                       >
@@ -178,8 +239,8 @@ export default function VehicleClientViewer({
               
               <PaginationItem>
                 <PaginationNext 
-                  onClick={() => nextPage()}
-                  className={!hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  className={currentPage >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                 />
               </PaginationItem>
             </PaginationContent>
@@ -187,8 +248,8 @@ export default function VehicleClientViewer({
           
           <div className="text-sm text-muted-foreground">
             Showing {(currentPage - 1) * 12 + 1} to{" "}
-            {Math.min(currentPage * 12, totalVehicleCount)} of{" "}
-            {totalVehicleCount} results
+            {Math.min(currentPage * 12, totalCount)} of{" "}
+            {totalCount} results
           </div>
         </div>
       )}

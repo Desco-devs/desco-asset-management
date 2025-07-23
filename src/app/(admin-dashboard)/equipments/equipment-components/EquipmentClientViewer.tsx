@@ -154,7 +154,7 @@ export default function EquipmentClientViewer({
       );
       const matchesLocation =
         filterState.selectedLocation === "all" ||
-        (projectClient &&
+        (projectClient && projectClient.location &&
           projectClient.location.uid === filterState.selectedLocation);
 
       return matchesClient && matchesLocation;
@@ -451,9 +451,12 @@ export default function EquipmentClientViewer({
                       client: {
                         uid: client.uid,
                         name: client.name,
-                        location: {
+                        location: client.location ? {
                           uid: client.location.uid,
                           address: client.location.address,
+                        } : {
+                          uid: "unknown-location-id",
+                          address: "Unknown Location",
                         },
                       },
                     }

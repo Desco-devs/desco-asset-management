@@ -5,10 +5,6 @@ import EquipmentCard from "@/components/assets/cards/EquipmentCard";
 import EquipmentCardSkeleton from "@/components/assets/cards/EquipmentCardSkeleton";
 import SharedFilters from "@/components/assets/filters/SharedFilters";
 import {
-  filterEquipment,
-  hasActiveFilters,
-} from "@/components/assets/utils/filterUtils";
-import {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
@@ -17,84 +13,81 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { useFilterState } from "@/hooks/assets/useFilterState";
-import { useServerPagination } from "@/hooks/useServerPagination";
-import type { Client, Equipment, Location, Project } from "@/types/assets";
+import type { Client, Location, Project } from "@/types/assets";
 import { useMemo, useState } from "react";
+import { useAssetsStore } from "../stores/assetsStore";
+import { useEquipmentList } from "../hooks/useAssetsQueries";
 
 interface EquipmentClientViewerProps {
-  equipment: Equipment[];
   clients: Client[];
   locations: Location[];
   projects: Project[];
-  newItemIds: Set<string>;
   totalEquipmentCount: number;
 }
 
 export default function EquipmentClientViewer({
-  equipment,
   clients,
   locations,
   projects,
-  newItemIds,
   totalEquipmentCount,
 }: EquipmentClientViewerProps) {
-  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(
-    null
-  );
+  const [selectedEquipment, setSelectedEquipment] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Filter state management
-  const { filterState, updateFilter, clearFilters } = useFilterState();
-
-  // Filter equipment based on selected filters and search query
-  const filteredEquipment = useMemo(() => {
-    const filtered = filterEquipment(equipment, filterState);
-    return filtered;
-  }, [equipment, filterState]);
-
-  // Server-side pagination hook
+  // Zustand store for client state
   const {
-    data: paginatedEquipment,
-    loading: paginationLoading,
-    currentPage,
-    totalPages,
-    hasNextPage,
-    hasPreviousPage,
-    goToPage,
-    nextPage,
-    previousPage,
-  } = useServerPagination<Equipment>({
-    initialData: filteredEquipment,
-    totalCount: totalEquipmentCount,
-    itemsPerPage: 12,
-    apiEndpoint: "/api/equipments/paginated",
-    externalData: filteredEquipment,
-  });
+    filters,
+    setFilters,
+    resetFilters,
+    hasActiveFilters,
+    getFilteredParams,
+    ui: { currentPage, newItemIds },
+    setCurrentPage,
+  } = useAssetsStore();
+
+  // TanStack Query for server state
+  const {
+    data: equipmentData,
+    isLoading,
+    isFetching,
+    error,
+  } = useEquipmentList(getFilteredParams(), currentPage);
 
   // Get projects filtered by selected client and location
   const availableProjects = useMemo(() => {
     return projects.filter((project) => {
       const matchesClient =
-        filterState.selectedClient === "all" ||
-        project.client.uid === filterState.selectedClient;
+        filters.clientId === "" ||
+        project.client.uid === filters.clientId;
       const projectClient = clients.find((c) => c.uid === project.client.uid);
       const matchesLocation =
-        filterState.selectedLocation === "all" ||
+        filters.locationId === "" ||
         (projectClient &&
-          projectClient.location.uid === filterState.selectedLocation);
+          projectClient.location.uid === filters.locationId);
 
       return matchesClient && matchesLocation;
     });
   }, [
     projects,
     clients,
-    filterState.selectedClient,
-    filterState.selectedLocation,
+    filters.clientId,
+    filters.locationId,
   ]);
 
-  // Check if any filters are active
-  const activeFilters = hasActiveFilters(filterState);
+  // Equipment data with fallbacks
+  const equipment = equipmentData?.equipment || [];
+  const totalPages = equipmentData?.totalPages || 1;
+  const totalCount = equipmentData?.totalCount || totalEquipmentCount;
+
+  // Handle filter changes
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters({ [key]: value });
+  };
+
+  // Handle pagination
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   return (
     <div className="space-y-6">
@@ -103,27 +96,79 @@ export default function EquipmentClientViewer({
         clients={clients}
         locations={locations}
         projects={availableProjects}
-        filterState={filterState}
-        onFilterChange={updateFilter}
-        onClearFilters={clearFilters}
-        hasActiveFilters={activeFilters}
-        resultsCount={filteredEquipment.length}
-        totalCount={totalEquipmentCount}
+        filterState={{
+          searchQuery: filters.search,
+          selectedLocation: filters.locationId || "all",
+          selectedClient: filters.clientId || "all",
+          selectedProject: filters.projectId || "all",
+          selectedStatus: filters.status,
+        }}
+        onFilterChange={handleFilterChange}
+        onClearFilters={resetFilters}
+        hasActiveFilters={hasActiveFilters()}
+        resultsCount={equipment.length}
+        totalCount={totalCount}
       />
 
       {/* Equipment Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {paginationLoading ? (
+        {isLoading || isFetching ? (
           // Show skeleton cards while loading
           Array.from({ length: 12 }).map((_, index) => (
             <EquipmentCardSkeleton key={`skeleton-${index}`} />
           ))
         ) : (
-          paginatedEquipment.map((item, index) => (
+          equipment.map((item, index) => (
             <EquipmentCard
-              key={item.uid || `equipment-${index}`}
-              equipment={item}
-              isNew={newItemIds.has(item.uid)}
+              key={item.id || `equipment-${index}`}
+              equipment={{
+                uid: item.id,
+                brand: item.serialNumber || "Unknown",
+                model: item.model || "Unknown Model",
+                type: item.category || "Unknown Type",
+                status: item.status,
+                owner: "Unknown Owner",
+                project: item.project
+                  ? {
+                      uid: item.project.id,
+                      name: item.project.name,
+                      client: item.project.client
+                        ? {
+                            uid: item.project.client.id,
+                            name: item.project.client.name,
+                            location: item.project.client.location
+                              ? {
+                                  uid: item.project.client.location.id,
+                                  address: item.project.client.location.name,
+                                }
+                              : {
+                                  uid: "unknown",
+                                  address: "Unknown Location",
+                                },
+                          }
+                        : {
+                            uid: "unknown",
+                            name: "Unknown Client",
+                            location: {
+                              uid: "unknown",
+                              address: "Unknown Location",
+                            },
+                          },
+                    }
+                  : {
+                      uid: "unknown",
+                      name: "Unknown Project",
+                      client: {
+                        uid: "unknown",
+                        name: "Unknown Client",
+                        location: {
+                          uid: "unknown",
+                          address: "Unknown Location",
+                        },
+                      },
+                    },
+              }}
+              isNew={newItemIds.has(item.id)}
               reportCount={0}
               onClick={() => {
                 setSelectedEquipment(item);
@@ -134,29 +179,38 @@ export default function EquipmentClientViewer({
         )}
       </div>
 
-      {filteredEquipment.length === 0 && (
+      {equipment.length === 0 && !isLoading && (
         <div className="p-8">
           <div className="text-center text-muted-foreground">
             <p className="text-lg font-medium mb-2">No equipment found</p>
             <p className="text-sm">
-              {filterState.searchQuery
-                ? `No equipment matches your search "${filterState.searchQuery}"`
+              {filters.search
+                ? `No equipment matches your search "${filters.search}"`
                 : "No equipment available to display"}
             </p>
           </div>
         </div>
       )}
 
+      {error && (
+        <div className="p-8">
+          <div className="text-center text-destructive">
+            <p className="text-lg font-medium mb-2">Error loading equipment</p>
+            <p className="text-sm">Please try again later.</p>
+          </div>
+        </div>
+      )}
+
       {/* Pagination */}
-      {totalEquipmentCount > 0 && totalPages > 1 && (
+      {totalCount > 0 && totalPages > 1 && (
         <div className="flex flex-col items-center gap-4">
           <Pagination>
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
-                  onClick={() => previousPage()}
+                  onClick={() => handlePageChange(currentPage - 1)}
                   className={
-                    !hasPreviousPage
+                    currentPage <= 1
                       ? "pointer-events-none opacity-50"
                       : "cursor-pointer"
                   }
@@ -173,7 +227,7 @@ export default function EquipmentClientViewer({
                     return (
                       <PaginationItem key={page}>
                         <PaginationLink
-                          onClick={() => goToPage(page)}
+                          onClick={() => handlePageChange(page)}
                           isActive={currentPage === page}
                           className="cursor-pointer"
                         >
@@ -197,9 +251,9 @@ export default function EquipmentClientViewer({
 
               <PaginationItem>
                 <PaginationNext
-                  onClick={() => nextPage()}
+                  onClick={() => handlePageChange(currentPage + 1)}
                   className={
-                    !hasNextPage
+                    currentPage >= totalPages
                       ? "pointer-events-none opacity-50"
                       : "cursor-pointer"
                   }
@@ -210,8 +264,8 @@ export default function EquipmentClientViewer({
 
           <div className="text-sm text-muted-foreground">
             Showing {(currentPage - 1) * 12 + 1} to{" "}
-            {Math.min(currentPage * 12, totalEquipmentCount)} of{" "}
-            {totalEquipmentCount} results
+            {Math.min(currentPage * 12, totalCount)} of{" "}
+            {totalCount} results
           </div>
         </div>
       )}
