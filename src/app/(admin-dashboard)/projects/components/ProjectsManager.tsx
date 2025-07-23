@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { Suspense } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LocationsTable } from './tables/LocationsTable'
 import { ClientsTable } from './tables/ClientsTable'
@@ -8,6 +8,7 @@ import { ProjectsTable } from './tables/ProjectsTable'
 import { LocationModal } from './modals/LocationModal'
 import { ClientModal } from './modals/ClientModal'
 import { ProjectModal } from './modals/ProjectModal'
+import { TableSkeleton } from './TableSkeleton'
 import { useProjectsStore } from '@/stores/projects-store'
 import { useProjectsRealtime } from '@/hooks/api/use-projects-realtime'
 
@@ -28,23 +29,31 @@ export function ProjectsManager() {
       </div>
 
       {/* Tabbed Interface */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="locations">Locations</TabsTrigger>
-          <TabsTrigger value="clients">Clients</TabsTrigger>
-          <TabsTrigger value="projects">Projects</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3">
+        <div className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="locations">Locations</TabsTrigger>
+            <TabsTrigger value="clients">Clients</TabsTrigger>
+            <TabsTrigger value="projects">Projects</TabsTrigger>
+          </TabsList>
+        </div>
         
         <TabsContent value="locations" className="space-y-4">
-          <LocationsTable onSelectLocation={() => {}} selectedLocationId={null} />
+          <Suspense fallback={<TableSkeleton />}>
+            <LocationsTable onSelectLocation={() => {}} selectedLocationId={null} />
+          </Suspense>
         </TabsContent>
         
         <TabsContent value="clients" className="space-y-4">
-          <ClientsTable onSelectClient={() => {}} />
+          <Suspense fallback={<TableSkeleton />}>
+            <ClientsTable onSelectClient={() => {}} />
+          </Suspense>
         </TabsContent>
         
         <TabsContent value="projects" className="space-y-4">
-          <ProjectsTable />
+          <Suspense fallback={<TableSkeleton />}>
+            <ProjectsTable />
+          </Suspense>
         </TabsContent>
       </Tabs>
 

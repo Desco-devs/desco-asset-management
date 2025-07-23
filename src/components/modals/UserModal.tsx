@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from '@/components/ui/drawer'
 import { Button } from '@/components/ui/button'
+import { X } from 'lucide-react'
 import { UserForm } from '@/components/forms/UserForm'
 import { User, CreateUserSchema, UpdateUserSchema } from '@/types/users'
 import { useUsersStore } from '@/stores/users-store'
@@ -71,9 +72,18 @@ export function UserModal({
   if (isMobile) {
     return (
       <Drawer open={isOpen} onOpenChange={onClose}>
-        <DrawerContent className="!max-h-[95vh] flex flex-col">
-          <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
-            <DrawerTitle className="flex items-center justify-between pr-8">
+        <DrawerContent className="!max-h-[95vh] flex flex-col dark:!bg-gray-900">
+          <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative dark:!bg-gray-900 dark:!border-gray-700">
+            <DrawerClose asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-4 top-4 rounded-full h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DrawerClose>
+            <DrawerTitle className="flex items-center justify-between pr-8 dark:!text-white">
               <span>{getTitle()}</span>
               {mode === 'view' && (
                 <Button 
@@ -86,7 +96,7 @@ export function UserModal({
               )}
             </DrawerTitle>
           </DrawerHeader>
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4 dark:!bg-gray-900">
             {content}
           </div>
         </DrawerContent>

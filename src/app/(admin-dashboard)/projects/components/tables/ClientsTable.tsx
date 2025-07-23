@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
@@ -145,17 +146,24 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col space-y-4">
         <div>
           <h2 className="text-2xl font-bold">All Clients</h2>
           <p className="text-muted-foreground">
             Manage all clients across all locations
           </p>
         </div>
-        <Button onClick={() => setClientModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Client
-        </Button>
+        
+        {/* Action Button Section - Mobile First */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button 
+            onClick={() => setClientModal(true)}
+            className="gap-2 flex-1 sm:flex-none font-semibold"
+          >
+            <Plus className="h-4 w-4" />
+            Add Client
+          </Button>
+        </div>
       </div>
 
       {/* Filters and Search */}
@@ -200,8 +208,8 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
         )}
       </div>
 
-      {/* Table */}
-      <div className="border rounded-lg">
+      {/* Desktop Table View */}
+      <div className="hidden lg:block border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
@@ -316,6 +324,113 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Mobile Card View - User Pattern */}
+      <div className="lg:hidden space-y-3">
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="animate-pulse">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-12 w-12 bg-gray-200 dark:bg-gray-700 rounded-full" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24" />
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-32" />
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-20" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : sortedClients.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center">
+              {clientTable.search ? 'No clients found' : 'No clients yet'}
+            </CardContent>
+          </Card>
+        ) : (
+          sortedClients.map((client, index) => (
+            <Card 
+              key={client.id || `client-${index}`} 
+              className="cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-[1.02]"
+              onClick={() => handleRowClick(client)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  {/* Client Icon */}
+                  <div className="relative">
+                    <div className="h-12 w-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-sm font-semibold">
+                      {client.name.charAt(0).toUpperCase()}
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-sm">{client.name}</h3>
+                        <Badge variant="outline" className="text-xs">
+                          {client.projects?.length || 0} projects
+                        </Badge>
+                      </div>
+                      {/* Action Menu */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                            handleEdit(client)
+                          }}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleDelete(client)
+                            }}
+                            disabled={isDeleting}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    
+                    <p className="text-xs text-gray-500 mb-1">{client.location?.address}</p>
+                    
+                    <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                      <span>
+                        {client.created_at ? (
+                          (() => {
+                            try {
+                              const date = new Date(client.created_at)
+                              return isNaN(date.getTime()) ? 'Just now' : `Created ${formatDistanceToNow(date, { addSuffix: true })}`
+                            } catch {
+                              return 'Just now'
+                            }
+                          })()
+                        ) : 'Just now'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Results count */}

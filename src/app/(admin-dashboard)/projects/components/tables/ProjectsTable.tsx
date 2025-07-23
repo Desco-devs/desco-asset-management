@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
@@ -153,31 +154,38 @@ export function ProjectsTable() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col space-y-4">
         <div>
           <h2 className="text-2xl font-bold">All Projects</h2>
           <p className="text-muted-foreground">
             Manage all projects with their clients, locations, equipment & vehicles
           </p>
         </div>
-        <div className="flex gap-2">
+        
+        {/* Action Buttons Section - Mobile First */}
+        <div className="flex flex-col sm:flex-row gap-3">
           <Button 
-            variant="outline" 
-            onClick={() => setLocationModal(true)}
+            onClick={() => setProjectModal(true)}
+            className="gap-2 flex-1 sm:flex-none font-semibold"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Location
+            <Plus className="h-4 w-4" />
+            Add Project
           </Button>
           <Button 
             variant="outline" 
             onClick={() => setClientModal(true)}
+            className="gap-2 flex-1 sm:flex-none font-medium"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4" />
             Add Client
           </Button>
-          <Button onClick={() => setProjectModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Project
+          <Button 
+            variant="outline" 
+            onClick={() => setLocationModal(true)}
+            className="gap-2 flex-1 sm:flex-none font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            Add Location
           </Button>
         </div>
       </div>
@@ -254,8 +262,8 @@ export function ProjectsTable() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="border rounded-lg">
+      {/* Desktop Table View */}
+      <div className="hidden lg:block border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
@@ -377,6 +385,123 @@ export function ProjectsTable() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Mobile Card View - User Pattern */}
+      <div className="lg:hidden space-y-3">
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="animate-pulse">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-12 w-12 bg-gray-200 dark:bg-gray-700 rounded-full" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24" />
+                        <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-16" />
+                      </div>
+                      <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                    </div>
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-32" />
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-20" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : sortedProjects.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center">
+              {projectTable.search ? 'No projects found' : 'No projects yet'}
+            </CardContent>
+          </Card>
+        ) : (
+          sortedProjects.map((project, index) => (
+            <Card 
+              key={project.id || `project-${index}`} 
+              className="cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-[1.02]"
+            >
+              <CardContent className="p-4">
+                <div className="flex flex-col space-y-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-sm">{project.name}</h3>
+                        <Badge 
+                          variant="outline"
+                          className="text-xs"
+                        >
+                          {project.equipments?.length || 0} equipment
+                        </Badge>
+                        <Badge 
+                          variant="outline"
+                          className="text-xs"
+                        >
+                          {project.vehicles?.length || 0} vehicles
+                        </Badge>
+                      </div>
+                      {/* Action Menu */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleEdit(project)
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleDelete(project)
+                            }}
+                            disabled={isDeleting}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    
+                    <p className="text-xs text-gray-500 mb-1">{project.client?.name}</p>
+                    {project.client?.location?.address && (
+                      <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                        📍 {project.client.location.address}
+                      </p>
+                    )}
+                    
+                    <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                      <span>
+                        {project.created_at ? (
+                          (() => {
+                            try {
+                              const date = new Date(project.created_at)
+                              return isNaN(date.getTime()) ? 'Just now' : formatDistanceToNow(date, { addSuffix: true })
+                            } catch {
+                              return 'Just now'
+                            }
+                          })()
+                        ) : 'Just now'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Results count */}

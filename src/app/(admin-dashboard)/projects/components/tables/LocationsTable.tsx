@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
@@ -122,17 +123,24 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col space-y-4">
         <div>
           <h2 className="text-2xl font-bold">Locations</h2>
           <p className="text-muted-foreground">
             Manage your locations and view associated clients
           </p>
         </div>
-        <Button onClick={() => setModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Location
-        </Button>
+        
+        {/* Action Button Section - Mobile First */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button 
+            onClick={() => setModal(true)}
+            className="gap-2 flex-1 sm:flex-none font-semibold"
+          >
+            <Plus className="h-4 w-4" />
+            Add Location
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -146,8 +154,8 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
         />
       </div>
 
-      {/* Table */}
-      <div className="border rounded-lg">
+      {/* Desktop Table View */}
+      <div className="hidden lg:block border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
@@ -257,6 +265,114 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Mobile Card View - User Pattern */}
+      <div className="lg:hidden space-y-3">
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="animate-pulse">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-12 w-12 bg-gray-200 dark:bg-gray-700 rounded-full" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32" />
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-20" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : sortedLocations.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center">
+              {locationTable.search ? 'No locations found' : 'No locations yet'}
+            </CardContent>
+          </Card>
+        ) : (
+          sortedLocations.map((location, index) => (
+            <Card 
+              key={location.id || `location-${index}`} 
+              className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-[1.02] ${
+                selectedLocationId === location.id ? 'ring-2 ring-primary bg-primary/5' : ''
+              }`}
+              onClick={() => handleRowClick(location)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  {/* Location Icon */}
+                  <div className="relative">
+                    <div className="h-12 w-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-sm font-semibold">
+                      📍
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-sm">{location.address}</h3>
+                        {selectedLocationId === location.id && (
+                          <Badge variant="secondary" className="text-xs">
+                            Selected
+                          </Badge>
+                        )}
+                      </div>
+                      {/* Action Menu */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                            handleEdit(location)
+                          }}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleDelete(location)
+                            }}
+                            disabled={isDeleting}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                      <span>
+                        {location.created_at ? (
+                          (() => {
+                            try {
+                              const date = new Date(location.created_at)
+                              return isNaN(date.getTime()) ? 'Just now' : `Created ${formatDistanceToNow(date, { addSuffix: true })}`
+                            } catch {
+                              return 'Just now'
+                            }
+                          })()
+                        ) : 'Just now'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Results count */}

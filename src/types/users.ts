@@ -6,6 +6,7 @@ export type UserStatus = user_status
 export interface User {
   id: string
   username: string
+  email: string | null
   full_name: string
   phone: string | null
   user_profile: string | null
@@ -79,12 +80,12 @@ export const USER_STATUSES: Record<UserStatus, string> = {
 }
 
 export const ROLE_COLORS: Record<UserRole, string> = {
-  SUPERADMIN: 'bg-red-100 text-red-800',
-  ADMIN: 'bg-blue-100 text-blue-800',
-  VIEWER: 'bg-gray-100 text-gray-800',
+  SUPERADMIN: 'bg-destructive/10 text-destructive border-destructive/20 dark:bg-destructive/20 dark:text-destructive-foreground',
+  ADMIN: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800/50',
+  VIEWER: 'bg-muted text-muted-foreground border-border dark:bg-muted dark:text-muted-foreground',
 }
 
 export const STATUS_COLORS: Record<UserStatus, string> = {
-  ACTIVE: 'bg-green-100 text-green-800',
-  INACTIVE: 'bg-red-100 text-red-800',
+  ACTIVE: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800/50',
+  INACTIVE: 'bg-destructive/10 text-destructive border-destructive/20 dark:bg-destructive/20 dark:text-destructive-foreground',
 }

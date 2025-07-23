@@ -17,6 +17,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   Drawer,
   DrawerContent,
   DrawerDescription,
@@ -61,22 +67,21 @@ export function UsersCards({
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [userBeingEdited, setUserBeingEdited] = useState<User | null>(null)
-  const [isDataUpdating, setIsDataUpdating] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
-  
-  // Responsive pagination - like vehicles pattern
   const [isMobile, setIsMobile] = useState(false)
-  
+
+  // Use shadcn pattern for mobile detection
   useEffect(() => {
-    const checkIsMobile = () => {
+    const checkMobile = () => {
       setIsMobile(window.innerWidth < 768)
     }
     
-    checkIsMobile()
-    window.addEventListener('resize', checkIsMobile)
-    
-    return () => window.removeEventListener('resize', checkIsMobile)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
   }, [])
+  const [isDataUpdating, setIsDataUpdating] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  
   
   const itemsPerPage = isMobile ? 6 : 12
   
@@ -112,13 +117,22 @@ export function UsersCards({
   }, [deleteLoading])
 
   const handleDelete = async (user: User) => {
+    // Prevent double-clicks/double-calls
+    if (loadingUserId === user.id) return
+    
     setLoadingUserId(user.id)
     try {
       await onDelete(user.id)
-      setDeleteUser(null) // Close dialog on success
+      // On success: close dialog and drawer/details view
+      // Note: The useDeleteUser hook already shows success toast
+      setDeleteUser(null)
+      setIsDrawerOpen(false) // Close the details drawer/dialog
+      setSelectedUser(null) // Clear selected user
+      setLoadingUserId(null)
     } catch (error) {
-      console.error('Failed to delete user:', error)
       setLoadingUserId(null) // Reset loading state on error
+      // Note: The useDeleteUser hook already shows error toast
+      // No need to add duplicate toast notifications here
     }
   }
 
@@ -148,20 +162,36 @@ export function UsersCards({
   }
 
   const handleEditClick = (user: User) => {
-    setUserBeingEdited(user)
+    // Following vehicles pattern: Close current modal first, then open edit modal
     setIsDrawerOpen(false)
-    onEdit(user)
+    setSelectedUser(null) // Clear selected user to ensure drawer is fully closed
+    
+    // Small delay to ensure proper transition (vehicles use 100ms)
+    setTimeout(() => {
+      setUserBeingEdited(user)
+      onEdit(user)
+    }, 150)
   }
 
-  // Reopen drawer when modal closes if user was being edited
+  // Reopen drawer when edit modal closes if user was being edited
   useEffect(() => {
     if (!isModalOpen && userBeingEdited) {
-      // Modal closed and we have a user that was being edited, reopen drawer with updated data
-      // Find the most current user data from the users array (includes real-time updates)
-      const currentUserData = users.find(u => u.id === userBeingEdited.id) || userBeingEdited
-      setSelectedUser(currentUserData)
-      setIsDrawerOpen(true)
-      setUserBeingEdited(null)
+      // Edit modal closed and we have a user that was being edited, reopen detail drawer with updated data
+      // Following vehicles pattern: small delay for proper transition  
+      setTimeout(() => {
+        // Find the most current user data from the users array (includes real-time updates)
+        const currentUserData = users.find(u => u.id === userBeingEdited.id) || userBeingEdited
+        setSelectedUser(currentUserData)
+        setIsDrawerOpen(true)
+        setUserBeingEdited(null)
+        
+        // Prevent focus from going to header elements after reopen
+        setTimeout(() => {
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur()
+          }
+        }, 100)
+      }, 150)
     }
   }, [isModalOpen, userBeingEdited, users])
 
@@ -189,11 +219,38 @@ export function UsersCards({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading users...</p>
-        </div>
+      <div className="space-y-3">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Card key={index} className="animate-pulse">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="relative">
+                  <div className="h-12 w-12 bg-gray-200 dark:bg-gray-700 rounded-full" />
+                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-gray-200 dark:bg-gray-700 rounded-full border-2 border-white dark:border-gray-800" />
+                </div>
+                
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24" />
+                      <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-16" />
+                      <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-14" />
+                    </div>
+                    <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                  </div>
+                  
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-20 mb-1" />
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-1" />
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24" />
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     )
   }
@@ -263,12 +320,18 @@ export function UsersCards({
                   </div>
                   
                   <p className="text-xs text-gray-500 mb-1">@{user.username}</p>
+                  {user.email && (
+                    <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      {user.email}
+                    </p>
+                  )}
                   
                   <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-                    {user.phone_number && (
+                    {user.phone && (
                       <span className="flex items-center gap-1">
                         <Phone className="h-3 w-3" />
-                        {user.phone_number}
+                        {user.phone}
                       </span>
                     )}
                     <span className="flex items-center gap-1">
@@ -321,13 +384,28 @@ export function UsersCards({
         </div>
       )}
 
-      {/* User Details Drawer */}
-      <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <DrawerContent className="!max-h-[95vh]">
+      {/* User Details - Responsive Dialog/Drawer */}
+      {isMobile ? (
+        <Drawer 
+          open={isDrawerOpen && !!selectedUser} 
+          onOpenChange={(open) => {
+            setIsDrawerOpen(open)
+            // Clear focus when drawer closes to prevent aria-hidden issues
+            if (!open) {
+              setSelectedUser(null)
+              setTimeout(() => {
+                if (document.activeElement instanceof HTMLElement) {
+                  document.activeElement.blur()
+                }
+              }, 100)
+            }
+          }}
+        >
+          <DrawerContent className="!max-h-[95vh] focus:outline-none">
           {selectedUser && (
             <>
-              <DrawerHeader className="border-b">
-                <div className="flex items-center justify-between">
+              <DrawerHeader className="border-b focus:outline-none">
+                <div className="flex items-center justify-between focus:outline-none">
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <Avatar className="h-12 w-12">
@@ -346,13 +424,13 @@ export function UsersCards({
                       )}
                     </div>
                     <div>
-                      <DrawerTitle className="text-lg font-semibold text-left flex items-center gap-2">
+                      <DrawerTitle className="text-lg font-semibold text-left flex items-center gap-2 focus:outline-none">
                         {selectedUser.full_name}
                         {isDataUpdating && (
                           <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
                         )}
                       </DrawerTitle>
-                      <DrawerDescription className="text-sm text-gray-500 text-left">
+                      <DrawerDescription className="text-sm text-gray-500 text-left focus:outline-none">
                         @{selectedUser.username}
                       </DrawerDescription>
                     </div>
@@ -375,15 +453,15 @@ export function UsersCards({
                 <div className="space-y-6">
                   {/* User Details - Role and Status */}
                   <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-gray-900">User Details</h3>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">User Details</h3>
                     <div className="grid grid-cols-1 gap-3">
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <p className="text-xs text-gray-500">Full Name</p>
-                        <p className="text-sm font-medium">{selectedUser.full_name}</p>
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Full Name</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedUser.full_name}</p>
                       </div>
                       <div className="flex gap-3">
-                        <div className="flex-1 p-3 bg-gray-50 rounded-lg">
-                          <p className="text-xs text-gray-500">Role</p>
+                        <div className="flex-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Role</p>
                           <Badge 
                             variant="outline"
                             className={`mt-1 text-xs ${ROLE_COLORS[selectedUser.role as keyof typeof ROLE_COLORS]}`}
@@ -391,8 +469,8 @@ export function UsersCards({
                             {USER_ROLES[selectedUser.role as keyof typeof USER_ROLES]}
                           </Badge>
                         </div>
-                        <div className="flex-1 p-3 bg-gray-50 rounded-lg">
-                          <p className="text-xs text-gray-500">Status</p>
+                        <div className="flex-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
                           <Badge 
                             variant="outline"
                             className={`mt-1 text-xs ${STATUS_COLORS[selectedUser.user_status as keyof typeof STATUS_COLORS]}`}
@@ -406,21 +484,30 @@ export function UsersCards({
 
                   {/* Contact Information */}
                   <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-gray-900">Contact Information</h3>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Contact Information</h3>
                     <div className="space-y-3">
-                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <Mail className="h-4 w-4 text-gray-400" />
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <Mail className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <div>
-                          <p className="text-xs text-gray-500">Email/Username</p>
-                          <p className="text-sm font-medium">{selectedUser.username}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedUser.email || 'No email available'}</p>
                         </div>
                       </div>
-                      {selectedUser.phone_number && (
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <Phone className="h-4 w-4 text-gray-400" />
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <div className="h-4 w-4 flex items-center justify-center">
+                          <span className="text-gray-400 dark:text-gray-500 font-mono text-sm">@</span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Username</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedUser.username}</p>
+                        </div>
+                      </div>
+                      {selectedUser.phone && (
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <Phone className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                           <div>
-                            <p className="text-xs text-gray-500">Phone Number</p>
-                            <p className="text-sm font-medium">{selectedUser.phone_number}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Phone Number</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedUser.phone}</p>
                           </div>
                         </div>
                       )}
@@ -429,12 +516,12 @@ export function UsersCards({
 
                   {/* Activity */}
                   <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-gray-900">Activity Status</h3>
-                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg transition-all duration-300">
-                      <Globe className="h-4 w-4 text-gray-400" />
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Activity Status</h3>
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg transition-all duration-300">
+                      <Globe className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                       <div>
-                        <p className="text-xs text-gray-500">Last Seen</p>
-                        <p className="text-sm font-medium">{formatLastSeen(selectedUser.last_seen, selectedUser.is_online)}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Last Seen</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatLastSeen(selectedUser.last_seen, selectedUser.is_online)}</p>
                       </div>
                     </div>
                   </div>
@@ -450,6 +537,7 @@ export function UsersCards({
                       variant="outline"
                       size="sm"
                       onClick={() => setDeleteUser(selectedUser)}
+                      disabled={!!loadingUserId}
                       className="flex-1 gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -471,27 +559,207 @@ export function UsersCards({
               </DrawerFooter>
             </>
           )}
-        </DrawerContent>
-      </Drawer>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog 
+          open={isDrawerOpen && !!selectedUser} 
+          onOpenChange={(open) => {
+            setIsDrawerOpen(open)
+            // Clear focus when dialog closes to prevent aria-hidden issues
+            if (!open) {
+              setSelectedUser(null)
+              setTimeout(() => {
+                if (document.activeElement instanceof HTMLElement) {
+                  document.activeElement.blur()
+                }
+              }, 100)
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto focus:outline-none">
+            {selectedUser && (
+              <>
+                <DialogHeader className="border-b pb-4 focus:outline-none">
+                  <div className="flex items-center justify-between focus:outline-none">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <Avatar className="h-12 w-12">
+                          <AvatarFallback className="bg-blue-100 text-blue-600">
+                            {getInitials(selectedUser.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div 
+                          className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white transition-all duration-300 ${
+                            selectedUser.is_online ? 'bg-green-500' : 'bg-gray-400'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <DialogTitle className="text-lg font-semibold focus:outline-none">{selectedUser.full_name}</DialogTitle>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 focus:outline-none">User Details</p>
+                      </div>
+                    </div>
+                  </div>
+                </DialogHeader>
+
+                {/* Content */}
+                <div className="py-6">
+                  <div className="space-y-6">
+                    {/* User Details - Role and Status */}
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">User Details</h3>
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Full Name</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedUser.full_name}</p>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className="flex-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Role</p>
+                            <Badge 
+                              variant="outline"
+                              className={`mt-1 text-xs ${ROLE_COLORS[selectedUser.role as keyof typeof ROLE_COLORS]}`}
+                            >
+                              {USER_ROLES[selectedUser.role as keyof typeof USER_ROLES]}
+                            </Badge>
+                          </div>
+                          <div className="flex-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Status</p>
+                            <Badge 
+                              variant="outline"
+                              className={`mt-1 text-xs ${STATUS_COLORS[selectedUser.user_status as keyof typeof STATUS_COLORS]}`}
+                            >
+                              {USER_STATUSES[selectedUser.user_status as keyof typeof USER_STATUSES]}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contact Information */}
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Contact Information</h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <Mail className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Email</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedUser.email || 'No email available'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <div className="h-4 w-4 flex items-center justify-center">
+                            <span className="text-gray-400 dark:text-gray-500 font-mono text-sm">@</span>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Username</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedUser.username}</p>
+                          </div>
+                        </div>
+                        {selectedUser.phone && (
+                          <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <Phone className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                            <div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Phone Number</p>
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedUser.phone}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Activity */}
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Activity Status</h3>
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg transition-all duration-300">
+                        <Globe className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                        <div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Last Seen</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatLastSeen(selectedUser.last_seen, selectedUser.is_online)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="border-t pt-4">
+                  <div className="flex gap-2 w-full">
+                    {canDelete && selectedUser.role !== 'SUPERADMIN' && (currentUserRole === 'SUPERADMIN' || currentUserRole === 'ADMIN') && (
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeleteUser(selectedUser)}
+                        disabled={!!loadingUserId}
+                        className="flex-1 gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </Button>
+                    )}
+                    {canEdit && (
+                      <Button 
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleEditClick(selectedUser)}
+                        className="flex-1 gap-2"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteUser} onOpenChange={() => !loadingUserId && setDeleteUser(null)}>
+      <AlertDialog 
+        open={!!deleteUser} 
+        onOpenChange={(open) => {
+          // Only allow closing if not currently deleting
+          if (!open && !loadingUserId) {
+            setDeleteUser(null)
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <span className="text-red-500">⚠️</span>
+              Delete User
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete <strong>{deleteUser?.full_name}</strong>? 
-              This action cannot be undone.
+            </AlertDialogDescription>
+            <AlertDialogDescription className="text-red-600 font-medium">
+              This action cannot be undone and will permanently remove the user and all associated data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={!!loadingUserId}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel 
+              disabled={!!loadingUserId}
+              onClick={() => setDeleteUser(null)}
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction 
               onClick={() => deleteUser && handleDelete(deleteUser)}
               disabled={!!loadingUserId}
               className="bg-red-600 hover:bg-red-700"
             >
-              {loadingUserId === deleteUser?.id ? 'Deleting...' : 'Delete'}
+              {loadingUserId === deleteUser?.id ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                  Deleting...
+                </div>
+              ) : (
+                'Delete User'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

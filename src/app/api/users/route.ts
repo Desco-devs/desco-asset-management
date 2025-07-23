@@ -70,6 +70,31 @@ export const GET = withResourcePermission('users', 'view', async (request: NextR
     try {
       users = await prisma.user.findMany(queryOptions)
       total = await prisma.user.count({ where: queryOptions.where })
+      
+      // Fetch email data from Supabase Auth for each user
+      const { createServiceRoleClient } = await import('@/lib/supabase-server')
+      const supabaseAdmin = createServiceRoleClient()
+      
+      // Add email to each user from Supabase Auth
+      const usersWithEmail = await Promise.all(
+        users.map(async (user: any) => {
+          try {
+            const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id)
+            return {
+              ...user,
+              email: authUser.user?.email || null
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch email for user ${user.id}:`, error)
+            return {
+              ...user,
+              email: null
+            }
+          }
+        })
+      )
+      
+      users = usersWithEmail
     } catch (prismaError) {
       // If there's a UUID validation error, try to get valid users only
       if (prismaError instanceof Error && 'code' in prismaError && prismaError.code === 'P2023') {
@@ -87,7 +112,29 @@ export const GET = withResourcePermission('users', 'view', async (request: NextR
           ORDER BY created_at DESC
         `
         
-        users = validUsers as any[]
+        // Add email to valid users from Supabase Auth
+        const { createServiceRoleClient } = await import('@/lib/supabase-server')
+        const supabaseAdmin = createServiceRoleClient()
+        
+        const validUsersWithEmail = await Promise.all(
+          (validUsers as any[]).map(async (user: any) => {
+            try {
+              const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id)
+              return {
+                ...user,
+                email: authUser.user?.email || null
+              }
+            } catch (error) {
+              console.warn(`Failed to fetch email for user ${user.id}:`, error)
+              return {
+                ...user,
+                email: null
+              }
+            }
+          })
+        )
+        
+        users = validUsersWithEmail
         total = users.length
       } else {
         throw prismaError
