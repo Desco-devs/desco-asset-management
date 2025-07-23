@@ -20,6 +20,7 @@ import {
   selectViewerImage,
   selectSelectedEquipment,
   selectIsEquipmentMaintenanceModalOpen,
+  selectIsMaintenanceReportDetailOpen,
   useEquipmentsStore,
 } from "@/stores/equipmentsStore";
 import { Download, Loader2, X, Trash2 } from "lucide-react";
@@ -30,6 +31,7 @@ import CreateEquipmentModalModern from "./modals/CreateEquipmentModalModern";
 import EditEquipmentModalModern from "./modals/EditEquipmentModalModern";
 import EquipmentModalModern from "./modals/EquipmentModalModern";
 import CreateEquipmentMaintenanceReportModal from "./modals/CreateEquipmentMaintenanceReportModal";
+import MaintenanceReportDetailDrawer from "./modals/MaintenanceReportDetailDrawer";
 
 export default function EquipmentsPageModern() {
   // Client state from Zustand (using optimized selectors)
@@ -41,6 +43,7 @@ export default function EquipmentsPageModern() {
   const deleteConfirmation = useEquipmentsStore(selectDeleteConfirmation);
   const selectedEquipment = useEquipmentsStore(selectSelectedEquipment);
   const isEquipmentMaintenanceModalOpen = useEquipmentsStore(selectIsEquipmentMaintenanceModalOpen);
+  const isMaintenanceReportDetailOpen = useEquipmentsStore(selectIsMaintenanceReportDetailOpen);
 
   // Actions
   const {
@@ -276,6 +279,11 @@ export default function EquipmentsPageModern() {
       {/* Equipment Maintenance Report Modal */}
       {isEquipmentMaintenanceModalOpen && selectedEquipment && (
         <CreateEquipmentMaintenanceReportModal equipmentId={selectedEquipment.uid} />
+      )}
+
+      {/* Maintenance Report Detail Drawer */}
+      {isMaintenanceReportDetailOpen && (
+        <MaintenanceReportDetailDrawer />
       )}
 
       {/* Global Image Viewer Modal - Always available */}

@@ -160,6 +160,8 @@ interface EquipmentsState {
   isMaintenanceModalOpen: boolean;
   selectedEquipmentMaintenanceReport: EquipmentMaintenanceReport | null;
   isEquipmentMaintenanceModalOpen: boolean;
+  selectedMaintenanceReportForDetail: EquipmentMaintenanceReport | null;
+  isMaintenanceReportDetailOpen: boolean;
   isExportModalOpen: boolean;
   currentPage: number;
   isMobile: boolean;
@@ -201,6 +203,8 @@ interface EquipmentsState {
   setIsMaintenanceModalOpen: (open: boolean) => void;
   setSelectedEquipmentMaintenanceReport: (report: EquipmentMaintenanceReport | null) => void;
   setIsEquipmentMaintenanceModalOpen: (open: boolean) => void;
+  setSelectedMaintenanceReportForDetail: (report: EquipmentMaintenanceReport | null) => void;
+  setIsMaintenanceReportDetailOpen: (open: boolean) => void;
   setIsExportModalOpen: (open: boolean) => void;
   setCurrentPage: (page: number) => void;
   setIsMobile: (isMobile: boolean) => void;
@@ -260,6 +264,8 @@ export const useEquipmentsStore = create<EquipmentsState>()(
         isMaintenanceModalOpen: false,
         selectedEquipmentMaintenanceReport: null,
         isEquipmentMaintenanceModalOpen: false,
+        selectedMaintenanceReportForDetail: null,
+        isMaintenanceReportDetailOpen: false,
         isExportModalOpen: false,
         currentPage: 1,
         isMobile: false,
@@ -297,6 +303,8 @@ export const useEquipmentsStore = create<EquipmentsState>()(
         setIsMaintenanceModalOpen: (open) => set({ isMaintenanceModalOpen: open }),
         setSelectedEquipmentMaintenanceReport: (report) => set({ selectedEquipmentMaintenanceReport: report }),
         setIsEquipmentMaintenanceModalOpen: (open) => set({ isEquipmentMaintenanceModalOpen: open }),
+        setSelectedMaintenanceReportForDetail: (report) => set({ selectedMaintenanceReportForDetail: report }),
+        setIsMaintenanceReportDetailOpen: (open) => set({ isMaintenanceReportDetailOpen: open }),
         setIsExportModalOpen: (open) => set({ isExportModalOpen: open }),
         setCurrentPage: (page) => set({ currentPage: page }),
         setIsMobile: (isMobile) => set({ isMobile }),
@@ -578,10 +586,12 @@ export const useEquipmentsStore = create<EquipmentsState>()(
           isCreateModalOpen: false,
           isMaintenanceModalOpen: false,
           isEquipmentMaintenanceModalOpen: false,
+          isMaintenanceReportDetailOpen: false,
           isExportModalOpen: false,
           selectedEquipment: null,
           selectedMaintenanceReport: null,
           selectedEquipmentMaintenanceReport: null,
+          selectedMaintenanceReportForDetail: null,
           isEditMode: false
         }),
       }),
@@ -607,6 +617,8 @@ export const selectSelectedMaintenanceReport = (state: EquipmentsState) => state
 export const selectIsMaintenanceModalOpen = (state: EquipmentsState) => state.isMaintenanceModalOpen;
 export const selectSelectedEquipmentMaintenanceReport = (state: EquipmentsState) => state.selectedEquipmentMaintenanceReport;
 export const selectIsEquipmentMaintenanceModalOpen = (state: EquipmentsState) => state.isEquipmentMaintenanceModalOpen;
+export const selectSelectedMaintenanceReportForDetail = (state: EquipmentsState) => state.selectedMaintenanceReportForDetail;
+export const selectIsMaintenanceReportDetailOpen = (state: EquipmentsState) => state.isMaintenanceReportDetailOpen;
 export const selectCurrentPage = (state: EquipmentsState) => state.currentPage;
 export const selectIsMobile = (state: EquipmentsState) => state.isMobile;
 export const selectSearchQuery = (state: EquipmentsState) => state.searchQuery;

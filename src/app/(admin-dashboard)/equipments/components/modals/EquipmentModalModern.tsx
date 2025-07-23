@@ -61,7 +61,7 @@ import EquipmentPartsViewer from "../EquipmentPartsViewer";
 
 export default function EquipmentModalModern() {
   // Server state from TanStack Query
-  const { equipments } = useEquipmentsWithReferenceData();
+  const { equipments, maintenanceReports } = useEquipmentsWithReferenceData();
 
   // Client state from Zustand
   const selectedEquipmentFromStore = useEquipmentsStore(selectSelectedEquipment);
@@ -241,8 +241,19 @@ export default function EquipmentModalModern() {
     );
   };
 
+  // Helper function to count maintenance issues for selected equipment
+  const getMaintenanceIssueCount = () => {
+    if (!selectedEquipment || !maintenanceReports) return 0;
+    
+    return maintenanceReports.filter(report => 
+      report.equipment_id === selectedEquipment.uid && 
+      report.status && 
+      !['COMPLETED', 'RESOLVED'].includes(report.status.toUpperCase())
+    ).length;
+  };
+
   // Tab content components - EXACTLY like CreateEquipmentForm
-  const renderTabButton = (tab: 'details' | 'images' | 'documents' | 'parts' | 'maintenance', label: string, icon: React.ReactNode) => (
+  const renderTabButton = (tab: 'details' | 'images' | 'documents' | 'parts' | 'maintenance', label: string, icon: React.ReactNode, count?: number) => (
     <Button
       type="button"
       variant={activeTab === tab ? 'default' : 'ghost'}
@@ -250,7 +261,14 @@ export default function EquipmentModalModern() {
       onClick={() => setActiveTab(tab)}
       className="flex-1 flex items-center gap-2"
     >
-      {icon}
+      <div className="relative">
+        {icon}
+        {count !== undefined && count > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1 py-0.5 min-w-[16px] h-[16px] flex items-center justify-center text-[10px] leading-none">
+            {count}
+          </span>
+        )}
+      </div>
       <span className="hidden sm:inline">{label}</span>
     </Button>
   );
@@ -266,7 +284,7 @@ export default function EquipmentModalModern() {
             {renderTabButton('images', 'Images', <Camera className="h-4 w-4" />)}
             {renderTabButton('documents', 'Docs', <FileText className="h-4 w-4" />)}
             {renderTabButton('parts', 'Parts', <Receipt className="h-4 w-4" />)}
-            {renderTabButton('maintenance', 'Maintenance', <Wrench className="h-4 w-4" />)}
+            {renderTabButton('maintenance', 'Maintenance', <Wrench className="h-4 w-4" />, getMaintenanceIssueCount())}
           </>
         ) : (
           <>
@@ -329,6 +347,11 @@ export default function EquipmentModalModern() {
             >
               <Wrench className="h-4 w-4" />
               Maintenance Reports
+              {getMaintenanceIssueCount() > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getMaintenanceIssueCount()}
+                </span>
+              )}
             </button>
           </>
         )}

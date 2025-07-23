@@ -30,6 +30,7 @@ import {
   selectSortOrder
 } from "@/stores/equipmentsStore";
 import {
+  AlertTriangle,
   Wrench,
   Download,
   Eye,
@@ -62,6 +63,17 @@ export default function EquipmentsListModern() {
   const filterMaintenance = useEquipmentsStore(selectFilterMaintenance);
   const isMobile = useEquipmentsStore(selectIsMobile);
   const isExportModalOpen = useEquipmentsStore((state) => state.isExportModalOpen);
+
+  // Helper function to check if equipment has maintenance issues
+  const hasMaintenanceIssues = (equipment: Equipment) => {
+    const hasReports = maintenanceReports.some(report => report.equipment_id === equipment.uid);
+    const hasOpenIssues = maintenanceReports.some(report => 
+      report.equipment_id === equipment.uid && 
+      report.status && 
+      !['COMPLETED', 'RESOLVED'].includes(report.status.toUpperCase())
+    );
+    return hasReports && hasOpenIssues;
+  };
 
   // Get store functions once
   const getFilteredEquipments = useEquipmentsStore(
@@ -725,6 +737,15 @@ export default function EquipmentsListModern() {
                             }
                           >
                             {daysUntilExpiry <= 0 ? "Expired" : "Expiring Soon"}
+                          </Badge>
+                        )}
+
+                        {/* Maintenance Issue Badge */}
+                        {hasMaintenanceIssues(equipment) && (
+                          <Badge className="bg-yellow-500 text-white hover:bg-yellow-600 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span className="hidden sm:inline">Maintenance Issue</span>
+                            <span className="sm:hidden">Issue</span>
                           </Badge>
                         )}
                       </div>
