@@ -296,10 +296,17 @@ export function FileUploadSectionSimple({
         )}
       </div>
 
-      {/* Image Viewer Modal - Exact same as PartsFolderManager */}
+      {/* Image Viewer Modal - Responsive sizing for mobile and desktop */}
       {showImageViewer && preview && isImage && (
         <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
-          <DialogContent className="!max-w-none !w-[40vw] max-h-[60vh] p-4" style={{ maxWidth: '40vw', width: '40vw' }}>
+          <DialogContent 
+            className="!max-w-none p-4 
+              w-[95vw] max-h-[90vh] sm:w-[80vw] sm:max-h-[75vh] lg:w-[60vw] lg:max-h-[65vh] xl:w-[40vw] xl:max-h-[60vh]" 
+            style={{ 
+              maxWidth: 'min(95vw, 800px)', 
+              width: 'min(95vw, 800px)'
+            }}
+          >
             <DialogHeader className="pb-4">
               <DialogTitle className="text-center">
                 {label}
@@ -309,7 +316,7 @@ export function FileUploadSectionSimple({
               <img
                 src={preview}
                 alt={label}
-                className="max-w-full max-h-[45vh] object-contain"
+                className="max-w-full max-h-[80vh] sm:max-h-[65vh] lg:max-h-[55vh] xl:max-h-[45vh] object-contain"
                 onClick={(e) => e.stopPropagation()}
                 onError={(e) => {
                   console.error('Image failed to load:', preview);

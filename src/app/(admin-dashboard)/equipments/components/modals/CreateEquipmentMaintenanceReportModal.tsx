@@ -7,6 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,8 +28,8 @@ import {
   useCreateEquipmentMaintenanceReport,
   useEquipmentsWithReferenceData,
 } from "@/hooks/useEquipmentsQuery";
-import { useEquipmentsStore } from "@/stores/equipmentsStore";
-import { Plus, Trash2 } from "lucide-react";
+import { useEquipmentsStore, selectIsMobile } from "@/stores/equipmentsStore";
+import { Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -34,7 +41,8 @@ export default function CreateEquipmentMaintenanceReportModal({
   equipmentId,
 }: CreateEquipmentMaintenanceReportModalProps) {
   const isOpen = useEquipmentsStore((state) => state.isEquipmentMaintenanceModalOpen);
-  const { setIsEquipmentMaintenanceModalOpen } = useEquipmentsStore();
+  const isMobile = useEquipmentsStore(selectIsMobile);
+  const { setIsEquipmentMaintenanceModalOpen, setIsModalOpen } = useEquipmentsStore();
   const { locations } = useEquipmentsWithReferenceData();
   const createMaintenanceReportMutation = useCreateEquipmentMaintenanceReport();
 
@@ -54,6 +62,10 @@ export default function CreateEquipmentMaintenanceReportModal({
 
   const handleClose = () => {
     setIsEquipmentMaintenanceModalOpen(false);
+    // Use setTimeout to ensure report drawer closes before opening detail drawer
+    setTimeout(() => {
+      setIsModalOpen(true); // Reopen detail drawer
+    }, 100); // Small delay to allow state transition
     // Reset form
     setFormData({
       issue_description: "",
@@ -134,7 +146,24 @@ export default function CreateEquipmentMaintenanceReportModal({
 
     try {
       await createMaintenanceReportMutation.mutateAsync(reportData);
-      handleClose();
+      setIsEquipmentMaintenanceModalOpen(false);
+      // Use setTimeout to ensure report drawer closes before opening detail drawer
+      setTimeout(() => {
+        setIsModalOpen(true); // Reopen detail drawer
+      }, 100); // Small delay to allow state transition
+      // Reset form
+      setFormData({
+        issue_description: "",
+        remarks: "",
+        inspection_details: "",
+        action_taken: "",
+        priority: "MEDIUM",
+        status: "REPORTED",
+        downtime_hours: "",
+        location_id: "",
+        parts_replaced: [""],
+        attachment_urls: [""],
+      });
     } catch (error) {
       console.error("Error creating maintenance report:", error);
     }
@@ -142,14 +171,9 @@ export default function CreateEquipmentMaintenanceReportModal({
 
   if (!isOpen) return null;
 
-  return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create Equipment Maintenance Report</DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
+  // Form content component to avoid duplication
+  const FormContent = () => (
+    <form onSubmit={handleSubmit} className="space-y-6">
           {/* Issue Description */}
           <div className="space-y-2">
             <Label htmlFor="issue_description">
@@ -377,6 +401,49 @@ export default function CreateEquipmentMaintenanceReportModal({
             </Button>
           </div>
         </form>
+  );
+
+  // Mobile drawer implementation
+  if (isMobile) {
+    return (
+      <Drawer open={isOpen} onOpenChange={handleClose}>
+        <DrawerContent className="!max-h-[95vh]">
+          <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
+            <DrawerClose asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="absolute right-4 top-4 rounded-full h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DrawerClose>
+            <div className="text-center space-y-2">
+              <DrawerTitle className="text-xl font-bold">
+                Create Maintenance Report
+              </DrawerTitle>
+              <p className="text-sm text-muted-foreground">
+                Add a new maintenance report for this equipment
+              </p>
+            </div>
+          </DrawerHeader>
+          
+          <div className="flex-1 overflow-y-auto p-4">
+            <FormContent />
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  // Desktop dialog implementation
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Equipment Maintenance Report</DialogTitle>
+        </DialogHeader>
+        <FormContent />
       </DialogContent>
     </Dialog>
   );

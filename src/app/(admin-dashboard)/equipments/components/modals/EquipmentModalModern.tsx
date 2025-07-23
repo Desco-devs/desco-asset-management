@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,7 @@ import {
   Eye,
   ExternalLink,
   FileText,
+  Hash,
   Loader2,
   MapPin,
   Receipt,
@@ -56,6 +58,7 @@ import {
 import { useEffect, useState } from "react";
 import EditEquipmentModalModern from "./EditEquipmentModalModern";
 import EquipmentMaintenanceReportsEnhanced from "../EquipmentMaintenanceReportsEnhanced";
+import EquipmentPartsViewer from "../EquipmentPartsViewer";
 
 export default function EquipmentModalModern() {
   // Server state from TanStack Query
@@ -69,11 +72,8 @@ export default function EquipmentModalModern() {
   const isPhotosCollapsed = useEquipmentsStore(selectIsPhotosCollapsed);
   const isDocumentsCollapsed = useEquipmentsStore(selectIsDocumentsCollapsed);
 
-  // Custom tab state
-  const [activeTab, setActiveTab] = useState<"details" | "maintenance" | "parts">("details");
-  const [viewerImage, setViewerImage] = useState<{ url: string; title: string } | null>(null);
-  const [showImageViewer, setShowImageViewer] = useState(false);
-  const [viewerImageData, setViewerImageData] = useState<{ url: string; title: string } | null>(null);
+  // Custom tab state - EXACTLY like CreateEquipmentForm with Images and Documents tabs
+  const [activeTab, setActiveTab] = useState<'details' | 'images' | 'documents' | 'parts' | 'maintenance'>('details');
 
   // Actions
   const {
@@ -117,12 +117,6 @@ export default function EquipmentModalModern() {
     }
   };
 
-  const handleImageClick = (url: string, title: string) => {
-    setViewerImage({ url, title });
-    if (isMobile) {
-      setIsModalOpen(false); // Close drawer on mobile when viewing image
-    }
-  };
 
   // Helper function to calculate days until expiry
   const getDaysUntilExpiry = (expiryDate: string) => {
@@ -175,350 +169,476 @@ export default function EquipmentModalModern() {
     },
   ].filter(doc => doc.url);
 
-  const ModalContent = () => (
-    <div className="space-y-6">
-      {/* Header with Equipment Info */}
-      <div className="space-y-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-              <Wrench className="h-6 w-6" />
-              {selectedEquipment.brand} {selectedEquipment.model}
-            </h2>
-            <p className="text-muted-foreground mt-1">{selectedEquipment.type}</p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleEdit}
-              className="gap-2"
-            >
-              <Edit className="h-4 w-4" />
-              Edit
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDelete}
-              disabled={deleteEquipmentMutation.isPending}
-              className="gap-2"
-            >
-              {deleteEquipmentMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              Delete
-            </Button>
+  // Image/Document Viewer Component - EXACTLY like FileUploadSectionSimple
+  const ImageViewerSection = ({ url, label, description }: { url: string; label: string; description: string }) => {
+    const [showImageViewer, setShowImageViewer] = useState(false);
+    
+    return (
+      <div className="space-y-2">
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+          <div className="space-y-2">
+            <div className="relative w-full max-w-[200px] mx-auto group">
+              <div 
+                className="relative cursor-pointer"
+                onClick={() => {
+                  console.log('Opening image viewer for:', label, url);
+                  setShowImageViewer(true);
+                }}
+              >
+                <Image
+                  src={url}
+                  alt={label}
+                  width={200}
+                  height={200}
+                  className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
+                />
+                <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
+                  <Eye className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                asChild
+              >
+                <a href={url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  View
+                </a>
+              </Button>
+            </div>
           </div>
         </div>
+        <p className="text-xs text-muted-foreground text-center">{description}</p>
 
-        {/* Status and Key Info */}
-        <div className="flex flex-wrap gap-2">
-          <Badge
-            className={
-              selectedEquipment.status === "OPERATIONAL"
-                ? "bg-green-100 text-green-800 hover:bg-green-200"
-                : "bg-red-100 text-red-800 hover:bg-red-200"
-            }
-          >
-            {selectedEquipment.status}
-          </Badge>
-
-          {selectedEquipment.plateNumber && (
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Wrench className="h-3 w-3" />
-              {selectedEquipment.plateNumber}
-            </Badge>
-          )}
-
-          {daysUntilExpiry !== null && daysUntilExpiry <= 30 && (
-            <Badge
-              className={
-                daysUntilExpiry <= 7
-                  ? "bg-red-500 text-white hover:bg-red-600"
-                  : "bg-orange-500 text-white hover:bg-orange-600"
-              }
+        {/* Image Viewer Modal - Responsive sizing for mobile and desktop like FileUploadSectionSimple */}
+        {showImageViewer && (
+          <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
+            <DialogContent 
+              className="!max-w-none p-4 
+                w-[95vw] max-h-[85vh] sm:w-[80vw] sm:max-h-[70vh] lg:w-[60vw] lg:max-h-[65vh] xl:w-[40vw] xl:max-h-[60vh]" 
+              style={{ 
+                maxWidth: 'min(95vw, 800px)', 
+                width: 'min(95vw, 800px)'
+              }}
             >
-              {daysUntilExpiry <= 0 ? "Insurance Expired" : "Insurance Expiring Soon"}
-            </Badge>
-          )}
-        </div>
+              <DialogHeader className="pb-4">
+                <DialogTitle className="text-center">
+                  {label}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="flex items-center justify-center">
+                <img
+                  src={url}
+                  alt={label}
+                  className="max-w-full max-h-[70vh] sm:max-h-[55vh] lg:max-h-[50vh] xl:max-h-[45vh] object-contain"
+                  onClick={(e) => e.stopPropagation()}
+                  onError={(e) => {
+                    console.error('Image failed to load:', url);
+                    console.error('Error details:', e);
+                  }}
+                  onLoad={() => {
+                    console.log('Image loaded successfully:', url);
+                  }}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
+    );
+  };
 
-      {/* Tabs */}
-      <div className="border-b">
-        <div className="flex space-x-6">
-          {["details", "maintenance", "parts"].map((tab) => (
+  // Tab content components - EXACTLY like CreateEquipmentForm
+  const renderTabButton = (tab: 'details' | 'images' | 'documents' | 'parts' | 'maintenance', label: string, icon: React.ReactNode) => (
+    <Button
+      type="button"
+      variant={activeTab === tab ? 'default' : 'ghost'}
+      size="sm"
+      onClick={() => setActiveTab(tab)}
+      className="flex-1 flex items-center gap-2"
+    >
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+    </Button>
+  );
+
+  const ModalContent = () => (
+    <div className="space-y-4">
+
+      {/* Tab Navigation - EXACTLY like CreateEquipmentForm */}
+      <div className={`w-full mb-6 ${isMobile ? 'grid grid-cols-5 bg-muted rounded-md p-1' : 'flex justify-center border-b'}`}>
+        {isMobile ? (
+          <>
+            {renderTabButton('details', 'Details', <Settings className="h-4 w-4" />)}
+            {renderTabButton('images', 'Images', <Camera className="h-4 w-4" />)}
+            {renderTabButton('documents', 'Docs', <FileText className="h-4 w-4" />)}
+            {renderTabButton('parts', 'Parts', <Receipt className="h-4 w-4" />)}
+            {renderTabButton('maintenance', 'Maintenance', <Wrench className="h-4 w-4" />)}
+          </>
+        ) : (
+          <>
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab as typeof activeTab)}
-              className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+              type="button"
+              onClick={() => setActiveTab('details')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'details'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
               }`}
             >
-              {tab === "details" && "Details"}
-              {tab === "maintenance" && "Maintenance"}
-              {tab === "parts" && "Parts"}
+              <Settings className="h-4 w-4" />
+              Equipment Details
             </button>
-          ))}
-        </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('images')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'images'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Camera className="h-4 w-4" />
+              Equipment Images
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('documents')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'documents'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              Documents
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('parts')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'parts'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Receipt className="h-4 w-4" />
+              Parts Management
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('maintenance')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'maintenance'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Wrench className="h-4 w-4" />
+              Maintenance Reports
+            </button>
+          </>
+        )}
       </div>
 
-      {/* Tab Content */}
-      {activeTab === "details" && (
-        <div className="space-y-6">
+      {/* Details Tab */}
+      {activeTab === 'details' && (
+        <div className={`${isMobile ? 'space-y-6' : 'space-y-8'}`}>
           {/* Equipment Details */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="pb-6">
+              <CardTitle className="text-lg flex items-center gap-2">
                 <Settings className="h-5 w-5" />
                 Equipment Information
               </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                View detailed information about this equipment
+              </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Owner:</span>
-                    <span className="font-medium">{selectedEquipment.owner}</span>
+            <CardContent className="space-y-8">
+              {/* Equipment Identity Section */}
+              <div className="space-y-4">
+                <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Wrench className="h-4 w-4" />
+                      Brand
+                    </Label>
+                    <div className="font-medium text-foreground">{selectedEquipment.brand}</div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Project:</span>
-                    <span className="font-medium">
-                      {selectedEquipment.project?.name || "Unassigned"}
-                    </span>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      Model
+                    </Label>
+                    <div className="font-medium text-foreground">{selectedEquipment.model}</div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Client:</span>
-                    <span className="font-medium">
-                      {selectedEquipment.project?.client?.name || "No client"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Location:</span>
-                    <span className="font-medium">
-                      {selectedEquipment.project?.client?.location?.address || "No location"}
-                    </span>
+                  <div className="space-y-2">
+                    <Label>Equipment Type</Label>
+                    <div className="font-medium text-foreground">{selectedEquipment.type}</div>
                   </div>
 
-                  {selectedEquipment.insuranceExpirationDate && (
-                    <div className="flex items-center gap-2">
-                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Insurance Expires:</span>
-                      <span
-                        className={`font-medium ${
-                          daysUntilExpiry !== null && daysUntilExpiry <= 7
-                            ? "text-red-600"
-                            : daysUntilExpiry !== null && daysUntilExpiry <= 30
-                            ? "text-orange-600"
-                            : ""
-                        }`}
-                      >
-                        {new Date(selectedEquipment.insuranceExpirationDate).toLocaleDateString()}
-                      </span>
-                    </div>
-                  )}
-
-                  {selectedEquipment.inspectionDate && (
-                    <div className="flex items-center gap-2">
-                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Last Inspection:</span>
-                      <span className="font-medium">
-                        {new Date(selectedEquipment.inspectionDate).toLocaleDateString()}
-                      </span>
+                  {selectedEquipment.plateNumber && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <Hash className="h-4 w-4" />
+                        Plate/Serial Number
+                      </Label>
+                      <div className="font-medium text-foreground font-mono">{selectedEquipment.plateNumber}</div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {selectedEquipment.remarks && (
-                <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-                  <h4 className="font-medium text-sm mb-2">Remarks:</h4>
-                  <p className="text-sm text-muted-foreground">{selectedEquipment.remarks}</p>
+              {/* Ownership & Project Section */}
+              <div className="space-y-4">
+                <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Owner
+                    </Label>
+                    <div className="font-medium text-foreground">{selectedEquipment.owner}</div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Assigned Project</Label>
+                    <div className="font-medium text-foreground">{selectedEquipment.project?.name || "Unassigned"}</div>
+                  </div>
                 </div>
-              )}
+              </div>
+
+              {/* Status Section */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Operational Status
+                  </Label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge
+                      className={
+                        selectedEquipment.status === "OPERATIONAL"
+                          ? "bg-green-100 text-green-800 hover:bg-green-200"
+                          : "bg-red-100 text-red-800 hover:bg-red-200"
+                      }
+                    >
+                      {selectedEquipment.status}
+                    </Badge>
+
+                    {selectedEquipment.plateNumber && (
+                      <Badge variant="outline" className="flex items-center gap-1">
+                        <Wrench className="h-3 w-3" />
+                        {selectedEquipment.plateNumber}
+                      </Badge>
+                    )}
+
+                    {daysUntilExpiry !== null && daysUntilExpiry <= 30 && (
+                      <Badge
+                        className={
+                          daysUntilExpiry <= 7
+                            ? "bg-red-500 text-white hover:bg-red-600"
+                            : "bg-orange-500 text-white hover:bg-orange-600"
+                        }
+                      >
+                        {daysUntilExpiry <= 0 ? "Insurance Expired" : "Insurance Expiring Soon"}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Photos Section */}
-          {images.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle
-                  className="flex items-center justify-between cursor-pointer"
-                  onClick={() => setIsPhotosCollapsed(!isPhotosCollapsed)}
-                >
-                  <div className="flex items-center gap-2">
-                    <Camera className="h-5 w-5" />
-                    Photos ({images.length})
+          {/* Inspection & Compliance Card */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CalendarDays className="h-4 w-4" />
+                Inspection & Compliance
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Inspection schedules and compliance information
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+                {selectedEquipment.inspectionDate && (
+                  <div className="space-y-2">
+                    <Label>Last Inspection Date</Label>
+                    <div className="font-medium text-foreground">
+                      {new Date(selectedEquipment.inspectionDate).toLocaleDateString()}
+                    </div>
                   </div>
-                  {isPhotosCollapsed ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronUp className="h-4 w-4" />
-                  )}
-                </CardTitle>
-              </CardHeader>
-              {!isPhotosCollapsed && (
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {images.map((image, index) => (
-                      <div
-                        key={`${selectedEquipment.uid}-image-${index}-${image.title}`}
-                        className="relative group cursor-pointer"
-                        onClick={() => handleImageClick(image.url!, image.title)}
-                      >
-                        <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-                          <Image
-                            src={image.url!}
-                            alt={image.title}
-                            fill
-                            className="object-cover transition-transform group-hover:scale-105"
-                          />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                            <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <image.icon className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">{image.title}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          )}
+                )}
 
-          {/* Inspection Images Section */}
-          {inspectionImages.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle
-                  className="flex items-center justify-between cursor-pointer"
-                  onClick={() => setIsDocumentsCollapsed(!isDocumentsCollapsed)}
-                >
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
-                    Inspection Images ({inspectionImages.length})
+                {selectedEquipment.insuranceExpirationDate && (
+                  <div className="space-y-2">
+                    <Label>Insurance Expiration Date</Label>
+                    <div className={`font-medium ${
+                      daysUntilExpiry !== null && daysUntilExpiry <= 7
+                        ? "text-red-600"
+                        : daysUntilExpiry !== null && daysUntilExpiry <= 30
+                        ? "text-orange-600"
+                        : "text-foreground"
+                    }`}>
+                      {new Date(selectedEquipment.insuranceExpirationDate).toLocaleDateString()}
+                    </div>
                   </div>
-                  {isDocumentsCollapsed ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronUp className="h-4 w-4" />
-                  )}
-                </CardTitle>
-              </CardHeader>
-              {!isDocumentsCollapsed && (
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {inspectionImages.map((image, index) => (
-                      <div
-                        key={`${selectedEquipment.uid}-inspection-${index}-${image.title}`}
-                        className="relative group cursor-pointer"
-                        onClick={() => handleImageClick(image.url!, image.title)}
-                      >
-                        <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-                          <img
-                            src={image.url!}
-                            alt={image.title}
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                          />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                            <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <image.icon className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">{image.title}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          )}
+                )}
 
-          {/* Documents Section */}
-          {documents.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Client</Label>
+                  <div className="font-medium text-foreground">{selectedEquipment.project?.client?.name || "No client"}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Additional Information */}
+          {selectedEquipment.remarks && (
             <Card>
-              <CardHeader>
-                <CardTitle
-                  className="flex items-center justify-between cursor-pointer"
-                  onClick={() => setIsDocumentsCollapsed(!isDocumentsCollapsed)}
-                >
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Documents ({documents.length})
-                  </div>
-                  {isDocumentsCollapsed ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronUp className="h-4 w-4" />
-                  )}
-                </CardTitle>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base">Additional Notes</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Special notes and remarks about this equipment
+                </p>
               </CardHeader>
-              {!isDocumentsCollapsed && (
-                <CardContent>
-                  <div className="space-y-3">
-                    {documents.map((document, index) => (
-                      <div
-                        key={`${selectedEquipment.uid}-document-${index}-${document.title}`}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <document.icon className="h-5 w-5 text-muted-foreground" />
-                          <span className="font-medium">{document.title}</span>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          asChild
-                          className="gap-2"
-                        >
-                          <a href={document.url!} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-4 w-4" />
-                            View
-                          </a>
-                        </Button>
-                      </div>
-                    ))}
+              <CardContent>
+                <div className="space-y-2">
+                  <Label>Remarks</Label>
+                  <div className="p-3 bg-muted/50 rounded-lg text-sm text-foreground">
+                    {selectedEquipment.remarks}
                   </div>
-                </CardContent>
-              )}
+                </div>
+              </CardContent>
             </Card>
           )}
         </div>
       )}
 
-      {activeTab === "maintenance" && (
-        <div>
+      {/* Images Tab - EXACTLY like CreateEquipmentForm */}
+      {activeTab === 'images' && (
+        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Camera className="h-4 w-4" />
+                Equipment Images {isMobile ? '' : ''}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Photos and inspection images for this equipment. These images help with identification, insurance claims, and maintenance records.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  {/* Equipment Image */}
+                  {selectedEquipment.image_url && (
+                    <ImageViewerSection 
+                      url={selectedEquipment.image_url}
+                      label="Equipment Image" 
+                      description="Equipment Image"
+                    />
+                  )}
+                  
+                  {/* Third-party Inspection */}
+                  {selectedEquipment.thirdpartyInspectionImage && (
+                    <ImageViewerSection 
+                      url={selectedEquipment.thirdpartyInspectionImage}
+                      label="Third-party Inspection" 
+                      description="Third-party Inspection"
+                    />
+                  )}
+                  
+                  {/* PGPC Inspection */}
+                  {selectedEquipment.pgpcInspectionImage && (
+                    <ImageViewerSection 
+                      url={selectedEquipment.pgpcInspectionImage}
+                      label="PGPC Inspection" 
+                      description="PGPC Inspection"
+                    />
+                  )}
+                </div>
+                {!selectedEquipment.image_url && !selectedEquipment.thirdpartyInspectionImage && !selectedEquipment.pgpcInspectionImage && (
+                  <div className="text-center py-8">
+                    <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <p className="text-muted-foreground">No images available for this equipment</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Documents Tab - EXACTLY like CreateEquipmentForm */}
+      {activeTab === 'documents' && (
+        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Documents {isMobile ? '' : ''}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Important equipment documents for compliance and record-keeping. Accepted formats: PDF and image files.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  {/* Original Receipt (OR) */}
+                  {selectedEquipment.originalReceiptUrl && (
+                    <ImageViewerSection 
+                      url={selectedEquipment.originalReceiptUrl}
+                      label="Original Receipt (OR)" 
+                      description="Proof of purchase document"
+                    />
+                  )}
+                  
+                  {/* Equipment Registration */}
+                  {selectedEquipment.equipmentRegistrationUrl && (
+                    <ImageViewerSection 
+                      url={selectedEquipment.equipmentRegistrationUrl}
+                      label="Equipment Registration" 
+                      description="Official equipment registration certificate"
+                    />
+                  )}
+                </div>
+                {!selectedEquipment.originalReceiptUrl && !selectedEquipment.equipmentRegistrationUrl && (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                    <p className="text-muted-foreground">No documents available for this equipment</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Parts Tab */}
+      {activeTab === 'parts' && (
+        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
+          <EquipmentPartsViewer equipmentParts={selectedEquipment.equipmentParts} />
+        </div>
+      )}
+
+      {/* Maintenance Tab */}
+      {activeTab === 'maintenance' && (
+        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
           <EquipmentMaintenanceReportsEnhanced equipmentId={selectedEquipment.uid} />
         </div>
       )}
 
-      {activeTab === "parts" && (
-        <div>
-          <p className="text-muted-foreground text-center py-8">
-            Equipment parts management functionality will be implemented soon.
-          </p>
-        </div>
-      )}
     </div>
   );
 
@@ -527,70 +647,126 @@ export default function EquipmentModalModern() {
     return <EditEquipmentModalModern />;
   }
 
-  return (
-    <>
-      {isMobile ? (
-        <Drawer open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DrawerContent className="max-h-[90vh]">
-            <DrawerHeader className="pb-2">
-              <DrawerTitle className="sr-only">Equipment Details</DrawerTitle>
-            </DrawerHeader>
-            <div className="px-4 pb-4 overflow-y-auto">
-              <ModalContent />
-            </div>
-            <DrawerFooter>
+  // Mobile drawer implementation
+  if (isMobile) {
+    return (
+      <>
+        <Drawer open={isModalOpen} onOpenChange={handleClose}>
+          <DrawerContent className="!max-h-[95vh]">
+            {/* Mobile Header - Exact copy from CreateEquipmentModalModern */}
+            <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
               <DrawerClose asChild>
-                <Button variant="outline" onClick={handleClose}>
-                  Close
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="absolute right-4 top-4 rounded-full h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
                 </Button>
               </DrawerClose>
+              <div className="text-center space-y-2">
+                <DrawerTitle className="text-xl font-bold">
+                  {selectedEquipment.brand} {selectedEquipment.model}
+                </DrawerTitle>
+                <p className="text-sm text-muted-foreground">
+                  View equipment details and maintenance records
+                </p>
+              </div>
+            </DrawerHeader>
+            
+            {/* Mobile Content - Exact copy from CreateEquipmentModalModern */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <ModalContent />
+            </div>
+            
+            {/* Mobile Action Buttons in Footer */}
+            <DrawerFooter className="p-4 pt-2 border-t bg-background">
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleEdit}
+                  className="flex-1"
+                  size="lg"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Equipment
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={deleteEquipmentMutation.isPending}
+                  className="flex-1"
+                  size="lg"
+                >
+                  {deleteEquipmentMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Delete Equipment
+                </Button>
+              </div>
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
-      ) : (
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="sr-only">Equipment Details</DialogTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-4 top-4"
-                onClick={handleClose}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogHeader>
+      </>
+    );
+  }
+
+  // Desktop dialog implementation - Exact copy from CreateEquipmentModalModern
+  return (
+    <>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent 
+          className="!max-w-none !w-[55vw] max-h-[95vh] overflow-hidden flex flex-col p-6"
+          style={{ maxWidth: '55vw', width: '55vw' }}
+        >
+          <DialogHeader className="flex-shrink-0 pb-4">
+            <DialogTitle className="text-xl">{selectedEquipment.brand} {selectedEquipment.model}</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              View equipment details, maintenance records, and documentation
+            </p>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto">
             <ModalContent />
-            <DialogFooter>
-              <Button variant="outline" onClick={handleClose}>
-                Close
+          </div>
+          
+          {/* Desktop Action Buttons in Footer */}
+          <DialogFooter className="pt-4 border-t bg-background">
+            <div className="flex gap-2 w-full">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleEdit}
+                className="flex-1"
+                size="lg"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Equipment
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-      
-      {/* Image Viewer Modal - Exact same as PartsFolderManager */}
-      {showImageViewer && viewerImageData && (
-        <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
-          <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
-            <DialogHeader className="pb-4">
-              <DialogTitle className="text-center">
-                {viewerImageData.title}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="flex items-center justify-center">
-              <img
-                src={viewerImageData.url}
-                alt={viewerImageData.title}
-                className="max-w-full max-h-[70vh] object-contain"
-                onClick={(e) => e.stopPropagation()}
-              />
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleteEquipmentMutation.isPending}
+                className="flex-1"
+                size="lg"
+              >
+                {deleteEquipmentMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Delete Equipment
+              </Button>
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </>
   );
 }

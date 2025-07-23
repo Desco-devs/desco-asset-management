@@ -534,24 +534,14 @@ export function ProjectsTable() {
                 <TableRow key={project.id || `project-${index}`}>
                   <TableCell className="font-medium">{project.name}</TableCell>
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium">
-                        {project.client?.name}
-                      </span>
-                      <span className="font-medium">
-                        {project.client?.name}
-                      </span>
-                    </div>
+                    <span className="font-medium">
+                      {project.client?.name}
+                    </span>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span className="text-sm">
-                        {project.client?.location?.address}
-                      </span>
-                      <span className="text-sm">
-                        {project.client?.location?.address}
-                      </span>
-                    </div>
+                    <span className="text-sm">
+                      {project.client?.location?.address}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">
@@ -643,7 +633,6 @@ export function ProjectsTable() {
         ) : paginationData.paginatedProjects.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
-              {projectTable.search ? "No projects found" : "No projects yet"}
               {projectTable.search ? "No projects found" : "No projects yet"}
             </CardContent>
           </Card>

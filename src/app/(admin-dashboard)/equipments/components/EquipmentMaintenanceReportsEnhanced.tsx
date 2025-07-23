@@ -36,7 +36,7 @@ export default function EquipmentMaintenanceReportsEnhanced({
   equipmentId,
 }: EquipmentMaintenanceReportsEnhancedProps) {
   const { data: maintenanceReports = [], isLoading } = useEquipmentMaintenanceReports();
-  const { setIsEquipmentMaintenanceModalOpen, setSelectedEquipmentMaintenanceReport } =
+  const { setIsEquipmentMaintenanceModalOpen, setSelectedEquipmentMaintenanceReport, setIsModalOpen } =
     useEquipmentsStore();
   const deleteMaintenanceReportMutation = useDeleteEquipmentMaintenanceReport();
 
@@ -138,7 +138,13 @@ export default function EquipmentMaintenanceReportsEnhanced({
             </p>
           </div>
           <Button
-            onClick={() => setIsEquipmentMaintenanceModalOpen(true)}
+            onClick={() => {
+              setIsModalOpen(false); // Close detail drawer first
+              // Use setTimeout to ensure detail drawer closes before opening report drawer
+              setTimeout(() => {
+                setIsEquipmentMaintenanceModalOpen(true); // Then open report drawer
+              }, 100); // Small delay to allow state transition
+            }}
             className="gap-2"
           >
             <Plus className="h-4 w-4" />
@@ -157,7 +163,13 @@ export default function EquipmentMaintenanceReportsEnhanced({
               your first report
             </p>
             <Button
-              onClick={() => setIsEquipmentMaintenanceModalOpen(true)}
+              onClick={() => {
+                setIsModalOpen(false); // Close detail drawer first
+                // Use setTimeout to ensure detail drawer closes before opening report drawer
+                setTimeout(() => {
+                  setIsEquipmentMaintenanceModalOpen(true); // Then open report drawer
+                }, 100); // Small delay to allow state transition
+              }}
               className="gap-2"
             >
               <Plus className="h-4 w-4" />

@@ -121,7 +121,7 @@ export function ExportDialog({ isOpen, onClose, equipments = [] }: ExportDialogP
               value={filters.reportType}
               onValueChange={(value) => setFilters(prev => ({ ...prev, reportType: value as 'summary' | 'detailed' }))}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select report type" />
               </SelectTrigger>
               <SelectContent>
@@ -141,7 +141,7 @@ export function ExportDialog({ isOpen, onClose, equipments = [] }: ExportDialogP
               value={filters.equipmentId || 'ALL_EQUIPMENTS'}
               onValueChange={(value) => setFilters(prev => ({ ...prev, equipmentId: value }))}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="All equipment" />
               </SelectTrigger>
               <SelectContent>
@@ -162,7 +162,7 @@ export function ExportDialog({ isOpen, onClose, equipments = [] }: ExportDialogP
               value={filters.status || 'ALL_STATUS'}
               onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="All status" />
               </SelectTrigger>
               <SelectContent>
@@ -182,7 +182,7 @@ export function ExportDialog({ isOpen, onClose, equipments = [] }: ExportDialogP
               value={filters.priority || 'ALL_PRIORITIES'}
               onValueChange={(value) => setFilters(prev => ({ ...prev, priority: value }))}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="All priorities" />
               </SelectTrigger>
               <SelectContent>
