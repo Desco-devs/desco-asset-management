@@ -10,7 +10,6 @@ import type {
 
 /**
  * Fetch essential dashboard data (counts and basic stats) - FAST
- * Fetch essential dashboard data (counts and basic stats) - FAST
  */
 export async function fetchDashboardData() {
   console.log('🔄 fetchDashboardData: Starting...');
@@ -115,18 +114,11 @@ async function fetchVehicleCounts() {
 
 /**
  * Fetch locations - SIMPLE VERSION (no deep joins)
- * Fetch locations - SIMPLE VERSION (no deep joins)
  */
-async function fetchLocationsSimple(): Promise<LocationData[]> {
 async function fetchLocationsSimple(): Promise<LocationData[]> {
   const locations = await prisma.location.findMany({
     take: 15,
     orderBy: { created_at: "desc" },
-    select: {
-      id: true,
-      address: true,
-      created_at: true,
-      created_by: true,
     select: {
       id: true,
       address: true,
@@ -150,9 +142,7 @@ async function fetchLocationsSimple(): Promise<LocationData[]> {
 
 /**
  * Fetch clients - SIMPLE VERSION
- * Fetch clients - SIMPLE VERSION
  */
-async function fetchClientsSimple(): Promise<ClientData[]> {
 async function fetchClientsSimple(): Promise<ClientData[]> {
   return prisma.client.findMany({
     take: 15,
@@ -176,7 +166,6 @@ async function fetchClientsSimple(): Promise<ClientData[]> {
  * Fetch projects - SIMPLE VERSION
  */
 async function fetchProjectsSimple(): Promise<ProjectData[]> {
-async function fetchProjectsSimple(): Promise<ProjectData[]> {
   return prisma.project.findMany({
     take: 15,
     orderBy: { created_at: "desc" },
@@ -187,16 +176,8 @@ async function fetchProjectsSimple(): Promise<ProjectData[]> {
       created_at: true,
       updated_at: true,
       created_by: true,
-    select: {
-      id: true,
-      name: true,
-      client_id: true,
-      created_at: true,
-      updated_at: true,
-      created_by: true,
       client: {
         select: {
-          id: true,
           id: true,
           name: true,
           location: { select: { address: true } },
@@ -210,9 +191,7 @@ async function fetchProjectsSimple(): Promise<ProjectData[]> {
 
 /**
  * Fetch recent equipment - SIMPLE VERSION (no deep joins)
- * Fetch recent equipment - SIMPLE VERSION (no deep joins)
  */
-async function fetchEquipmentListSimple(): Promise<EquipmentData[]> {
 async function fetchEquipmentListSimple(): Promise<EquipmentData[]> {
   const equipment = await prisma.equipment.findMany({
     take: 10,
@@ -227,20 +206,7 @@ async function fetchEquipmentListSimple(): Promise<EquipmentData[]> {
       created_at: true,
       inspection_date: true,
       project_id: true,
-    select: {
-      id: true,
-      brand: true,
-      model: true,
-      type: true,
-      status: true,
-      owner: true,
-      created_at: true,
-      inspection_date: true,
-      project_id: true,
       project: {
-        select: {
-          id: true,
-          name: true,
         select: {
           id: true,
           name: true,
@@ -273,9 +239,7 @@ async function fetchEquipmentListSimple(): Promise<EquipmentData[]> {
 
 /**
  * Fetch recent vehicles - SIMPLE VERSION (no deep joins)
- * Fetch recent vehicles - SIMPLE VERSION (no deep joins)
  */
-async function fetchVehiclesListSimple(): Promise<VehicleData[]> {
 async function fetchVehiclesListSimple(): Promise<VehicleData[]> {
   const vehicles = await prisma.vehicle.findMany({
     take: 10,
@@ -291,21 +255,7 @@ async function fetchVehiclesListSimple(): Promise<VehicleData[]> {
       created_at: true,
       inspection_date: true,
       project_id: true,
-    select: {
-      id: true,
-      brand: true,
-      model: true,
-      type: true,
-      plate_number: true,
-      status: true,
-      owner: true,
-      created_at: true,
-      inspection_date: true,
-      project_id: true,
       project: {
-        select: {
-          id: true,
-          name: true,
         select: {
           id: true,
           name: true,
@@ -339,7 +289,6 @@ async function fetchVehiclesListSimple(): Promise<VehicleData[]> {
 
 /**
  * Fetch recent maintenance reports - SIMPLE VERSION (no deep joins)
- * Fetch recent maintenance reports - SIMPLE VERSION (no deep joins)
  */
 async function fetchMaintenanceReportsSimple(): Promise<MaintenanceReportData[]> {
   const reports = await prisma.maintenance_equipment_report.findMany({
@@ -355,11 +304,6 @@ async function fetchMaintenanceReportsSimple(): Promise<MaintenanceReportData[]>
       equipment_id: true,
       location_id: true,
       equipment: {
-        select: {
-          id: true,
-          brand: true,
-          model: true,
-          type: true,
         select: {
           id: true,
           brand: true,

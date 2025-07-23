@@ -1,23 +1,5 @@
 "use client";
-"use client";
 
-import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
 import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,11 +29,6 @@ import { useDeleteLocation, useLocations } from "@/hooks/api/use-projects";
 import { useLocationTable, useProjectsStore } from "@/stores/projects-store";
 import type { Location } from "@/types/projects";
 import { formatDistanceToNow } from "date-fns";
-} from "@/components/ui/table";
-import { useDeleteLocation, useLocations } from "@/hooks/api/use-projects";
-import { useLocationTable, useProjectsStore } from "@/stores/projects-store";
-import type { Location } from "@/types/projects";
-import { formatDistanceToNow } from "date-fns";
 import {
   ChevronLeft,
   ChevronRight,
@@ -65,22 +42,7 @@ import {
 } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
-  ChevronLeft,
-  ChevronRight,
-  Edit,
-  List,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Trash2,
-  X,
-} from "lucide-react";
-import React from "react";
-import { toast } from "sonner";
 
-export function LocationsTable() {
-  const { data: locations, isLoading, error } = useLocations();
-  const { mutate: deleteLocation, isPending: isDeleting } = useDeleteLocation();
 export function LocationsTable() {
   const { data: locations, isLoading, error } = useLocations();
   const { mutate: deleteLocation, isPending: isDeleting } = useDeleteLocation();
@@ -88,18 +50,7 @@ export function LocationsTable() {
   const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
   const [locationToDelete, setLocationToDelete] =
     React.useState<Location | null>(null);
-  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
-  const [locationToDelete, setLocationToDelete] =
-    React.useState<Location | null>(null);
 
-  const setModal = useProjectsStore((state) => state.setLocationModal);
-  const locationTable = useLocationTable();
-  const setLocationTable = useProjectsStore((state) => state.setLocationTable);
-
-  const setIsMobile = useProjectsStore((state) => state.setIsMobile);
-  const getEffectiveLocationItemsPerPage = useProjectsStore(
-    (state) => state.getEffectiveLocationItemsPerPage
-  );
   const setModal = useProjectsStore((state) => state.setLocationModal);
   const locationTable = useLocationTable();
   const setLocationTable = useProjectsStore((state) => state.setLocationTable);
@@ -119,17 +70,8 @@ export function LocationsTable() {
     window.addEventListener("resize", checkIsMobile);
     return () => window.removeEventListener("resize", checkIsMobile);
   }, [setIsMobile]);
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    checkIsMobile();
-    window.addEventListener("resize", checkIsMobile);
-    return () => window.removeEventListener("resize", checkIsMobile);
-  }, [setIsMobile]);
 
   const handleEdit = (location: Location) => {
-    setModal(true, location.id);
-  };
     setModal(true, location.id);
   };
 
@@ -137,20 +79,12 @@ export function LocationsTable() {
     setLocationToDelete(location);
     setDeleteModalOpen(true);
   };
-    setLocationToDelete(location);
-    setDeleteModalOpen(true);
-  };
 
   const handleConfirmDelete = () => {
     if (!locationToDelete) return;
 
-    if (!locationToDelete) return;
-
     deleteLocation(locationToDelete.id, {
       onSuccess: () => {
-        toast.success("Location deleted successfully");
-        setDeleteModalOpen(false);
-        setLocationToDelete(null);
         toast.success("Location deleted successfully");
         setDeleteModalOpen(false);
         setLocationToDelete(null);
@@ -160,24 +94,12 @@ export function LocationsTable() {
       },
     });
   };
-        toast.error("Failed to delete location: " + error.message);
-      },
-    });
-  };
 
   const handleSearch = (value: string) => {
     setLocationTable({ search: value, page: 1 });
   };
-    setLocationTable({ search: value, page: 1 });
-  };
 
   const handleSort = (sortBy: typeof locationTable.sortBy) => {
-    const sortOrder =
-      locationTable.sortBy === sortBy && locationTable.sortOrder === "asc"
-        ? "desc"
-        : "asc";
-    setLocationTable({ sortBy, sortOrder });
-  };
     const sortOrder =
       locationTable.sortBy === sortBy && locationTable.sortOrder === "asc"
         ? "desc"
@@ -197,29 +119,12 @@ export function LocationsTable() {
         .includes(locationTable.search.toLowerCase())
     );
   }, [locations, locationTable.search]);
-    if (!locations) return [];
-
-    if (!locationTable.search) return locations;
-
-    return locations.filter((location) =>
-      location.address
-        .toLowerCase()
-        .includes(locationTable.search.toLowerCase())
-    );
-  }, [locations, locationTable.search]);
 
   // Sort locations
   const sortedLocations = React.useMemo(() => {
     if (!filteredLocations.length) return [];
 
-    if (!filteredLocations.length) return [];
-
     return [...filteredLocations].sort((a, b) => {
-      const aValue = a[locationTable.sortBy];
-      const bValue = b[locationTable.sortBy];
-
-      if (locationTable.sortOrder === "asc") {
-        return aValue > bValue ? 1 : -1;
       const aValue = a[locationTable.sortBy];
       const bValue = b[locationTable.sortBy];
 
@@ -229,20 +134,9 @@ export function LocationsTable() {
       return aValue < bValue ? 1 : -1;
     });
   }, [filteredLocations, locationTable.sortBy, locationTable.sortOrder]);
-      return aValue < bValue ? 1 : -1;
-    });
-  }, [filteredLocations, locationTable.sortBy, locationTable.sortOrder]);
 
   // Pagination logic
   const paginationData = React.useMemo(() => {
-    const itemsPerPage = getEffectiveLocationItemsPerPage();
-    const startIndex = (locationTable.page - 1) * itemsPerPage;
-    const paginatedLocations = sortedLocations.slice(
-      startIndex,
-      startIndex + itemsPerPage
-    );
-    const totalPages = Math.ceil(sortedLocations.length / itemsPerPage);
-
     const itemsPerPage = getEffectiveLocationItemsPerPage();
     const startIndex = (locationTable.page - 1) * itemsPerPage;
     const paginatedLocations = sortedLocations.slice(
@@ -258,14 +152,9 @@ export function LocationsTable() {
       currentPage: locationTable.page,
     };
   }, [sortedLocations, locationTable.page, getEffectiveLocationItemsPerPage]);
-      currentPage: locationTable.page,
-    };
-  }, [sortedLocations, locationTable.page, getEffectiveLocationItemsPerPage]);
 
   // Pagination handlers
   const handlePageChange = (newPage: number) => {
-    setLocationTable({ page: newPage });
-  };
     setLocationTable({ page: newPage });
   };
 
@@ -274,7 +163,6 @@ export function LocationsTable() {
       <div className="text-center py-8 text-red-600">
         Error loading locations: {error.message}
       </div>
-    );
     );
   }
 
@@ -314,14 +202,8 @@ export function LocationsTable() {
                 return locationTable.sortOrder === "desc"
                   ? "created_at"
                   : "created_at_old";
-                return locationTable.sortOrder === "desc"
-                  ? "created_at"
-                  : "created_at_old";
               }
               if (locationTable.sortBy === "address") {
-                return locationTable.sortOrder === "asc"
-                  ? "address"
-                  : "address_desc";
                 return locationTable.sortOrder === "asc"
                   ? "address"
                   : "address_desc";
@@ -332,7 +214,6 @@ export function LocationsTable() {
             })()}
             onValueChange={(value) => {
               if (value === "clear-sort") {
-                handleSort("address"); // Reset to default
                 handleSort("address"); // Reset to default
                 return;
               }
@@ -386,19 +267,11 @@ export function LocationsTable() {
               <Badge variant="secondary" className="gap-1 pr-1">
                 Sort:{" "}
                 {(() => {
-                Sort:{" "}
-                {(() => {
                   if (locationTable.sortBy === "created_at")
                     return locationTable.sortOrder === "desc"
                       ? "Newest Added"
                       : "Oldest Added";
-                    return locationTable.sortOrder === "desc"
-                      ? "Newest Added"
-                      : "Oldest Added";
                   if (locationTable.sortBy === "address")
-                    return locationTable.sortOrder === "asc"
-                      ? "Address A-Z"
-                      : "Address Z-A";
                     return locationTable.sortOrder === "asc"
                       ? "Address A-Z"
                       : "Address Z-A";
@@ -411,9 +284,6 @@ export function LocationsTable() {
                   onClick={() =>
                     setLocationTable({ sortBy: undefined, sortOrder: "asc" })
                   }
-                  onClick={() =>
-                    setLocationTable({ sortBy: undefined, sortOrder: "asc" })
-                  }
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -423,12 +293,10 @@ export function LocationsTable() {
             {locationTable.search && (
               <Badge variant="secondary" className="gap-1 pr-1">
                 Search: {locationTable.search}
-                Search: {locationTable.search}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
-                  onClick={() => handleSearch("")}
                   onClick={() => handleSearch("")}
                 >
                   <X className="h-3 w-3" />
@@ -441,8 +309,6 @@ export function LocationsTable() {
               variant="outline"
               size="sm"
               onClick={() => {
-                handleSearch("");
-                setLocationTable({ sortBy: undefined, sortOrder: "asc" });
                 handleSearch("");
                 setLocationTable({ sortBy: undefined, sortOrder: "asc" });
               }}
@@ -460,31 +326,23 @@ export function LocationsTable() {
           <TableHeader>
             <TableRow>
               <TableHead
-              <TableHead
                 className="cursor-pointer select-none"
-                onClick={() => handleSort("address")}
                 onClick={() => handleSort("address")}
               >
                 Address
                 {locationTable.sortBy === "address" && (
-                {locationTable.sortBy === "address" && (
                   <span className="ml-1">
-                    {locationTable.sortOrder === "asc" ? "↑" : "↓"}
                     {locationTable.sortOrder === "asc" ? "↑" : "↓"}
                   </span>
                 )}
               </TableHead>
               <TableHead
-              <TableHead
                 className="cursor-pointer select-none"
-                onClick={() => handleSort("created_at")}
                 onClick={() => handleSort("created_at")}
               >
                 Created
                 {locationTable.sortBy === "created_at" && (
-                {locationTable.sortBy === "created_at" && (
                   <span className="ml-1">
-                    {locationTable.sortOrder === "asc" ? "↑" : "↓"}
                     {locationTable.sortOrder === "asc" ? "↑" : "↓"}
                   </span>
                 )}
@@ -505,17 +363,12 @@ export function LocationsTable() {
                   {locationTable.search
                     ? "No locations found"
                     : "No locations yet"}
-                  {locationTable.search
-                    ? "No locations found"
-                    : "No locations yet"}
                 </TableCell>
               </TableRow>
             ) : (
               paginationData.paginatedLocations.map((location, index) => (
                 <TableRow
-                <TableRow
                   key={location.id || `location-${index}`}
-                  className="hover:bg-muted/50"
                   className="hover:bg-muted/50"
                 >
                   <TableCell className="font-medium">
@@ -534,24 +387,10 @@ export function LocationsTable() {
                           }
                         })()
                       : "Just now"}
-                    {location.created_at
-                      ? (() => {
-                          try {
-                            const date = new Date(location.created_at);
-                            return isNaN(date.getTime())
-                              ? "Just now"
-                              : formatDistanceToNow(date, { addSuffix: true });
-                          } catch {
-                            return "Just now";
-                          }
-                        })()
-                      : "Just now"}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
                         <Button
                           variant="ghost"
                           className="h-8 w-8 p-0"
@@ -567,22 +406,12 @@ export function LocationsTable() {
                             handleEdit(location);
                           }}
                         >
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(location);
-                          }}
-                        >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                        <DropdownMenuItem
                           className="text-red-600"
                           onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleDelete(location);
                             e.preventDefault();
                             e.stopPropagation();
                             handleDelete(location);
@@ -630,9 +459,6 @@ export function LocationsTable() {
             <Card
               key={location.id || `location-${index}`}
               className="hover:shadow-md transition-all duration-200"
-            <Card
-              key={location.id || `location-${index}`}
-              className="hover:shadow-md transition-all duration-200"
             >
               <CardContent className="p-4">
                 <div className="flex flex-col space-y-3">
@@ -651,8 +477,6 @@ export function LocationsTable() {
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
-                        <Button
-                          variant="ghost"
                           className="h-8 w-8 p-0"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -661,11 +485,7 @@ export function LocationsTable() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                        <DropdownMenuItem
                           onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleEdit(location);
                             e.preventDefault();
                             e.stopPropagation();
                             handleEdit(location);
@@ -675,12 +495,8 @@ export function LocationsTable() {
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                        <DropdownMenuItem
                           className="text-red-600"
                           onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleDelete(location);
                             e.preventDefault();
                             e.stopPropagation();
                             handleDelete(location);
@@ -776,8 +592,6 @@ export function LocationsTable() {
         <div className="text-sm text-muted-foreground">
           Showing {paginationData.paginatedLocations.length} of{" "}
           {sortedLocations.length} locations
-          Showing {paginationData.paginatedLocations.length} of{" "}
-          {sortedLocations.length} locations
           {sortedLocations.length < locations.length && (
             <span className="ml-2">
               (filtered from {locations.length} total)
@@ -803,7 +617,6 @@ export function LocationsTable() {
         confirmText="Delete Location"
       />
     </div>
-  );
   );
 }
 
