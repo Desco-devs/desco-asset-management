@@ -216,7 +216,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
 
       {/* Details Tab */}
       {activeTab === 'details' && (
-        <div className={`${isMobile ? 'space-y-6' : 'space-y-6'}`}>
+        <div className={`${isMobile ? 'space-y-6' : 'space-y-8'}`}>
           {/* Vehicle Information - Full Width Layout */}
           <Card>
             <CardHeader className="pb-6">

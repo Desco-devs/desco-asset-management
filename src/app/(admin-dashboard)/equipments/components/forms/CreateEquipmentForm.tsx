@@ -220,32 +220,85 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-      {/* Mobile Tab Navigation */}
-      {isMobile && (
-        <div className="grid w-full grid-cols-4 mb-4 bg-muted rounded-md p-1">
-          {renderTabButton('details', 'Details', <Settings className="h-4 w-4" />)}
-          {renderTabButton('photos', 'Photos', <Camera className="h-4 w-4" />)}
-          {renderTabButton('documents', 'Documents', <FileText className="h-4 w-4" />)}
-          {renderTabButton('parts', 'Parts', <Wrench className="h-4 w-4" />)}
-        </div>
-      )}
+      {/* Tab Navigation - All Screen Sizes */}
+      <div className={`w-full mb-6 ${isMobile ? 'grid grid-cols-4 bg-muted rounded-md p-1' : 'flex justify-center border-b'}`}>
+        {isMobile ? (
+          <>
+            {renderTabButton('details', 'Details', <Settings className="h-4 w-4" />)}
+            {renderTabButton('photos', 'Photos', <Camera className="h-4 w-4" />)}
+            {renderTabButton('documents', 'Documents', <FileText className="h-4 w-4" />)}
+            {renderTabButton('parts', 'Parts', <Wrench className="h-4 w-4" />)}
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setActiveTab('details')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'details'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Settings className="h-4 w-4" />
+              Equipment Details
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('photos')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'photos'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Camera className="h-4 w-4" />
+              Equipment Images
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('documents')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'documents'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              Documents
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('parts')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'parts'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Wrench className="h-4 w-4" />
+              Parts Management
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Details Tab */}
-      {(!isMobile || activeTab === 'details') && (
-        <div className="space-y-6">
+      {activeTab === 'details' && (
+        <div className={`${isMobile ? 'space-y-6' : 'space-y-8'}`}>
           <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Settings className="h-4 w-4" />
+            <CardHeader className="pb-6">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Settings className="h-5 w-5" />
                 Equipment Information
               </CardTitle>
               <p className="text-sm text-muted-foreground">
                 Enter the basic information about your equipment
               </p>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Equipment Identity Section */}
-              <div className="grid grid-cols-1 gap-4">
+            <CardContent>
+              {/* Equipment Identity Section - Wide Grid */}
+              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                 <div className="space-y-2">
                   <Label htmlFor="brand" className="flex items-center gap-2">
                     <Wrench className="h-4 w-4" />
@@ -309,7 +362,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
               </div>
 
               {/* Ownership & Project Section */}
-              <div className="grid grid-cols-1 gap-4">
+              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
                 <div className="space-y-2">
                   <Label htmlFor="owner" className="flex items-center gap-2">
                     <User className="h-4 w-4" />
@@ -371,8 +424,8 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
                 Set up inspection schedules and compliance dates
               </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
+            <CardContent>
+              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
                 <div className="space-y-2">
                   <Label>Last Inspection Date</Label>
                   <Popover>
@@ -477,7 +530,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       )}
 
       {/* Photos Tab */}
-      {(!isMobile || activeTab === 'photos') && (
+      {activeTab === 'photos' && (
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
           <Card>
             <CardHeader className="pb-3">
@@ -491,7 +544,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
                   <FileUploadSectionSimple
                     label="Equipment Image"
                     accept="image/*"
@@ -526,7 +579,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       )}
 
       {/* Documents Tab */}
-      {(!isMobile || activeTab === 'documents') && (
+      {activeTab === 'documents' && (
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
           <Card>
             <CardHeader className="pb-3">
@@ -540,7 +593,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
                   <div className="space-y-2">
                     <FileUploadSectionSimple
                       label="Original Receipt (OR)"
@@ -572,7 +625,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       )}
 
       {/* Parts Tab */}
-      {(!isMobile || activeTab === 'parts') && (
+      {activeTab === 'parts' && (
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
           <Card>
             <CardHeader className="pb-3">

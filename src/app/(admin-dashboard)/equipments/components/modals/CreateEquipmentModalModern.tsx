@@ -89,15 +89,21 @@ export default function CreateEquipmentModalModern() {
     );
   }
 
-  // Desktop dialog implementation
+  // Desktop dialog implementation  
   return (
     <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create New Equipment</DialogTitle>
+      <DialogContent 
+        className="!max-w-none !w-[55vw] max-h-[95vh] overflow-hidden flex flex-col p-6"
+        style={{ maxWidth: '55vw', width: '55vw' }}
+      >
+        <DialogHeader className="flex-shrink-0 pb-4">
+          <DialogTitle className="text-xl">Create New Equipment</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Add new equipment to your inventory with comprehensive details
+          </p>
         </DialogHeader>
         
-        <div className="py-4">
+        <div className="flex-1 overflow-y-auto">
           <CreateEquipmentForm 
             projects={projects.map(p => ({
               id: p.uid,
