@@ -592,13 +592,47 @@ export function ProjectsTable() {
             >
               <CardContent className="p-4">
                 <div className="flex flex-col space-y-3">
-                  {/* Header with title and eye icon */}
+                  {/* Header with title and actions */}
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-base leading-tight">{project.name}</h3>
                     </div>
-                    {/* Eye icon - Visual indicator for clickable card */}
-                    <Eye className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    {/* Actions dropdown */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleEdit(project)
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-red-600"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDelete(project)
+                          }}
+                          disabled={isDeleting}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
 
                   {/* Equipment and Vehicle badges */}
@@ -640,6 +674,7 @@ export function ProjectsTable() {
                       })()
                     ) : 'Just now'}
                   </div>
+
                 </div>
               </CardContent>
             </Card>

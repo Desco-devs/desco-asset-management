@@ -149,6 +149,26 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
     })
   }, [filteredClients, clientTable.sortBy, clientTable.sortOrder])
 
+  // Pagination logic
+  const paginationData = React.useMemo(() => {
+    const itemsPerPage = getEffectiveClientItemsPerPage()
+    const startIndex = (clientTable.page - 1) * itemsPerPage
+    const paginatedClients = sortedClients.slice(startIndex, startIndex + itemsPerPage)
+    const totalPages = Math.ceil(sortedClients.length / itemsPerPage)
+    
+    return {
+      paginatedClients,
+      totalPages,
+      itemsPerPage,
+      currentPage: clientTable.page
+    }
+  }, [sortedClients, clientTable.page, getEffectiveClientItemsPerPage])
+
+  // Pagination handlers
+  const handlePageChange = (newPage: number) => {
+    setClientTable({ page: newPage })
+  }
+
   if (error) {
     return (
       <div className="text-center py-8 text-red-600">
@@ -391,14 +411,14 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
                   Loading clients...
                 </TableCell>
               </TableRow>
-            ) : sortedClients.length === 0 ? (
+            ) : paginationData.paginatedClients.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-8">
                   {clientTable.search ? 'No clients found' : 'No clients yet'}
                 </TableCell>
               </TableRow>
             ) : (
-              sortedClients.map((client, index) => (
+              paginationData.paginatedClients.map((client, index) => (
                 <TableRow 
                   key={client.id || `client-${index}`}
                   className="cursor-pointer hover:bg-muted/50"
@@ -487,14 +507,14 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
               </CardContent>
             </Card>
           ))
-        ) : sortedClients.length === 0 ? (
+        ) : paginationData.paginatedClients.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
               {clientTable.search ? 'No clients found' : 'No clients yet'}
             </CardContent>
           </Card>
         ) : (
-          sortedClients.map((client, index) => (
+          paginationData.paginatedClients.map((client, index) => (
             <Card 
               key={client.id || `client-${index}`} 
               className="cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-[1.02]"
@@ -502,13 +522,47 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
             >
               <CardContent className="p-4">
                 <div className="flex flex-col space-y-3">
-                  {/* Header with title and eye icon */}
+                  {/* Header with title and actions */}
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-base leading-tight">{client.name}</h3>
                     </div>
-                    {/* Eye icon - Visual indicator for clickable card */}
-                    <Eye className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    {/* Actions dropdown */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleEdit(client)
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-red-600"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDelete(client)
+                          }}
+                          disabled={isDeleting}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
 
                   {/* Projects badge */}
@@ -534,6 +588,7 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
                       })()
                     ) : 'Just now'}
                   </div>
+
                 </div>
               </CardContent>
             </Card>
@@ -541,13 +596,56 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
         )}
       </div>
 
+      {/* Mobile-Optimized Pagination */}
+      {paginationData.totalPages > 1 && (
+        <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(paginationData.currentPage - 1)}
+            disabled={paginationData.currentPage === 1}
+            className="gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Previous</span>
+            <span className="sm:hidden">Prev</span>
+          </Button>
+
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="font-mono">
+              {paginationData.currentPage}/{paginationData.totalPages}
+            </Badge>
+            <span className="text-xs text-muted-foreground hidden sm:block">
+              of {sortedClients.length} clients
+            </span>
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(paginationData.currentPage + 1)}
+            disabled={paginationData.currentPage === paginationData.totalPages}
+            className="gap-1"
+          >
+            <span className="hidden sm:inline">Next</span>
+            <span className="sm:hidden">Next</span>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       {/* Results count */}
       {clients && (
         <div className="text-sm text-muted-foreground">
-          Showing {sortedClients.length} of {clients.length} clients
-          {(locationFilter !== 'all' || clientTable.search) && (
+          Showing {paginationData.paginatedClients.length} of {sortedClients.length} clients
+          {sortedClients.length < clients.length && (
             <span className="ml-2">
-              (filtered)
+              (filtered from {clients.length} total)
+            </span>
+          )}
+          {paginationData.totalPages > 1 && (
+            <span className="ml-2">
+              • Page {paginationData.currentPage} of {paginationData.totalPages}
             </span>
           )}
         </div>
