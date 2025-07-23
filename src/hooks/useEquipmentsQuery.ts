@@ -330,7 +330,84 @@ export function useEquipmentsWithReferenceData() {
   };
 }
 
-// Equipment Mutations
+// Fast Server Action Equipment Creation
+export function useCreateEquipmentAction() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      // Import server action dynamically for edge compatibility
+      const { createEquipmentAction } = await import('../app/(admin-dashboard)/equipments/actions');
+      return await createEquipmentAction(formData);
+    },
+    onMutate: async (formData: FormData) => {
+      // Cancel outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: equipmentKeys.equipments() });
+
+      // Snapshot the previous value for rollback
+      const previousEquipments = queryClient.getQueryData<Equipment[]>(equipmentKeys.equipments());
+
+      // Create optimistic equipment for instant UI feedback
+      const brand = formData.get("brand") as string;
+      const model = formData.get("model") as string;
+      const type = formData.get("type") as string;
+      const owner = formData.get("owner") as string;
+      const status = formData.get("status") as string;
+      
+      if (brand && model && type && owner) {
+        const optimisticEquipment: Equipment = {
+          uid: `temp_${Date.now()}`, // Temporary ID for optimistic update
+          brand,
+          model,
+          type,
+          owner,
+          status: (status as "OPERATIONAL" | "NON_OPERATIONAL") || "OPERATIONAL",
+          plateNumber: formData.get("plateNumber") as string || undefined,
+          remarks: formData.get("remarks") as string || undefined,
+          insuranceExpirationDate: formData.get("insuranceExpirationDate") as string || '',
+          before: formData.get("before") ? parseInt(formData.get("before") as string) : undefined,
+          inspectionDate: formData.get("inspectionDate") as string || undefined,
+          image_url: undefined,
+          originalReceiptUrl: undefined,
+          equipmentRegistrationUrl: undefined,
+          thirdpartyInspectionImage: undefined,
+          pgpcInspectionImage: undefined,
+          equipmentParts: undefined,
+          project: { uid: '', name: 'Loading...', client: { uid: '', name: 'Loading...', location: { uid: '', address: 'Loading...' }}},
+        };
+
+        // Optimistically update cache for instant feedback
+        queryClient.setQueryData<Equipment[]>(equipmentKeys.equipments(), (oldData) => {
+          return oldData ? [optimisticEquipment, ...oldData] : [optimisticEquipment];
+        });
+      }
+
+      return { previousEquipments };
+    },
+    onSuccess: (result, formData, context) => {
+      // Server action completed successfully - realtime will handle the real data
+      console.log('✅ Equipment creation server action completed:', result);
+      
+      // Invalidate to get fresh data with proper relationships
+      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
+    },
+    onError: (error, formData, context) => {
+      // Rollback optimistic update on error
+      if (context?.previousEquipments) {
+        queryClient.setQueryData(equipmentKeys.equipments(), context.previousEquipments);
+      }
+      
+      console.error('❌ Equipment creation failed:', error);
+      toast.error('Failed to create equipment: ' + error.message);
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure cache consistency
+      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
+    },
+  });
+}
+
+// Legacy API Equipment Mutations (kept for compatibility)
 export function useCreateEquipment() {
   const queryClient = useQueryClient();
   

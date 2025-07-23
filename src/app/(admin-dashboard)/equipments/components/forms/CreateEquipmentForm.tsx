@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { format } from "date-fns";
-import { createEquipmentAction } from "../../actions";
+import { useCreateEquipmentAction } from "@/hooks/useEquipmentsQuery";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,19 +18,17 @@ import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectio
 import PartsFolderManager, { type PartsStructure } from "./PartsFolderManager";
 import { toast } from "sonner";
 
-// Submit button component that uses useFormStatus
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  
+// Submit button component that uses mutation state
+function SubmitButton({ isLoading }: { isLoading: boolean }) {
   return (
     <Button 
       type="submit" 
-      disabled={pending}
+      disabled={isLoading}
       className="w-full"
       size="lg"
     >
-      {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-      {pending ? "Creating Equipment..." : "Create Equipment"}
+      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      {isLoading ? "Creating Equipment..." : "Create Equipment"}
     </Button>
   );
 }
@@ -46,6 +44,12 @@ interface CreateEquipmentFormProps {
 }
 
 export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isMobile = false }: CreateEquipmentFormProps) {
+  // Fast server action mutation hook
+  const createEquipmentMutation = useCreateEquipmentAction();
+  
+  // Form reference for resetting
+  const formRef = useRef<HTMLFormElement>(null);
+  
   // Tab state for mobile
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'documents' | 'parts'>('details');
   
@@ -84,91 +88,120 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     
     const formDataFromForm = new FormData(e.currentTarget);
     
-    try {
-      // Client-side validation before submission
-      const brand = formDataFromForm.get('brand') as string;
-      const model = formDataFromForm.get('model') as string;
-      const owner = formDataFromForm.get('owner') as string;
+    // Client-side validation before submission
+    const brand = formDataFromForm.get('brand') as string;
+    const model = formDataFromForm.get('model') as string;
+    const owner = formDataFromForm.get('owner') as string;
 
-      console.log("Client-side validation:", {
-        brand: brand || 'MISSING',
-        model: model || 'MISSING',
-        type: formData.type || 'MISSING',
-        owner: owner || 'MISSING',
-        projectId: formData.projectId || 'MISSING'
-      });
+    console.log("Client-side validation:", {
+      brand: brand || 'MISSING',
+      model: model || 'MISSING',
+      type: formData.type || 'MISSING',
+      owner: owner || 'MISSING',
+      projectId: formData.projectId || 'MISSING'
+    });
 
-      if (!brand?.trim()) {
-        console.log("Validation failed: Missing brand");
-        return;
-      }
-      if (!model?.trim()) {
-        console.log("Validation failed: Missing model");
-        return;
-      }
-      if (!formData.type) {
-        console.log("Validation failed: Missing type");
-        return;
-      }
-      if (!owner?.trim()) {
-        console.log("Validation failed: Missing owner");
-        return;
-      }
-      if (!formData.projectId) {
-        console.log("Validation failed: Missing project");
-        return;
-      }
-      // Add all the files to formData
-      Object.entries(files).forEach(([key, file]) => {
-        if (file) {
-          formDataFromForm.append(key, file);
-        }
-      });
-
-      // Add parts structure data
-      formDataFromForm.append('partsStructure', JSON.stringify(partsStructure));
-      
-      // Add all parts files to formData with folder information
-      partsStructure.rootFiles.forEach((partFile, index) => {
-        formDataFromForm.append(`partsFile_root_${index}`, partFile.file);
-        formDataFromForm.append(`partsFile_root_${index}_name`, partFile.name);
-      });
-
-      partsStructure.folders.forEach((folder, folderIndex) => {
-        folder.files.forEach((partFile, fileIndex) => {
-          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
-          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
-          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
-        });
-      });
-      
-      // Add select field values to formData
-      formDataFromForm.append('type', formData.type);
-      formDataFromForm.append('projectId', formData.projectId);
-      formDataFromForm.append('status', formData.status);
-      formDataFromForm.append('before', formData.before);
-      
-      // Add date values to formData
-      if (formData.inspectionDate) {
-        formDataFromForm.append('inspectionDate', format(formData.inspectionDate, 'yyyy-MM-dd'));
-      }
-      if (formData.insuranceExpirationDate) {
-        formDataFromForm.append('insuranceExpirationDate', format(formData.insuranceExpirationDate, 'yyyy-MM-dd'));
-      }
-      
-      await createEquipmentAction(formDataFromForm);
-      
-      // Success message will be shown by the mutation hook's toast
-      // No need for alert here since realtime updates will show the equipment immediately
-      
-      // Form will reset automatically after successful submission
-      if (onSuccess) {
-        onSuccess();
-      }
-    } catch (error) {
-      console.error("Form submission error:", error);
-      // Error will be handled by the mutation hook's toast
+    if (!brand?.trim()) {
+      toast.error("Please enter equipment brand");
+      return;
     }
+    if (!model?.trim()) {
+      toast.error("Please enter equipment model");
+      return;
+    }
+    if (!formData.type) {
+      toast.error("Please select equipment type");
+      return;
+    }
+    if (!owner?.trim()) {
+      toast.error("Please enter equipment owner");
+      return;
+    }
+    if (!formData.projectId) {
+      toast.error("Please select a project");
+      return;
+    }
+    
+    // Add all the files to formData
+    Object.entries(files).forEach(([key, file]) => {
+      if (file) {
+        formDataFromForm.append(key, file);
+      }
+    });
+
+    // Add parts structure data
+    formDataFromForm.append('partsStructure', JSON.stringify(partsStructure));
+    
+    // Add all parts files to formData with folder information
+    partsStructure.rootFiles.forEach((partFile, index) => {
+      formDataFromForm.append(`partsFile_root_${index}`, partFile.file);
+      formDataFromForm.append(`partsFile_root_${index}_name`, partFile.name);
+    });
+
+    partsStructure.folders.forEach((folder, folderIndex) => {
+      folder.files.forEach((partFile, fileIndex) => {
+        formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
+        formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
+        formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
+      });
+    });
+    
+    // Add select field values to formData
+    formDataFromForm.append('type', formData.type);
+    formDataFromForm.append('projectId', formData.projectId);
+    formDataFromForm.append('status', formData.status);
+    formDataFromForm.append('before', formData.before);
+    
+    // Add date values to formData
+    if (formData.inspectionDate) {
+      formDataFromForm.append('inspectionDate', format(formData.inspectionDate, 'yyyy-MM-dd'));
+    }
+    if (formData.insuranceExpirationDate) {
+      formDataFromForm.append('insuranceExpirationDate', format(formData.insuranceExpirationDate, 'yyyy-MM-dd'));
+    }
+    
+    // Use fast mutation with optimistic updates
+    createEquipmentMutation.mutate(formDataFromForm, {
+      onSuccess: (result) => {
+        // Show success toast
+        toast.success(`Equipment "${brand} ${model}" created successfully!`);
+        
+        // Reset form state only on successful submission
+        setFormData({
+          type: '',
+          projectId: '',
+          status: 'OPERATIONAL',
+          before: '6',
+          inspectionDate: new Date(),
+          insuranceExpirationDate: undefined
+        });
+        setFiles({
+          equipmentImage: null,
+          thirdpartyInspection: null,
+          pgpcInspection: null,
+          originalReceipt: null,
+          equipmentRegistration: null,
+        });
+        setPartsStructure({
+          rootFiles: [],
+          folders: []
+        });
+        
+        // Reset the actual form inputs
+        if (formRef.current) {
+          formRef.current.reset();
+        }
+        
+        if (onSuccess) {
+          onSuccess();
+        }
+      },
+      onError: (error) => {
+        // Form data is preserved on error - no reset
+        // Error toast is already handled by the mutation hook
+        console.error("Equipment creation failed:", error);
+      }
+    });
   };
 
   // Tab content components
@@ -186,7 +219,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
   );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
       {/* Mobile Tab Navigation */}
       {isMobile && (
         <div className="grid w-full grid-cols-4 mb-4 bg-muted rounded-md p-1">
@@ -576,7 +609,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
           </Button>
         )}
         <div className="flex-1">
-          <SubmitButton />
+          <SubmitButton isLoading={createEquipmentMutation.isPending} />
         </div>
       </div>
     </form>

@@ -403,6 +403,7 @@ export default function PartsFolderManager({
             {/* Mobile-visible action buttons */}
             <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 opacity-100 transition-opacity">
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => {
@@ -416,6 +417,7 @@ export default function PartsFolderManager({
                 Rename
               </Button>
               <Button
+                type="button"
                 variant="destructive"
                 size="sm"
                 onClick={() => deleteFolder(folder.id)}
@@ -447,6 +449,7 @@ export default function PartsFolderManager({
               
               <div className="flex gap-2">
                 <Button
+                  type="button"
                   variant="outline"
                   size="sm"
                   className="flex-1 gap-2"
@@ -500,6 +503,7 @@ export default function PartsFolderManager({
       {/* Header */}
       <div>
         <Button
+          type="button"
           onClick={() => setIsCreateFolderModalOpen(true)}
           className="w-full gap-2"
         >
@@ -547,6 +551,7 @@ export default function PartsFolderManager({
             )}
             
             <Button
+              type="button"
               variant="outline"
               className="w-full gap-2"
               onClick={() => rootFileInputRef.current?.click()}
