@@ -53,14 +53,19 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
   // Tab state for mobile
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'documents' | 'parts'>('details');
   
-  // Form state for select fields and dates
+  // Form state for all fields
   const [formData, setFormData] = useState({
+    brand: '',
+    model: '',
+    plateNumber: '',
+    owner: '',
     type: '',
     projectId: '',
     status: 'OPERATIONAL',
     before: '6',
     inspectionDate: new Date(),
-    insuranceExpirationDate: undefined as Date | undefined
+    insuranceExpirationDate: undefined as Date | undefined,
+    remarks: ''
   });
   
   // File state for images and documents
@@ -89,23 +94,19 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     const formDataFromForm = new FormData(e.currentTarget);
     
     // Client-side validation before submission
-    const brand = formDataFromForm.get('brand') as string;
-    const model = formDataFromForm.get('model') as string;
-    const owner = formDataFromForm.get('owner') as string;
-
     console.log("Client-side validation:", {
-      brand: brand || 'MISSING',
-      model: model || 'MISSING',
+      brand: formData.brand || 'MISSING',
+      model: formData.model || 'MISSING',
       type: formData.type || 'MISSING',
-      owner: owner || 'MISSING',
+      owner: formData.owner || 'MISSING',
       projectId: formData.projectId || 'MISSING'
     });
 
-    if (!brand?.trim()) {
+    if (!formData.brand?.trim()) {
       toast.error("Please enter equipment brand");
       return;
     }
-    if (!model?.trim()) {
+    if (!formData.model?.trim()) {
       toast.error("Please enter equipment model");
       return;
     }
@@ -113,7 +114,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       toast.error("Please select equipment type");
       return;
     }
-    if (!owner?.trim()) {
+    if (!formData.owner?.trim()) {
       toast.error("Please enter equipment owner");
       return;
     }
@@ -146,7 +147,12 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       });
     });
     
-    // Add select field values to formData
+    // Add all form field values to formData
+    formDataFromForm.append('brand', formData.brand);
+    formDataFromForm.append('model', formData.model);
+    formDataFromForm.append('plateNumber', formData.plateNumber);
+    formDataFromForm.append('owner', formData.owner);
+    formDataFromForm.append('remarks', formData.remarks);
     formDataFromForm.append('type', formData.type);
     formDataFromForm.append('projectId', formData.projectId);
     formDataFromForm.append('status', formData.status);
@@ -164,16 +170,21 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     createEquipmentMutation.mutate(formDataFromForm, {
       onSuccess: (result) => {
         // Show success toast
-        toast.success(`Equipment "${brand} ${model}" created successfully!`);
+        toast.success(`Equipment "${formData.brand} ${formData.model}" created successfully!`);
         
         // Reset form state only on successful submission
         setFormData({
+          brand: '',
+          model: '',
+          plateNumber: '',
+          owner: '',
           type: '',
           projectId: '',
           status: 'OPERATIONAL',
           before: '6',
           inspectionDate: new Date(),
-          insuranceExpirationDate: undefined
+          insuranceExpirationDate: undefined,
+          remarks: ''
         });
         setFiles({
           equipmentImage: null,
@@ -307,6 +318,8 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
                   <Input
                     id="brand"
                     name="brand"
+                    value={formData.brand}
+                    onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
                     required
                     placeholder="e.g. Caterpillar, Komatsu, JCB"
                     className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
@@ -321,6 +334,8 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
                   <Input
                     id="model"
                     name="model"
+                    value={formData.model}
+                    onChange={(e) => setFormData(prev => ({ ...prev, model: e.target.value }))}
                     required
                     placeholder="e.g. 320D, PC200, JS130"
                     className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
@@ -355,6 +370,8 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
                   <Input
                     id="plateNumber"
                     name="plateNumber"
+                    value={formData.plateNumber}
+                    onChange={(e) => setFormData(prev => ({ ...prev, plateNumber: e.target.value }))}
                     placeholder="e.g. EQP-001 or Serial Number"
                     className="font-mono transition-all duration-200 focus:ring-2 focus:ring-blue-500"
                   />
@@ -371,6 +388,8 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
                   <Input
                     id="owner"
                     name="owner"
+                    value={formData.owner}
+                    onChange={(e) => setFormData(prev => ({ ...prev, owner: e.target.value }))}
                     required
                     placeholder="Owner name or company"
                     className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
@@ -519,6 +538,8 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
                 <Textarea
                   id="remarks"
                   name="remarks"
+                  value={formData.remarks}
+                  onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
                   rows={3}
                   placeholder="Enter any special notes, conditions, or important information about this equipment..."
                   className="resize-none transition-all duration-200 focus:ring-2 focus:ring-blue-500"
