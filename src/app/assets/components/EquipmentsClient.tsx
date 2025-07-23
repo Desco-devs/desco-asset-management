@@ -63,6 +63,7 @@ export default function EquipmentClientViewer({
       const matchesLocation =
         filters.locationId === "" ||
         (projectClient &&
+          projectClient.location &&
           projectClient.location.uid === filters.locationId);
 
       return matchesClient && matchesLocation;
@@ -118,16 +119,24 @@ export default function EquipmentClientViewer({
             <EquipmentCardSkeleton key={`skeleton-${index}`} />
           ))
         ) : (
-          equipment.map((item, index) => (
+          equipment.map((item: any, index: number) => (
             <EquipmentCard
               key={item.id || `equipment-${index}`}
               equipment={{
                 uid: item.id,
-                brand: item.serialNumber || "Unknown",
+                brand: item.brand || "Unknown",
                 model: item.model || "Unknown Model",
-                type: item.category || "Unknown Type",
+                type: item.type || "Unknown Type",
                 status: item.status,
-                owner: "Unknown Owner",
+                owner: item.owner || "Unknown Owner",
+                image_url: item.image_url,
+                insuranceExpirationDate: item.insurance_expiration_date || "",
+                plateNumber: item.plate_number,
+                remarks: item.remarks,
+                originalReceiptUrl: item.original_receipt_url,
+                equipmentRegistrationUrl: item.equipment_registration_url,
+                thirdpartyInspectionImage: item.thirdparty_inspection_image,
+                pgpcInspectionImage: item.pgpc_inspection_image,
                 project: item.project
                   ? {
                       uid: item.project.id,
@@ -139,7 +148,7 @@ export default function EquipmentClientViewer({
                             location: item.project.client.location
                               ? {
                                   uid: item.project.client.location.id,
-                                  address: item.project.client.location.name,
+                                  address: item.project.client.location.address,
                                 }
                               : {
                                   uid: "unknown",

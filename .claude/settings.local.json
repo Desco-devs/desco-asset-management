@@ -47,7 +47,8 @@
       "Bash(npm update:*)",
       "Bash(pkill:*)",
       "Bash(mv:*)",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(kill:*)"
     ],
     "deny": []
   }

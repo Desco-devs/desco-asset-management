@@ -81,7 +81,7 @@ export function useEquipmentList(filters: Record<string, string>, page: number) 
     queryFn: () => fetchEquipmentList(filters, page),
     staleTime: 1000 * 60 * 2, // 2 minutes
     gcTime: 1000 * 60 * 5, // 5 minutes
-    keepPreviousData: true, // For smooth pagination
+    placeholderData: 'keepPreviousData' as any, // For smooth pagination
   });
 }
 
@@ -91,7 +91,7 @@ export function useVehiclesList(filters: Record<string, string>, page: number) {
     queryFn: () => fetchVehiclesList(filters, page),
     staleTime: 1000 * 60 * 2, // 2 minutes
     gcTime: 1000 * 60 * 5, // 5 minutes
-    keepPreviousData: true, // For smooth pagination
+    placeholderData: 'keepPreviousData' as any, // For smooth pagination
   });
 }
 

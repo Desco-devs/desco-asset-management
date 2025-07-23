@@ -1,6 +1,6 @@
 "use client";
 
-import VehicleModal from "@/app/(admin-dashboard)/vehicles/components/modals/VehicleModalModern";
+import VehicleModal from "./VehicleModal";
 import VehicleCard from "@/components/assets/cards/VehicleCard";
 import VehicleCardSkeleton from "@/components/assets/cards/VehicleCardSkeleton";
 import SharedFilters from "@/components/assets/filters/SharedFilters";
@@ -62,7 +62,7 @@ export default function VehicleClientViewer({
       const projectClient = clients.find((c) => c.uid === project.client.uid);
       const matchesLocation =
         filters.locationId === "" ||
-        (projectClient && projectClient.location.uid === filters.locationId);
+        (projectClient && projectClient.location && projectClient.location.uid === filters.locationId);
 
       return matchesClient && matchesLocation;
     });
@@ -112,17 +112,27 @@ export default function VehicleClientViewer({
             <VehicleCardSkeleton key={`skeleton-${index}`} />
           ))
         ) : (
-          vehicles.map((vehicle, index) => (
+          vehicles.map((vehicle: any, index: number) => (
             <VehicleCard
               key={vehicle.id || `vehicle-${index}`}
               vehicle={{
                 uid: vehicle.id,
-                brand: vehicle.make || "Unknown",
+                brand: vehicle.brand || "Unknown",
                 model: vehicle.model || "Unknown Model",
-                type: vehicle.category || "Unknown Type",
-                plateNumber: vehicle.licensePlate || "",
+                type: vehicle.type || "Unknown Type",
+                plateNumber: vehicle.plate_number || "",
+                inspectionDate: vehicle.inspection_date || "",
+                before: vehicle.before,
+                expiryDate: vehicle.expiry_date || "",
                 status: vehicle.status,
-                owner: "Unknown Owner",
+                owner: vehicle.owner || "Unknown Owner",
+                frontImgUrl: vehicle.front_img_url,
+                backImgUrl: vehicle.back_img_url,
+                side1ImgUrl: vehicle.side1_img_url,
+                side2ImgUrl: vehicle.side2_img_url,
+                remarks: vehicle.remarks,
+                originalReceiptUrl: vehicle.original_receipt_url,
+                carRegistrationUrl: vehicle.car_registration_url,
                 project: vehicle.project
                   ? {
                       uid: vehicle.project.id,
@@ -134,7 +144,7 @@ export default function VehicleClientViewer({
                             location: vehicle.project.client.location
                               ? {
                                   uid: vehicle.project.client.location.id,
-                                  address: vehicle.project.client.location.name,
+                                  address: vehicle.project.client.location.address,
                                 }
                               : {
                                   uid: "unknown",
@@ -255,8 +265,17 @@ export default function VehicleClientViewer({
       )}
 
       {/* Vehicle Modal */}
-      {selectedVehicle && isModalOpen && (
-        <VehicleModal />
+      {selectedVehicle && (
+        <VehicleModal
+          vehicle={selectedVehicle}
+          isOpen={isModalOpen}
+          onOpenChange={(open) => {
+            setIsModalOpen(open);
+            if (!open) {
+              setSelectedVehicle(null);
+            }
+          }}
+        />
       )}
     </div>
   );

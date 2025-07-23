@@ -1,14 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useAssetsCache } from './useAssetsQueries';
 import { useAssetsStore } from '../stores/assetsStore';
 import type { EquipmentWithRelations, VehicleWithRelations } from '@/types/assets';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createClient();
 
 export function useRealTimeUpdates() {
   const cache = useAssetsCache();
@@ -36,7 +33,7 @@ export function useRealTimeUpdates() {
               if (newRecord) {
                 try {
                   // Fetch complete record with relations
-                  const response = await fetch(`/api/equipment/${newRecord.id}`);
+                  const response = await fetch(`/api/assets/equipment/${newRecord.id}`);
                   if (response.ok) {
                     const fullRecord: EquipmentWithRelations = await response.json();
                     cache.addEquipmentItem(fullRecord);
@@ -68,7 +65,7 @@ export function useRealTimeUpdates() {
               if (newRecord) {
                 try {
                   // Fetch updated record with relations
-                  const response = await fetch(`/api/equipment/${newRecord.id}`);
+                  const response = await fetch(`/api/assets/equipment/${newRecord.id}`);
                   if (response.ok) {
                     const fullRecord: EquipmentWithRelations = await response.json();
                     cache.updateEquipmentItem(newRecord.id, () => fullRecord);
@@ -120,14 +117,14 @@ export function useRealTimeUpdates() {
               if (newRecord) {
                 try {
                   // Fetch complete record with relations
-                  const response = await fetch(`/api/vehicles/${newRecord.id}`);
+                  const response = await fetch(`/api/assets/vehicles/${newRecord.id}`);
                   if (response.ok) {
                     const fullRecord: VehicleWithRelations = await response.json();
                     cache.addVehicleItem(fullRecord);
                     addNewItemId(newRecord.id);
                     
                     toast.success('New vehicle added', {
-                      description: `${fullRecord.make} ${fullRecord.model || 'Vehicle'} has been added`,
+                      description: `${fullRecord.brand} ${fullRecord.model || 'Vehicle'} has been added`,
                       action: {
                         label: 'View',
                         onClick: () => {
@@ -152,13 +149,13 @@ export function useRealTimeUpdates() {
               if (newRecord) {
                 try {
                   // Fetch updated record with relations
-                  const response = await fetch(`/api/vehicles/${newRecord.id}`);
+                  const response = await fetch(`/api/assets/vehicles/${newRecord.id}`);
                   if (response.ok) {
                     const fullRecord: VehicleWithRelations = await response.json();
                     cache.updateVehicleItem(newRecord.id, () => fullRecord);
                     
                     toast.info('Vehicle updated', {
-                      description: `${fullRecord.make} ${fullRecord.model || 'Vehicle'} has been updated`,
+                      description: `${fullRecord.brand} ${fullRecord.model || 'Vehicle'} has been updated`,
                     });
                   }
                 } catch (error) {

@@ -83,6 +83,7 @@ export default function EquipmentModalModern() {
     setIsPhotosCollapsed,
     setIsDocumentsCollapsed,
     setDeleteConfirmation,
+    setIsEquipmentMaintenanceModalOpen,
   } = useEquipmentsStore();
 
   // Mutations
@@ -104,6 +105,8 @@ export default function EquipmentModalModern() {
     setIsModalOpen(false);
     setSelectedEquipment(null);
     setIsEditMode(false);
+    // Close any open maintenance modals
+    setIsEquipmentMaintenanceModalOpen(false);
   };
 
   const handleEdit = () => {

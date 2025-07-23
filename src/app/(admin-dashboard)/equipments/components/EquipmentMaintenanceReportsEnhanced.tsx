@@ -139,11 +139,8 @@ export default function EquipmentMaintenanceReportsEnhanced({
           </div>
           <Button
             onClick={() => {
-              setIsModalOpen(false); // Close detail drawer first
-              // Use setTimeout to ensure detail drawer closes before opening report drawer
-              setTimeout(() => {
-                setIsEquipmentMaintenanceModalOpen(true); // Then open report drawer
-              }, 100); // Small delay to allow state transition
+              setIsModalOpen(false);
+              setIsEquipmentMaintenanceModalOpen(true);
             }}
             className="gap-2"
           >
@@ -164,11 +161,8 @@ export default function EquipmentMaintenanceReportsEnhanced({
             </p>
             <Button
               onClick={() => {
-                setIsModalOpen(false); // Close detail drawer first
-                // Use setTimeout to ensure detail drawer closes before opening report drawer
-                setTimeout(() => {
-                  setIsEquipmentMaintenanceModalOpen(true); // Then open report drawer
-                }, 100); // Small delay to allow state transition
+                setIsModalOpen(false);
+                setIsEquipmentMaintenanceModalOpen(true);
               }}
               className="gap-2"
             >
