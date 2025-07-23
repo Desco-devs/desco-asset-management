@@ -297,7 +297,22 @@ export function useCreateUser() {
       toast.success('User created successfully')
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to create user')
+      // Handle validation errors with user-friendly messages
+      if (error instanceof UserValidationError) {
+        // Show validation errors as warning toasts, not error toasts
+        if (error.message.includes('email address has already been registered')) {
+          toast.warning('This email address is already registered. Please use a different email.')
+        } else if (error.message.includes('Username already exists')) {
+          toast.warning('This username is already taken. Please choose a different username.')
+        } else if (error.message.includes('Missing required fields')) {
+          toast.warning('Please fill in all required fields.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        // Show actual server errors as error toasts
+        toast.error(error.message || 'Failed to create user. Please try again.')
+      }
     },
     // Prevent React from logging mutation errors
     throwOnError: false,
@@ -316,7 +331,20 @@ export function useUpdateUser() {
       toast.success('User updated successfully')
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to update user')
+      // Handle validation errors with user-friendly messages
+      if (error instanceof UserValidationError) {
+        // Show validation errors as warning toasts, not error toasts
+        if (error.message.includes('Username already exists')) {
+          toast.warning('This username is already taken. Please choose a different username.')
+        } else if (error.message.includes('Invalid user ID format')) {
+          toast.warning('Invalid user selected. Please refresh and try again.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        // Show actual server errors as error toasts
+        toast.error(error.message || 'Failed to update user. Please try again.')
+      }
     },
     // Prevent React from logging mutation errors
     throwOnError: false,
@@ -334,7 +362,22 @@ export function useDeleteUser() {
       toast.success('User deleted successfully')
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to delete user')
+      // Handle validation errors with user-friendly messages
+      if (error instanceof UserValidationError) {
+        // Show validation errors as warning toasts, not error toasts
+        if (error.message.includes('cannot delete your own account')) {
+          toast.warning('You cannot delete your own account.')
+        } else if (error.message.includes('Only Super Admin can delete')) {
+          toast.warning('Only Super Admins can delete Admin accounts.')
+        } else if (error.message.includes('Invalid user ID format')) {
+          toast.warning('Invalid user selected. Please refresh and try again.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        // Show actual server errors as error toasts
+        toast.error(error.message || 'Failed to delete user. Please try again.')
+      }
     },
     // Prevent React from logging mutation errors
     throwOnError: false,

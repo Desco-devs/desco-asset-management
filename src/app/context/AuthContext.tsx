@@ -26,10 +26,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useOnlineHeartbeat(!!user);
 
   const fetchUserProfile = useCallback(async (userId: string) => {
+    console.log('🔄 fetchUserProfile: Starting for user:', userId);
     try {
-      const response = await fetch(`/api/users/${userId}`);
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('User profile fetch timeout')), 10000);
+      });
+      
+      const fetchPromise = fetch(`/api/users/${userId}`);
+      
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+      
       if (response.ok) {
         const userData = await response.json();
+        console.log('✅ fetchUserProfile: Success', userData);
         setUserState(userData);
         
         // Update Supabase user metadata with role for middleware access
@@ -46,9 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.error("Error updating user metadata:", metadataError);
           }
         }
+      } else {
+        console.error('❌ fetchUserProfile: HTTP error', response.status);
+        // Still set loading to false even if user fetch fails
+        setLoading(false);
       }
     } catch (error) {
-      console.error("Error fetching user profile:", error);
+      console.error("❌ fetchUserProfile: Error:", error);
+      // Don't let auth hang if user profile fails
+      setLoading(false);
     }
   }, [supabase]);
 

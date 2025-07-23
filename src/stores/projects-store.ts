@@ -74,7 +74,7 @@ const initialClientTable: ClientTableState = {
   limit: 10,
   sortBy: 'created_at',
   sortOrder: 'desc',
-  locationId: undefined,
+  location_id: undefined,
 }
 
 const initialProjectTable: ProjectTableState = {
@@ -83,7 +83,7 @@ const initialProjectTable: ProjectTableState = {
   limit: 10,
   sortBy: 'created_at',
   sortOrder: 'desc',
-  clientId: undefined,
+  client_id: undefined,
 }
 
 export const useProjectsStore = create<ProjectsUIState>()(
@@ -146,13 +146,14 @@ export const useProjectsStore = create<ProjectsUIState>()(
       // Navigation Actions
       setSelectedLocation: (locationId) =>
         set((prev) => ({
+          ...prev,
           selectedLocationId: locationId,
           // Reset client selection when location changes
           selectedClientId: null,
           // Update client table filter
           clientTable: {
             ...prev.clientTable,
-            location_id: locationId,
+            location_id: locationId || undefined,
             page: 1, // Reset to first page
           },
           // Update project table filter (clear client filter)
@@ -165,11 +166,12 @@ export const useProjectsStore = create<ProjectsUIState>()(
       
       setSelectedClient: (clientId) =>
         set((prev) => ({
+          ...prev,
           selectedClientId: clientId,
           // Update project table filter
           projectTable: {
             ...prev.projectTable,
-            client_id: clientId,
+            client_id: clientId || undefined,
             page: 1, // Reset to first page
           }
         }), false, 'setSelectedClient'),

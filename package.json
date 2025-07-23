@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node server.js",
+    "dev": "next dev --turbopack",
     "dev:next": "next dev --turbopack", 
-    "dev:socket": "node server.js",
+    "__comment_dev:socket": "node server.js (CHAT APP TEMPORARILY DISABLED)",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",

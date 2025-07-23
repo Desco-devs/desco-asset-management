@@ -1,10 +1,9 @@
 // Main type exports
 export * from './auth'
-export * from './equipment'
 export * from './vehicles'
-export * from './users'
-export * from './assets'
-export * from './chat-app'
+// export * from './assets' // Temporarily disabled due to type conflicts
+// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
+// export * from './chat-app'
 export * from './dashboard'
 export * from './data-table'
 export * from './equipment-parts'

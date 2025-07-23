@@ -45,6 +45,7 @@ interface UsersCardsProps {
   canCreate?: boolean
   deleteLoading?: boolean
   currentUserRole?: 'SUPERADMIN' | 'ADMIN' | 'VIEWER'
+  currentUserId?: string
   isModalOpen?: boolean
 }
 
@@ -60,6 +61,7 @@ export function UsersCards({
   canCreate = false,
   deleteLoading = false,
   currentUserRole,
+  currentUserId,
   isModalOpen = false,
 }: UsersCardsProps) {
   const [deleteUser, setDeleteUser] = useState<User | null>(null)
@@ -145,7 +147,7 @@ export function UsersCards({
       .slice(0, 2)
   }
 
-  const formatLastSeen = (lastSeen: string | null, isOnline: boolean) => {
+  const formatLastSeen = (lastSeen: string | Date | null, isOnline: boolean) => {
     if (isOnline) return 'Online now'
     if (!lastSeen) return 'Never'
     
@@ -532,7 +534,10 @@ export function UsersCards({
               {/* Footer Actions */}
               <DrawerFooter className="border-t p-4">
                 <div className="flex gap-2 w-full">
-                  {canDelete && selectedUser.role !== 'SUPERADMIN' && (currentUserRole === 'SUPERADMIN' || currentUserRole === 'ADMIN') && (
+                  {canDelete && selectedUser.role !== 'SUPERADMIN' && (
+                    currentUserRole === 'SUPERADMIN' || 
+                    (currentUserRole === 'ADMIN' && selectedUser.role === 'VIEWER')
+                  ) && (
                     <Button 
                       variant="outline"
                       size="sm"
@@ -544,7 +549,11 @@ export function UsersCards({
                       Delete
                     </Button>
                   )}
-                  {canEdit && (
+                  {canEdit && selectedUser.role !== 'SUPERADMIN' && (
+                    currentUserRole === 'SUPERADMIN' || 
+                    selectedUser.id === currentUserId ||
+                    (currentUserRole === 'ADMIN' && selectedUser.role === 'VIEWER')
+                  ) && (
                     <Button 
                       variant="default"
                       size="sm"
@@ -686,7 +695,10 @@ export function UsersCards({
                 {/* Footer Actions */}
                 <div className="border-t pt-4">
                   <div className="flex gap-2 w-full">
-                    {canDelete && selectedUser.role !== 'SUPERADMIN' && (currentUserRole === 'SUPERADMIN' || currentUserRole === 'ADMIN') && (
+                    {canDelete && selectedUser.role !== 'SUPERADMIN' && (
+                    currentUserRole === 'SUPERADMIN' || 
+                    (currentUserRole === 'ADMIN' && selectedUser.role === 'VIEWER')
+                  ) && (
                       <Button 
                         variant="outline"
                         size="sm"

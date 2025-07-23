@@ -148,7 +148,7 @@ export default function DataTable<T>({
         const aVal = (a as Record<string, unknown>)[sortConfig.key];
         const bVal = (b as Record<string, unknown>)[sortConfig.key];
         if (aVal === bVal) return 0;
-        const comp = aVal < bVal ? -1 : 1;
+        const comp = (aVal as any) < (bVal as any) ? -1 : 1;
         return sortConfig.direction === "asc" ? comp : -comp;
       });
     }
@@ -340,14 +340,14 @@ export default function DataTable<T>({
               ) : (
                 paginatedData.map((record, index) => (
                   <TableRow
-                    key={getRowKey(record, index)}
+                    key={getRowKey(record, index) as string}
                     className="hover:bg-muted/50 cursor-pointer"
                   >
                     {columns.map((col) => (
                       <TableCell key={col.key} className={col.className}>
                         {col.render
                           ? col.render((record as Record<string, unknown>)[col.key], record, index)
-                          : (record as Record<string, unknown>)[col.key]}
+                          : String((record as Record<string, unknown>)[col.key] ?? '')}
                       </TableCell>
                     ))}
                     {renderRowActions && (

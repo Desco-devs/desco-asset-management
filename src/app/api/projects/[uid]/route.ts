@@ -54,8 +54,31 @@ export async function PATCH(
       include: { client: true, equipments: true, vehicles: true },
     });
     return NextResponse.json(project);
-  } catch (err) {
-    console.error("PATCH /projects/[uid] error:", err);
+  } catch (err: unknown) {
+    // Check if it's a validation error that shouldn't be logged
+    const isValidationError = err instanceof Error && 'code' in err && 
+                             (err.code === 'P2002' || err.code === 'P2025')
+    
+    if (!isValidationError) {
+      // Only log actual server errors, not validation errors
+      console.error("PATCH /projects/[uid] error:", err);
+    }
+    
+    if (err instanceof Error && 'code' in err) {
+      if (err.code === 'P2002') {
+        return NextResponse.json(
+          { error: "Project with this name already exists for this client" },
+          { status: 400 }
+        );
+      }
+      if (err.code === 'P2025') {
+        return NextResponse.json(
+          { error: "Project not found" },
+          { status: 404 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       { error: "Failed to update project" },
       { status: 500 }
@@ -71,8 +94,22 @@ export async function DELETE(
     const { uid } = await context.params;    // ← await params here
     await prisma.project.delete({ where: { id: uid } });
     return NextResponse.json({ message: "Deleted successfully" });
-  } catch (err) {
-    console.error("DELETE /projects/[uid] error:", err);
+  } catch (err: unknown) {
+    // Check if it's a validation error that shouldn't be logged
+    const isValidationError = err instanceof Error && 'code' in err && err.code === 'P2025'
+    
+    if (!isValidationError) {
+      // Only log actual server errors, not validation errors
+      console.error("DELETE /projects/[uid] error:", err);
+    }
+    
+    if (err instanceof Error && 'code' in err && err.code === 'P2025') {
+      return NextResponse.json(
+        { error: "Project not found" },
+        { status: 404 }
+      );
+    }
+    
     return NextResponse.json(
       { error: "Failed to delete project" },
       { status: 500 }

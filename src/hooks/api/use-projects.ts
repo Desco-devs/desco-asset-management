@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import type { 
   Location, 
   Client, 
@@ -12,6 +13,14 @@ import type {
   UpdateClientData,
   UpdateProjectData
 } from '@/types/projects'
+
+// Custom error class for validation errors that should show as warnings
+class ProjectValidationError extends Error {
+  constructor(message: string, public isValidationError: boolean = true) {
+    super(message)
+    this.name = 'ProjectValidationError'
+  }
+}
 
 // Query Keys
 export const projectsKeys = {
@@ -39,8 +48,21 @@ const api = {
       body: JSON.stringify(data),
     })
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to create location')
+      const result = await response.json()
+      const errorMessage = result.error || 'Failed to create location'
+      
+      // Check if it's a validation error (400 status)
+      const isValidationError = response.status === 400 && (
+        errorMessage.includes('already exists') ||
+        errorMessage.includes('required') ||
+        errorMessage.includes('Invalid')
+      )
+      
+      if (isValidationError) {
+        throw new ProjectValidationError(errorMessage)
+      } else {
+        throw new Error(errorMessage)
+      }
     }
     const result = await response.json()
     return result.data // API returns { success: true, data: location }
@@ -53,8 +75,20 @@ const api = {
       body: JSON.stringify({ address: data.address }),
     })
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to update location')
+      const result = await response.json()
+      const errorMessage = result.error || 'Failed to update location'
+      
+      const isValidationError = response.status === 400 && (
+        errorMessage.includes('already exists') ||
+        errorMessage.includes('required') ||
+        errorMessage.includes('Invalid')
+      )
+      
+      if (isValidationError) {
+        throw new ProjectValidationError(errorMessage)
+      } else {
+        throw new Error(errorMessage)
+      }
     }
     const result = await response.json()
     return result.data || result
@@ -65,8 +99,20 @@ const api = {
       method: 'DELETE',
     })
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to delete location')
+      const result = await response.json()
+      const errorMessage = result.error || 'Failed to delete location'
+      
+      const isValidationError = (response.status === 400 || response.status === 403) && (
+        errorMessage.includes('existing clients') ||
+        errorMessage.includes('Cannot delete') ||
+        errorMessage.includes('Insufficient permissions')
+      )
+      
+      if (isValidationError) {
+        throw new ProjectValidationError(errorMessage)
+      } else {
+        throw new Error(errorMessage)
+      }
     }
   },
 
@@ -88,8 +134,20 @@ const api = {
       }),
     })
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to create client')
+      const result = await response.json()
+      const errorMessage = result.error || 'Failed to create client'
+      
+      const isValidationError = response.status === 400 && (
+        errorMessage.includes('already exists') ||
+        errorMessage.includes('required') ||
+        errorMessage.includes('Invalid')
+      )
+      
+      if (isValidationError) {
+        throw new ProjectValidationError(errorMessage)
+      } else {
+        throw new Error(errorMessage)
+      }
     }
     const result = await response.json()
     return result.client || result.data || result
@@ -102,8 +160,20 @@ const api = {
       body: JSON.stringify({ name: data.name, locationId: data.location_id }),
     })
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to update client')
+      const result = await response.json()
+      const errorMessage = result.error || 'Failed to update client'
+      
+      const isValidationError = response.status === 400 && (
+        errorMessage.includes('already exists') ||
+        errorMessage.includes('required') ||
+        errorMessage.includes('Invalid')
+      )
+      
+      if (isValidationError) {
+        throw new ProjectValidationError(errorMessage)
+      } else {
+        throw new Error(errorMessage)
+      }
     }
     const result = await response.json()
     return result.data || result
@@ -114,8 +184,20 @@ const api = {
       method: 'DELETE',
     })
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to delete client')
+      const result = await response.json()
+      const errorMessage = result.error || 'Failed to delete client'
+      
+      const isValidationError = (response.status === 400 || response.status === 403) && (
+        errorMessage.includes('existing projects') ||
+        errorMessage.includes('Cannot delete') ||
+        errorMessage.includes('Insufficient permissions')
+      )
+      
+      if (isValidationError) {
+        throw new ProjectValidationError(errorMessage)
+      } else {
+        throw new Error(errorMessage)
+      }
     }
   },
 
@@ -138,8 +220,20 @@ const api = {
       }),
     })
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to create project')
+      const result = await response.json()
+      const errorMessage = result.error || 'Failed to create project'
+      
+      const isValidationError = response.status === 400 && (
+        errorMessage.includes('already exists') ||
+        errorMessage.includes('required') ||
+        errorMessage.includes('Invalid')
+      )
+      
+      if (isValidationError) {
+        throw new ProjectValidationError(errorMessage)
+      } else {
+        throw new Error(errorMessage)
+      }
     }
     const result = await response.json()
     return result.data || result
@@ -152,8 +246,20 @@ const api = {
       body: JSON.stringify({ name: data.name, clientId: data.client_id }),
     })
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to update project')
+      const result = await response.json()
+      const errorMessage = result.error || 'Failed to update project'
+      
+      const isValidationError = response.status === 400 && (
+        errorMessage.includes('already exists') ||
+        errorMessage.includes('required') ||
+        errorMessage.includes('Invalid')
+      )
+      
+      if (isValidationError) {
+        throw new ProjectValidationError(errorMessage)
+      } else {
+        throw new Error(errorMessage)
+      }
     }
     const result = await response.json()
     return result.data || result
@@ -164,8 +270,20 @@ const api = {
       method: 'DELETE',
     })
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to delete project')
+      const result = await response.json()
+      const errorMessage = result.error || 'Failed to delete project'
+      
+      const isValidationError = (response.status === 400 || response.status === 403) && (
+        errorMessage.includes('Cannot delete') ||
+        errorMessage.includes('Insufficient permissions') ||
+        errorMessage.includes('Invalid')
+      )
+      
+      if (isValidationError) {
+        throw new ProjectValidationError(errorMessage)
+      } else {
+        throw new Error(errorMessage)
+      }
     }
   },
 }
@@ -192,7 +310,15 @@ export function useClients(locationId?: string) {
 export function useProjects(clientId?: string) {
   return useQuery({
     queryKey: clientId ? projectsKeys.projectsByClient(clientId) : projectsKeys.projects(),
-    queryFn: () => api.getProjects(clientId),
+    queryFn: async () => {
+      const result = await api.getProjects(clientId)
+      // If result is an array, it means it's from clientId query, return as is
+      if (Array.isArray(result)) {
+        return { data: result, permissions: null }
+      }
+      // If result has data property, return full result with permissions
+      return result
+    },
     staleTime: 30 * 1000, // 30 seconds - rely on realtime for updates
     gcTime: 5 * 60 * 1000, // 5 minutes
   })
@@ -213,6 +339,20 @@ export function useCreateLocation() {
         if (exists) return oldData
         return [newLocation, ...oldData]
       })
+      toast.success('Location created successfully')
+    },
+    onError: (error: Error) => {
+      if (error instanceof ProjectValidationError) {
+        if (error.message.includes('already exists')) {
+          toast.warning('A location with this address already exists. Please use a different address.')
+        } else if (error.message.includes('required')) {
+          toast.warning('Please fill in all required fields.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        toast.error(error.message || 'Failed to create location. Please try again.')
+      }
     },
   })
 }
@@ -234,6 +374,20 @@ export function useUpdateLocation() {
       queryClient.invalidateQueries({ queryKey: projectsKeys.locations() })
       // Also invalidate clients cache since client location data might be affected
       queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
+      toast.success('Location updated successfully')
+    },
+    onError: (error: Error) => {
+      if (error instanceof ProjectValidationError) {
+        if (error.message.includes('already exists')) {
+          toast.warning('A location with this address already exists. Please use a different address.')
+        } else if (error.message.includes('required')) {
+          toast.warning('Please fill in all required fields.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        toast.error(error.message || 'Failed to update location. Please try again.')
+      }
     },
   })
 }
@@ -250,6 +404,20 @@ export function useDeleteLocation() {
       })
       // Also invalidate dependent data
       queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
+      toast.success('Location deleted successfully')
+    },
+    onError: (error: Error) => {
+      if (error instanceof ProjectValidationError) {
+        if (error.message.includes('existing clients')) {
+          toast.warning('Cannot delete location with existing clients. Please move or delete clients first.')
+        } else if (error.message.includes('Insufficient permissions')) {
+          toast.warning('You do not have permission to delete locations.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        toast.error(error.message || 'Failed to delete location. Please try again.')
+      }
     },
   })
 }
@@ -276,6 +444,20 @@ export function useCreateClient() {
         if (exists) return oldData
         return [newClient, ...oldData]
       })
+      toast.success('Client created successfully')
+    },
+    onError: (error: Error) => {
+      if (error instanceof ProjectValidationError) {
+        if (error.message.includes('already exists')) {
+          toast.warning('A client with this name already exists in this location. Please use a different name.')
+        } else if (error.message.includes('required')) {
+          toast.warning('Please fill in all required fields.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        toast.error(error.message || 'Failed to create client. Please try again.')
+      }
     },
   })
 }
@@ -304,6 +486,20 @@ export function useUpdateClient() {
       queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
       // Also invalidate projects cache since project client data might be affected
       queryClient.invalidateQueries({ queryKey: projectsKeys.projects() })
+      toast.success('Client updated successfully')
+    },
+    onError: (error: Error) => {
+      if (error instanceof ProjectValidationError) {
+        if (error.message.includes('already exists')) {
+          toast.warning('A client with this name already exists in this location. Please use a different name.')
+        } else if (error.message.includes('required')) {
+          toast.warning('Please fill in all required fields.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        toast.error(error.message || 'Failed to update client. Please try again.')
+      }
     },
   })
 }
@@ -320,6 +516,20 @@ export function useDeleteClient() {
       })
       // Also invalidate dependent data
       queryClient.invalidateQueries({ queryKey: projectsKeys.projects() })
+      toast.success('Client deleted successfully')
+    },
+    onError: (error: Error) => {
+      if (error instanceof ProjectValidationError) {
+        if (error.message.includes('existing projects')) {
+          toast.warning('Cannot delete client with existing projects. Please move or delete projects first.')
+        } else if (error.message.includes('Insufficient permissions')) {
+          toast.warning('You do not have permission to delete clients.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        toast.error(error.message || 'Failed to delete client. Please try again.')
+      }
     },
   })
 }
@@ -348,9 +558,9 @@ export function useCreateProject() {
       })
       
       // Update clients cache to reflect new project count
-      queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
+      queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData: any) => {
         if (!oldData) return oldData
-        return oldData.map(client => {
+        return oldData.map((client: any) => {
           if (client.id === newProject.client_id) {
             return {
               ...client,
@@ -363,6 +573,20 @@ export function useCreateProject() {
       
       // Also invalidate clients queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
+      toast.success('Project created successfully')
+    },
+    onError: (error: Error) => {
+      if (error instanceof ProjectValidationError) {
+        if (error.message.includes('already exists')) {
+          toast.warning('A project with this name already exists for this client. Please use a different name.')
+        } else if (error.message.includes('required')) {
+          toast.warning('Please fill in all required fields.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        toast.error(error.message || 'Failed to create project. Please try again.')
+      }
     },
   })
 }
@@ -387,6 +611,20 @@ export function useUpdateProject() {
           project.id === updatedProject.id ? updatedProject : project
         )
       })
+      toast.success('Project updated successfully')
+    },
+    onError: (error: Error) => {
+      if (error instanceof ProjectValidationError) {
+        if (error.message.includes('already exists')) {
+          toast.warning('A project with this name already exists for this client. Please use a different name.')
+        } else if (error.message.includes('required')) {
+          toast.warning('Please fill in all required fields.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        toast.error(error.message || 'Failed to update project. Please try again.')
+      }
     },
   })
 }
@@ -423,6 +661,18 @@ export function useDeleteProject() {
         
         // Also invalidate clients queries to ensure fresh data
         queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
+      }
+      toast.success('Project deleted successfully')
+    },
+    onError: (error: Error) => {
+      if (error instanceof ProjectValidationError) {
+        if (error.message.includes('Insufficient permissions')) {
+          toast.warning('You do not have permission to delete projects.')
+        } else {
+          toast.warning(error.message)
+        }
+      } else {
+        toast.error(error.message || 'Failed to delete project. Please try again.')
       }
     },
   })

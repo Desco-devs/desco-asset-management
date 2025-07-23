@@ -145,6 +145,7 @@ export function generateRecentActivity(
       description: `New ${item.type} equipment added`,
       timestamp: item.created_at.toISOString(),
       status: item.status,
+      user: "System", // Add required user field
     });
   });
 
@@ -158,6 +159,7 @@ export function generateRecentActivity(
       description: `Vehicle ${item.plate_number} registered`,
       timestamp: item.created_at.toISOString(),
       status: item.status,
+      user: "System", // Add required user field
     });
   });
 
@@ -170,6 +172,7 @@ export function generateRecentActivity(
       title: item.name,
       description: "New project created",
       timestamp: item.created_at.toISOString(),
+      user: "System", // Add required user field
     });
   });
 
@@ -182,6 +185,7 @@ export function generateRecentActivity(
       title: item.name,
       description: "New client registered",
       timestamp: item.created_at.toISOString(),
+      user: "System", // Add required user field
     });
   });
 
@@ -196,6 +200,7 @@ export function generateRecentActivity(
       timestamp: (item.date_reported || item.created_at).toISOString(),
       status: item.status || report_status.IN_PROGRESS,
       priority: item.priority || report_priority.HIGH,
+      user: "System", // Add required user field
     });
   });
 
@@ -208,6 +213,7 @@ export function generateRecentActivity(
       title: item.address,
       description: "New location added",
       timestamp: item.created_at.toISOString(),
+      user: "System", // Add required user field
     });
   });
 

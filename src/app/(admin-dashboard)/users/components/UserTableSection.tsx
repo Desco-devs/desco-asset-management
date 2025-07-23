@@ -13,6 +13,7 @@ interface UserTableSectionProps {
   onCreateNew: () => void
   deleteLoading?: boolean
   currentUserRole?: 'SUPERADMIN' | 'ADMIN' | 'VIEWER'
+  currentUserId?: string
   isModalOpen?: boolean
 }
 
@@ -25,6 +26,7 @@ export function UserTableSection({
   onCreateNew,
   deleteLoading = false,
   currentUserRole,
+  currentUserId,
   isModalOpen = false,
 }: UserTableSectionProps) {
   return (
@@ -41,6 +43,7 @@ export function UserTableSection({
         canCreate={usersData?.permissions.can_create}
         deleteLoading={deleteLoading}
         currentUserRole={currentUserRole}
+        currentUserId={currentUserId}
         isModalOpen={isModalOpen}
       />
     </div>

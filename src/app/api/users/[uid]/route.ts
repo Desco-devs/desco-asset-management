@@ -122,7 +122,15 @@ export async function PUT(
 
       return NextResponse.json(updatedUser)
     } catch (error: unknown) {
-      console.error('Error updating user:', error)
+      // Check if it's a validation error that shouldn't be logged
+      const isValidationError = error instanceof Error && 'code' in error && 
+                               (error.code === 'P2002' || error.code === 'P2025')
+      
+      if (!isValidationError) {
+        // Only log actual server errors, not validation errors
+        console.error('Error updating user:', error)
+      }
+      
       if (error instanceof Error && 'code' in error && error.code === 'P2002') {
         return NextResponse.json({ error: 'Username already exists' }, { status: 400 })
       }
@@ -174,7 +182,14 @@ export async function DELETE(
 
       return NextResponse.json({ message: 'User deleted successfully' })
     } catch (error: unknown) {
-      console.error('Error deleting user:', error)
+      // Check if it's a validation error that shouldn't be logged
+      const isValidationError = error instanceof Error && 'code' in error && error.code === 'P2025'
+      
+      if (!isValidationError) {
+        // Only log actual server errors, not validation errors
+        console.error('Error deleting user:', error)
+      }
+      
       if (error instanceof Error && 'code' in error && error.code === 'P2025') {
         return NextResponse.json({ error: 'User not found' }, { status: 404 })
       }

@@ -1,7 +1,22 @@
-'use client'
+"use client";
 
-import React from 'react'
-import { Button } from "@/components/ui/button"
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -9,178 +24,185 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  useClients,
+  useDeleteClient,
+  useLocations,
+} from "@/hooks/api/use-projects";
+import { useClientTable, useProjectsStore } from "@/stores/projects-store";
+import type { Client } from "@/types/projects";
+import { formatDistanceToNow } from "date-fns";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Search, Plus, Edit, Trash2, Eye, Filter, X, List, ChevronLeft, ChevronRight } from "lucide-react"
-import { useClients, useDeleteClient, useLocations } from '@/hooks/api/use-projects'
-import { useProjectsStore, useClientModal, useClientTable } from '@/stores/projects-store'
-import { formatDistanceToNow } from 'date-fns'
-import { toast } from 'sonner'
-import type { Client } from '@/types/projects'
-import { DeleteConfirmationModal } from '@/components/modals/DeleteConfirmationModal'
+  ChevronLeft,
+  ChevronRight,
+  Edit,
+  Filter,
+  List,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import React from "react";
+import { toast } from "sonner";
 
-interface ClientsTableProps {
-  onSelectClient?: (client: Client) => void
-}
+export function ClientsTable() {
+  const setClientTable = useProjectsStore((state) => state.setClientTable);
+  const setClientModal = useProjectsStore((state) => state.setClientModal);
 
-export function ClientsTable({ onSelectClient }: ClientsTableProps) {
-  const setClientTable = useProjectsStore(state => state.setClientTable)
-  const setClientModal = useProjectsStore(state => state.setClientModal)
-  const isMobile = useProjectsStore(state => state.isMobile)
-  const setIsMobile = useProjectsStore(state => state.setIsMobile)
-  const getEffectiveClientItemsPerPage = useProjectsStore(state => state.getEffectiveClientItemsPerPage)
+  const setIsMobile = useProjectsStore((state) => state.setIsMobile);
+  const getEffectiveClientItemsPerPage = useProjectsStore(
+    (state) => state.getEffectiveClientItemsPerPage
+  );
 
   // Mobile detection
   React.useEffect(() => {
     const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-    
-    checkIsMobile()
-    window.addEventListener('resize', checkIsMobile)
-    return () => window.removeEventListener('resize', checkIsMobile)
-  }, [setIsMobile])
-  
-  const { data: locations } = useLocations()
-  const { data: clients, isLoading, error } = useClients()
-  const { mutate: deleteClient, isPending: isDeleting } = useDeleteClient()
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, [setIsMobile]);
+
+  const { data: locations } = useLocations();
+  const { data: clients, isLoading, error } = useClients();
+  const { mutate: deleteClient, isPending: isDeleting } = useDeleteClient();
 
   // Local filtering state
-  const [locationFilter, setLocationFilter] = React.useState<string>('all')
-  
-  // Delete confirmation modal state
-  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false)
-  const [clientToDelete, setClientToDelete] = React.useState<Client | null>(null)
-  
-  const setModal = useProjectsStore(state => state.setClientModal)
-  const clientTable = useClientTable()
+  const [locationFilter, setLocationFilter] = React.useState<string>("all");
 
-  // No longer need selectedLocation since we show all clients
+  // Delete confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
+  const [clientToDelete, setClientToDelete] = React.useState<Client | null>(
+    null
+  );
+
+  const clientTable = useClientTable();
 
   const handleEdit = (client: Client) => {
-    setClientModal(true, client.id)
-  }
+    setClientModal(true, client.id);
+  };
 
   const handleDelete = (client: Client) => {
-    setClientToDelete(client)
-    setDeleteModalOpen(true)
-  }
+    setClientToDelete(client);
+    setDeleteModalOpen(true);
+  };
 
   const handleConfirmDelete = () => {
-    if (!clientToDelete) return
-    
+    if (!clientToDelete) return;
+
     deleteClient(clientToDelete.id, {
       onSuccess: () => {
-        toast.success('Client deleted successfully')
-        setDeleteModalOpen(false)
-        setClientToDelete(null)
+        toast.success("Client deleted successfully");
+        setDeleteModalOpen(false);
+        setClientToDelete(null);
       },
       onError: (error) => {
-        toast.error('Failed to delete client: ' + error.message)
-      }
-    })
-  }
-
-  const handleRowClick = (client: Client) => {
-    onSelectClient?.(client)
-  }
+        toast.error("Failed to delete client: " + error.message);
+      },
+    });
+  };
 
   const handleSearch = (value: string) => {
-    setClientTable({ search: value, page: 1 })
-  }
+    setClientTable({ search: value, page: 1 });
+  };
 
   const handleSort = (sortBy: typeof clientTable.sortBy) => {
-    const sortOrder = clientTable.sortBy === sortBy && clientTable.sortOrder === 'asc' ? 'desc' : 'asc'
-    setClientTable({ sortBy, sortOrder })
-  }
+    const sortOrder =
+      clientTable.sortBy === sortBy && clientTable.sortOrder === "asc"
+        ? "desc"
+        : "asc";
+    setClientTable({ sortBy, sortOrder });
+  };
 
-  // Removed handleBack since no hierarchical navigation
 
   // Filter clients based on search and location
   const filteredClients = React.useMemo(() => {
-    if (!clients) return []
-    
-    let filtered = clients
+    if (!clients) return [];
+
+    let filtered = clients;
 
     // Apply search filter
     if (clientTable.search) {
-      filtered = filtered.filter(client =>
+      filtered = filtered.filter((client) =>
         client.name.toLowerCase().includes(clientTable.search.toLowerCase())
-      )
+      );
     }
 
     // Apply location filter
-    if (locationFilter !== 'all') {
-      filtered = filtered.filter(client => 
-        client.location_id === locationFilter
-      )
+    if (locationFilter !== "all") {
+      filtered = filtered.filter(
+        (client) => client.location_id === locationFilter
+      );
     }
 
-    return filtered
-  }, [clients, clientTable.search, locationFilter])
+    return filtered;
+  }, [clients, clientTable.search, locationFilter]);
 
   // Sort clients
   const sortedClients = React.useMemo(() => {
-    if (!filteredClients.length) return []
-    
+    if (!filteredClients.length) return [];
+
     return [...filteredClients].sort((a, b) => {
-      const aValue = a[clientTable.sortBy]
-      const bValue = b[clientTable.sortBy]
-      
-      if (clientTable.sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1
+      const aValue = a[clientTable.sortBy];
+      const bValue = b[clientTable.sortBy];
+
+      if (clientTable.sortOrder === "asc") {
+        return aValue > bValue ? 1 : -1;
       }
-      return aValue < bValue ? 1 : -1
-    })
-  }, [filteredClients, clientTable.sortBy, clientTable.sortOrder])
+      return aValue < bValue ? 1 : -1;
+    });
+  }, [filteredClients, clientTable.sortBy, clientTable.sortOrder]);
 
   // Pagination logic
   const paginationData = React.useMemo(() => {
-    const itemsPerPage = getEffectiveClientItemsPerPage()
-    const startIndex = (clientTable.page - 1) * itemsPerPage
-    const paginatedClients = sortedClients.slice(startIndex, startIndex + itemsPerPage)
-    const totalPages = Math.ceil(sortedClients.length / itemsPerPage)
-    
+    const itemsPerPage = getEffectiveClientItemsPerPage();
+    const startIndex = (clientTable.page - 1) * itemsPerPage;
+    const paginatedClients = sortedClients.slice(
+      startIndex,
+      startIndex + itemsPerPage
+    );
+    const totalPages = Math.ceil(sortedClients.length / itemsPerPage);
+
     return {
       paginatedClients,
       totalPages,
       itemsPerPage,
-      currentPage: clientTable.page
-    }
-  }, [sortedClients, clientTable.page, getEffectiveClientItemsPerPage])
+      currentPage: clientTable.page,
+    };
+  }, [sortedClients, clientTable.page, getEffectiveClientItemsPerPage]);
 
   // Pagination handlers
   const handlePageChange = (newPage: number) => {
-    setClientTable({ page: newPage })
-  }
+    setClientTable({ page: newPage });
+  };
 
   if (error) {
     return (
       <div className="text-center py-8 text-red-600">
         Error loading clients: {error.message}
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-4">
+      {/* Add Button */}
+      <div className="flex justify-end">
+        <Button
+          onClick={() => setClientModal(true)}
+          className="gap-2 font-semibold w-full sm:w-auto"
+        >
+          <Plus className="h-4 w-4" />
+          Add Client
+        </Button>
+      </div>
 
-      {/* Search, Filter & Sort Section */}
+      {/* Search */}
       <div className="space-y-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -193,12 +215,12 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
         </div>
 
         {/* Filter and Sort Buttons */}
-        <div className="flex gap-3">
+        <div className="flex flex-row gap-3">
           <Select
-            value={locationFilter !== 'all' ? `location-${locationFilter}` : ""}
+            value={locationFilter !== "all" ? `location-${locationFilter}` : ""}
             onValueChange={(value) => {
               if (value === "clear-all") {
-                setLocationFilter('all');
+                setLocationFilter("all");
               }
               // Location filters
               else if (value.startsWith("location-")) {
@@ -214,9 +236,12 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
             <SelectContent className="w-80">
               <div className="p-3 max-h-96 overflow-y-auto">
                 {/* Clear Filters */}
-                {locationFilter !== 'all' && (
+                {locationFilter !== "all" && (
                   <div className="mb-4">
-                    <SelectItem value="clear-all" className="text-red-600 font-medium">
+                    <SelectItem
+                      value="clear-all"
+                      className="text-red-600 font-medium"
+                    >
                       Clear All Filters
                     </SelectItem>
                   </div>
@@ -246,22 +271,24 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
           <Select
             value={(() => {
               if (!clientTable.sortBy) return "clear-sort";
-              
+
               if (clientTable.sortBy === "created_at") {
-                return clientTable.sortOrder === "desc" ? "created_at" : "created_at_old";
+                return clientTable.sortOrder === "desc"
+                  ? "created_at"
+                  : "created_at_old";
               }
               if (clientTable.sortBy === "name") {
                 return clientTable.sortOrder === "asc" ? "name" : "name_desc";
               }
-              
+
               return clientTable.sortBy;
             })()}
             onValueChange={(value) => {
               if (value === "clear-sort") {
-                handleSort('name'); // Reset to default
+                handleSort("name"); // Reset to default
                 return;
               }
-              
+
               if (value === "created_at") {
                 setClientTable({ sortBy: "created_at", sortOrder: "desc" });
               } else if (value === "created_at_old") {
@@ -303,23 +330,32 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
         </div>
 
         {/* Active Filter Badges */}
-        {(locationFilter !== 'all' || clientTable.search || clientTable.sortBy) && (
+        {(locationFilter !== "all" ||
+          clientTable.search ||
+          clientTable.sortBy) && (
           <div className="flex flex-wrap gap-2">
             {/* Sort Badge */}
             {clientTable.sortBy && (
               <Badge variant="secondary" className="gap-1 pr-1">
-                Sort: {(() => {
+                Sort:{" "}
+                {(() => {
                   if (clientTable.sortBy === "created_at")
-                    return clientTable.sortOrder === "desc" ? "Newest Added" : "Oldest Added";
+                    return clientTable.sortOrder === "desc"
+                      ? "Newest Added"
+                      : "Oldest Added";
                   if (clientTable.sortBy === "name")
-                    return clientTable.sortOrder === "asc" ? "Client A-Z" : "Client Z-A";
+                    return clientTable.sortOrder === "asc"
+                      ? "Client A-Z"
+                      : "Client Z-A";
                   return clientTable.sortBy;
                 })()}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
-                  onClick={() => setClientTable({ sortBy: "", sortOrder: "asc" })}
+                  onClick={() =>
+                    setClientTable({ sortBy: undefined, sortOrder: "asc" })
+                  }
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -328,12 +364,12 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
             {/* Search Badge */}
             {clientTable.search && (
               <Badge variant="secondary" className="gap-1 pr-1">
-                Search: "{clientTable.search}"
+                Search: {clientTable.search}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
-                  onClick={() => handleSearch('')}
+                  onClick={() => handleSearch("")}
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -341,14 +377,16 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
             )}
 
             {/* Location Filter Badge */}
-            {locationFilter !== 'all' && (
+            {locationFilter !== "all" && (
               <Badge variant="secondary" className="gap-1 pr-1">
-                Location: {locations?.find(l => l.id === locationFilter)?.address || locationFilter}
+                Location:{" "}
+                {locations?.find((l) => l.id === locationFilter)?.address ||
+                  locationFilter}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
-                  onClick={() => setLocationFilter('all')}
+                  onClick={() => setLocationFilter("all")}
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -360,9 +398,9 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
               variant="outline"
               size="sm"
               onClick={() => {
-                setLocationFilter('all');
-                handleSearch('');
-                setClientTable({ sortBy: "", sortOrder: "asc" });
+                setLocationFilter("all");
+                handleSearch("");
+                setClientTable({ sortBy: undefined, sortOrder: "asc" });
               }}
               className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
             >
@@ -377,27 +415,27 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer select-none"
-                onClick={() => handleSort('name')}
+                onClick={() => handleSort("name")}
               >
                 Client Name
-                {clientTable.sortBy === 'name' && (
+                {clientTable.sortBy === "name" && (
                   <span className="ml-1">
-                    {clientTable.sortOrder === 'asc' ? '↑' : '↓'}
+                    {clientTable.sortOrder === "asc" ? "↑" : "↓"}
                   </span>
                 )}
               </TableHead>
               <TableHead>Location</TableHead>
               <TableHead>Projects</TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer select-none"
-                onClick={() => handleSort('created_at')}
+                onClick={() => handleSort("created_at")}
               >
                 Created
-                {clientTable.sortBy === 'created_at' && (
+                {clientTable.sortBy === "created_at" && (
                   <span className="ml-1">
-                    {clientTable.sortOrder === 'asc' ? '↑' : '↓'}
+                    {clientTable.sortOrder === "asc" ? "↑" : "↓"}
                   </span>
                 )}
               </TableHead>
@@ -414,22 +452,19 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
             ) : paginationData.paginatedClients.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-8">
-                  {clientTable.search ? 'No clients found' : 'No clients yet'}
+                  {clientTable.search ? "No clients found" : "No clients yet"}
                 </TableCell>
               </TableRow>
             ) : (
               paginationData.paginatedClients.map((client, index) => (
-                <TableRow 
+                <TableRow
                   key={client.id || `client-${index}`}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => handleRowClick(client)}
+                  className="hover:bg-muted/50"
                 >
-                  <TableCell className="font-medium">
-                    {client.name}
-                  </TableCell>
+                  <TableCell className="font-medium">{client.name}</TableCell>
                   <TableCell>
                     <span className="text-sm">
-                      {client.location?.address || 'No location'}
+                      {client.location?.address || "No location"}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -438,22 +473,24 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {client.created_at ? (
-                      (() => {
-                        try {
-                          const date = new Date(client.created_at)
-                          return isNaN(date.getTime()) ? 'Just now' : formatDistanceToNow(date, { addSuffix: true })
-                        } catch {
-                          return 'Just now'
-                        }
-                      })()
-                    ) : 'Just now'}
+                    {client.created_at
+                      ? (() => {
+                          try {
+                            const date = new Date(client.created_at);
+                            return isNaN(date.getTime())
+                              ? "Just now"
+                              : formatDistanceToNow(date, { addSuffix: true });
+                          } catch {
+                            return "Just now";
+                          }
+                        })()
+                      : "Just now"}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           className="h-8 w-8 p-0"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -461,19 +498,21 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={(e) => {
-                          e.stopPropagation()
-                          handleEdit(client)
-                        }}>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(client);
+                          }}
+                        >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           className="text-red-600"
                           onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleDelete(client)
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDelete(client);
                           }}
                           disabled={isDeleting}
                         >
@@ -510,28 +549,29 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
         ) : paginationData.paginatedClients.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
-              {clientTable.search ? 'No clients found' : 'No clients yet'}
+              {clientTable.search ? "No clients found" : "No clients yet"}
             </CardContent>
           </Card>
         ) : (
           paginationData.paginatedClients.map((client, index) => (
-            <Card 
-              key={client.id || `client-${index}`} 
-              className="cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-[1.02]"
-              onClick={() => handleRowClick(client)}
+            <Card
+              key={client.id || `client-${index}`}
+              className="hover:shadow-md transition-all duration-200"
             >
               <CardContent className="p-4">
                 <div className="flex flex-col space-y-3">
                   {/* Header with title and actions */}
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base leading-tight">{client.name}</h3>
+                      <h3 className="font-semibold text-base leading-tight">
+                        {client.name}
+                      </h3>
                     </div>
                     {/* Actions dropdown */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           className="h-8 w-8 p-0"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -539,22 +579,22 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleEdit(client)
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleEdit(client);
                           }}
                         >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           className="text-red-600"
                           onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleDelete(client)
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDelete(client);
                           }}
                           disabled={isDeleting}
                         >
@@ -571,24 +611,29 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
                       {client.projects?.length || 0} projects
                     </Badge>
                   </div>
-                  
+
                   {/* Location */}
-                  <p className="text-sm text-gray-600 font-medium">{client.location?.address}</p>
-                  
+                  <p className="text-sm text-gray-600 font-medium">
+                    {client.location?.address}
+                  </p>
+
                   {/* Created time */}
                   <div className="text-xs text-gray-400">
-                    {client.created_at ? (
-                      (() => {
-                        try {
-                          const date = new Date(client.created_at)
-                          return isNaN(date.getTime()) ? 'Just now' : `Created ${formatDistanceToNow(date, { addSuffix: true })}`
-                        } catch {
-                          return 'Just now'
-                        }
-                      })()
-                    ) : 'Just now'}
+                    {client.created_at
+                      ? (() => {
+                          try {
+                            const date = new Date(client.created_at);
+                            return isNaN(date.getTime())
+                              ? "Just now"
+                              : `Created ${formatDistanceToNow(date, {
+                                  addSuffix: true,
+                                })}`;
+                          } catch {
+                            return "Just now";
+                          }
+                        })()
+                      : "Just now"}
                   </div>
-
                 </div>
               </CardContent>
             </Card>
@@ -637,11 +682,10 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
       {/* Results count */}
       {clients && (
         <div className="text-sm text-muted-foreground">
-          Showing {paginationData.paginatedClients.length} of {sortedClients.length} clients
+          Showing {paginationData.paginatedClients.length} of{" "}
+          {sortedClients.length} clients
           {sortedClients.length < clients.length && (
-            <span className="ml-2">
-              (filtered from {clients.length} total)
-            </span>
+            <span className="ml-2">(filtered from {clients.length} total)</span>
           )}
           {paginationData.totalPages > 1 && (
             <span className="ml-2">
@@ -663,5 +707,5 @@ export function ClientsTable({ onSelectClient }: ClientsTableProps) {
         confirmText="Delete Client"
       />
     </div>
-  )
+  );
 }

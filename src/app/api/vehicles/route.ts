@@ -51,11 +51,11 @@ export const GET = withResourcePermission('vehicles', 'view', async (request: Ne
     return NextResponse.json({
       data: vehicles,
       total,
-      user_role: user.role,
+      user_role: _user.role,
       permissions: {
-        can_create: user.role !== 'VIEWER',
-        can_update: user.role !== 'VIEWER',
-        can_delete: user.role === 'SUPERADMIN'
+        can_create: _user.role !== 'VIEWER',
+        can_update: _user.role !== 'VIEWER',
+        can_delete: _user.role === 'SUPERADMIN'
       }
     })
   } catch (err) {

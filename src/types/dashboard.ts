@@ -38,10 +38,11 @@ export interface DetailedData {
 export interface ActivityItem {
   id: string;
   type: 'equipment' | 'vehicle' | 'project' | 'client' | 'maintenance' | 'location';
-  action: 'created' | 'updated' | 'reported';
-  title: string;
+  action: 'created' | 'updated' | 'reported' | 'deleted';
+  title?: string;
   description: string;
   timestamp: string;
+  user: string;
   status?: string;
   priority?: string;
 }

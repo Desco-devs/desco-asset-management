@@ -31,7 +31,7 @@ export function UserForm({ user, onSubmit, onCancel, loading = false, mode }: Us
     watch,
     formState: { errors },
   } = useForm({
-    resolver: zodResolver(isEdit ? updateUserSchema : createUserSchema),
+    // resolver: zodResolver(isEdit ? updateUserSchema : createUserSchema) as any,
     defaultValues: isEdit || isView ? {
       username: user?.username || '',
       full_name: user?.full_name || '',

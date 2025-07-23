@@ -111,7 +111,7 @@ export async function PUT(
 
       // Handle completion logic
       if (status === 'COMPLETED') {
-        if (!existingReport.repaired_by) updateData.repaired_by = user.id;
+        if (!existingReport.repaired_by) updateData.repaired_by = _user.id;
         if (!existingReport.date_repaired) updateData.date_repaired = new Date();
       }
 

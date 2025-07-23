@@ -18,7 +18,7 @@ export function ProjectModal() {
   const setModal = useProjectsStore(state => state.setProjectModal)
   const { data: projects } = useProjects()
   
-  const project = editingId ? projects?.find(p => p.id === editingId) : null
+  const project = editingId ? projects?.data?.find(p => p.id === editingId) : null
   const isEditing = !!editingId
 
   const handleSuccess = () => {

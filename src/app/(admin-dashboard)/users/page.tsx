@@ -11,7 +11,7 @@ import { useAuth } from '@/app/context/AuthContext'
 // Page-specific components
 import { UserHeader } from './components/UserHeader'
 import { UserStats } from './components/UserStats'
-import { UserFilters } from './components/UserFilters'
+import { UserSearchAndActions } from './components/UserSearchAndActions'
 import { UserTableSection } from './components/UserTableSection'
 
 export default function UsersPage() {
@@ -109,8 +109,6 @@ export default function UsersPage() {
       {/* Header */}
       <UserHeader 
         total={usersData?.originalTotal || usersData?.total}
-        onCreateNew={openCreateModal}
-        canCreate={usersData?.permissions.can_create}
       />
 
       {/* Stats Cards */}
@@ -121,14 +119,16 @@ export default function UsersPage() {
         />
       )}
 
-      {/* Filters */}
-      <UserFilters
+      {/* Search and Actions */}
+      <UserSearchAndActions
         filters={filters}
         hasActiveFilters={hasActiveFilters}
         onSearchChange={handleSearchChange}
         onRoleFilter={handleRoleFilter}
         onStatusFilter={handleStatusFilter}
         onClearFilters={clearFilters}
+        onCreateNew={openCreateModal}
+        canCreate={usersData?.permissions.can_create}
       />
 
       {/* Users Table */}
@@ -141,6 +141,7 @@ export default function UsersPage() {
         onCreateNew={openCreateModal}
         deleteLoading={deleteUserMutation.isPending}
         currentUserRole={currentUser?.role}
+        currentUserId={currentUser?.id}
         isModalOpen={modalState.isOpen}
       />
 

@@ -71,12 +71,13 @@ const data = {
       icon: User,
       isActive: true,
     },
-    {
-      title: "Chat",
-      url: "/chat-app",
-      icon: User,
-      isActive: true,
-    },
+    // CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
+    // {
+    //   title: "Chat",
+    //   url: "/chat-app",
+    //   icon: User,
+    //   isActive: true,
+    // },
   ],
 };
 

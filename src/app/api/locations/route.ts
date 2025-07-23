@@ -112,7 +112,13 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: unknown) {
-    console.error("Error creating location:", error);
+    // Check if it's a validation error that shouldn't be logged
+    const isValidationError = error instanceof Error && 'code' in error && error.code === "P2002"
+    
+    if (!isValidationError) {
+      // Only log actual server errors, not validation errors
+      console.error("Error creating location:", error);
+    }
     
     if (error instanceof Error && 'code' in error && error.code === "P2002") {
       return NextResponse.json(

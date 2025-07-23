@@ -4,15 +4,13 @@ import { Suspense } from "react";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import {
-  EquipmentsCount,
-  MaintenanceAlerts,
-  OverviewStats,
-  QuickActions,
-  RecentActivity,
-  VehiclesAndEquipments,
-  VehiclesCount,
-} from "./components";
+import { EquipmentsCount } from "./stats/EquipmentsCount";
+import { OverviewStats } from "./stats/OverviewStats";
+import { VehiclesCount } from "./stats/VehiclesCount";
+import { VehiclesAndEquipments } from "./charts/VehiclesAndEquipments";
+import { MaintenanceAlerts } from "./ui/MaintenanceAlerts";
+import { QuickActions } from "./ui/QuickActions";
+import { RecentActivity } from "./ui/RecentActivity";
 
 function DashboardSkeleton() {
   return (

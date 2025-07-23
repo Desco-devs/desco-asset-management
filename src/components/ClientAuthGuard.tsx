@@ -21,20 +21,11 @@ export default function ClientAuthGuard({ children, redirectTo = '/login' }: Cli
     }
   }, [user, loading, router, redirectTo]);
 
-  // Show loading only when actually loading
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Skeleton className="h-12 w-12 rounded-full mx-auto" />
-          <Skeleton className="h-4 w-32 mx-auto" />
-        </div>
-      </div>
-    );
-  }
+  // Don't show loading skeleton - let individual routes handle their own loading states
+  // This prevents infinite skeleton blocking all admin routes
 
-  // Show children only if user is authenticated
-  if (user) {
+  // Show children only if user is authenticated OR still loading (let routes handle their own loading)
+  if (user || loading) {
     return <>{children}</>;
   }
 

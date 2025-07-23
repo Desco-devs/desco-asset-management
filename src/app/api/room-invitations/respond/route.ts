@@ -1,3 +1,16 @@
+// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
+
+import { NextRequest, NextResponse } from "next/server";
+// import { prisma } from "@/lib/prisma";
+
+export async function POST(request: NextRequest) {
+  return NextResponse.json(
+    { error: "Chat app temporarily disabled" },
+    { status: 503 }
+  );
+}
+
+/*
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -119,3 +132,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+*/

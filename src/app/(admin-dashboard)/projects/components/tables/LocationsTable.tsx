@@ -1,7 +1,22 @@
-'use client'
+"use client";
 
-import React from 'react'
-import { Button } from "@/components/ui/button"
+import { DeleteConfirmationModal } from "@/components/modals/DeleteConfirmationModal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -9,162 +24,162 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/table";
+import { useDeleteLocation, useLocations } from "@/hooks/api/use-projects";
+import { useLocationTable, useProjectsStore } from "@/stores/projects-store";
+import type { Location } from "@/types/projects";
+import { formatDistanceToNow } from "date-fns";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Search, Plus, Edit, Trash2, Eye, X, List, ChevronLeft, ChevronRight } from "lucide-react"
-import { useLocations, useDeleteLocation } from '@/hooks/api/use-projects'
-import { useProjectsStore, useLocationModal, useLocationTable } from '@/stores/projects-store'
-import { formatDistanceToNow } from 'date-fns'
-import { toast } from 'sonner'
-import type { Location } from '@/types/projects'
-import { DeleteConfirmationModal } from '@/components/modals/DeleteConfirmationModal'
+  ChevronLeft,
+  ChevronRight,
+  Edit,
+  List,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import React from "react";
+import { toast } from "sonner";
 
-interface LocationsTableProps {
-  onSelectLocation?: (location: Location) => void
-  selectedLocationId?: string | null
-}
-
-export function LocationsTable({ onSelectLocation, selectedLocationId }: LocationsTableProps) {
-  const { data: locations, isLoading, error } = useLocations()
-  const { mutate: deleteLocation, isPending: isDeleting } = useDeleteLocation()
+export function LocationsTable() {
+  const { data: locations, isLoading, error } = useLocations();
+  const { mutate: deleteLocation, isPending: isDeleting } = useDeleteLocation();
   // Delete confirmation modal state
-  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false)
-  const [locationToDelete, setLocationToDelete] = React.useState<Location | null>(null)
+  const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
+  const [locationToDelete, setLocationToDelete] =
+    React.useState<Location | null>(null);
 
-  const setModal = useProjectsStore(state => state.setLocationModal)
-  const locationTable = useLocationTable()
-  const setLocationTable = useProjectsStore(state => state.setLocationTable)
-  const setCurrentView = useProjectsStore(state => state.setCurrentView) 
-  const setSelectedLocation = useProjectsStore(state => state.setSelectedLocation)
-  const isMobile = useProjectsStore(state => state.isMobile)
-  const setIsMobile = useProjectsStore(state => state.setIsMobile)
-  const getEffectiveLocationItemsPerPage = useProjectsStore(state => state.getEffectiveLocationItemsPerPage)
+  const setModal = useProjectsStore((state) => state.setLocationModal);
+  const locationTable = useLocationTable();
+  const setLocationTable = useProjectsStore((state) => state.setLocationTable);
+
+  const setIsMobile = useProjectsStore((state) => state.setIsMobile);
+  const getEffectiveLocationItemsPerPage = useProjectsStore(
+    (state) => state.getEffectiveLocationItemsPerPage
+  );
 
   // Mobile detection
   React.useEffect(() => {
     const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-    
-    checkIsMobile()
-    window.addEventListener('resize', checkIsMobile)
-    return () => window.removeEventListener('resize', checkIsMobile)
-  }, [setIsMobile])
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, [setIsMobile]);
 
   const handleEdit = (location: Location) => {
-    setModal(true, location.id)
-  }
+    setModal(true, location.id);
+  };
 
   const handleDelete = (location: Location) => {
-    setLocationToDelete(location)
-    setDeleteModalOpen(true)
-  }
+    setLocationToDelete(location);
+    setDeleteModalOpen(true);
+  };
 
   const handleConfirmDelete = () => {
-    if (!locationToDelete) return
-    
+    if (!locationToDelete) return;
+
     deleteLocation(locationToDelete.id, {
       onSuccess: () => {
-        toast.success('Location deleted successfully')
-        // Clear selection if deleted location was selected
-        if (selectedLocationId === locationToDelete.id) {
-          setSelectedLocation(null)
-        }
-        setDeleteModalOpen(false)
-        setLocationToDelete(null)
+        toast.success("Location deleted successfully");
+        setDeleteModalOpen(false);
+        setLocationToDelete(null);
       },
       onError: (error) => {
-        toast.error('Failed to delete location: ' + error.message)
-      }
-    })
-  }
-
-  const handleRowClick = (location: Location) => {
-    onSelectLocation?.(location)
-  }
+        toast.error("Failed to delete location: " + error.message);
+      },
+    });
+  };
 
   const handleSearch = (value: string) => {
-    setLocationTable({ search: value, page: 1 })
-  }
+    setLocationTable({ search: value, page: 1 });
+  };
 
   const handleSort = (sortBy: typeof locationTable.sortBy) => {
-    const sortOrder = locationTable.sortBy === sortBy && locationTable.sortOrder === 'asc' ? 'desc' : 'asc'
-    setLocationTable({ sortBy, sortOrder })
-  }
+    const sortOrder =
+      locationTable.sortBy === sortBy && locationTable.sortOrder === "asc"
+        ? "desc"
+        : "asc";
+    setLocationTable({ sortBy, sortOrder });
+  };
 
   // Filter locations based on search
   const filteredLocations = React.useMemo(() => {
-    if (!locations) return []
-    
-    if (!locationTable.search) return locations
-    
-    return locations.filter(location =>
-      location.address.toLowerCase().includes(locationTable.search.toLowerCase())
-    )
-  }, [locations, locationTable.search])
+    if (!locations) return [];
+
+    if (!locationTable.search) return locations;
+
+    return locations.filter((location) =>
+      location.address
+        .toLowerCase()
+        .includes(locationTable.search.toLowerCase())
+    );
+  }, [locations, locationTable.search]);
 
   // Sort locations
   const sortedLocations = React.useMemo(() => {
-    if (!filteredLocations.length) return []
-    
+    if (!filteredLocations.length) return [];
+
     return [...filteredLocations].sort((a, b) => {
-      const aValue = a[locationTable.sortBy]
-      const bValue = b[locationTable.sortBy]
-      
-      if (locationTable.sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1
+      const aValue = a[locationTable.sortBy];
+      const bValue = b[locationTable.sortBy];
+
+      if (locationTable.sortOrder === "asc") {
+        return aValue > bValue ? 1 : -1;
       }
-      return aValue < bValue ? 1 : -1
-    })
-  }, [filteredLocations, locationTable.sortBy, locationTable.sortOrder])
+      return aValue < bValue ? 1 : -1;
+    });
+  }, [filteredLocations, locationTable.sortBy, locationTable.sortOrder]);
 
   // Pagination logic
   const paginationData = React.useMemo(() => {
-    const itemsPerPage = getEffectiveLocationItemsPerPage()
-    const startIndex = (locationTable.page - 1) * itemsPerPage
-    const paginatedLocations = sortedLocations.slice(startIndex, startIndex + itemsPerPage)
-    const totalPages = Math.ceil(sortedLocations.length / itemsPerPage)
-    
+    const itemsPerPage = getEffectiveLocationItemsPerPage();
+    const startIndex = (locationTable.page - 1) * itemsPerPage;
+    const paginatedLocations = sortedLocations.slice(
+      startIndex,
+      startIndex + itemsPerPage
+    );
+    const totalPages = Math.ceil(sortedLocations.length / itemsPerPage);
+
     return {
       paginatedLocations,
       totalPages,
       itemsPerPage,
-      currentPage: locationTable.page
-    }
-  }, [sortedLocations, locationTable.page, getEffectiveLocationItemsPerPage])
+      currentPage: locationTable.page,
+    };
+  }, [sortedLocations, locationTable.page, getEffectiveLocationItemsPerPage]);
 
   // Pagination handlers
   const handlePageChange = (newPage: number) => {
-    setLocationTable({ page: newPage })
-  }
+    setLocationTable({ page: newPage });
+  };
 
   if (error) {
     return (
       <div className="text-center py-8 text-red-600">
         Error loading locations: {error.message}
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-4">
+      {/* Add Button */}
+      <div className="flex justify-end">
+        <Button
+          onClick={() => setModal(true)}
+          className="gap-2 font-semibold w-full sm:w-auto"
+        >
+          <Plus className="h-4 w-4" />
+          Add Location
+        </Button>
+      </div>
 
-      {/* Search and Sort Section */}
+      {/* Search */}
       <div className="space-y-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -177,26 +192,30 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
         </div>
 
         {/* Sort Button */}
-        <div className="flex gap-3">
+        <div className="flex flex-row gap-3">
           <Select
             value={(() => {
               if (!locationTable.sortBy) return "clear-sort";
-              
+
               if (locationTable.sortBy === "created_at") {
-                return locationTable.sortOrder === "desc" ? "created_at" : "created_at_old";
+                return locationTable.sortOrder === "desc"
+                  ? "created_at"
+                  : "created_at_old";
               }
               if (locationTable.sortBy === "address") {
-                return locationTable.sortOrder === "asc" ? "address" : "address_desc";
+                return locationTable.sortOrder === "asc"
+                  ? "address"
+                  : "address_desc";
               }
-              
+
               return locationTable.sortBy;
             })()}
             onValueChange={(value) => {
               if (value === "clear-sort") {
-                handleSort('address'); // Reset to default
+                handleSort("address"); // Reset to default
                 return;
               }
-              
+
               if (value === "created_at") {
                 setLocationTable({ sortBy: "created_at", sortOrder: "desc" });
               } else if (value === "created_at_old") {
@@ -243,18 +262,25 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
             {/* Sort Badge */}
             {locationTable.sortBy && (
               <Badge variant="secondary" className="gap-1 pr-1">
-                Sort: {(() => {
+                Sort:{" "}
+                {(() => {
                   if (locationTable.sortBy === "created_at")
-                    return locationTable.sortOrder === "desc" ? "Newest Added" : "Oldest Added";
+                    return locationTable.sortOrder === "desc"
+                      ? "Newest Added"
+                      : "Oldest Added";
                   if (locationTable.sortBy === "address")
-                    return locationTable.sortOrder === "asc" ? "Address A-Z" : "Address Z-A";
+                    return locationTable.sortOrder === "asc"
+                      ? "Address A-Z"
+                      : "Address Z-A";
                   return locationTable.sortBy;
                 })()}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
-                  onClick={() => setLocationTable({ sortBy: "", sortOrder: "asc" })}
+                  onClick={() =>
+                    setLocationTable({ sortBy: undefined, sortOrder: "asc" })
+                  }
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -263,12 +289,12 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
             {/* Search Badge */}
             {locationTable.search && (
               <Badge variant="secondary" className="gap-1 pr-1">
-                Search: "{locationTable.search}"
+                Search: {locationTable.search}
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
-                  onClick={() => handleSearch('')}
+                  onClick={() => handleSearch("")}
                 >
                   <X className="h-3 w-3" />
                 </Button>
@@ -280,8 +306,8 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
               variant="outline"
               size="sm"
               onClick={() => {
-                handleSearch('');
-                setLocationTable({ sortBy: "", sortOrder: "asc" });
+                handleSearch("");
+                setLocationTable({ sortBy: undefined, sortOrder: "asc" });
               }}
               className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
             >
@@ -296,25 +322,25 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer select-none"
-                onClick={() => handleSort('address')}
+                onClick={() => handleSort("address")}
               >
                 Address
-                {locationTable.sortBy === 'address' && (
+                {locationTable.sortBy === "address" && (
                   <span className="ml-1">
-                    {locationTable.sortOrder === 'asc' ? '↑' : '↓'}
+                    {locationTable.sortOrder === "asc" ? "↑" : "↓"}
                   </span>
                 )}
               </TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer select-none"
-                onClick={() => handleSort('created_at')}
+                onClick={() => handleSort("created_at")}
               >
                 Created
-                {locationTable.sortBy === 'created_at' && (
+                {locationTable.sortBy === "created_at" && (
                   <span className="ml-1">
-                    {locationTable.sortOrder === 'asc' ? '↑' : '↓'}
+                    {locationTable.sortOrder === "asc" ? "↑" : "↓"}
                   </span>
                 )}
               </TableHead>
@@ -331,43 +357,39 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
             ) : paginationData.paginatedLocations.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={3} className="text-center py-8">
-                  {locationTable.search ? 'No locations found' : 'No locations yet'}
+                  {locationTable.search
+                    ? "No locations found"
+                    : "No locations yet"}
                 </TableCell>
               </TableRow>
             ) : (
               paginationData.paginatedLocations.map((location, index) => (
-                <TableRow 
+                <TableRow
                   key={location.id || `location-${index}`}
-                  className={`cursor-pointer hover:bg-muted/50 ${
-                    selectedLocationId === location.id ? 'bg-muted' : ''
-                  }`}
-                  onClick={() => handleRowClick(location)}
+                  className="hover:bg-muted/50"
                 >
                   <TableCell className="font-medium">
                     {location.address}
-                    {selectedLocationId === location.id && (
-                      <Badge variant="secondary" className="ml-2">
-                        Selected
-                      </Badge>
-                    )}
                   </TableCell>
                   <TableCell>
-                    {location.created_at ? (
-                      (() => {
-                        try {
-                          const date = new Date(location.created_at)
-                          return isNaN(date.getTime()) ? 'Just now' : formatDistanceToNow(date, { addSuffix: true })
-                        } catch {
-                          return 'Just now'
-                        }
-                      })()
-                    ) : 'Just now'}
+                    {location.created_at
+                      ? (() => {
+                          try {
+                            const date = new Date(location.created_at);
+                            return isNaN(date.getTime())
+                              ? "Just now"
+                              : formatDistanceToNow(date, { addSuffix: true });
+                          } catch {
+                            return "Just now";
+                          }
+                        })()
+                      : "Just now"}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           className="h-8 w-8 p-0"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -375,19 +397,21 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={(e) => {
-                          e.stopPropagation()
-                          handleEdit(location)
-                        }}>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(location);
+                          }}
+                        >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           className="text-red-600"
                           onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleDelete(location)
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDelete(location);
                           }}
                           disabled={isDeleting}
                         >
@@ -423,30 +447,29 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
         ) : paginationData.paginatedLocations.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
-              {locationTable.search ? 'No locations found' : 'No locations yet'}
+              {locationTable.search ? "No locations found" : "No locations yet"}
             </CardContent>
           </Card>
         ) : (
           paginationData.paginatedLocations.map((location, index) => (
-            <Card 
-              key={location.id || `location-${index}`} 
-              className={`cursor-pointer hover:shadow-md transition-all duration-200 hover:scale-[1.02] ${
-                selectedLocationId === location.id ? 'ring-2 ring-primary bg-primary/5' : ''
-              }`}
-              onClick={() => handleRowClick(location)}
+            <Card
+              key={location.id || `location-${index}`}
+              className="hover:shadow-md transition-all duration-200"
             >
               <CardContent className="p-4">
                 <div className="flex flex-col space-y-3">
                   {/* Header with title and actions */}
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base leading-tight">{location.address}</h3>
+                      <h3 className="font-semibold text-base leading-tight">
+                        {location.address}
+                      </h3>
                     </div>
                     {/* Actions dropdown */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           className="h-8 w-8 p-0"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -454,22 +477,22 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleEdit(location)
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleEdit(location);
                           }}
                         >
                           <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           className="text-red-600"
                           onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleDelete(location)
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDelete(location);
                           }}
                           disabled={isDeleting}
                         >
@@ -480,27 +503,23 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
                     </DropdownMenu>
                   </div>
 
-                  {/* Selected badge */}
-                  {selectedLocationId === location.id && (
-                    <Badge variant="secondary" className="text-xs w-fit">
-                      Selected
-                    </Badge>
-                  )}
-                  
                   {/* Created time */}
                   <div className="text-xs text-gray-400">
-                    {location.created_at ? (
-                      (() => {
-                        try {
-                          const date = new Date(location.created_at)
-                          return isNaN(date.getTime()) ? 'Just now' : `Created ${formatDistanceToNow(date, { addSuffix: true })}`
-                        } catch {
-                          return 'Just now'
-                        }
-                      })()
-                    ) : 'Just now'}
+                    {location.created_at
+                      ? (() => {
+                          try {
+                            const date = new Date(location.created_at);
+                            return isNaN(date.getTime())
+                              ? "Just now"
+                              : `Created ${formatDistanceToNow(date, {
+                                  addSuffix: true,
+                                })}`;
+                          } catch {
+                            return "Just now";
+                          }
+                        })()
+                      : "Just now"}
                   </div>
-
                 </div>
               </CardContent>
             </Card>
@@ -549,7 +568,8 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
       {/* Results count */}
       {locations && (
         <div className="text-sm text-muted-foreground">
-          Showing {paginationData.paginatedLocations.length} of {sortedLocations.length} locations
+          Showing {paginationData.paginatedLocations.length} of{" "}
+          {sortedLocations.length} locations
           {sortedLocations.length < locations.length && (
             <span className="ml-2">
               (filtered from {locations.length} total)
@@ -575,5 +595,5 @@ export function LocationsTable({ onSelectLocation, selectedLocationId }: Locatio
         confirmText="Delete Location"
       />
     </div>
-  )
+  );
 }

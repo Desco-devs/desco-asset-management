@@ -45,7 +45,9 @@
       "Bash(ls:*)",
       "Bash(npx eslint:*)",
       "Bash(npm update:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(mv:*)",
+      "Bash(env)"
     ],
     "deny": []
   }

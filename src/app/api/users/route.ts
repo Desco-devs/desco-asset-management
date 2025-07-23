@@ -199,7 +199,16 @@ export const POST = withResourcePermission('users', 'create', async (request: Ne
     })
 
     if (authError || !authUser.user) {
-      console.error('Supabase Auth error:', authError)
+      // Check if it's a validation error that shouldn't be logged as an error
+      const isValidationError = authError?.code === 'email_exists' || 
+                               authError?.message?.includes('already been registered') ||
+                               authError?.status === 422
+      
+      if (!isValidationError) {
+        // Only log actual server errors, not validation errors
+        console.error('Supabase Auth error:', authError)
+      }
+      
       return NextResponse.json({ 
         error: authError?.message || 'Failed to create user in authentication system' 
       }, { status: 400 })
@@ -231,7 +240,14 @@ export const POST = withResourcePermission('users', 'create', async (request: Ne
 
     return NextResponse.json(newUser, { status: 201 })
   } catch (error: unknown) {
-    console.error('Error creating user:', error)
+    // Check if it's a validation error that shouldn't be logged
+    const isValidationError = error instanceof Error && 'code' in error && error.code === 'P2002'
+    
+    if (!isValidationError) {
+      // Only log actual server errors, not validation errors
+      console.error('Error creating user:', error)
+    }
+    
     if (error instanceof Error && 'code' in error) {
       if (error.code === 'P2002') {
         return NextResponse.json({ error: 'Username already exists' }, { status: 400 })

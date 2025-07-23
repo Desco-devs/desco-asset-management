@@ -91,7 +91,14 @@ export const POST = withResourcePermission('projects', 'create', async (request:
     
     return NextResponse.json(project, { status: 201 });
   } catch (error: unknown) {
-    console.error("Error creating project:", error);
+    // Check if it's a validation error that shouldn't be logged
+    const isValidationError = error instanceof Error && 'code' in error && error.code === 'P2002'
+    
+    if (!isValidationError) {
+      // Only log actual server errors, not validation errors
+      console.error("Error creating project:", error);
+    }
+    
     if (error instanceof Error && 'code' in error && error.code === 'P2002') {
       return NextResponse.json({ error: 'Project with this name already exists for this client' }, { status: 400 })
     }

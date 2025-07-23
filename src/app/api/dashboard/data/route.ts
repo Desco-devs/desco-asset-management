@@ -11,7 +11,18 @@ import {
 
 export async function GET() {
   try {
-    // Fetch all data using organized data fetching functions
+    console.log('📊 Dashboard API: Starting data fetch...');
+    
+    // Add timeout to prevent infinite hanging
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Dashboard data fetch timeout after 10 seconds')), 10000);
+    });
+    
+    const dataPromise = fetchDashboardData();
+    
+    // Race between data fetch and timeout
+    const result = await Promise.race([dataPromise, timeoutPromise]);
+    
     const {
       equipmentCounts,
       vehicleCounts,
@@ -26,7 +37,9 @@ export async function GET() {
       projectsTotalCount,
       maintenanceReportsTotalCount,
       maintenanceReportsStatusCounts,
-    } = await fetchDashboardData();
+    } = result as any;
+    
+    console.log('✅ Dashboard API: Data fetched successfully');
 
     // Transform counts using utility functions
     const equipmentData = transformEquipmentCounts(equipmentCounts);
