@@ -191,7 +191,10 @@ export function FileUploadSectionSimple({
               <div className="relative w-full max-w-[200px] mx-auto group">
                 <div 
                   className="relative cursor-pointer"
-                  onClick={() => setShowImageViewer(true)}
+                  onClick={() => {
+                    console.log('Opening image viewer for:', label, preview);
+                    setShowImageViewer(true);
+                  }}
                 >
                   <Image
                     src={preview || ""}
@@ -311,12 +314,21 @@ export function FileUploadSectionSimple({
               </DialogTitle>
             </DialogHeader>
             <div className="flex-1 flex items-center justify-center bg-black min-h-[70vh]">
-              <img
-                src={preview}
-                alt={label}
-                className="max-w-full max-h-[80vh] object-contain"
-                onClick={(e) => e.stopPropagation()}
-              />
+              {preview && (
+                <img
+                  src={preview}
+                  alt={label}
+                  className="max-w-full max-h-[80vh] object-contain"
+                  onClick={(e) => e.stopPropagation()}
+                  onError={(e) => {
+                    console.error('Image failed to load:', preview);
+                    console.error('Error details:', e);
+                  }}
+                  onLoad={() => {
+                    console.log('Image loaded successfully:', preview);
+                  }}
+                />
+              )}
             </div>
             <div className="absolute inset-0 bg-black" onClick={() => setShowImageViewer(false)} />
           </DialogContent>

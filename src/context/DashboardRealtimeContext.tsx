@@ -263,10 +263,13 @@ export function DashboardRealtimeProvider({
 
     // Add error handler for the channel
     dashboardChannel.on("system", { event: "error" }, (error) => {
-      console.error("🌐❌ GLOBAL Dashboard channel error:", error);
-      connectionErrorRef.current = error?.message || "Channel error occurred";
-      isConnectedRef.current = false;
-      retryConnection();
+      // Only log if it's actually an error (not a success message)
+      if (error?.status !== 'ok') {
+        console.error("🌐❌ GLOBAL Dashboard channel error:", error);
+        connectionErrorRef.current = error?.message || "Channel error occurred";
+        isConnectedRef.current = false;
+        retryConnection();
+      }
     });
 
     // Handler functions - Enhanced with error handling

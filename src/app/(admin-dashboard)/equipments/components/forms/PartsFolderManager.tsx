@@ -70,12 +70,15 @@ export default function PartsFolderManager({
   // Modal states
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [isRenameFolderModalOpen, setIsRenameFolderModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [selectedFolder, setSelectedFolder] = useState<PartFolder | null>(null);
+  const [folderToDelete, setFolderToDelete] = useState<PartFolder | null>(null);
   
   // Collapsible states
   const [isRootCollapsed, setIsRootCollapsed] = useState(false);
   const [isFoldersCollapsed, setIsFoldersCollapsed] = useState(false);
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
   
   // File input refs
   const rootFileInputRef = useRef<HTMLInputElement>(null);
@@ -173,17 +176,24 @@ export default function PartsFolderManager({
     if (!folder) return;
 
     if (folder.files.length > 0) {
-      if (!confirm(`Delete folder "${folder.name}" and all ${folder.files.length} files inside?`)) {
-        return;
-      }
+      // Show confirmation dialog for non-empty folders
+      setFolderToDelete(folder);
+      setIsDeleteConfirmOpen(true);
+    } else {
+      // Delete empty folders immediately
+      confirmDeleteFolder(folder);
     }
+  };
 
+  const confirmDeleteFolder = (folder: PartFolder) => {
     const newStructure = {
       ...partsStructure,
-      folders: partsStructure.folders.filter((f) => f.id !== folderId),
+      folders: partsStructure.folders.filter((f) => f.id !== folder.id),
     };
 
     updatePartsStructure(newStructure);
+    setIsDeleteConfirmOpen(false);
+    setFolderToDelete(null);
   };
 
   // File operations
@@ -288,13 +298,13 @@ export default function PartsFolderManager({
 
     return (
       <>
-        <div className="relative group border rounded-lg p-2 bg-card hover:bg-muted/50 transition-colors">
+        <div 
+          className="relative group border rounded-lg p-2 bg-card hover:bg-muted/50 transition-colors cursor-pointer"
+          onClick={file.preview ? handleImageClick : undefined}
+        >
           <div className="flex items-center gap-2">
             {file.preview ? (
-              <div 
-                className="relative cursor-pointer group/image"
-                onClick={handleImageClick}
-              >
+              <div className="relative group/image">
                 <img
                   src={file.preview}
                   alt={file.name}
@@ -320,7 +330,10 @@ export default function PartsFolderManager({
             variant="destructive"
             size="sm"
             className="absolute top-1 right-1 h-6 w-6 p-0 sm:opacity-0 sm:group-hover:opacity-100 opacity-100 transition-opacity"
-            onClick={handleRemove}
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent container click
+              handleRemove(e);
+            }}
           >
             <X className="h-3 w-3" />
           </Button>
@@ -329,24 +342,18 @@ export default function PartsFolderManager({
         {/* Image Viewer Modal */}
         {showImageViewer && file.preview && (
           <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
-            <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-              <DialogHeader className="p-4">
-                <DialogTitle className="flex items-center justify-between">
-                  <span>{file.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowImageViewer(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+            <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
+              <DialogHeader className="pb-4">
+                <DialogTitle className="text-center">
+                  {file.name}
                 </DialogTitle>
               </DialogHeader>
-              <div className="flex-1 flex items-center justify-center p-4">
+              <div className="flex items-center justify-center">
                 <img
                   src={file.preview}
                   alt={file.name}
-                  className="max-w-full max-h-[70vh] object-contain rounded"
+                  className="max-w-full max-h-[70vh] object-contain"
+                  onClick={(e) => e.stopPropagation()}
                 />
               </div>
             </DialogContent>
@@ -356,17 +363,41 @@ export default function PartsFolderManager({
     );
   };
 
+  // Helper function to toggle individual folder collapse
+  const toggleFolderCollapse = (folderId: string) => {
+    setCollapsedFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
+      } else {
+        newSet.add(folderId);
+      }
+      return newSet;
+    });
+  };
+
   // Folder component
-  const FolderComponent = ({ folder }: { folder: PartFolder }) => (
+  const FolderComponent = ({ folder }: { folder: PartFolder }) => {
+    const isCollapsed = collapsedFolders.has(folder.id);
+    
+    return (
     <ContextMenu>
       <ContextMenuTrigger>
         <Card className="hover:shadow-md transition-shadow relative group">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle 
+              className="text-base flex items-center gap-2 cursor-pointer hover:bg-muted/50 -m-4 p-4 rounded-lg transition-colors"
+              onClick={() => toggleFolderCollapse(folder.id)}
+            >
               <Folder className="h-5 w-5 text-blue-600" />
               {folder.name}
-              <span className="text-xs text-muted-foreground ml-auto">
+              <span className="text-xs text-muted-foreground ml-auto flex items-center gap-2">
                 ({folder.files.length} files)
+                {isCollapsed ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
               </span>
             </CardTitle>
             {/* Mobile-visible action buttons */}
@@ -395,6 +426,7 @@ export default function PartsFolderManager({
               </Button>
             </div>
           </CardHeader>
+          {!isCollapsed && (
           <CardContent>
             <div className="space-y-2">
               {folder.files.length === 0 ? (
@@ -437,6 +469,7 @@ export default function PartsFolderManager({
               />
             </div>
           </CardContent>
+          )}
         </Card>
       </ContextMenuTrigger>
       <ContextMenuContent>
@@ -459,21 +492,16 @@ export default function PartsFolderManager({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
-  );
+    );
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Equipment Parts Manager</h3>
-          <p className="text-sm text-muted-foreground">
-            Organize part images and documents in folders or upload directly to root
-          </p>
-        </div>
+      <div>
         <Button
           onClick={() => setIsCreateFolderModalOpen(true)}
-          className="gap-2"
+          className="w-full gap-2"
         >
           <FolderPlus className="h-4 w-4" />
           New Folder
@@ -624,6 +652,34 @@ export default function PartsFolderManager({
               Cancel
             </Button>
             <Button onClick={renameFolder}>Rename</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Folder</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p>
+              Are you sure you want to delete the folder <strong>"{folderToDelete?.name}"</strong> and all <strong>{folderToDelete?.files.length}</strong> files inside?
+            </p>
+            <p className="text-sm text-muted-foreground">
+              This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => folderToDelete && confirmDeleteFolder(folderToDelete)}
+            >
+              Delete Folder
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

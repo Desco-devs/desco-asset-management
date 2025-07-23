@@ -79,7 +79,11 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     setFiles(prev => ({ ...prev, [fieldName]: file }));
   };
 
-  const handleAction = async (formDataFromForm: FormData) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    const formDataFromForm = new FormData(e.currentTarget);
+    
     try {
       // Client-side validation before submission
       const brand = formDataFromForm.get('brand') as string;
@@ -95,23 +99,23 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       });
 
       if (!brand?.trim()) {
-        toast.error("Please enter equipment brand");
+        console.log("Validation failed: Missing brand");
         return;
       }
       if (!model?.trim()) {
-        toast.error("Please enter equipment model");
+        console.log("Validation failed: Missing model");
         return;
       }
       if (!formData.type) {
-        toast.error("Please select equipment type");
+        console.log("Validation failed: Missing type");
         return;
       }
       if (!owner?.trim()) {
-        toast.error("Please enter equipment owner");
+        console.log("Validation failed: Missing owner");
         return;
       }
       if (!formData.projectId) {
-        toast.error("Please select a project");
+        console.log("Validation failed: Missing project");
         return;
       }
       // Add all the files to formData
@@ -182,7 +186,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
   );
 
   return (
-    <form action={handleAction} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Mobile Tab Navigation */}
       {isMobile && (
         <div className="grid w-full grid-cols-4 mb-4 bg-muted rounded-md p-1">

@@ -430,14 +430,13 @@ export default function EquipmentModalModern() {
                         onClick={() => handleImageClick(image.url!, image.title)}
                       >
                         <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-                          <Image
+                          <img
                             src={image.url!}
                             alt={image.title}
-                            fill
-                            className="object-cover transition-transform group-hover:scale-105"
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
                           />
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                            <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                           </div>
                         </div>
                         <div className="flex items-center gap-2 mt-2">

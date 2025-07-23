@@ -774,11 +774,10 @@ export function useSupabaseRealtime() {
                 return deduplicateEquipments([transformedEquipment, ...oldData]);
               });
               
-              // Simple individual toast with duplicate prevention
+              // Event tracking for duplicate prevention
               const eventKey = `insert-${transformedEquipment.uid}`;
               if (!processedEvents.current.has(eventKey)) {
                 processedEvents.current.add(eventKey);
-                toast.success(`Equipment "${transformedEquipment.brand} ${transformedEquipment.model}" created successfully!`);
                 
                 // Clean up old events (keep only last 100 to prevent memory leak)
                 if (processedEvents.current.size > 100) {
