@@ -13,8 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { Settings, Camera, FileText, Upload, CalendarIcon, User, Building2, Car, Hash, Shield, Loader2 } from "lucide-react";
+import { Settings, Camera, FileText, Upload, CalendarIcon, User, Building2, Car, Hash, Shield, Loader2, Wrench } from "lucide-react";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
+import PartsFolderManager, { type PartsStructure } from "@/app/(admin-dashboard)/equipments/components/forms/PartsFolderManager";
 
 // Submit button component that uses useFormStatus
 function SubmitButton() {
@@ -45,7 +46,7 @@ interface CreateVehicleFormProps {
 
 export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMobile = false }: CreateVehicleFormProps) {
   // Tab state for mobile
-  const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'documents'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'documents' | 'parts'>('details');
   
   // Form state for select fields and dates
   const [formData, setFormData] = useState({
@@ -67,6 +68,12 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
     carRegistration: null as File | null,
     pgpcInspection: null as File | null,
   });
+
+  // Parts structure state
+  const [partsStructure, setPartsStructure] = useState<PartsStructure>({
+    rootFiles: [],
+    folders: []
+  });
   
   // File change handlers
   const handleFileChange = (fieldName: keyof typeof files) => (file: File | null) => {
@@ -80,6 +87,23 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
         if (file) {
           formDataFromForm.append(key, file);
         }
+      });
+
+      // Add parts structure data
+      formDataFromForm.append('partsStructure', JSON.stringify(partsStructure));
+      
+      // Add all parts files to formData with folder information
+      partsStructure.rootFiles.forEach((partFile, index) => {
+        formDataFromForm.append(`partsFile_root_${index}`, partFile.file);
+        formDataFromForm.append(`partsFile_root_${index}_name`, partFile.name);
+      });
+
+      partsStructure.folders.forEach((folder, folderIndex) => {
+        folder.files.forEach((partFile, fileIndex) => {
+          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
+          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
+          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
+        });
       });
       
       // Add select field values to formData
@@ -112,7 +136,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
   };
 
   // Tab content components
-  const renderTabButton = (tab: 'details' | 'photos' | 'documents', label: string, icon: React.ReactNode) => (
+  const renderTabButton = (tab: 'details' | 'photos' | 'documents' | 'parts', label: string, icon: React.ReactNode) => (
     <Button
       type="button"
       variant={activeTab === tab ? 'default' : 'ghost'}
@@ -127,31 +151,86 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
 
   return (
     <form action={handleAction} className="space-y-4">
-      {/* Mobile Tab Navigation */}
-      {isMobile && (
-        <div className="grid w-full grid-cols-3 mb-4 bg-muted rounded-md p-1">
-          {renderTabButton('details', 'Details', <Settings className="h-4 w-4" />)}
-          {renderTabButton('photos', 'Photos', <Camera className="h-4 w-4" />)}
-          {renderTabButton('documents', 'Documents', <FileText className="h-4 w-4" />)}
-        </div>
-      )}
+      {/* Tab Navigation - All Screen Sizes */}
+      <div className={`w-full mb-6 ${isMobile ? 'grid grid-cols-4 bg-muted rounded-md p-1' : 'flex justify-center border-b'}`}>
+        {isMobile ? (
+          <>
+            {renderTabButton('details', 'Details', <Settings className="h-4 w-4" />)}
+            {renderTabButton('photos', 'Photos', <Camera className="h-4 w-4" />)}
+            {renderTabButton('documents', 'Documents', <FileText className="h-4 w-4" />)}
+            {renderTabButton('parts', 'Parts', <Wrench className="h-4 w-4" />)}
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setActiveTab('details')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'details'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Settings className="h-4 w-4" />
+              Vehicle Details
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('photos')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'photos'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Camera className="h-4 w-4" />
+              Vehicle Images
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('documents')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'documents'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              Documents
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('parts')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'parts'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Wrench className="h-4 w-4" />
+              Parts Management
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Details Tab */}
-      {(!isMobile || activeTab === 'details') && (
-        <div className="space-y-6">
+      {activeTab === 'details' && (
+        <div className={`${isMobile ? 'space-y-6' : 'space-y-6'}`}>
+          {/* Vehicle Information - Full Width Layout */}
           <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Settings className="h-4 w-4" />
+            <CardHeader className="pb-6">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Settings className="h-5 w-5" />
                 Vehicle Information
               </CardTitle>
               <p className="text-sm text-muted-foreground">
                 Enter the basic information about your vehicle
               </p>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Vehicle Identity Section */}
-              <div className="grid grid-cols-1 gap-4">
+            <CardContent>
+              {/* Vehicle Identity Section - Wide Grid */}
+              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                 <div className="space-y-2">
                   <Label htmlFor="brand" className="flex items-center gap-2">
                     <Car className="h-4 w-4" />
@@ -210,10 +289,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                     className="font-mono transition-all duration-200 focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-              </div>
 
-              {/* Ownership & Project Section */}
-              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="owner" className="flex items-center gap-2">
                     <User className="h-4 w-4" />
@@ -243,45 +319,45 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
 
-              {/* Status */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Operational Status *
-                </Label>
-                <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}>
-                  <SelectTrigger className="w-full transition-all duration-200 focus:ring-2 focus:ring-blue-500">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent className="w-full">
-                    <SelectItem value="OPERATIONAL">Operational</SelectItem>
-                    <SelectItem value="NON_OPERATIONAL">Non-Operational</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Operational Status *
+                  </Label>
+                  <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}>
+                    <SelectTrigger className="w-full transition-all duration-200 focus:ring-2 focus:ring-blue-500">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent className="w-full">
+                      <SelectItem value="OPERATIONAL">Operational</SelectItem>
+                      <SelectItem value="NON_OPERATIONAL">Non-Operational</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Inspection & Compliance Card */}
+          {/* Inspection & Compliance - Wide Layout */}
           <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base flex items-center gap-2">
-                <CalendarIcon className="h-4 w-4" />
+            <CardHeader className="pb-6">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CalendarIcon className="h-5 w-5" />
                 Inspection & Compliance
               </CardTitle>
               <p className="text-sm text-muted-foreground">
                 Set up inspection schedules and compliance dates
               </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
+            <CardContent>
+              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
                 <div className="space-y-2">
                   <Label>Last Inspection Date *</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
+                        type="button"
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal transition-all duration-200 focus:ring-2 focus:ring-blue-500",
@@ -312,6 +388,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
+                        type="button"
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal transition-all duration-200 focus:ring-2 focus:ring-blue-500",
@@ -356,7 +433,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
             </CardContent>
           </Card>
 
-          {/* Additional Notes Card */}
+          {/* Additional Notes - Full Width */}
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="text-base">Additional Notes</CardTitle>
@@ -381,8 +458,8 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
       )}
 
       {/* Photos Tab */}
-      {(!isMobile || activeTab === 'photos') && (
-        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
+      {activeTab === 'photos' && (
+        <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -395,11 +472,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <p className="text-xs text-muted-foreground">
-                  <strong>Tip:</strong> Take photos in good lighting and ensure license plates and identification numbers are visible.
-                </p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
                   <FileUploadSectionSimple
                     label="Front View"
                     accept="image/*"
@@ -443,8 +516,8 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
       )}
 
       {/* Documents Tab */}
-      {(!isMobile || activeTab === 'documents') && (
-        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
+      {activeTab === 'documents' && (
+        <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -457,14 +530,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <p className="text-xs text-blue-700">
-                    <strong>Document Requirements:</strong> Ensure all documents are clear, legible, and up-to-date. 
-                    Blurred or expired documents may not be accepted for regulatory compliance.
-                  </p>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
                   <div className="space-y-2">
                     <FileUploadSectionSimple
                       label="Original Receipt (OR)"
@@ -502,6 +568,30 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Parts Tab */}
+      {activeTab === 'parts' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Wrench className="h-4 w-4" />
+                Vehicle Parts Management {isMobile ? '' : '(Optional)'}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Organize parts documentation in folders or upload directly to root. 
+                This creates a structured file system for easy parts management.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <PartsFolderManager 
+                onChange={setPartsStructure}
+                initialData={partsStructure}
+              />
             </CardContent>
           </Card>
         </div>

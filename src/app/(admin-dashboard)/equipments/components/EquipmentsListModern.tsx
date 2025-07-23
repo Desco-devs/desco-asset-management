@@ -325,7 +325,7 @@ export default function EquipmentsListModern() {
                       .filter(Boolean)
                       .sort()
                       .map((type) => (
-                        <SelectItem key={type} value={`type-${type}`}>
+                        <SelectItem key={`type-${type}`} value={`type-${type}`}>
                           {type}
                         </SelectItem>
                       ))}
@@ -342,7 +342,7 @@ export default function EquipmentsListModern() {
                       .filter(Boolean)
                       .sort()
                       .map((owner) => (
-                        <SelectItem key={owner} value={`owner-${owner}`}>
+                        <SelectItem key={`owner-${owner}`} value={`owner-${owner}`}>
                           {owner}
                         </SelectItem>
                       ))}

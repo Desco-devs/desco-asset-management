@@ -117,7 +117,7 @@ export default function VehiclesPageModern() {
 
     return (
       <Dialog open={true} onOpenChange={closeImageViewer}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[90vw] md:max-w-[85vw] lg:max-w-[80vw] xl:max-w-[75vw] max-h-[95vh] sm:max-h-[90vh] p-0 bg-black/95">
+        <DialogContent className="!max-w-none !w-[55vw] max-h-[95vh] p-0 bg-black/95" style={{ maxWidth: '55vw', width: '55vw' }}>
           <DialogHeader className="p-4 bg-black/80">
             <div className="flex items-center justify-between">
               <DialogTitle className="text-white text-lg">
