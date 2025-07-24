@@ -24,6 +24,8 @@ interface FileUploadSectionSimpleProps {
   // Add props to make it controlled
   selectedFile?: File | null;
   keepExisting?: boolean;
+  // Add prop to hide change button
+  hideChangeButton?: boolean;
 }
 
 export function FileUploadSectionSimple({
@@ -36,6 +38,7 @@ export function FileUploadSectionSimple({
   icon = <Upload className="h-4 w-4" />,
   selectedFile: propSelectedFile,
   keepExisting: propKeepExisting,
+  hideChangeButton = false,
 }: FileUploadSectionSimpleProps) {
   // Use props if provided, otherwise fallback to local state
   const [localSelectedFile, setLocalSelectedFile] = useState<File | null>(null);
@@ -242,22 +245,24 @@ export function FileUploadSectionSimple({
                   </Button>
                 </>
               ) : (
-                // Existing file - show Change and Remove buttons
+                // Existing file - show Change and Remove buttons (conditionally)
                 <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Simple direct approach - just trigger the file input
-                      const fileInput = document.querySelector(`input[type="file"]#file-${label.replace(/\s+/g, '-').toLowerCase()}`) as HTMLInputElement;
-                      fileInput?.click();
-                    }}
-                  >
-                    <Upload className="h-4 w-4 mr-1" />
-                    Change
-                  </Button>
+                  {!hideChangeButton && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Simple direct approach - just trigger the file input
+                        const fileInput = document.querySelector(`input[type="file"]#file-${label.replace(/\s+/g, '-').toLowerCase()}`) as HTMLInputElement;
+                        fileInput?.click();
+                      }}
+                    >
+                      <Upload className="h-4 w-4 mr-1" />
+                      Change
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"

@@ -50,7 +50,43 @@ export async function GET(request: Request) {
       equipmentRegistrationUrl: item.equipment_registration_url || undefined,
       thirdpartyInspectionImage: item.thirdparty_inspection_image || undefined,
       pgpcInspectionImage: item.pgpc_inspection_image || undefined,
-      equipmentParts: item.equipment_parts || undefined,
+      equipmentParts: item.equipment_parts && item.equipment_parts.length > 0 
+        ? (() => {
+            try {
+              const rawParts = item.equipment_parts[0];
+              
+              // Check if it's a URL (legacy format)
+              if (typeof rawParts === 'string' && rawParts.startsWith('http')) {
+                // Legacy format: convert URL array to modern format
+                return {
+                  rootFiles: item.equipment_parts.map((url, index) => ({
+                    id: `legacy_${index}`,
+                    name: url.split('/').pop() || `image_${index}`,
+                    preview: url
+                  })),
+                  folders: []
+                };
+              }
+              
+              // Try to parse as JSON (modern format)
+              return JSON.parse(rawParts);
+            } catch (error) {
+              console.warn('Failed to parse equipment_parts for equipment', item.id, ':', error);
+              // If parsing fails but we have data, treat as legacy URL format
+              if (item.equipment_parts.length > 0) {
+                return {
+                  rootFiles: item.equipment_parts.map((url, index) => ({
+                    id: `legacy_${index}`,
+                    name: url.split('/').pop() || `image_${index}`,
+                    preview: url
+                  })),
+                  folders: []
+                };
+              }
+              return { rootFiles: [], folders: [] };
+            }
+          })()
+        : undefined,
       project: {
         uid: item.project.id,
         name: item.project.name,

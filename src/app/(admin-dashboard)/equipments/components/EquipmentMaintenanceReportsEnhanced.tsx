@@ -162,6 +162,8 @@ export default function EquipmentMaintenanceReportsEnhanced({
                 onClick={() => {
                   setSelectedMaintenanceReportForDetail(report);
                   setIsMaintenanceReportDetailOpen(true);
+                  // Close equipment modal in mobile to prevent navigation conflicts
+                  setIsModalOpen(false);
                 }}
                 className="border rounded-lg p-4 hover:shadow-md transition-all cursor-pointer bg-card hover:border-primary/50"
               >

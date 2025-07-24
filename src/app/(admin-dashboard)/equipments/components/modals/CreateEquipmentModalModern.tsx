@@ -50,7 +50,7 @@ export default function CreateEquipmentModalModern() {
   if (isMobile) {
     return (
       <Drawer open={isCreateModalOpen} onOpenChange={handleClose}>
-        <DrawerContent className="!max-h-[95vh]">
+        <DrawerContent className="!max-h-[95dvh]">
           {/* Mobile Header */}
           <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
             <DrawerClose asChild>
@@ -93,7 +93,7 @@ export default function CreateEquipmentModalModern() {
   return (
     <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
       <DialogContent 
-        className="!max-w-none !w-[55vw] max-h-[95vh] overflow-hidden flex flex-col p-6"
+        className="!max-w-none !w-[55vw] max-h-[95dvh] overflow-hidden flex flex-col p-6"
         style={{ maxWidth: '55vw', width: '55vw' }}
       >
         <DialogHeader className="flex-shrink-0 pb-4">

@@ -68,6 +68,11 @@ export async function PUT(
   try {
     const { id } = await context.params;
     const body = await request.json();
+    
+    // Debug: Log the incoming data
+    console.log("PUT /api/equipments/maintenance-reports/[id] - Received data:", body);
+    console.log("Update ID:", id);
+    
     const {
       equipment_id,
       location_id,
@@ -97,24 +102,28 @@ export async function PUT(
       );
     }
 
+    // Debug: Log the update data
+    const updateData = {
+      equipment_id,
+      location_id,
+      issue_description,
+      remarks,
+      inspection_details,
+      action_taken,
+      parts_replaced: parts_replaced || [],
+      priority,
+      status,
+      downtime_hours: downtime_hours || null,
+      date_repaired: date_repaired ? new Date(date_repaired) : null,
+      attachment_urls: attachment_urls || [],
+      reported_by,
+      repaired_by,
+    };
+    console.log("Update data prepared:", updateData);
+
     const updatedReport = await prisma.maintenance_equipment_report.update({
       where: { id },
-      data: {
-        equipment_id,
-        location_id,
-        issue_description,
-        remarks,
-        inspection_details,
-        action_taken,
-        parts_replaced: parts_replaced || [],
-        priority,
-        status,
-        downtime_hours,
-        date_repaired: date_repaired ? new Date(date_repaired) : null,
-        attachment_urls: attachment_urls || [],
-        reported_by,
-        repaired_by,
-      },
+      data: updateData,
       include: {
         equipment: {
           include: {
@@ -150,8 +159,19 @@ export async function PUT(
     return NextResponse.json(updatedReport);
   } catch (error) {
     console.error('Error updating equipment maintenance report:', error);
+    console.error('Full error details:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+      stack: error?.stack
+    });
+    
     return NextResponse.json(
-      { error: 'Failed to update equipment maintenance report' },
+      { 
+        error: 'Failed to update equipment maintenance report',
+        details: error?.message || 'Unknown error',
+        code: error?.code
+      },
       { status: 500 }
     );
   }

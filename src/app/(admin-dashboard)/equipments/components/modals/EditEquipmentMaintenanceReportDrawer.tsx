@@ -28,37 +28,40 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import {
-  useCreateEquipmentMaintenanceReport,
+  useUpdateEquipmentMaintenanceReport,
   useEquipmentsWithReferenceData,
 } from "@/hooks/useEquipmentsQuery";
 import { useEquipmentsStore, selectIsMobile } from "@/stores/equipmentsStore";
 import { Plus, Trash2, X, Settings, Camera, FileText, Upload, MapPin, Calendar, Clock, Wrench } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase";
 
-interface CreateEquipmentMaintenanceReportModalProps {
-  equipmentId: string;
-}
-
-export default function CreateEquipmentMaintenanceReportModal({
-  equipmentId,
-}: CreateEquipmentMaintenanceReportModalProps) {
-  // State from Zustand (following proper Next.js pattern)
-  const isOpen = useEquipmentsStore((state) => state.isEquipmentMaintenanceModalOpen);
+export default function EditEquipmentMaintenanceReportDrawer() {
+  // State from Zustand
+  const isOpen = useEquipmentsStore((state) => state.isEditMaintenanceReportDrawerOpen);
   const isMobile = useEquipmentsStore(selectIsMobile);
-  const { setIsEquipmentMaintenanceModalOpen, setIsModalOpen } = useEquipmentsStore();
+  const selectedReport = useEquipmentsStore((state) => state.selectedMaintenanceReportForEdit);
+  const { 
+    setIsEditMaintenanceReportDrawerOpen, 
+    setSelectedMaintenanceReportForEdit,
+    setIsMaintenanceReportDetailOpen,
+    setSelectedMaintenanceReportForDetail,
+    setIsModalOpen
+  } = useEquipmentsStore();
 
   // Server state from TanStack Query
   const { locations } = useEquipmentsWithReferenceData();
-  const createMaintenanceReportMutation = useCreateEquipmentMaintenanceReport();
+  const updateMaintenanceReportMutation = useUpdateEquipmentMaintenanceReport();
 
-  // Local form state (client state)
+  // Local form state
   const [activeTab, setActiveTab] = useState<'details' | 'parts' | 'attachments'>('details');
   
   // Stable tab change handler
   const handleTabChange = useCallback((tab: 'details' | 'parts' | 'attachments') => {
     setActiveTab(tab);
   }, []);
+
   const [formData, setFormData] = useState({
     issue_description: "",
     remarks: "",
@@ -74,9 +77,33 @@ export default function CreateEquipmentMaintenanceReportModal({
   const [partsFiles, setPartsFiles] = useState<File[]>([]);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
 
-  // Stable event handlers using useCallback (proper Next.js pattern)
+  // Populate form data when selectedReport changes
+  useEffect(() => {
+    if (selectedReport) {
+      setFormData({
+        issue_description: selectedReport.issue_description || "",
+        remarks: selectedReport.remarks || "",
+        inspection_details: selectedReport.inspection_details || "",
+        action_taken: selectedReport.action_taken || "",
+        priority: selectedReport.priority || "MEDIUM",
+        status: selectedReport.status || "REPORTED",
+        downtime_hours: selectedReport.downtime_hours?.toString() || "",
+        location_id: selectedReport.location_id || "",
+        parts_replaced: selectedReport.parts_replaced && selectedReport.parts_replaced.length > 0 
+          ? selectedReport.parts_replaced 
+          : [""],
+        attachment_urls: selectedReport.attachment_urls && selectedReport.attachment_urls.length > 0 
+          ? selectedReport.attachment_urls 
+          : [""],
+      });
+    }
+  }, [selectedReport]);
+
+  // Stable event handlers using useCallback
   const handleClose = useCallback(() => {
-    setIsEquipmentMaintenanceModalOpen(false);
+    setIsEditMaintenanceReportDrawerOpen(false);
+    const reportToReturn = selectedReport; // Store before clearing
+    setSelectedMaintenanceReportForEdit(null);
     // Reset form state
     setActiveTab('details');
     setPartsFiles([]);
@@ -93,9 +120,46 @@ export default function CreateEquipmentMaintenanceReportModal({
       parts_replaced: [""],
       attachment_urls: [""],
     });
-    // Return to detail drawer
-    setIsModalOpen(true);
-  }, [setIsEquipmentMaintenanceModalOpen, setIsModalOpen]);
+    // Reopen maintenance report detail drawer (user came from there)
+    if (reportToReturn) {
+      setSelectedMaintenanceReportForDetail(reportToReturn);
+      setIsMaintenanceReportDetailOpen(true);
+    } else {
+      // Fallback to equipment modal if no report
+      setIsModalOpen(true);
+    }
+  }, [setIsEditMaintenanceReportDrawerOpen, selectedReport, setSelectedMaintenanceReportForDetail, setIsMaintenanceReportDetailOpen, setIsModalOpen]);
+
+  const handleSaveAndViewDetails = useCallback((updatedReport?: any) => {
+    // Use the updated report if provided, otherwise use selected report
+    const reportToShow = updatedReport || selectedReport;
+    if (reportToShow) {
+      // Set the updated report for detail view
+      setSelectedMaintenanceReportForDetail(reportToShow);
+      setIsMaintenanceReportDetailOpen(true);
+      // Close edit drawer (this will also close equipment modal via handleClose)
+      setIsEditMaintenanceReportDrawerOpen(false);
+      setSelectedMaintenanceReportForEdit(null);
+      // Reset form state
+      setActiveTab('details');
+      setPartsFiles([]);
+      setAttachmentFiles([]);
+      setFormData({
+        issue_description: "",
+        remarks: "",
+        inspection_details: "",
+        action_taken: "",
+        priority: "MEDIUM",
+        status: "REPORTED",
+        downtime_hours: "",
+        location_id: "",
+        parts_replaced: [""],
+        attachment_urls: [""],
+      });
+      // Equipment modal stays closed since we're opening detail drawer
+      // (Detail drawer will handle reopening equipment modal when it closes)
+    }
+  }, [selectedReport, setSelectedMaintenanceReportForDetail, setIsMaintenanceReportDetailOpen, setIsEditMaintenanceReportDrawerOpen, setSelectedMaintenanceReportForEdit, setPartsFiles, setAttachmentFiles, setFormData, setActiveTab]);
 
   const handleInputChange = useCallback((field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -129,43 +193,142 @@ export default function CreateEquipmentMaintenanceReportModal({
     }));
   }, []);
 
+  // File upload helper function  
+  const uploadFileToSupabase = useCallback(async (file: File, prefix: string): Promise<string> => {
+    const supabase = createClient();
+    const timestamp = Date.now();
+    const ext = file.name.split('.').pop();
+    const filename = `${prefix}_${timestamp}.${ext}`;
+    
+    // Create a simple folder structure for maintenance reports
+    const equipmentId = selectedReport?.equipment_id || 'unknown';
+    const filepath = `equipments/maintenance-reports/${equipmentId}/${filename}`;
+    
+    const buffer = await file.arrayBuffer();
+    const { data: uploadData, error: uploadErr } = await supabase.storage
+      .from('equipments')
+      .upload(filepath, buffer, { cacheControl: '3600', upsert: false });
+
+    if (uploadErr || !uploadData) {
+      throw new Error(`Upload failed: ${uploadErr?.message}`);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('equipments')
+      .getPublicUrl(uploadData.path);
+
+    return urlData.publicUrl;
+  }, [selectedReport?.equipment_id]);
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!selectedReport) {
+      toast.error("No report selected for editing");
+      return;
+    }
 
     if (!formData.issue_description.trim()) {
       toast.error("Issue description is required");
       return;
     }
 
-    const filteredPartsReplaced = formData.parts_replaced.filter(
-      (part) => part.trim() !== ""
-    );
-    const filteredAttachmentUrls = formData.attachment_urls.filter(
-      (url) => url.trim() !== ""
-    );
+    // Validate parts: if a part has a name, it should have an image/attachment URL
+    const partsValidation = formData.parts_replaced.some((part, index) => {
+      const hasPartName = part.trim() !== "";
+      const hasPartImage = partsFiles[index] || (selectedReport?.attachment_urls?.[index]?.trim());
+      return hasPartName && !hasPartImage;
+    });
 
-    const reportData = {
-      equipment_id: equipmentId,
-      issue_description: formData.issue_description,
-      remarks: formData.remarks || undefined,
-      inspection_details: formData.inspection_details || undefined,
-      action_taken: formData.action_taken || undefined,
-      priority: formData.priority,
-      status: formData.status,
-      downtime_hours: formData.downtime_hours || undefined,
-      location_id: formData.location_id || undefined,
-      parts_replaced: filteredPartsReplaced,
-      attachment_urls: filteredAttachmentUrls,
-      date_reported: new Date().toISOString(),
-    };
+    if (partsValidation) {
+      toast.error("Each part with a name must have an associated image");
+      return;
+    }
 
     try {
-      await createMaintenanceReportMutation.mutateAsync(reportData);
-      handleClose();
+      // Step 1: Upload new files first
+      const uploadedUrls: string[] = [...formData.attachment_urls];
+      
+      // Upload parts files and replace URLs
+      for (let i = 0; i < partsFiles.length; i++) {
+        const file = partsFiles[i];
+        if (file) {
+          try {
+            const uploadedUrl = await uploadFileToSupabase(file, `part_${i}`);
+            uploadedUrls[i] = uploadedUrl;
+            toast.success(`Part ${i + 1} image uploaded successfully`);
+          } catch (uploadError) {
+            console.error(`Error uploading part ${i + 1} image:`, uploadError);
+            toast.error(`Failed to upload part ${i + 1} image`);
+            return; // Stop if upload fails
+          }
+        }
+      }
+
+      // Upload attachment files
+      for (let i = 0; i < attachmentFiles.length; i++) {
+        const file = attachmentFiles[i];
+        if (file) {
+          try {
+            const uploadedUrl = await uploadFileToSupabase(file, `attachment_${i}`);
+            // Find the next available slot or append
+            const attachmentIndex = partsFiles.length + i;
+            uploadedUrls[attachmentIndex] = uploadedUrl;
+            toast.success(`Attachment ${i + 1} uploaded successfully`);
+          } catch (uploadError) {
+            console.error(`Error uploading attachment ${i + 1}:`, uploadError);
+            toast.error(`Failed to upload attachment ${i + 1}`);
+            return; // Stop if upload fails
+          }
+        }
+      }
+
+      // Step 2: Filter out empty parts and attachment URLs
+      const filteredPartsReplaced = formData.parts_replaced.filter(
+        (part) => part.trim() !== ""
+      );
+      const filteredAttachmentUrls = uploadedUrls.filter(
+        (url) => url && url.trim() !== ""
+      );
+
+      // Step 3: Update the maintenance report with new data
+      const reportData = {
+        id: selectedReport.id,
+        equipment_id: selectedReport.equipment_id,
+        issue_description: formData.issue_description,
+        remarks: formData.remarks || undefined,
+        inspection_details: formData.inspection_details || undefined,
+        action_taken: formData.action_taken || undefined,
+        priority: formData.priority,
+        status: formData.status,
+        downtime_hours: formData.downtime_hours || undefined,
+        // location_id is required in schema, fallback to existing value if empty
+        location_id: formData.location_id || selectedReport.location_id,
+        parts_replaced: filteredPartsReplaced,
+        attachment_urls: filteredAttachmentUrls,
+        date_repaired: formData.status === "COMPLETED" && !selectedReport.date_repaired 
+          ? new Date().toISOString() 
+          : selectedReport.date_repaired,
+      };
+
+      // Debug: Log the data being sent
+      console.log("Sending report data with uploaded URLs:", reportData);
+
+      const updatedReport = await updateMaintenanceReportMutation.mutateAsync(reportData);
+      handleSaveAndViewDetails(updatedReport);
+      toast.success("Maintenance report updated successfully");
     } catch (error) {
-      console.error("Error creating maintenance report:", error);
+      console.error("Error updating maintenance report:", error);
+      toast.error("Failed to update maintenance report");
     }
-  }, [formData, equipmentId, createMaintenanceReportMutation, handleClose]);
+  }, [formData, selectedReport, updateMaintenanceReportMutation, handleSaveAndViewDetails, partsFiles, attachmentFiles, uploadFileToSupabase]);
+
+  // Validation helper for parts
+  const validatePart = useCallback((partName: string, index: number) => {
+    const hasPartName = partName.trim() !== "";
+    const hasPartImage = partsFiles[index] || (selectedReport?.attachment_urls?.[index]?.trim());
+    return !hasPartName || hasPartImage; // Valid if no name OR has image
+  }, [partsFiles, selectedReport?.attachment_urls]);
 
   // Stable tab button renderer
   const renderTabButton = useCallback((tab: 'details' | 'parts' | 'attachments', label: string, icon: React.ReactNode) => (
@@ -181,7 +344,7 @@ export default function CreateEquipmentMaintenanceReportModal({
     </Button>
   ), [activeTab, handleTabChange]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !selectedReport) return null;
 
   // Mobile: Drawer pattern
   if (isMobile) {
@@ -195,7 +358,7 @@ export default function CreateEquipmentMaintenanceReportModal({
               </Button>
             </DrawerClose>
             <DrawerTitle className="text-xl font-bold">
-              Create Equipment Maintenance Report
+              Edit Maintenance Report
             </DrawerTitle>
           </DrawerHeader>
           <div className="flex-1 overflow-y-auto p-4">
@@ -218,7 +381,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                         Issue Information
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        Describe the maintenance issue or task details
+                        Update the maintenance issue or task details
                       </p>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -371,7 +534,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                       Parts Replaced
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Upload images and details of parts that were replaced during maintenance
+                      Update images and details of parts that were replaced during maintenance
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -380,6 +543,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                         <FileUploadSectionSimple
                           label={`Part ${index + 1} Image`}
                           accept="image/*"
+                          currentFileUrl={selectedReport?.attachment_urls?.[index] || null}
                           onFileChange={(file) => {
                             const newFiles = [...partsFiles];
                             if (file) {
@@ -397,8 +561,13 @@ export default function CreateEquipmentMaintenanceReportModal({
                             value={part}
                             onChange={(e) => handleArrayChange("parts_replaced", index, e.target.value)}
                             placeholder="Part name or description..."
-                            className="flex-1"
+                            className={`flex-1 ${!validatePart(part, index) ? 'border-red-500 focus:border-red-500' : ''}`}
                           />
+                          {!validatePart(part, index) && (
+                            <div className="flex items-center">
+                              <span className="text-red-500 text-xs">Image required</span>
+                            </div>
+                          )}
                           {formData.parts_replaced.length > 1 && (
                             <Button
                               type="button"
@@ -436,7 +605,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                       Attachments & Images
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Upload additional images, documents, or reference materials for this maintenance report
+                      Update additional images, documents, or reference materials for this maintenance report
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -445,6 +614,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                         <FileUploadSectionSimple
                           label={`Attachment ${index + 1}`}
                           accept="image/*,application/pdf,.doc,.docx"
+                          currentFileUrl={url || null}
                           onFileChange={(file) => {
                             const newFiles = [...attachmentFiles];
                             if (file) {
@@ -502,10 +672,10 @@ export default function CreateEquipmentMaintenanceReportModal({
               <Button
                 type="button"
                 onClick={handleSubmit}
-                disabled={createMaintenanceReportMutation.isPending}
+                disabled={updateMaintenanceReportMutation.isPending}
                 className="flex-1"
               >
-                {createMaintenanceReportMutation.isPending ? "Creating..." : "Create Report"}
+                {updateMaintenanceReportMutation.isPending ? "Updating..." : "Save Changes"}
               </Button>
             </div>
           </DrawerFooter>
@@ -519,7 +689,7 @@ export default function CreateEquipmentMaintenanceReportModal({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Equipment Maintenance Report</DialogTitle>
+          <DialogTitle>Edit Maintenance Report</DialogTitle>
         </DialogHeader>
         <div className="space-y-6">
           {/* Tab Navigation - Desktop Style */}
@@ -693,7 +863,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                   Parts Replaced
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Upload images and details of parts that were replaced during maintenance
+                  Update images and details of parts that were replaced during maintenance
                 </p>
               </div>
               {formData.parts_replaced.map((part, index) => (
@@ -701,6 +871,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                   <FileUploadSectionSimple
                     label={`Part ${index + 1} Image`}
                     accept="image/*"
+                    currentFileUrl={selectedReport?.attachment_urls?.[index] || null}
                     onFileChange={(file) => {
                       const newFiles = [...partsFiles];
                       if (file) {
@@ -718,8 +889,13 @@ export default function CreateEquipmentMaintenanceReportModal({
                       value={part}
                       onChange={(e) => handleArrayChange("parts_replaced", index, e.target.value)}
                       placeholder="Part name or description..."
-                      className="flex-1"
+                      className={`flex-1 ${!validatePart(part, index) ? 'border-red-500 focus:border-red-500' : ''}`}
                     />
+                    {!validatePart(part, index) && (
+                      <div className="flex items-center">
+                        <span className="text-red-500 text-xs">Image required</span>
+                      </div>
+                    )}
                     {formData.parts_replaced.length > 1 && (
                       <Button
                         type="button"
@@ -756,7 +932,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                   Attachments & Images
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Upload additional images, documents, or reference materials for this maintenance report
+                  Update additional images, documents, or reference materials for this maintenance report
                 </p>
               </div>
               {formData.attachment_urls.map((url, index) => (
@@ -764,6 +940,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                   <FileUploadSectionSimple
                     label={`Attachment ${index + 1}`}
                     accept="image/*,application/pdf,.doc,.docx"
+                    currentFileUrl={url || null}
                     onFileChange={(file) => {
                       const newFiles = [...attachmentFiles];
                       if (file) {
@@ -818,9 +995,9 @@ export default function CreateEquipmentMaintenanceReportModal({
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={createMaintenanceReportMutation.isPending}
+              disabled={updateMaintenanceReportMutation.isPending}
             >
-              {createMaintenanceReportMutation.isPending ? "Creating..." : "Create Report"}
+              {updateMaintenanceReportMutation.isPending ? "Updating..." : "Save Changes"}
             </Button>
           </div>
         </div>

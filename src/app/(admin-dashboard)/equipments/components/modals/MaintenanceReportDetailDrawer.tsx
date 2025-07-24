@@ -31,9 +31,11 @@ import {
   Trash2,
   ExternalLink,
   Camera,
-  FileText
+  FileText,
+  Eye
 } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import Image from "next/image";
 
 export default function MaintenanceReportDetailDrawer() {
   // State from Zustand
@@ -43,30 +45,49 @@ export default function MaintenanceReportDetailDrawer() {
   const { 
     setIsMaintenanceReportDetailOpen, 
     setSelectedMaintenanceReportForDetail,
-    setSelectedEquipmentMaintenanceReport,
+    setSelectedMaintenanceReportForEdit,
+    setIsEditMaintenanceReportDrawerOpen,
     setIsModalOpen 
   } = useEquipmentsStore();
 
   // Server state
   const deleteMaintenanceReportMutation = useDeleteEquipmentMaintenanceReport();
   
-  // Local state for delete confirmation
+  // Local state for delete confirmation, tab navigation and image viewer
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'parts' | 'attachments'>('details');
+  const [imageViewer, setImageViewer] = useState<{isOpen: boolean, url: string, title: string}>({isOpen: false, url: '', title: ''});
+
+  // Reset tab when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab('details');
+    }
+  }, [isOpen]);
+
+  // Stable tab change handler
+  const handleTabChange = useCallback((tab: 'details' | 'parts' | 'attachments') => {
+    setActiveTab(tab);
+  }, []);
 
   const handleClose = useCallback(() => {
     setIsMaintenanceReportDetailOpen(false);
     setSelectedMaintenanceReportForDetail(null);
-    // Reopen equipment detail drawer
+    // Reopen equipment modal after closing detail drawer
     setIsModalOpen(true);
   }, [setIsMaintenanceReportDetailOpen, setSelectedMaintenanceReportForDetail, setIsModalOpen]);
 
   const handleEdit = useCallback(() => {
     if (!selectedReport) return;
-    // Set report for edit modal
-    setSelectedEquipmentMaintenanceReport(selectedReport);
-    // Close this drawer and reopen equipment detail
-    handleClose();
-  }, [selectedReport, setSelectedEquipmentMaintenanceReport, handleClose]);
+    // Set report for edit drawer
+    setSelectedMaintenanceReportForEdit(selectedReport);
+    setIsEditMaintenanceReportDrawerOpen(true);
+    // Close this drawer
+    setIsMaintenanceReportDetailOpen(false);
+    setSelectedMaintenanceReportForDetail(null);
+    // Close equipment modal to prevent navigation conflicts (same as opening detail from main modal)
+    setIsModalOpen(false);
+  }, [selectedReport, setSelectedMaintenanceReportForEdit, setIsEditMaintenanceReportDrawerOpen, setIsMaintenanceReportDetailOpen, setSelectedMaintenanceReportForDetail, setIsModalOpen]);
 
   const handleDeleteClick = useCallback(() => {
     setShowDeleteConfirmation(true);
@@ -78,11 +99,14 @@ export default function MaintenanceReportDetailDrawer() {
     try {
       await deleteMaintenanceReportMutation.mutateAsync(selectedReport.id);
       setShowDeleteConfirmation(false);
-      handleClose();
+      // Close this drawer and reopen equipment modal
+      setIsMaintenanceReportDetailOpen(false);
+      setSelectedMaintenanceReportForDetail(null);
+      setIsModalOpen(true);
     } catch (error) {
       console.error("Error deleting maintenance report:", error);
     }
-  }, [selectedReport, deleteMaintenanceReportMutation, handleClose]);
+  }, [selectedReport, deleteMaintenanceReportMutation, setIsMaintenanceReportDetailOpen, setSelectedMaintenanceReportForDetail, setIsModalOpen]);
 
   const handleDeleteCancel = useCallback(() => {
     setShowDeleteConfirmation(false);
@@ -128,210 +152,413 @@ export default function MaintenanceReportDetailDrawer() {
     }
   }, []);
 
+  // Stable tab button renderer
+  const renderTabButton = useCallback((tab: 'details' | 'parts' | 'attachments', label: string, icon: React.ReactNode, count?: number) => (
+    <Button
+      type="button"
+      variant={activeTab === tab ? 'default' : 'ghost'}
+      size="sm"
+      onClick={() => handleTabChange(tab)}
+      className="flex-1 flex items-center gap-2"
+    >
+      <div className="relative">
+        {icon}
+        {count !== undefined && count > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1 py-0.5 min-w-[16px] h-[16px] flex items-center justify-center text-[10px] leading-none">
+            {count}
+          </span>
+        )}
+      </div>
+      <span className="hidden sm:inline">{label}</span>
+    </Button>
+  ), [activeTab, handleTabChange]);
+
+  // Helper functions for counts
+  const getPartsCount = () => {
+    return selectedReport?.parts_replaced?.length || 0;
+  };
+
+  const getAttachmentsCount = () => {
+    return selectedReport?.attachment_urls?.length || 0;
+  };
+
+  // Image Viewer Component - EXACTLY like equipment modal
+  const ImageViewerModal = () => (
+    <Dialog open={imageViewer.isOpen} onOpenChange={() => setImageViewer({isOpen: false, url: '', title: ''})}>
+      <DialogContent 
+        className="!max-w-none p-4 
+          w-[95vw] max-h-[85vh] sm:w-[80vw] sm:max-h-[70vh] lg:w-[60vw] lg:max-h-[65vh] xl:w-[40vw] xl:max-h-[60vh]" 
+        style={{ 
+          maxWidth: 'min(95vw, 800px)', 
+          width: 'min(95vw, 800px)'
+        }}
+      >
+        <DialogHeader className="pb-4">
+          <DialogTitle className="text-center">
+            {imageViewer.title}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex items-center justify-center">
+          <Image
+            src={imageViewer.url}
+            alt={imageViewer.title}
+            width={800}
+            height={600}
+            className="max-w-full max-h-[70vh] sm:max-h-[55vh] lg:max-h-[50vh] xl:max-h-[45vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+            onError={(e) => {
+              console.error('Image failed to load:', imageViewer.url);
+              console.error('Error details:', e);
+            }}
+            onLoad={() => {
+              console.log('Image loaded successfully:', imageViewer.url);
+            }}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (!isOpen || !selectedReport) return null;
 
   // Report content component
   const ReportContent = () => (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold mb-3">{selectedReport.issue_description}</h2>
-        <div className="flex flex-wrap gap-2 mb-4">
-          <Badge className={getStatusColor(selectedReport.status)}>
-            {selectedReport.status || "REPORTED"}
-          </Badge>
-          <Badge className={getPriorityColor(selectedReport.priority)}>
-            {selectedReport.priority || "MEDIUM"} Priority
-          </Badge>
-        </div>
+    <div className="space-y-4">
+      {/* Tab Navigation - Mobile and Desktop */}
+      <div className={`w-full mb-6 ${isMobile ? 'grid grid-cols-3 bg-muted rounded-md p-1' : 'flex justify-center border-b'}`}>
+        {isMobile ? (
+          <>
+            {renderTabButton('details', 'Details', <FileText className="h-4 w-4" />)}
+            {renderTabButton('parts', 'Parts', <Wrench className="h-4 w-4" />, getPartsCount() > 0 ? getPartsCount() : undefined)}
+            {renderTabButton('attachments', 'Images', <Camera className="h-4 w-4" />, getAttachmentsCount() > 0 ? getAttachmentsCount() : undefined)}
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => handleTabChange('details')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'details'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              Report Details
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange('parts')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'parts'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Wrench className="h-4 w-4" />
+              Parts Replaced
+              {getPartsCount() > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getPartsCount()}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabChange('attachments')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'attachments'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <Camera className="h-4 w-4" />
+              Attachments
+              {getAttachmentsCount() > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getAttachmentsCount()}
+                </span>
+              )}
+            </button>
+          </>
+        )}
       </div>
 
-      {/* Key Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium">Reported:</span>
-            <span>{formatDate(selectedReport.date_reported)}</span>
-          </div>
-
-          {selectedReport.date_repaired && (
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Completed:</span>
-              <span>{formatDate(selectedReport.date_repaired)}</span>
-            </div>
-          )}
-
-          {selectedReport.downtime_hours && (
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Downtime:</span>
-              <span>{selectedReport.downtime_hours} hours</span>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          {selectedReport.reported_user && (
-            <div className="flex items-center gap-2 text-sm">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Reported by:</span>
-              <span>{selectedReport.reported_user.full_name}</span>
-            </div>
-          )}
-
-          {selectedReport.repaired_user && (
-            <div className="flex items-center gap-2 text-sm">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Repaired by:</span>
-              <span>{selectedReport.repaired_user.full_name}</span>
-            </div>
-          )}
-
-          {selectedReport.location && (
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">Location:</span>
-              <span>{selectedReport.location.address}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Details Sections */}
-      {selectedReport.inspection_details && (
-        <div className="space-y-2">
-          <h3 className="font-semibold flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Inspection Details
-          </h3>
-          <div className="bg-muted p-4 rounded-lg">
-            <p className="text-sm whitespace-pre-wrap">{selectedReport.inspection_details}</p>
-          </div>
-        </div>
-      )}
-
-      {selectedReport.action_taken && (
-        <div className="space-y-2">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Wrench className="h-4 w-4" />
-            Action Taken
-          </h3>
-          <div className="bg-muted p-4 rounded-lg">
-            <p className="text-sm whitespace-pre-wrap">{selectedReport.action_taken}</p>
-          </div>
-        </div>
-      )}
-
-      {selectedReport.remarks && (
-        <div className="space-y-2">
-          <h3 className="font-semibold flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Additional Remarks
-          </h3>
-          <div className="bg-muted p-4 rounded-lg">
-            <p className="text-sm whitespace-pre-wrap">{selectedReport.remarks}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Parts Replaced */}
-      {selectedReport.parts_replaced && selectedReport.parts_replaced.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Wrench className="h-4 w-4" />
-            Parts Replaced ({selectedReport.parts_replaced.length})
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {selectedReport.parts_replaced.map((part, index) => (
-              <Badge
-                key={`${selectedReport.id}-part-${index}-${part}`}
-                variant="outline"
-                className="justify-start p-2 h-auto"
-              >
-                {part}
+      {/* Details Tab */}
+      {activeTab === 'details' && (
+        <div className={`space-y-6 ${isMobile ? '' : 'border-t pt-4'}`}>
+          {/* Header */}
+          <div>
+            <h2 className="text-xl font-bold mb-3">{selectedReport.issue_description}</h2>
+            <div className="flex flex-wrap gap-2 mb-4">
+              <Badge className={getStatusColor(selectedReport.status)}>
+                {selectedReport.status || "REPORTED"}
               </Badge>
-            ))}
+              <Badge className={getPriorityColor(selectedReport.priority)}>
+                {selectedReport.priority || "MEDIUM"} Priority
+              </Badge>
+            </div>
           </div>
+
+          {/* Key Information */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium">Reported:</span>
+                <span>{formatDate(selectedReport.date_reported)}</span>
+              </div>
+
+              {selectedReport.date_repaired && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Completed:</span>
+                  <span>{formatDate(selectedReport.date_repaired)}</span>
+                </div>
+              )}
+
+              {selectedReport.downtime_hours && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Downtime:</span>
+                  <span>{selectedReport.downtime_hours} hours</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {selectedReport.reported_user && (
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Reported by:</span>
+                  <span>{selectedReport.reported_user.full_name}</span>
+                </div>
+              )}
+
+              {selectedReport.repaired_user && (
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Repaired by:</span>
+                  <span>{selectedReport.repaired_user.full_name}</span>
+                </div>
+              )}
+
+              {selectedReport.location && (
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Location:</span>
+                  <span>{selectedReport.location.address}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Details Sections */}
+          {selectedReport.inspection_details && (
+            <div className="space-y-2">
+              <h3 className="font-semibold flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Inspection Details
+              </h3>
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="text-sm whitespace-pre-wrap">{selectedReport.inspection_details}</p>
+              </div>
+            </div>
+          )}
+
+          {selectedReport.action_taken && (
+            <div className="space-y-2">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Wrench className="h-4 w-4" />
+                Action Taken
+              </h3>
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="text-sm whitespace-pre-wrap">{selectedReport.action_taken}</p>
+              </div>
+            </div>
+          )}
+
+          {selectedReport.remarks && (
+            <div className="space-y-2">
+              <h3 className="font-semibold flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Additional Remarks
+              </h3>
+              <div className="bg-muted p-4 rounded-lg">
+                <p className="text-sm whitespace-pre-wrap">{selectedReport.remarks}</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Attachments */}
-      {selectedReport.attachment_urls && selectedReport.attachment_urls.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Camera className="h-4 w-4" />
-            Attachments ({selectedReport.attachment_urls.length})
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {selectedReport.attachment_urls.map((url, index) => {
-              const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
-              
-              return (
-                <div key={`${selectedReport.id}-attachment-${index}-${url.split('/').pop()}`} className="border rounded-lg p-3">
-                  {isImage ? (
-                    <div className="space-y-2">
-                      <img
-                        src={url}
-                        alt={`Attachment ${index + 1}`}
-                        className="max-w-full max-h-[80vh] sm:max-h-[65vh] lg:max-h-[55vh] xl:max-h-[45vh] object-contain rounded"
-                        onError={(e) => {
-                          console.error('Image load error:', e);
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const errorDiv = target.nextElementSibling as HTMLElement;
-                          if (errorDiv && errorDiv.classList.contains('image-error')) {
-                            errorDiv.style.display = 'block';
-                          }
-                        }}
-                        onLoad={() => {
-                          console.log('Image loaded successfully:', url);
-                        }}
-                      />
-                      <div className="image-error hidden text-sm text-muted-foreground text-center py-4 bg-muted rounded">
+      {/* Parts Tab */}
+      {activeTab === 'parts' && (
+        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Wrench className="h-4 w-4" />
+              Parts Replaced
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Components and parts that were replaced during this maintenance
+            </p>
+          </div>
+          
+          {selectedReport.parts_replaced && selectedReport.parts_replaced.length > 0 ? (
+            <div className="space-y-4">
+              {selectedReport.parts_replaced.map((part, index) => {
+                // Check if there's an associated image for this part
+                const partImageUrl = selectedReport.attachment_urls?.[index];
+                const isImage = partImageUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(partImageUrl);
+                
+                return (
+                  <div key={`${selectedReport.id}-part-${index}-${part}`} className="border rounded-lg p-4 space-y-3">
+                    {/* Part Name - Full Width */}
+                    <div className="flex items-center gap-2">
+                      <Wrench className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-sm flex-1">{part}</span>
+                    </div>
+                    
+                    {/* Part Image - Clickable with image viewer */}
+                    {isImage && (
+                      <div className="space-y-2">
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                          <div className="relative w-full max-w-[200px] mx-auto group">
+                            <div 
+                              className="relative cursor-pointer"
+                              onClick={() => {
+                                console.log('Opening image viewer for part:', part, partImageUrl);
+                                setImageViewer({isOpen: true, url: partImageUrl, title: `Part: ${part}`});
+                              }}
+                            >
+                              <Image
+                                src={partImageUrl}
+                                alt={`Part: ${part}`}
+                                width={200}
+                                height={200}
+                                className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
+                                onError={(e) => {
+                                  console.error('Part image load error:', e);
+                                }}
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
+                                <Eye className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">Click to view full image</p>
+                      </div>
+                    )}
+                    
+                    {/* No image placeholder */}
+                    {!isImage && partImageUrl && (
+                      <div className="text-center py-4 bg-muted rounded">
                         <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <p>Failed to load image</p>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <p className="text-sm text-muted-foreground">Part reference file</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="mt-2"
-                          onClick={() => window.open(url, "_blank")}
+                          onClick={() => window.open(partImageUrl, "_blank")}
                         >
                           <ExternalLink className="h-3 w-3 mr-1" />
-                          Open in new tab
+                          Open File
                         </Button>
                       </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Wrench className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <p className="text-muted-foreground">No parts were replaced in this maintenance</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Attachments Tab */}
+      {activeTab === 'attachments' && (
+        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
+          <div className="space-y-2">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Camera className="h-4 w-4" />
+              Attachments & Images
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Photos, documents and reference materials for this maintenance report
+            </p>
+          </div>
+          
+          {selectedReport.attachment_urls && selectedReport.attachment_urls.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {selectedReport.attachment_urls.map((url, index) => {
+                const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+                
+                return (
+                  <div key={`${selectedReport.id}-attachment-${index}-${url.split('/').pop()}`} className="border rounded-lg p-3">
+                    {isImage ? (
+                      <div className="space-y-2">
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                          <div className="relative w-full max-w-[200px] mx-auto group">
+                            <div 
+                              className="relative cursor-pointer"
+                              onClick={() => {
+                                console.log('Opening image viewer for attachment:', index + 1, url);
+                                setImageViewer({isOpen: true, url: url, title: `Attachment ${index + 1}`});
+                              }}
+                            >
+                              <Image
+                                src={url}
+                                alt={`Attachment ${index + 1}`}
+                                width={200}
+                                height={200}
+                                className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
+                                onError={(e) => {
+                                  console.error('Attachment image load error:', e);
+                                }}
+                                onLoad={() => {
+                                  console.log('Attachment image loaded successfully:', url);
+                                }}
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
+                                <Eye className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">Click to view full image</p>
+                      </div>
+                    ) : (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full justify-center gap-1"
+                        className="w-full justify-start gap-2 h-auto p-3"
                         onClick={() => window.open(url, "_blank")}
                       >
-                        <ExternalLink className="h-3 w-3" />
-                        Open Full Size
+                        <ExternalLink className="h-4 w-4" />
+                        <span className="text-left">
+                          <div className="font-medium">Attachment {index + 1}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {url.split('/').pop()}
+                          </div>
+                        </span>
                       </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full justify-start gap-2 h-auto p-3"
-                      onClick={() => window.open(url, "_blank")}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      <span className="text-left">
-                        <div className="font-medium">Attachment {index + 1}</div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {url.split('/').pop()}
-                        </div>
-                      </span>
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <p className="text-muted-foreground">No attachments available for this report</p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -340,7 +567,7 @@ export default function MaintenanceReportDetailDrawer() {
 
   // Render delete confirmation dialog separately
   const DeleteConfirmationDialog = () => (
-    <Dialog open={showDeleteConfirmation} onOpenChange={setShowDeleteConfirmation}>
+    <Dialog open={showDeleteConfirmation} onOpenChange={handleDeleteCancel}>
       <DialogContent className="w-[95vw] max-w-[425px] mx-auto p-0 overflow-hidden">
         <div className="p-6 flex flex-col h-full">
           <DialogHeader>
@@ -419,7 +646,7 @@ export default function MaintenanceReportDetailDrawer() {
       {/* Main content - either drawer or dialog */}
       {isMobile ? (
         <Drawer open={isOpen} onOpenChange={handleClose}>
-          <DrawerContent className="!max-h-[95vh]">
+          <DrawerContent className="!max-h-[95dvh]">
             <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
               <DrawerClose asChild>
                 <Button variant="ghost" size="sm" className="absolute right-4 top-4 rounded-full h-8 w-8 p-0">
@@ -458,7 +685,7 @@ export default function MaintenanceReportDetailDrawer() {
         </Drawer>
       ) : (
         <Dialog open={isOpen} onOpenChange={handleClose}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Maintenance Report Details</DialogTitle>
             </DialogHeader>
@@ -487,6 +714,9 @@ export default function MaintenanceReportDetailDrawer() {
 
       {/* Delete confirmation dialog */}
       <DeleteConfirmationDialog />
+      
+      {/* Image viewer modal */}
+      <ImageViewerModal />
     </>
   );
 }

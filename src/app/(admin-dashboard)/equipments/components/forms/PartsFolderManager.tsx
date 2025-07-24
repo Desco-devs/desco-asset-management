@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,10 +62,14 @@ export default function PartsFolderManager({
   onChange, 
   initialData 
 }: PartsFolderManagerProps) {
-  // State management
-  const [partsStructure, setPartsStructure] = useState<PartsStructure>(
-    initialData || { rootFiles: [], folders: [] }
-  );
+  // State management - ensure safe defaults
+  const [partsStructure, setPartsStructure] = useState<PartsStructure>(() => {
+    const safeInitialData = initialData || { rootFiles: [], folders: [] };
+    return {
+      rootFiles: Array.isArray(safeInitialData.rootFiles) ? safeInitialData.rootFiles : [],
+      folders: Array.isArray(safeInitialData.folders) ? safeInitialData.folders : []
+    };
+  });
   
   // Modal states
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
@@ -83,6 +87,17 @@ export default function PartsFolderManager({
   // File input refs
   const rootFileInputRef = useRef<HTMLInputElement>(null);
   const folderFileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+
+  // Update parts structure when initialData changes (for edit mode)
+  useEffect(() => {
+    if (initialData) {
+      const safeData = {
+        rootFiles: Array.isArray(initialData.rootFiles) ? initialData.rootFiles : [],
+        folders: Array.isArray(initialData.folders) ? initialData.folders : []
+      };
+      setPartsStructure(safeData);
+    }
+  }, [initialData]);
 
   // Helper function to generate unique IDs
   const generateId = () => Math.random().toString(36).substring(2, 15);

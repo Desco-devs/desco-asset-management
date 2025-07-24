@@ -39,6 +39,7 @@ import {
   Camera,
   ChevronDown,
   ChevronUp,
+  ClipboardList,
   Edit,
   Eye,
   FileText,
@@ -220,9 +221,11 @@ export default function EquipmentModalModern() {
                 </DialogTitle>
               </DialogHeader>
               <div className="flex items-center justify-center">
-                <img
+                <Image
                   src={url}
                   alt={label}
+                  width={800}
+                  height={600}
                   className="max-w-full max-h-[70vh] sm:max-h-[55vh] lg:max-h-[50vh] xl:max-h-[45vh] object-contain"
                   onClick={(e) => e.stopPropagation()}
                   onError={(e) => {
@@ -250,6 +253,62 @@ export default function EquipmentModalModern() {
       report.status && 
       !['COMPLETED', 'RESOLVED'].includes(report.status.toUpperCase())
     ).length;
+  };
+
+  // Helper function to count total maintenance reports for selected equipment
+  const getMaintenanceReportsCount = () => {
+    if (!selectedEquipment || !maintenanceReports) return 0;
+    
+    return maintenanceReports.filter(report => 
+      report.equipment_id === selectedEquipment.uid
+    ).length;
+  };
+
+  // Helper function to count images for selected equipment
+  const getImagesCount = () => {
+    if (!selectedEquipment) return 0;
+    
+    let count = 0;
+    if (selectedEquipment.image_url) count++;
+    if (selectedEquipment.thirdpartyInspectionImage) count++;
+    if (selectedEquipment.pgpcInspectionImage) count++;
+    
+    return count;
+  };
+
+  // Helper function to count documents for selected equipment
+  const getDocumentsCount = () => {
+    if (!selectedEquipment) return 0;
+    
+    let count = 0;
+    if (selectedEquipment.originalReceiptUrl) count++;
+    if (selectedEquipment.equipmentRegistrationUrl) count++;
+    
+    return count;
+  };
+
+  // Helper function to count equipment parts for selected equipment
+  const getEquipmentPartsCount = () => {
+    if (!selectedEquipment || !selectedEquipment.equipmentParts) return 0;
+    
+    // Count files in rootFiles array and recursively in folders
+    const countFiles = (partsData: any): number => {
+      if (!partsData) return 0;
+      
+      let count = 0;
+      if (partsData.rootFiles && Array.isArray(partsData.rootFiles)) {
+        count += partsData.rootFiles.length;
+      }
+      if (partsData.folders && Array.isArray(partsData.folders)) {
+        partsData.folders.forEach((folder: any) => {
+          count += countFiles(folder);
+        });
+      }
+      
+      return count;
+    };
+    
+    return countFiles(selectedEquipment.equipmentParts);
   };
 
   // Tab content components - EXACTLY like CreateEquipmentForm
@@ -281,10 +340,10 @@ export default function EquipmentModalModern() {
         {isMobile ? (
           <>
             {renderTabButton('details', 'Details', <Settings className="h-4 w-4" />)}
-            {renderTabButton('images', 'Images', <Camera className="h-4 w-4" />)}
-            {renderTabButton('documents', 'Docs', <FileText className="h-4 w-4" />)}
-            {renderTabButton('parts', 'Parts', <Receipt className="h-4 w-4" />)}
-            {renderTabButton('maintenance', 'Maintenance', <Wrench className="h-4 w-4" />, getMaintenanceIssueCount())}
+            {renderTabButton('images', 'Images', <Camera className="h-4 w-4" />, getImagesCount() > 0 ? getImagesCount() : undefined)}
+            {renderTabButton('documents', 'Docs', <FileText className="h-4 w-4" />, getDocumentsCount() > 0 ? getDocumentsCount() : undefined)}
+            {renderTabButton('parts', 'Parts', <Wrench className="h-4 w-4" />, getEquipmentPartsCount() > 0 ? getEquipmentPartsCount() : undefined)}
+            {renderTabButton('maintenance', 'Maintenance', <ClipboardList className="h-4 w-4" />, getMaintenanceReportsCount())}
           </>
         ) : (
           <>
@@ -333,7 +392,7 @@ export default function EquipmentModalModern() {
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
               }`}
             >
-              <Receipt className="h-4 w-4" />
+              <Wrench className="h-4 w-4" />
               Parts Management
             </button>
             <button
@@ -345,11 +404,11 @@ export default function EquipmentModalModern() {
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
               }`}
             >
-              <Wrench className="h-4 w-4" />
+              <ClipboardList className="h-4 w-4" />
               Maintenance Reports
-              {getMaintenanceIssueCount() > 0 && (
-                <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
-                  {getMaintenanceIssueCount()}
+              {getMaintenanceReportsCount() > 0 && (
+                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getMaintenanceReportsCount()}
                 </span>
               )}
             </button>
@@ -377,7 +436,7 @@ export default function EquipmentModalModern() {
                 <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
-                      <Wrench className="h-4 w-4" />
+                      <Building2 className="h-4 w-4" />
                       Brand
                     </Label>
                     <div className="font-medium text-foreground">{selectedEquipment.brand}</div>
@@ -446,7 +505,7 @@ export default function EquipmentModalModern() {
 
                     {selectedEquipment.plateNumber && (
                       <Badge variant="outline" className="flex items-center gap-1">
-                        <Wrench className="h-3 w-3" />
+                        <Hash className="h-3 w-3" />
                         {selectedEquipment.plateNumber}
                       </Badge>
                     )}
@@ -645,7 +704,15 @@ export default function EquipmentModalModern() {
               View and browse parts documentation organized in folders.
             </p>
           </div>
-          <EquipmentPartsViewer equipmentParts={selectedEquipment.equipmentParts} />
+          <EquipmentPartsViewer 
+            equipmentParts={
+              selectedEquipment.equipmentParts 
+                ? typeof selectedEquipment.equipmentParts === 'string'
+                  ? JSON.parse(selectedEquipment.equipmentParts)
+                  : selectedEquipment.equipmentParts
+                : { rootFiles: [], folders: [] }
+            } 
+          />
         </div>
       )}
 
@@ -669,7 +736,7 @@ export default function EquipmentModalModern() {
     return (
       <>
         <Drawer open={isModalOpen} onOpenChange={handleClose}>
-          <DrawerContent className="!max-h-[95vh]">
+          <DrawerContent className="!max-h-[95dvh]">
             {/* Mobile Header - Exact copy from CreateEquipmentModalModern */}
             <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
               <DrawerClose asChild>
@@ -737,7 +804,7 @@ export default function EquipmentModalModern() {
     <>
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent 
-          className="!max-w-none !w-[55vw] max-h-[95vh] overflow-hidden flex flex-col p-6"
+          className="!max-w-none !w-[55vw] max-h-[95dvh] overflow-hidden flex flex-col p-6"
           style={{ maxWidth: '55vw', width: '55vw' }}
         >
           <DialogHeader className="flex-shrink-0 pb-4">

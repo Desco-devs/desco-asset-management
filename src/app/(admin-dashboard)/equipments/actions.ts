@@ -135,15 +135,7 @@ export async function createEquipmentAction(formData: FormData) {
     const before = formData.get("before") as string;
     const remarks = formData.get("remarks") as string;
 
-    // Basic validation with detailed logging
-    console.log("Equipment creation validation:", {
-      brand: brand || 'MISSING',
-      model: model || 'MISSING', 
-      type: type || 'MISSING',
-      owner: owner || 'MISSING',
-      projectId: projectId || 'MISSING'
-    });
-
+    // Basic validation
     if (!brand || !model || !type || !owner || !projectId) {
       throw new Error(`Missing required fields: ${[
         !brand && 'brand',

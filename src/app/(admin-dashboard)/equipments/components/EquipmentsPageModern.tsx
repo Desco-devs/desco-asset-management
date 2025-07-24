@@ -21,6 +21,7 @@ import {
   selectSelectedEquipment,
   selectIsEquipmentMaintenanceModalOpen,
   selectIsMaintenanceReportDetailOpen,
+  selectIsEditMaintenanceReportDrawerOpen,
   useEquipmentsStore,
 } from "@/stores/equipmentsStore";
 import { Download, Loader2, X, Trash2 } from "lucide-react";
@@ -32,6 +33,7 @@ import EditEquipmentModalModern from "./modals/EditEquipmentModalModern";
 import EquipmentModalModern from "./modals/EquipmentModalModern";
 import CreateEquipmentMaintenanceReportModal from "./modals/CreateEquipmentMaintenanceReportModal";
 import MaintenanceReportDetailDrawer from "./modals/MaintenanceReportDetailDrawer";
+import EditEquipmentMaintenanceReportDrawer from "./modals/EditEquipmentMaintenanceReportDrawer";
 
 export default function EquipmentsPageModern() {
   // Client state from Zustand (using optimized selectors)
@@ -44,6 +46,7 @@ export default function EquipmentsPageModern() {
   const selectedEquipment = useEquipmentsStore(selectSelectedEquipment);
   const isEquipmentMaintenanceModalOpen = useEquipmentsStore(selectIsEquipmentMaintenanceModalOpen);
   const isMaintenanceReportDetailOpen = useEquipmentsStore(selectIsMaintenanceReportDetailOpen);
+  const isEditMaintenanceReportDrawerOpen = useEquipmentsStore(selectIsEditMaintenanceReportDrawerOpen);
 
   // Actions
   const {
@@ -58,11 +61,9 @@ export default function EquipmentsPageModern() {
 
   // Image viewer functions
   const closeImageViewer = () => {
-    console.log("Closing image viewer in parent component");
     setViewerImage(null);
     if (isMobile) {
       // On mobile, reopen the drawer when closing image viewer
-      console.log("Mobile: reopening drawer");
       setTimeout(() => {
         setIsModalOpen(true);
       }, 100);
@@ -273,8 +274,7 @@ export default function EquipmentsPageModern() {
       {/* Create Equipment Modal */}
       {isCreateModalOpen && <CreateEquipmentModalModern />}
 
-      {/* Edit Equipment Modal */}
-      {isEditMode && <EditEquipmentModalModern />}
+      {/* Edit Equipment Modal - Handled by EquipmentModalModern when isEditMode is true */}
 
       {/* Equipment Maintenance Report Modal */}
       {isEquipmentMaintenanceModalOpen && selectedEquipment && (
@@ -284,6 +284,11 @@ export default function EquipmentsPageModern() {
       {/* Maintenance Report Detail Drawer */}
       {isMaintenanceReportDetailOpen && (
         <MaintenanceReportDetailDrawer />
+      )}
+
+      {/* Edit Maintenance Report Drawer */}
+      {isEditMaintenanceReportDrawerOpen && (
+        <EditEquipmentMaintenanceReportDrawer />
       )}
 
       {/* Global Image Viewer Modal - Always available */}

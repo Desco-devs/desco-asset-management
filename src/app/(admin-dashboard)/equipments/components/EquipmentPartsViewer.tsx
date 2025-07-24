@@ -20,13 +20,14 @@ import {
 import Image from "next/image";
 
 interface EquipmentPartsViewerProps {
-  equipmentParts?: string[];
+  equipmentParts?: string[] | { rootFiles: any[]; folders: any[] } | string;
 }
 
 interface ParsedFile {
   id: string;
   name: string;
   url: string;
+  preview?: string;
   type: 'image' | 'document';
 }
 
@@ -51,36 +52,117 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
 
   // Parse equipment parts data into folder structure
-  const parsePartsData = (parts: string[]): ParsedPartData => {
-    if (!parts || parts.length === 0) {
+  const parsePartsData = (parts: string[] | { rootFiles: any[]; folders: any[] } | string | undefined): ParsedPartData => {
+    if (!parts) {
       return { rootFiles: [], folders: [] };
     }
 
-    // For now, we'll parse parts as simple URLs
-    // In the future, this could parse JSON data with folder structure
-    const rootFiles: ParsedFile[] = [];
-    const folders: ParsedFolder[] = [];
+    // Handle string (JSON) format
+    if (typeof parts === 'string') {
+      try {
+        const parsed = JSON.parse(parts);
+        if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
+          return parsed;
+        }
+        // If it's just a string URL, treat it as single file
+        return { 
+          rootFiles: [{
+            id: 'file-0',
+            name: parts.split('/').pop() || 'File',
+            url: parts,
+            type: parts.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document'
+          }], 
+          folders: [] 
+        };
+      } catch {
+        // If JSON parse fails, treat as single URL
+        return { 
+          rootFiles: [{
+            id: 'file-0',
+            name: parts.split('/').pop() || 'File',
+            url: parts,
+            type: parts.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document'
+          }], 
+          folders: [] 
+        };
+      }
+    }
 
-    parts.forEach((url, index) => {
-      const fileName = url.split('/').pop() || `Part ${index + 1}`;
-      const isImage = url.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-      
-      const file: ParsedFile = {
-        id: `file-${index}`,
-        name: fileName,
-        url,
-        type: isImage ? 'image' : 'document',
-      };
+    // Handle object format (already parsed)
+    if (typeof parts === 'object' && !Array.isArray(parts)) {
+      if (parts.rootFiles && parts.folders) {
+        // Ensure files have proper structure with type detection
+        const processedData = {
+          rootFiles: parts.rootFiles.map((file: any, index: number) => {
+            const fileUrl = file.preview || file.url || '';
+            const fileName = file.name || fileUrl.split('/').pop() || `File ${index + 1}`;
+            const isImage = fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) || file.type === 'image';
+            
+            return {
+              id: file.id || `file-${index}`,
+              name: fileName,
+              url: fileUrl,
+              preview: file.preview || fileUrl,
+              type: isImage ? 'image' : 'document'
+            } as ParsedFile;
+          }),
+          folders: parts.folders.map((folder: any) => ({
+            ...folder,
+            files: folder.files?.map((file: any, index: number) => {
+              const fileUrl = file.preview || file.url || '';
+              const fileName = file.name || fileUrl.split('/').pop() || `File ${index + 1}`;
+              const isImage = fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) || file.type === 'image';
+              
+              return {
+                id: file.id || `file-${index}`,
+                name: fileName,
+                url: fileUrl,
+                preview: file.preview || fileUrl,
+                type: isImage ? 'image' : 'document'
+              } as ParsedFile;
+            }) || []
+          }))
+        };
+        
+        return processedData;
+      }
+    }
 
-      // For now, all files go to root
-      // Later, we could parse folder paths from the URL or JSON structure
-      rootFiles.push(file);
-    });
+    // Handle array format (legacy)
+    if (Array.isArray(parts)) {
+      if (parts.length === 0) {
+        return { rootFiles: [], folders: [] };
+      }
 
-    return { rootFiles, folders };
+      const rootFiles: ParsedFile[] = [];
+      const folders: ParsedFolder[] = [];
+
+      parts.forEach((url, index) => {
+        const fileName = url.split('/').pop() || `Part ${index + 1}`;
+        const isImage = url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+        
+        const file: ParsedFile = {
+          id: `file-${index}`,
+          name: fileName,
+          url,
+          type: isImage ? 'image' : 'document',
+        };
+
+        rootFiles.push(file);
+      });
+
+      return { rootFiles, folders };
+    }
+
+    // Fallback
+    return { rootFiles: [], folders: [] };
   };
 
   const parsedData = parsePartsData(equipmentParts);
+  
+  // Debug logging to see what we're receiving
+  console.log('🔍 EquipmentPartsViewer received equipmentParts:', equipmentParts);
+  console.log('🔍 Parsed data:', parsedData);
 
   const handleImageClick = (url: string, name: string) => {
     setSelectedImage(url);
@@ -103,17 +185,18 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
   // File preview component - same as PartsFolderManager but read-only
   const FilePreview = ({ file }: { file: ParsedFile }) => {
     const isImage = file.type === 'image';
+    const fileUrl = file.preview || file.url;
     
     return (
       <div 
         className="relative group border rounded-lg p-2 bg-card hover:bg-muted/50 transition-colors cursor-pointer"
-        onClick={() => handleImageClick(file.url, file.name)}
+        onClick={() => handleImageClick(fileUrl, file.name)}
       >
         <div className="flex items-center gap-2">
           {isImage ? (
             <div className="relative group/image">
               <img
-                src={file.url}
+                src={fileUrl}
                 alt={file.name}
                 className="w-10 h-10 object-cover rounded hover:opacity-80 transition-opacity"
               />
@@ -292,11 +375,8 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
                 className="max-w-full max-h-[80vh] sm:max-h-[65vh] lg:max-h-[55vh] xl:max-h-[45vh] object-contain"
                 onClick={(e) => e.stopPropagation()}
                 onError={(e) => {
-                  console.error('Image failed to load:', selectedImage);
-                  console.error('Error details:', e);
                 }}
                 onLoad={() => {
-                  console.log('Image loaded successfully:', selectedImage);
                 }}
               />
             </div>

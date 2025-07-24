@@ -162,6 +162,8 @@ interface EquipmentsState {
   isEquipmentMaintenanceModalOpen: boolean;
   selectedMaintenanceReportForDetail: EquipmentMaintenanceReport | null;
   isMaintenanceReportDetailOpen: boolean;
+  selectedMaintenanceReportForEdit: EquipmentMaintenanceReport | null;
+  isEditMaintenanceReportDrawerOpen: boolean;
   isExportModalOpen: boolean;
   currentPage: number;
   isMobile: boolean;
@@ -205,6 +207,8 @@ interface EquipmentsState {
   setIsEquipmentMaintenanceModalOpen: (open: boolean) => void;
   setSelectedMaintenanceReportForDetail: (report: EquipmentMaintenanceReport | null) => void;
   setIsMaintenanceReportDetailOpen: (open: boolean) => void;
+  setSelectedMaintenanceReportForEdit: (report: EquipmentMaintenanceReport | null) => void;
+  setIsEditMaintenanceReportDrawerOpen: (open: boolean) => void;
   setIsExportModalOpen: (open: boolean) => void;
   setCurrentPage: (page: number) => void;
   setIsMobile: (isMobile: boolean) => void;
@@ -266,6 +270,8 @@ export const useEquipmentsStore = create<EquipmentsState>()(
         isEquipmentMaintenanceModalOpen: false,
         selectedMaintenanceReportForDetail: null,
         isMaintenanceReportDetailOpen: false,
+        selectedMaintenanceReportForEdit: null,
+        isEditMaintenanceReportDrawerOpen: false,
         isExportModalOpen: false,
         currentPage: 1,
         isMobile: false,
@@ -305,6 +311,8 @@ export const useEquipmentsStore = create<EquipmentsState>()(
         setIsEquipmentMaintenanceModalOpen: (open) => set({ isEquipmentMaintenanceModalOpen: open }),
         setSelectedMaintenanceReportForDetail: (report) => set({ selectedMaintenanceReportForDetail: report }),
         setIsMaintenanceReportDetailOpen: (open) => set({ isMaintenanceReportDetailOpen: open }),
+        setSelectedMaintenanceReportForEdit: (report) => set({ selectedMaintenanceReportForEdit: report }),
+        setIsEditMaintenanceReportDrawerOpen: (open) => set({ isEditMaintenanceReportDrawerOpen: open }),
         setIsExportModalOpen: (open) => set({ isExportModalOpen: open }),
         setCurrentPage: (page) => set({ currentPage: page }),
         setIsMobile: (isMobile) => set({ isMobile }),
@@ -587,11 +595,13 @@ export const useEquipmentsStore = create<EquipmentsState>()(
           isMaintenanceModalOpen: false,
           isEquipmentMaintenanceModalOpen: false,
           isMaintenanceReportDetailOpen: false,
+          isEditMaintenanceReportDrawerOpen: false,
           isExportModalOpen: false,
           selectedEquipment: null,
           selectedMaintenanceReport: null,
           selectedEquipmentMaintenanceReport: null,
           selectedMaintenanceReportForDetail: null,
+          selectedMaintenanceReportForEdit: null,
           isEditMode: false
         }),
       }),
@@ -619,6 +629,8 @@ export const selectSelectedEquipmentMaintenanceReport = (state: EquipmentsState)
 export const selectIsEquipmentMaintenanceModalOpen = (state: EquipmentsState) => state.isEquipmentMaintenanceModalOpen;
 export const selectSelectedMaintenanceReportForDetail = (state: EquipmentsState) => state.selectedMaintenanceReportForDetail;
 export const selectIsMaintenanceReportDetailOpen = (state: EquipmentsState) => state.isMaintenanceReportDetailOpen;
+export const selectSelectedMaintenanceReportForEdit = (state: EquipmentsState) => state.selectedMaintenanceReportForEdit;
+export const selectIsEditMaintenanceReportDrawerOpen = (state: EquipmentsState) => state.isEditMaintenanceReportDrawerOpen;
 export const selectCurrentPage = (state: EquipmentsState) => state.currentPage;
 export const selectIsMobile = (state: EquipmentsState) => state.isMobile;
 export const selectSearchQuery = (state: EquipmentsState) => state.searchQuery;

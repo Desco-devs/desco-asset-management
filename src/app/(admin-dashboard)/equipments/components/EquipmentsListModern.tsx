@@ -410,8 +410,6 @@ export default function EquipmentsListModern() {
               return sortBy;
             })()}
             onValueChange={(value) => {
-              console.log("🔄 Sort selection changed to:", value);
-
               // Handle clear sort
               if (value === "clear-sort") {
                 setSortBy("");
