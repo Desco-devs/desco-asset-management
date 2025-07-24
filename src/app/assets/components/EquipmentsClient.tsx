@@ -178,7 +178,7 @@ export default function EquipmentClientViewer({
                     },
               }}
               isNew={newItemIds.has(item.id)}
-              reportCount={0}
+              reportCount={item.maintenanceReportCount || 0}
               onClick={() => {
                 setSelectedEquipment(item);
                 setIsModalOpen(true);

@@ -40,6 +40,8 @@ import {
   Shield,
   Upload,
   X,
+  Wrench,
+  Save,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import EditVehicleForm from "../forms/EditVehicleForm";
@@ -82,8 +84,8 @@ export default function EditVehicleModalModern() {
   // Get reference data
   const { projects } = useVehiclesWithReferenceData();
 
-  // Custom tab state instead of using Tabs component
-  const [activeTab, setActiveTab] = useState<"info" | "photos">("info");
+  // Custom tab state - EXACTLY like EditEquipmentDrawer with tabs
+  const [activeTab, setActiveTab] = useState<'details' | 'images' | 'documents' | 'parts'>('details');
 
   // Loading states for better UX
   const [isUpdatingPhotos, setIsUpdatingPhotos] = useState(false);
@@ -379,6 +381,83 @@ export default function EditVehicleModalModern() {
       }
     }
   };
+
+  // Helper function to count images for selected vehicle
+  const getImagesCount = () => {
+    if (!selectedVehicle) return 0;
+    
+    let count = 0;
+    if (selectedVehicle.front_img_url && files.frontImg.keep) count++;
+    if (selectedVehicle.back_img_url && files.backImg.keep) count++;
+    if (selectedVehicle.side1_img_url && files.side1Img.keep) count++;
+    if (selectedVehicle.side2_img_url && files.side2Img.keep) count++;
+    if (files.frontImg.file) count++;
+    if (files.backImg.file) count++;
+    if (files.side1Img.file) count++;
+    if (files.side2Img.file) count++;
+    
+    return count;
+  };
+
+  // Helper function to count documents for selected vehicle
+  const getDocumentsCount = () => {
+    if (!selectedVehicle) return 0;
+    
+    let count = 0;
+    if (selectedVehicle.original_receipt_url && files.originalReceipt.keep) count++;
+    if (selectedVehicle.car_registration_url && files.carRegistration.keep) count++;
+    if (selectedVehicle.pgpc_inspection_image && files.pgpcInspection.keep) count++;
+    if (files.originalReceipt.file) count++;
+    if (files.carRegistration.file) count++;
+    if (files.pgpcInspection.file) count++;
+    
+    return count;
+  };
+
+  // Helper function to count vehicle parts for selected vehicle
+  const getVehiclePartsCount = () => {
+    if (!selectedVehicle || !selectedVehicle.vehicle_parts) return 0;
+    
+    // Count files in rootFiles array and recursively in folders
+    const countFiles = (partsData: any): number => {
+      if (!partsData) return 0;
+      
+      let count = 0;
+      if (partsData.rootFiles && Array.isArray(partsData.rootFiles)) {
+        count += partsData.rootFiles.length;
+      }
+      if (partsData.folders && Array.isArray(partsData.folders)) {
+        partsData.folders.forEach((folder: any) => {
+          count += countFiles(folder);
+        });
+      }
+      
+      return count;
+    };
+    
+    return countFiles(selectedVehicle.vehicle_parts);
+  };
+
+  // Tab content components - EXACTLY like EditEquipmentDrawer
+  const renderTabButton = (tab: 'details' | 'images' | 'documents' | 'parts', label: string, icon: React.ReactNode, count?: number) => (
+    <Button
+      type="button"
+      variant={activeTab === tab ? 'default' : 'ghost'}
+      size="sm"
+      onClick={() => setActiveTab(tab)}
+      className="flex-1 flex items-center gap-2"
+    >
+      <div className="relative">
+        {icon}
+        {count !== undefined && count > 0 && (
+          <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full px-1 py-0.5 min-w-[16px] h-[16px] flex items-center justify-center text-[10px] leading-none">
+            {count}
+          </span>
+        )}
+      </div>
+      <span className="hidden sm:inline">{label}</span>
+    </Button>
+  );
 
   if (!selectedVehicle) return null;
 

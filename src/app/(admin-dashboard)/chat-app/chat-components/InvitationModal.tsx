@@ -61,7 +61,7 @@ const InvitationModal = ({
           <div className="flex items-start space-x-4 p-4 bg-muted/50 rounded-lg">
             <div className="relative">
               <Avatar className="h-12 w-12">
-                <AvatarImage src={room.avatar_url || ""} />
+                <AvatarImage src={room.avatar_url || undefined} />
                 <AvatarFallback className="text-sm">
                   {room.name.substring(0, 2).toUpperCase()}
                 </AvatarFallback>
@@ -101,7 +101,7 @@ const InvitationModal = ({
               <p className="text-sm font-medium">Invited by:</p>
               <div className="flex items-center space-x-3 p-3 bg-muted/30 rounded-lg">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={room.invited_by.user_profile || ""} />
+                  <AvatarImage src={room.invited_by.user_profile || undefined} />
                   <AvatarFallback className="text-xs">
                     {room.invited_by.full_name.substring(0, 2).toUpperCase()}
                   </AvatarFallback>

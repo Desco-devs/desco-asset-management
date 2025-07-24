@@ -213,7 +213,7 @@ const ChatHeader = ({
 
         <div className="relative sm:flex hidden">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={currentRoom?.avatar_url || ""} />
+            <AvatarImage src={currentRoom?.avatar_url || undefined} />
             <AvatarFallback className="text-sm">
               {currentRoom?.name.substring(0, 2).toUpperCase()}
             </AvatarFallback>

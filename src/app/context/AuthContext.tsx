@@ -150,6 +150,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSupabaseUser(null);
   };
 
+  const refreshUser = async () => {
+    if (supabaseUser?.id) {
+      await fetchUserProfile(supabaseUser.id);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -158,7 +164,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearUser, 
       loading, 
       signIn, 
-      signOut 
+      signOut,
+      refreshUser
     }}>
       {children}
     </AuthContext.Provider>

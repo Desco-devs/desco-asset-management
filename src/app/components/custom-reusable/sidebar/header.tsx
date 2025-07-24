@@ -1,8 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -23,44 +22,38 @@ const Header = () => {
   const [currentDate, setCurrentDate] = useState("");
   const [currentTime, setCurrentTime] = useState("");
 
-  // Update time every second
+  // Memoized date and time formatters
+  const dateFormatter = useMemo(() => new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }), []);
+
+  const timeFormatter = useMemo(() => new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  }), []);
+
+  // Optimized time update function
+  const updateDateTime = useCallback(() => {
+    const now = new Date();
+    setCurrentDate(dateFormatter.format(now));
+    setCurrentTime(timeFormatter.format(now));
+  }, [dateFormatter, timeFormatter]);
+
+  // Update time every second with cleanup
   useEffect(() => {
-    const updateDateTime = () => {
-      // Create a date object for Philippines time (UTC+8)
-      const now = new Date();
-      const options: Intl.DateTimeFormatOptions = {
-        timeZone: "Asia/Manila",
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      };
-
-      // Format date: "January 01, 2025"
-      const formattedDate = now.toLocaleDateString("en-US", options);
-      setCurrentDate(formattedDate);
-
-      // Format time: "12:34:56 PM"
-      const timeOptions: Intl.DateTimeFormatOptions = {
-        timeZone: "Asia/Manila",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true,
-      };
-      const formattedTime = now.toLocaleTimeString("en-US", timeOptions);
-      setCurrentTime(formattedTime);
-    };
-
-    // Update immediately and then every second
     updateDateTime();
     const intervalId = setInterval(updateDateTime, 1000);
-
-    // Clean up interval on unmount
     return () => clearInterval(intervalId);
-  }, []);
+  }, [updateDateTime]);
 
-  // Smart breadcrumb logic - only show relevant segments
-  const getSmartBreadcrumbs = () => {
+  // Memoized breadcrumb calculation
+  const { paths: breadcrumbPaths, currentPage } = useMemo(() => {
     const segments = pathname?.split("/").filter(Boolean) ?? [];
 
     // If we're at root, just return empty
@@ -122,9 +115,7 @@ const Header = () => {
       .join(" ");
 
     return { paths, currentPage };
-  };
-
-  const { paths: breadcrumbPaths, currentPage } = getSmartBreadcrumbs();
+  }, [pathname]);
 
   return (
     <header className="w-full flex sticky top-0 bg-background h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 border-b z-50">

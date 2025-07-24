@@ -48,7 +48,8 @@
       "Bash(pkill:*)",
       "Bash(mv:*)",
       "Bash(env)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(npx prisma db seed:*)"
     ],
     "deny": []
   }

@@ -53,6 +53,7 @@ export interface AuthContextType {
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 // Auth component prop types

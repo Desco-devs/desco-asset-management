@@ -301,7 +301,7 @@ const InviteUsersModal = ({
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-3">
                                 <Avatar className="h-8 w-8">
-                                  <AvatarImage src={user.user_profile || ""} />
+                                  <AvatarImage src={user.user_profile || undefined} />
                                   <AvatarFallback className="text-xs">
                                     {user.full_name
                                       .substring(0, 2)
@@ -381,7 +381,7 @@ const InviteUsersModal = ({
                         <CardContent className="p-3">
                           <div className="flex items-center space-x-3">
                             <Avatar className="h-8 w-8">
-                              <AvatarImage src={user.user_profile || ""} />
+                              <AvatarImage src={user.user_profile || undefined} />
                               <AvatarFallback className="text-xs">
                                 {user.full_name.substring(0, 2).toUpperCase()}
                               </AvatarFallback>

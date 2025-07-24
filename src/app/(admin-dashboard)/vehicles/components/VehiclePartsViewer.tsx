@@ -46,12 +46,12 @@ export default function VehiclePartsViewer({ vehicleParts = [] }: VehiclePartsVi
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedImageName, setSelectedImageName] = useState<string>("");
   
-  // Collapsible states - same as PartsFolderManager
+  // Collapsible states - same as EquipmentPartsViewer
   const [isRootCollapsed, setIsRootCollapsed] = useState(false);
   const [isFoldersCollapsed, setIsFoldersCollapsed] = useState(false);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
 
-  // Parse vehicle parts data into folder structure
+  // Parse vehicle parts data into folder structure - EXACTLY like EquipmentPartsViewer
   const parsePartsData = (parts: string[] | { rootFiles: any[]; folders: any[] } | string | undefined): ParsedPartData => {
     if (!parts) {
       return { rootFiles: [], folders: [] };
@@ -78,7 +78,7 @@ export default function VehiclePartsViewer({ vehicleParts = [] }: VehiclePartsVi
         // If JSON parse fails, treat as single URL
         return { 
           rootFiles: [{
-            id: 'file-1',
+            id: 'file-0',
             name: parts.split('/').pop() || 'File',
             url: parts,
             type: parts.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document'
@@ -88,67 +88,210 @@ export default function VehiclePartsViewer({ vehicleParts = [] }: VehiclePartsVi
       }
     }
 
+    // Handle object format (already parsed)
+    if (typeof parts === 'object' && !Array.isArray(parts)) {
+      if (parts.rootFiles && parts.folders) {
+        // Ensure files have proper structure with type detection
+        const processedData = {
+          rootFiles: parts.rootFiles.map((file: any, index: number) => {
+            const fileUrl = file.preview || file.url || '';
+            const fileName = file.name || fileUrl.split('/').pop() || `File ${index + 1}`;
+            
+            // Better image detection - check file extension and MIME type
+            const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+            const isImageByExtension = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
+            const isImageByUrl = fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+            const isImageByMimeType = file.file?.type?.startsWith('image/');
+            const isImage = isImageByExtension || isImageByUrl || isImageByMimeType || file.type === 'image';
+            
+            return {
+              id: file.id || `file-${index}`,
+              name: fileName,
+              url: fileUrl,
+              preview: file.preview || fileUrl,
+              type: isImage ? 'image' : 'document'
+            } as ParsedFile;
+          }),
+          folders: parts.folders.map((folder: any) => ({
+            ...folder,
+            files: folder.files?.map((file: any, index: number) => {
+              const fileUrl = file.preview || file.url || '';
+              const fileName = file.name || fileUrl.split('/').pop() || `File ${index + 1}`;
+              
+              // Better image detection - check file extension and MIME type
+              const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+              const isImageByExtension = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
+              const isImageByUrl = fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+              const isImageByMimeType = file.file?.type?.startsWith('image/');
+              const isImage = isImageByExtension || isImageByUrl || isImageByMimeType || file.type === 'image';
+              
+              return {
+                id: file.id || `file-${index}`,
+                name: fileName,
+                url: fileUrl,
+                preview: file.preview || fileUrl,
+                type: isImage ? 'image' : 'document'
+              } as ParsedFile;
+            }) || []
+          }))
+        };
+        
+        return processedData;
+      }
+    }
+
     // Handle array format (legacy)
     if (Array.isArray(parts)) {
-      return {
-        rootFiles: parts.map((url, index) => ({
+      if (parts.length === 0) {
+        return { rootFiles: [], folders: [] };
+      }
+
+      const rootFiles: ParsedFile[] = [];
+      const folders: ParsedFolder[] = [];
+
+      parts.forEach((url, index) => {
+        const fileName = url.split('/').pop() || `Part ${index + 1}`;
+        const isImage = url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+        
+        const file: ParsedFile = {
           id: `file-${index}`,
-          name: url.split('/').pop() || `File ${index + 1}`,
+          name: fileName,
           url,
-          type: url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' as const : 'document' as const
-        })),
-        folders: []
-      };
+          type: isImage ? 'image' : 'document',
+        };
+
+        rootFiles.push(file);
+      });
+
+      return { rootFiles, folders };
     }
 
-    // Handle object format with rootFiles and folders
-    if (parts && typeof parts === 'object' && 'rootFiles' in parts && 'folders' in parts) {
-      return parts as ParsedPartData;
-    }
-
+    // Fallback
     return { rootFiles: [], folders: [] };
   };
 
   const parsedData = parsePartsData(vehicleParts);
-  const totalFiles = parsedData.rootFiles.length + parsedData.folders.reduce((acc, folder) => acc + folder.files.length, 0);
+  
+  // Debug logging to see what we're receiving
+  console.log('🔍 VehiclePartsViewer received vehicleParts:', vehicleParts);
+  console.log('🔍 Parsed data:', parsedData);
 
-  const openImageViewer = (url: string, name: string) => {
+  const handleImageClick = (url: string, name: string) => {
     setSelectedImage(url);
     setSelectedImageName(name);
   };
 
-  const closeImageViewer = () => {
-    setSelectedImage(null);
-    setSelectedImageName("");
-  };
-
+  // Helper function to toggle individual folder collapse - same as EquipmentPartsViewer
   const toggleFolderCollapse = (folderId: string) => {
-    const newCollapsed = new Set(collapsedFolders);
-    if (newCollapsed.has(folderId)) {
-      newCollapsed.delete(folderId);
-    } else {
-      newCollapsed.add(folderId);
-    }
-    setCollapsedFolders(newCollapsed);
+    setCollapsedFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
+      } else {
+        newSet.add(folderId);
+      }
+      return newSet;
+    });
   };
 
-  const getFileIcon = (type: 'image' | 'document') => {
-    return type === 'image' ? ImageIcon : File;
-  };
-
-  if (totalFiles === 0) {
+  // File preview component - same as EquipmentPartsViewer but read-only
+  const FilePreview = ({ file }: { file: ParsedFile }) => {
+    const isImage = file.type === 'image';
+    const fileUrl = file.preview || file.url;
+    
     return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Receipt className="h-5 w-5" />
-            Vehicle Parts
+      <div 
+        className="relative group border rounded-lg p-2 bg-card hover:bg-muted/50 transition-colors cursor-pointer"
+        onClick={() => handleImageClick(fileUrl, file.name)}
+      >
+        <div className="flex items-center gap-2">
+          {isImage ? (
+            <div className="relative group/image">
+              <img
+                src={fileUrl}
+                alt={file.name}
+                className="w-10 h-10 object-cover rounded hover:opacity-80 transition-opacity"
+              />
+              <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
+                <Eye className="h-3 w-3 text-white" />
+              </div>
+            </div>
+          ) : (
+            <File className="h-10 w-10 text-muted-foreground" />
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate" title={file.name}>
+              {file.name}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {isImage ? 'Image' : 'Document'}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Folder component - same as EquipmentPartsViewer but read-only
+  const FolderComponent = ({ folder }: { folder: ParsedFolder }) => {
+    const isCollapsed = collapsedFolders.has(folder.id);
+    
+    return (
+      <Card className="hover:shadow-md transition-shadow">
+        <CardHeader className="pb-3">
+          <CardTitle 
+            className="text-base flex items-center gap-2 cursor-pointer hover:bg-muted/50 -m-4 p-4 rounded-lg transition-colors"
+            onClick={() => toggleFolderCollapse(folder.id)}
+          >
+            <Folder className="h-5 w-5 text-blue-600" />
+            {folder.name}
+            <span className="text-xs text-muted-foreground ml-auto flex items-center gap-2">
+              ({folder.files.length} files)
+              {isCollapsed ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
+            </span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <Receipt className="mx-auto h-12 w-12 mb-4 opacity-50" />
-            <p>No parts uploaded yet</p>
+        {!isCollapsed && (
+          <CardContent>
+            <div className="space-y-2">
+              {folder.files.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-sm">
+                  No files in this folder
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {folder.files.map((file) => (
+                    <FilePreview key={file.id} file={file} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+    );
+  };
+
+  if (parsedData.rootFiles.length === 0 && parsedData.folders.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Receipt className="h-4 w-4" />
+            Vehicle Parts
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Parts documentation and images for this vehicle
+          </p>
+        </CardHeader>
+        <CardContent className="py-12">
+          <div className="text-center">
+            <Folder className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground">No parts data available for this vehicle</p>
           </div>
         </CardContent>
       </Card>
@@ -157,169 +300,97 @@ export default function VehiclePartsViewer({ vehicleParts = [] }: VehiclePartsVi
 
   return (
     <>
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Receipt className="h-5 w-5" />
-            Vehicle Parts ({totalFiles} files)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Root Files Section */}
-          {parsedData.rootFiles.length > 0 && (
-            <div className="space-y-2">
-              <div 
-                className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded-md transition-colors" 
-                onClick={() => setIsRootCollapsed(!isRootCollapsed)}
-              >
-                {isRootCollapsed ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-                <Receipt className="h-4 w-4" />
-                <span className="font-medium">Root Files ({parsedData.rootFiles.length})</span>
+      <div className="space-y-6">
+        {/* Root Files Section - same as EquipmentPartsViewer */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle 
+              className="text-base flex items-center justify-between cursor-pointer"
+              onClick={() => setIsRootCollapsed(!isRootCollapsed)}
+            >
+              <div className="flex items-center gap-2">
+                <ImageIcon className="h-5 w-5" />
+                Root Files ({parsedData.rootFiles.length})
               </div>
-              
-              {!isRootCollapsed && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 ml-6">
-                  {parsedData.rootFiles.map((file) => {
-                    const FileIcon = getFileIcon(file.type);
-                    return (
-                      <div key={file.id} className="group relative">
-                        <div className="aspect-square bg-muted rounded-lg overflow-hidden relative border hover:border-primary/50 transition-colors">
-                          {file.type === 'image' ? (
-                            <Image
-                              src={file.url}
-                              alt={file.name}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <FileIcon className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                            <button
-                              onClick={() => openImageViewer(file.url, file.name)}
-                              className="bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-colors"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                        <p className="text-xs text-center mt-1 truncate" title={file.name}>
-                          {file.name}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
+              {isRootCollapsed ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
+            </CardTitle>
+          </CardHeader>
+          {!isRootCollapsed && (
+            <CardContent>
+              <div className="space-y-4">
+                {parsedData.rootFiles.length === 0 ? (
+                  <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
+                    <ImageIcon className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-muted-foreground">No files in root folder</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {parsedData.rootFiles.map((file) => (
+                      <FilePreview key={file.id} file={file} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Folders Section - same as EquipmentPartsViewer */}
+        {parsedData.folders.length > 0 && (
+          <div className="space-y-4">
+            <div 
+              className="flex items-center justify-between cursor-pointer"
+              onClick={() => setIsFoldersCollapsed(!isFoldersCollapsed)}
+            >
+              <h4 className="font-medium">Folders ({parsedData.folders.length})</h4>
+              {isFoldersCollapsed ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
               )}
             </div>
-          )}
-
-          {/* Folders Section */}
-          {parsedData.folders.length > 0 && (
-            <div className="space-y-2">
-              <div 
-                className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded-md transition-colors" 
-                onClick={() => setIsFoldersCollapsed(!isFoldersCollapsed)}
-              >
-                {isFoldersCollapsed ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-                <Folder className="h-4 w-4" />
-                <span className="font-medium">Folders ({parsedData.folders.length})</span>
+            {!isFoldersCollapsed && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {parsedData.folders.map((folder) => (
+                  <FolderComponent key={folder.id} folder={folder} />
+                ))}
               </div>
-              
-              {!isFoldersCollapsed && (
-                <div className="ml-6 space-y-4">
-                  {parsedData.folders.map((folder) => {
-                    const isFolderCollapsed = collapsedFolders.has(folder.id);
-                    return (
-                      <div key={folder.id} className="space-y-2">
-                        <div 
-                          className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded-md transition-colors" 
-                          onClick={() => toggleFolderCollapse(folder.id)}
-                        >
-                          {isFolderCollapsed ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                          <Folder className="h-4 w-4 text-blue-500" />
-                          <span className="font-medium">{folder.name} ({folder.files.length})</span>
-                        </div>
-                        
-                        {!isFolderCollapsed && folder.files.length > 0 && (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 ml-6">
-                            {folder.files.map((file) => {
-                              const FileIcon = getFileIcon(file.type);
-                              return (
-                                <div key={file.id} className="group relative">
-                                  <div className="aspect-square bg-muted rounded-lg overflow-hidden relative border hover:border-primary/50 transition-colors">
-                                    {file.type === 'image' ? (
-                                      <Image
-                                        src={file.url}
-                                        alt={file.name}
-                                        fill
-                                        className="object-cover"
-                                        sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full flex items-center justify-center">
-                                        <FileIcon className="h-8 w-8 text-muted-foreground" />
-                                      </div>
-                                    )}
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                      <button
-                                        onClick={() => openImageViewer(file.url, file.name)}
-                                        className="bg-white/90 hover:bg-white p-2 rounded-full shadow-lg transition-colors"
-                                      >
-                                        <Eye className="h-4 w-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                  <p className="text-xs text-center mt-1 truncate" title={file.name}>
-                                    {file.name}
-                                  </p>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </div>
+        )}
+      </div>
 
-      {/* Image Viewer Modal */}
+      {/* Image Viewer Modal - Same responsive sizing as EquipmentPartsViewer */}
       {selectedImage && (
-        <Dialog open={true} onOpenChange={closeImageViewer}>
-          <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-            <DialogHeader className="p-6 pb-0">
-              <DialogTitle>{selectedImageName}</DialogTitle>
+        <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+          <DialogContent 
+            className="!max-w-none p-4 
+              w-[95vw] max-h-[90vh] sm:w-[80vw] sm:max-h-[75vh] lg:w-[60vw] lg:max-h-[65vh] xl:w-[40vw] xl:max-h-[60vh]" 
+            style={{ 
+              maxWidth: 'min(95vw, 800px)', 
+              width: 'min(95vw, 800px)'
+            }}
+          >
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-center">
+                {selectedImageName}
+              </DialogTitle>
             </DialogHeader>
-            <div className="p-6 pt-4">
-              <div className="relative w-full max-h-[70vh] flex items-center justify-center">
-                <Image
-                  src={selectedImage}
-                  alt={selectedImageName}
-                  width={800}
-                  height={600}
-                  className="object-contain max-w-full max-h-full"
-                />
-              </div>
+            <div className="flex items-center justify-center">
+              <img
+                src={selectedImage}
+                alt={selectedImageName}
+                className="max-w-full max-h-[80vh] sm:max-h-[65vh] lg:max-h-[55vh] xl:max-h-[45vh] object-contain"
+                onClick={(e) => e.stopPropagation()}
+                onError={(e) => {
+                }}
+                onLoad={() => {
+                }}
+              />
             </div>
           </DialogContent>
         </Dialog>

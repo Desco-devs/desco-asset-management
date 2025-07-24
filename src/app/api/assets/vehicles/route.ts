@@ -62,6 +62,11 @@ export async function GET(request: NextRequest) {
               },
             },
           },
+          _count: {
+            select: {
+              maintenance_reports: true,
+            },
+          },
         },
         orderBy: { created_at: 'desc' },
         skip,
@@ -74,6 +79,7 @@ export async function GET(request: NextRequest) {
 
     const serializedVehicles = vehicles.map((item) => ({
       ...item,
+      maintenanceReportCount: item._count.maintenance_reports,
       createdAt: item.created_at.toISOString(),
       updatedAt: item.updated_at.toISOString(),
       project: item.project ? {

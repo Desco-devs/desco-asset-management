@@ -19,11 +19,6 @@ import { Button } from "@/components/ui/button";
 import {
   LogOut,
   User,
-  Settings,
-  CreditCard,
-  Bell,
-  HelpCircle,
-  Mail,
   Loader2,
 } from "lucide-react";
 import { color } from "@/lib/color";
@@ -67,7 +62,7 @@ export default function UserProfile() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-9 w-9 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user.user_profile ?? ""} alt={user.full_name} />
+            <AvatarImage src={user.user_profile || undefined} alt={user.full_name} />
             <AvatarFallback className={`${color}`}>{initials}</AvatarFallback>
           </Avatar>
         </Button>
@@ -83,35 +78,9 @@ export default function UserProfile() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push('/profile')}>
             <User className="mr-2 h-4 w-4" />
             <span>Profile</span>
-            <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <CreditCard className="mr-2 h-4 w-4" />
-            <span>Billing</span>
-            <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
-            <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Bell className="mr-2 h-4 w-4" />
-            <span>Notifications</span>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <HelpCircle className="mr-2 h-4 w-4" />
-            <span>Help & Support</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Mail className="mr-2 h-4 w-4" />
-            <span>Contact Us</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

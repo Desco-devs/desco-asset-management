@@ -1,10 +1,24 @@
 "use client";
 
-import React from "react";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import React, { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { AppSidebar } from "../components/custom-reusable/sidebar/app-sidebar";
 import Header from "../components/custom-reusable/sidebar/header";
 import { CardContent } from "@/components/ui/card";
+
+function SidebarWrapper({ children }: { children: React.ReactNode }) {
+  const { setOpenMobile, isMobile } = useSidebar();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [pathname, setOpenMobile, isMobile]);
+
+  return <>{children}</>;
+}
 
 export default function DashboardClientLayout({
   children,
@@ -17,7 +31,9 @@ export default function DashboardClientLayout({
       <div className="flex h-screen w-full flex-col">
         <Header />
         <main className="w-full h-full">
-          <CardContent className="p-0">{children}</CardContent>
+          <CardContent className="p-0">
+            <SidebarWrapper>{children}</SidebarWrapper>
+          </CardContent>
         </main>
       </div>
     </SidebarProvider>

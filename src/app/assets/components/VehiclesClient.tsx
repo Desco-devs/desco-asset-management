@@ -174,6 +174,7 @@ export default function VehicleClientViewer({
                     },
               }}
               isNew={newItemIds.has(vehicle.id)}
+              reportCount={vehicle.maintenanceReportCount || 0}
               onClick={() => {
                 setSelectedVehicle(vehicle);
                 setIsModalOpen(true);

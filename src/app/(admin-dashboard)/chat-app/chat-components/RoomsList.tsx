@@ -118,7 +118,7 @@ const RoomsList = ({
                   <div className="flex items-center space-x-3 w-full ">
                     <div className="relative">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={room.avatar_url || ""} />
+                        <AvatarImage src={room.avatar_url || undefined} />
                         <AvatarFallback className="text-sm">
                           {room.name.substring(0, 2).toUpperCase()}
                         </AvatarFallback>

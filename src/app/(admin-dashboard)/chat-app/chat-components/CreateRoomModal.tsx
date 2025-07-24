@@ -421,7 +421,7 @@ const CreateRoomModal = ({
                                 <div className="flex items-center space-x-3">
                                   <Avatar className="h-8 w-8">
                                     <AvatarImage
-                                      src={user.user_profile || ""}
+                                      src={user.user_profile || undefined}
                                     />
                                     <AvatarFallback className="text-xs">
                                       {user.full_name
@@ -496,7 +496,7 @@ const CreateRoomModal = ({
                             <CardContent className="p-2">
                               <div className="flex items-center space-x-2">
                                 <Avatar className="h-6 w-6">
-                                  <AvatarImage src={user.user_profile || ""} />
+                                  <AvatarImage src={user.user_profile || undefined} />
                                   <AvatarFallback className="text-xs">
                                     {user.full_name
                                       .substring(0, 2)

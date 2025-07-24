@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -8,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Car, FileText } from "lucide-react";
+import { Car, FileText, Eye } from "lucide-react";
 import Image from "next/image";
 import { isExpiringSoon, isExpired } from "../utils/dateUtils";
 import type { Vehicle } from "@/types/assets";
@@ -16,13 +17,17 @@ import type { Vehicle } from "@/types/assets";
 interface VehicleCardProps {
   vehicle: Vehicle;
   isNew?: boolean;
+  reportCount?: number;
   onClick: () => void;
+  onViewReports?: (e: React.MouseEvent) => void;
 }
 
 export default function VehicleCard({
   vehicle,
   isNew = false,
+  reportCount = 0,
   onClick,
+  onViewReports,
 }: VehicleCardProps) {
   const getStatusColor = (status: string) => {
     return status === "OPERATIONAL"
@@ -70,9 +75,23 @@ export default function VehicleCard({
           )}
 
         <div className="space-y-1">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <Car className="h-5 w-5" />
-            {vehicle.brand} {vehicle.model}
+          <CardTitle className="text-sm flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Car className="h-5 w-5" />
+              {vehicle.brand} {vehicle.model}
+            </div>
+            {/* Maintenance Reports Button */}
+            {reportCount > 0 && onViewReports && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onViewReports}
+                className="h-6 px-2 text-xs border-red-300 text-red-600 hover:bg-red-100 hover:border-red-400"
+              >
+                <Eye className="h-3 w-3 mr-1" />
+                {reportCount} report{reportCount !== 1 ? "s" : ""}
+              </Button>
+            )}
           </CardTitle>
           <CardDescription className="font-medium text-accent-foreground/70 text-xs">
             {vehicle.type}

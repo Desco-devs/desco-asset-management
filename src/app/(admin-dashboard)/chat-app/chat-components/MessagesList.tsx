@@ -146,7 +146,7 @@ const MessagesList = ({
               >
                 {!isMe && (
                   <Avatar className="h-8 w-8 mt-1">
-                    <AvatarImage src={msg.sender.user_profile || ""} />
+                    <AvatarImage src={msg.sender.user_profile || undefined} />
                     <AvatarFallback className="text-xs bg-muted">
                       {msg.sender.full_name.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
