@@ -96,7 +96,13 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
           rootFiles: parts.rootFiles.map((file: any, index: number) => {
             const fileUrl = file.preview || file.url || '';
             const fileName = file.name || fileUrl.split('/').pop() || `File ${index + 1}`;
-            const isImage = fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) || file.type === 'image';
+            
+            // Better image detection - check file extension and MIME type
+            const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+            const isImageByExtension = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
+            const isImageByUrl = fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+            const isImageByMimeType = file.file?.type?.startsWith('image/');
+            const isImage = isImageByExtension || isImageByUrl || isImageByMimeType || file.type === 'image';
             
             return {
               id: file.id || `file-${index}`,
@@ -111,7 +117,13 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
             files: folder.files?.map((file: any, index: number) => {
               const fileUrl = file.preview || file.url || '';
               const fileName = file.name || fileUrl.split('/').pop() || `File ${index + 1}`;
-              const isImage = fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) || file.type === 'image';
+              
+              // Better image detection - check file extension and MIME type
+              const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+              const isImageByExtension = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
+              const isImageByUrl = fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+              const isImageByMimeType = file.file?.type?.startsWith('image/');
+              const isImage = isImageByExtension || isImageByUrl || isImageByMimeType || file.type === 'image';
               
               return {
                 id: file.id || `file-${index}`,

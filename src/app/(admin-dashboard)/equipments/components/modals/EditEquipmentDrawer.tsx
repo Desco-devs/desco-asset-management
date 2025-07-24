@@ -168,45 +168,93 @@ function EditEquipmentDrawer() {
       
       setFormData(newFormData);
 
-      // Initialize parts structure - handle legacy format properly
+      // Initialize parts structure - handle legacy format properly like EquipmentPartsViewer
       try {
         const rawParts = selectedEquipment.equipmentParts;
-        let parsedParts;
+        let parsedParts: PartsStructure;
         
         if (!rawParts) {
           parsedParts = { rootFiles: [], folders: [] };
         } else if (typeof rawParts === 'string') {
           try {
-            parsedParts = JSON.parse(rawParts);
+            const parsed = JSON.parse(rawParts);
+            if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
+              // Modern format - ensure proper structure
+              parsedParts = {
+                rootFiles: Array.isArray(parsed.rootFiles) ? parsed.rootFiles.map((file: any, index: number) => {
+                  // If the file has a preview URL (from existing data), use it
+                  if (file.preview && typeof file.preview === 'string') {
+                    const fileName = file.name || file.preview.split('/').pop() || `image_${index}`;
+                    const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+                    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
+                    const mimeType = isImage ? `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}` : 'application/octet-stream';
+                    
+                    return {
+                      id: file.id || `existing_${index}`,
+                      name: fileName,
+                      file: new File([''], fileName, { type: mimeType }),
+                      preview: file.preview // Keep existing preview URL
+                    };
+                  }
+                  return file;
+                }) : [],
+                folders: Array.isArray(parsed.folders) ? parsed.folders.map((folder: any) => ({
+                  ...folder,
+                  files: Array.isArray(folder.files) ? folder.files.map((file: any, index: number) => {
+                    if (file.preview && typeof file.preview === 'string') {
+                      const fileName = file.name || file.preview.split('/').pop() || `image_${index}`;
+                      const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+                      const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
+                      const mimeType = isImage ? `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}` : 'application/octet-stream';
+                      
+                      return {
+                        id: file.id || `existing_${index}`,
+                        name: fileName,
+                        file: new File([''], fileName, { type: mimeType }),
+                        preview: file.preview
+                      };
+                    }
+                    return file;
+                  }) : []
+                })) : []
+              };
+            } else {
+              parsedParts = { rootFiles: [], folders: [] };
+            }
           } catch {
             parsedParts = { rootFiles: [], folders: [] };
           }
         } else if (Array.isArray(rawParts)) {
           // Legacy format: array of URLs - convert to root files
           parsedParts = {
-            rootFiles: rawParts.map((url, index) => ({
-              id: `legacy_${index}`,
-              name: url.split('/').pop() || `image_${index}`,
-              file: new File([], url.split('/').pop() || `image_${index}`, { type: 'image/jpeg' }),
-              preview: url
-            })),
+            rootFiles: rawParts.map((url, index) => {
+              const fileName = url.split('/').pop() || `image_${index}`;
+              const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+              const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
+              const mimeType = isImage ? `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}` : 'application/octet-stream';
+              
+              return {
+                id: `legacy_${index}`,
+                name: fileName,
+                file: new File([''], fileName, { type: mimeType }),
+                preview: url // Use the existing URL as preview for legacy files
+              };
+            }),
             folders: []
           };
         } else if (rawParts && typeof rawParts === 'object') {
-          parsedParts = rawParts;
+          // Already an object - ensure proper structure
+          parsedParts = {
+            rootFiles: Array.isArray(rawParts.rootFiles) ? rawParts.rootFiles : [],
+            folders: Array.isArray(rawParts.folders) ? rawParts.folders : []
+          };
         } else {
           parsedParts = { rootFiles: [], folders: [] };
         }
         
-        // Ensure valid structure
-        const safeParts = {
-          rootFiles: Array.isArray(parsedParts?.rootFiles) ? parsedParts.rootFiles : [],
-          folders: Array.isArray(parsedParts?.folders) ? parsedParts.folders : []
-        };
-        
-        setPartsStructure(safeParts);
+        setPartsStructure(parsedParts);
       } catch (error) {
-        // Failed to parse equipment parts, using fallback
+        console.error('Failed to parse equipment parts:', error);
         setPartsStructure({ rootFiles: [], folders: [] });
       }
 
@@ -925,16 +973,23 @@ function EditEquipmentDrawer() {
       {/* Parts Tab - EXACTLY like CreateEquipmentForm */}
       {activeTab === 'parts' && (
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold">Equipment Parts Management</h3>
-            <p className="text-sm text-muted-foreground">
-              Upload and organize equipment parts documentation in folders. This helps with maintenance planning and parts ordering.
-            </p>
-          </div>
-          <PartsFolderManager 
-            onChange={setPartsStructure}
-            initialData={partsStructure}
-          />
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Wrench className="h-4 w-4" />
+                Equipment Parts Management {isMobile ? '' : ''}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Upload and organize equipment parts documentation in folders. This helps with maintenance planning and parts ordering.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <PartsFolderManager 
+                onChange={setPartsStructure}
+                initialData={partsStructure}
+              />
+            </CardContent>
+          </Card>
         </div>
       )}
 
