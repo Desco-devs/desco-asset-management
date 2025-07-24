@@ -388,3 +388,442 @@ export async function fetchMaintenanceReportsStatusCounts() {
     },
   });
 }
+
+/**
+ * Fetch maintenance alerts for dashboard
+ */
+export async function fetchMaintenanceAlerts() {
+  console.log('🚨 Fetching maintenance alerts...');
+  
+  const now = new Date();
+  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+  try {
+    // 1. Active Maintenance Reports (REPORTED, IN_PROGRESS)
+    const equipmentReportsPromise = prisma.maintenance_equipment_report.findMany({
+      where: {
+        status: {
+          in: ['REPORTED', 'IN_PROGRESS']
+        }
+      },
+      include: {
+        equipment: {
+          select: {
+            id: true,
+            brand: true,
+            model: true,
+            type: true,
+            status: true
+          }
+        },
+        location: {
+          select: {
+            address: true
+          }
+        }
+      },
+      orderBy: [
+        { priority: 'desc' },
+        { date_reported: 'desc' }
+      ],
+      take: 50
+    });
+
+    const vehicleReportsPromise = prisma.maintenance_vehicle_report.findMany({
+      where: {
+        status: {
+          in: ['REPORTED', 'IN_PROGRESS']
+        }
+      },
+      include: {
+        vehicle: {
+          select: {
+            id: true,
+            brand: true,
+            model: true,
+            type: true,
+            plate_number: true,
+            status: true
+          }
+        },
+        location: {
+          select: {
+            address: true
+          }
+        }
+      },
+      orderBy: [
+        { priority: 'desc' },
+        { date_reported: 'desc' }
+      ],
+      take: 50
+    });
+
+    // 2. Non-Operational Assets
+    const nonOperationalEquipmentPromise = prisma.equipment.findMany({
+      where: {
+        status: 'NON_OPERATIONAL'
+      },
+      select: {
+        id: true,
+        brand: true,
+        model: true,
+        type: true,
+        status: true,
+        updated_at: true,
+        project: {
+          select: {
+            name: true,
+            client: {
+              select: {
+                location: {
+                  select: {
+                    address: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      take: 20
+    });
+
+    const nonOperationalVehiclesPromise = prisma.vehicle.findMany({
+      where: {
+        status: 'NON_OPERATIONAL'
+      },
+      select: {
+        id: true,
+        brand: true,
+        model: true,
+        type: true,
+        plate_number: true,
+        status: true,
+        updated_at: true,
+        project: {
+          select: {
+            name: true,
+            client: {
+              select: {
+                location: {
+                  select: {
+                    address: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      take: 20
+    });
+
+    // 3. Overdue Inspections & Insurance Expiry
+    const overdueVehiclesPromise = prisma.vehicle.findMany({
+      where: {
+        OR: [
+          { inspection_date: { lt: now } },
+          { expiry_date: { lt: now } }
+        ],
+        status: 'OPERATIONAL' // Only alert for operational vehicles
+      },
+      select: {
+        id: true,
+        brand: true,
+        model: true,
+        type: true,
+        plate_number: true,
+        inspection_date: true,
+        expiry_date: true,
+        project: {
+          select: {
+            name: true,
+            client: {
+              select: {
+                location: {
+                  select: {
+                    address: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      take: 20
+    });
+
+    const insuranceExpiringEquipmentPromise = prisma.equipment.findMany({
+      where: {
+        insurance_expiration_date: {
+          lte: thirtyDaysFromNow,
+          gte: now
+        },
+        status: 'OPERATIONAL'
+      },
+      select: {
+        id: true,
+        brand: true,
+        model: true,
+        type: true,
+        insurance_expiration_date: true,
+        project: {
+          select: {
+            name: true,
+            client: {
+              select: {
+                location: {
+                  select: {
+                    address: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      take: 20
+    });
+
+    // Execute all queries in parallel
+    const [
+      equipmentReports,
+      vehicleReports,
+      nonOperationalEquipment,
+      nonOperationalVehicles,
+      overdueVehicles,
+      insuranceExpiringEquipment
+    ] = await Promise.all([
+      equipmentReportsPromise,
+      vehicleReportsPromise,
+      nonOperationalEquipmentPromise,
+      nonOperationalVehiclesPromise,
+      overdueVehiclesPromise,
+      insuranceExpiringEquipmentPromise
+    ]);
+
+    console.log('✅ Maintenance alerts fetched successfully');
+    
+    return {
+      equipmentReports,
+      vehicleReports,
+      nonOperationalEquipment,
+      nonOperationalVehicles,
+      overdueVehicles,
+      insuranceExpiringEquipment
+    };
+
+  } catch (error) {
+    console.error('❌ Error fetching maintenance alerts:', error);
+    return {
+      equipmentReports: [],
+      vehicleReports: [],
+      nonOperationalEquipment: [],
+      nonOperationalVehicles: [],
+      overdueVehicles: [],
+      insuranceExpiringEquipment: []
+    };
+  }
+}
+
+/**
+ * Fetch recent activities for dashboard - more comprehensive data
+ */
+export async function fetchRecentActivities() {
+  console.log('📊 Fetching recent activities...');
+  
+  try {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    
+    // Fetch recent maintenance reports with user info
+    const recentMaintenancePromise = prisma.maintenance_equipment_report.findMany({
+      where: {
+        created_at: {
+          gte: sevenDaysAgo
+        }
+      },
+      include: {
+        equipment: {
+          select: {
+            brand: true,
+            model: true,
+            type: true
+          }
+        },
+        reported_user: {
+          select: {
+            full_name: true,
+            username: true
+          }
+        },
+        repaired_user: {
+          select: {
+            full_name: true,
+            username: true
+          }
+        }
+      },
+      orderBy: {
+        created_at: 'desc'
+      },
+      take: 20
+    });
+
+    // Fetch recent vehicle maintenance reports
+    const recentVehicleMaintenancePromise = prisma.maintenance_vehicle_report.findMany({
+      where: {
+        created_at: {
+          gte: sevenDaysAgo
+        }
+      },
+      include: {
+        vehicle: {
+          select: {
+            brand: true,
+            model: true,
+            plate_number: true
+          }
+        },
+        reported_user: {
+          select: {
+            full_name: true,
+            username: true
+          }
+        },
+        repaired_user: {
+          select: {
+            full_name: true,
+            username: true
+          }
+        }
+      },
+      orderBy: {
+        created_at: 'desc'
+      },
+      take: 20
+    });
+
+    // Fetch recently created equipment
+    const recentEquipmentPromise = prisma.equipment.findMany({
+      where: {
+        created_at: {
+          gte: sevenDaysAgo
+        }
+      },
+      include: {
+        user: {
+          select: {
+            full_name: true,
+            username: true
+          }
+        },
+        project: {
+          select: {
+            name: true,
+            client: {
+              select: {
+                name: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        created_at: 'desc'
+      },
+      take: 10
+    });
+
+    // Fetch recently created vehicles
+    const recentVehiclesPromise = prisma.vehicle.findMany({
+      where: {
+        created_at: {
+          gte: sevenDaysAgo
+        }
+      },
+      include: {
+        user: {
+          select: {
+            full_name: true,
+            username: true
+          }
+        },
+        project: {
+          select: {
+            name: true,
+            client: {
+              select: {
+                name: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        created_at: 'desc'
+      },
+      take: 10
+    });
+
+    // Fetch recently created projects
+    const recentProjectsPromise = prisma.project.findMany({
+      where: {
+        created_at: {
+          gte: sevenDaysAgo
+        }
+      },
+      include: {
+        user: {
+          select: {
+            full_name: true,
+            username: true
+          }
+        },
+        client: {
+          select: {
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        created_at: 'desc'
+      },
+      take: 5
+    });
+
+    const [
+      recentMaintenance,
+      recentVehicleMaintenance,
+      recentEquipment,
+      recentVehicles,
+      recentProjects
+    ] = await Promise.all([
+      recentMaintenancePromise,
+      recentVehicleMaintenancePromise,
+      recentEquipmentPromise,
+      recentVehiclesPromise,
+      recentProjectsPromise
+    ]);
+
+    console.log('✅ Recent activities fetched successfully');
+    
+    return {
+      recentMaintenance,
+      recentVehicleMaintenance,
+      recentEquipment,
+      recentVehicles,
+      recentProjects
+    };
+
+  } catch (error) {
+    console.error('❌ Error fetching recent activities:', error);
+    return {
+      recentMaintenance: [],
+      recentVehicleMaintenance: [],
+      recentEquipment: [],
+      recentVehicles: [],
+      recentProjects: []
+    };
+  }
+}

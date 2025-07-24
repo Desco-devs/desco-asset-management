@@ -235,6 +235,7 @@ model vehicle {
   original_receipt_url  String?
   car_registration_url  String?
   pgpc_inspection_image String?
+  vehicle_parts         String[]
   project_id            String                       @db.Uuid
   created_at            DateTime                     @default(now())
   updated_at            DateTime                     @updatedAt

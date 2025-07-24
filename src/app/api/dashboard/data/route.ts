@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchDashboardData } from "@/lib/dashboard-data";
+import { fetchDashboardData, fetchMaintenanceAlerts, fetchRecentActivities } from "@/lib/dashboard-data";
 import {
   transformEquipmentCounts,
   transformVehicleCounts,
@@ -7,6 +7,8 @@ import {
   transformOverviewStats,
   transformDetailedData,
   generateRecentActivity,
+  generateEnhancedRecentActivity,
+  transformMaintenanceAlerts,
 } from "@/lib/dashboard-utils";
 
 export async function GET() {
@@ -23,6 +25,30 @@ export async function GET() {
     // Race between data fetch and timeout
     const result = await Promise.race([dataPromise, timeoutPromise]);
     
+    // Fetch maintenance alerts and recent activities separately to avoid slowing down main data
+    const maintenanceAlertsPromise = fetchMaintenanceAlerts().catch(err => {
+      console.warn('Maintenance alerts failed:', err);
+      return {
+        equipmentReports: [],
+        vehicleReports: [],
+        nonOperationalEquipment: [],
+        nonOperationalVehicles: [],
+        overdueVehicles: [],
+        insuranceExpiringEquipment: []
+      };
+    });
+
+    const recentActivitiesPromise = fetchRecentActivities().catch(err => {
+      console.warn('Recent activities failed:', err);
+      return {
+        recentMaintenance: [],
+        recentVehicleMaintenance: [],
+        recentEquipment: [],
+        recentVehicles: [],
+        recentProjects: []
+      };
+    });
+    
     const {
       equipmentCounts,
       vehicleCounts,
@@ -38,6 +64,12 @@ export async function GET() {
       maintenanceReportsTotalCount,
       maintenanceReportsStatusCounts,
     } = result as any;
+    
+    // Get maintenance alerts and recent activities
+    const [maintenanceAlertsData, recentActivitiesData] = await Promise.all([
+      maintenanceAlertsPromise,
+      recentActivitiesPromise
+    ]);
     
     console.log('✅ Dashboard API: Data fetched successfully');
 
@@ -75,15 +107,11 @@ export async function GET() {
       maintenanceReportsData
     );
 
-    // Generate recent activity
-    const recentActivityData = generateRecentActivity(
-      equipmentListData,
-      vehiclesListData,
-      projectsData,
-      clientsData,
-      maintenanceReportsData,
-      locationsData
-    );
+    // Generate recent activity using enhanced data
+    const recentActivityData = generateEnhancedRecentActivity(recentActivitiesData);
+
+    // Transform maintenance alerts
+    const transformedMaintenanceAlerts = transformMaintenanceAlerts(maintenanceAlertsData);
 
     return NextResponse.json({
       equipmentCounts: equipmentData,
@@ -91,6 +119,7 @@ export async function GET() {
       overviewStats: overviewStatsData,
       recentActivity: recentActivityData,
       detailedData,
+      maintenanceAlerts: transformedMaintenanceAlerts,
     });
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
@@ -122,6 +151,7 @@ export async function GET() {
         vehicles: [],
         maintenanceReports: [],
       },
+      maintenanceAlerts: [],
     });
   }
 }

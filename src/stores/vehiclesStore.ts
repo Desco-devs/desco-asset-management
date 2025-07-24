@@ -21,6 +21,7 @@ export interface Vehicle {
   original_receipt_url?: string;
   car_registration_url?: string;
   pgpc_inspection_image?: string;
+  vehicle_parts?: string[];
   project: {
     id: string;
     name: string;
@@ -122,6 +123,10 @@ interface VehiclesState {
   isEditMode: boolean;
   selectedMaintenanceReport: MaintenanceReport | null;
   isMaintenanceModalOpen: boolean;
+  selectedMaintenanceReportForDetail: MaintenanceReport | null;
+  isMaintenanceReportDetailOpen: boolean;
+  selectedMaintenanceReportForEdit: MaintenanceReport | null;
+  isEditMaintenanceReportDrawerOpen: boolean;
   isExportModalOpen: boolean;
   currentPage: number;
   isMobile: boolean;
@@ -161,6 +166,10 @@ interface VehiclesState {
   setIsEditMode: (isEdit: boolean) => void;
   setSelectedMaintenanceReport: (report: MaintenanceReport | null) => void;
   setIsMaintenanceModalOpen: (open: boolean) => void;
+  setSelectedMaintenanceReportForDetail: (report: MaintenanceReport | null) => void;
+  setIsMaintenanceReportDetailOpen: (open: boolean) => void;
+  setSelectedMaintenanceReportForEdit: (report: MaintenanceReport | null) => void;
+  setIsEditMaintenanceReportDrawerOpen: (open: boolean) => void;
   setIsExportModalOpen: (open: boolean) => void;
   setCurrentPage: (page: number) => void;
   setIsMobile: (isMobile: boolean) => void;
@@ -218,6 +227,10 @@ export const useVehiclesStore = create<VehiclesState>()(
         isEditMode: false,
         selectedMaintenanceReport: null,
         isMaintenanceModalOpen: false,
+        selectedMaintenanceReportForDetail: null,
+        isMaintenanceReportDetailOpen: false,
+        selectedMaintenanceReportForEdit: null,
+        isEditMaintenanceReportDrawerOpen: false,
         isExportModalOpen: false,
         currentPage: 1,
         isMobile: false,
@@ -253,6 +266,10 @@ export const useVehiclesStore = create<VehiclesState>()(
         setIsEditMode: (isEdit) => set({ isEditMode: isEdit }),
         setSelectedMaintenanceReport: (report) => set({ selectedMaintenanceReport: report }),
         setIsMaintenanceModalOpen: (open) => set({ isMaintenanceModalOpen: open }),
+        setSelectedMaintenanceReportForDetail: (report) => set({ selectedMaintenanceReportForDetail: report }),
+        setIsMaintenanceReportDetailOpen: (open) => set({ isMaintenanceReportDetailOpen: open }),
+        setSelectedMaintenanceReportForEdit: (report) => set({ selectedMaintenanceReportForEdit: report }),
+        setIsEditMaintenanceReportDrawerOpen: (open) => set({ isEditMaintenanceReportDrawerOpen: open }),
         setIsExportModalOpen: (open) => set({ isExportModalOpen: open }),
         setCurrentPage: (page) => set({ currentPage: page }),
         setIsMobile: (isMobile) => set({ isMobile }),
@@ -527,9 +544,13 @@ export const useVehiclesStore = create<VehiclesState>()(
           isModalOpen: false,
           isCreateModalOpen: false,
           isMaintenanceModalOpen: false,
+          isMaintenanceReportDetailOpen: false,
+          isEditMaintenanceReportDrawerOpen: false,
           isExportModalOpen: false,
           selectedVehicle: null,
           selectedMaintenanceReport: null,
+          selectedMaintenanceReportForDetail: null,
+          selectedMaintenanceReportForEdit: null,
           isEditMode: false
         }),
       }),
@@ -553,6 +574,10 @@ export const selectIsCreateModalOpen = (state: VehiclesState) => state.isCreateM
 export const selectIsEditMode = (state: VehiclesState) => state.isEditMode;
 export const selectSelectedMaintenanceReport = (state: VehiclesState) => state.selectedMaintenanceReport;
 export const selectIsMaintenanceModalOpen = (state: VehiclesState) => state.isMaintenanceModalOpen;
+export const selectSelectedMaintenanceReportForDetail = (state: VehiclesState) => state.selectedMaintenanceReportForDetail;
+export const selectIsMaintenanceReportDetailOpen = (state: VehiclesState) => state.isMaintenanceReportDetailOpen;
+export const selectSelectedMaintenanceReportForEdit = (state: VehiclesState) => state.selectedMaintenanceReportForEdit;
+export const selectIsEditMaintenanceReportDrawerOpen = (state: VehiclesState) => state.isEditMaintenanceReportDrawerOpen;
 export const selectCurrentPage = (state: VehiclesState) => state.currentPage;
 export const selectIsMobile = (state: VehiclesState) => state.isMobile;
 export const selectSearchQuery = (state: VehiclesState) => state.searchQuery;

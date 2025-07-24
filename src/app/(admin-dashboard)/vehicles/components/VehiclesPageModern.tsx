@@ -17,6 +17,7 @@ import {
   selectIsEditMode,
   selectIsMobile,
   selectIsModalOpen,
+  selectIsMaintenanceReportDetailOpen,
   selectViewerImage,
   useVehiclesStore,
 } from "@/stores/vehiclesStore";
@@ -24,7 +25,9 @@ import { Download, Loader2, X, Trash2 } from "lucide-react";
 import React from "react";
 import CreateVehicleModalModern from "./modals/CreateVehicleModalModern";
 import EditVehicleModalModern from "./modals/EditVehicleModalModern";
+import EditVehicleMaintenanceReportDrawer from "./modals/EditVehicleMaintenanceReportDrawer";
 import VehicleModalModern from "./modals/VehicleModalModern";
+import MaintenanceReportDetailDrawer from "./modals/MaintenanceReportDetailDrawer";
 import VehiclesListModern from "./VehiclesListModern";
 
 export default function VehiclesPageModern() {
@@ -32,6 +35,7 @@ export default function VehiclesPageModern() {
   const isModalOpen = useVehiclesStore(selectIsModalOpen);
   const isCreateModalOpen = useVehiclesStore(selectIsCreateModalOpen);
   const isEditMode = useVehiclesStore(selectIsEditMode);
+  const isMaintenanceReportDetailOpen = useVehiclesStore(selectIsMaintenanceReportDetailOpen);
   const viewerImage = useVehiclesStore(selectViewerImage);
   const isMobile = useVehiclesStore(selectIsMobile);
   const deleteConfirmation = useVehiclesStore(selectDeleteConfirmation);
@@ -264,7 +268,11 @@ export default function VehiclesPageModern() {
       {/* Edit Vehicle Modal */}
       {isEditMode && <EditVehicleModalModern />}
 
-      {/* Maintenance Modal will be added in Feature 6 */}
+      {/* Edit Vehicle Maintenance Report Drawer */}
+      <EditVehicleMaintenanceReportDrawer />
+
+      {/* Maintenance Report Detail Drawer */}
+      {isMaintenanceReportDetailOpen && <MaintenanceReportDetailDrawer />}
 
       {/* Global Image Viewer Modal - Always available */}
       <ImageViewerModal />

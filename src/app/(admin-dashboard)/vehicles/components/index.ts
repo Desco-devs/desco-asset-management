@@ -11,6 +11,7 @@ export { default as CreateVehicleModalModern } from './modals/CreateVehicleModal
 export { default as EditVehicleModalModern } from './modals/EditVehicleModalModern';
 export { default as CreateMaintenanceReportModal } from './modals/CreateMaintenanceReportModal';
 export { default as EditMaintenanceReportModal } from './modals/EditMaintenanceReportModal';
+export { default as MaintenanceReportDetailDrawer } from './modals/MaintenanceReportDetailDrawer';
 
 // Forms
 export { default as CreateVehicleForm } from './forms/CreateVehicleForm';

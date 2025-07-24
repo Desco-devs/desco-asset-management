@@ -15,7 +15,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { Settings, Camera, FileText, Upload, CalendarIcon, User, Building2, Car, Hash, Shield, Loader2, Wrench } from "lucide-react";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
-import PartsFolderManager, { type PartsStructure } from "@/app/(admin-dashboard)/equipments/components/forms/PartsFolderManager";
+import VehiclePartsFolderManager, { type PartsStructure } from "./VehiclePartsFolderManager";
+import { toast } from "sonner";
 
 // Submit button component that uses useFormStatus
 function SubmitButton() {
@@ -45,17 +46,31 @@ interface CreateVehicleFormProps {
 }
 
 export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMobile = false }: CreateVehicleFormProps) {
+  // Debug: Log projects data
+  console.log('🔍 Projects in form:', projects);
+  
   // Tab state for mobile
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'documents' | 'parts'>('details');
   
-  // Form state for select fields and dates
+  // Date picker states
+  const [inspectionDateOpen, setInspectionDateOpen] = useState(false);
+  const [expiryDateOpen, setExpiryDateOpen] = useState(false);
+  
+  // Form state for all form fields to prevent reset on tab switch or validation error
   const [formData, setFormData] = useState({
+    // Select fields and dates
     type: '',
     projectId: '',
     status: 'OPERATIONAL',
     before: '6',
     inspectionDate: new Date(),
-    expiryDate: undefined as Date | undefined
+    expiryDate: undefined as Date | undefined,
+    // Text input fields
+    brand: '',
+    model: '',
+    plateNumber: '',
+    owner: '',
+    remarks: ''
   });
   
   // File state for images and documents
@@ -80,7 +95,10 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
     setFiles(prev => ({ ...prev, [fieldName]: file }));
   };
 
-  const handleAction = async (formDataFromForm: FormData) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault(); // Prevent form reset
+    
+    const formDataFromForm = new FormData(e.currentTarget);
     try {
       // Add all the files to formData
       Object.entries(files).forEach(([key, file]) => {
@@ -120,18 +138,62 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
         formDataFromForm.append('expiryDate', format(formData.expiryDate, 'yyyy-MM-dd'));
       }
       
-      await createVehicleAction(formDataFromForm);
+      const result = await createVehicleAction(formDataFromForm);
       
-      // Success message will be shown by the mutation hook's toast
-      // No need for alert here since realtime updates will show the vehicle immediately
-      
-      // Form will reset automatically after successful submission
-      if (onSuccess) {
-        onSuccess();
+      if (result.success) {
+        // Success - show success toast and reset form manually
+        toast.success("Vehicle created successfully!");
+        
+        // Reset form state manually only on success
+        setFormData({
+          type: '',
+          projectId: '',
+          status: 'OPERATIONAL',
+          before: '6',
+          inspectionDate: new Date(),
+          expiryDate: undefined,
+          brand: '',
+          model: '',
+          plateNumber: '',
+          owner: '',
+          remarks: ''
+        });
+        setFiles({
+          frontImg: null,
+          backImg: null,
+          side1Img: null,
+          side2Img: null,
+          originalReceipt: null,
+          carRegistration: null,
+          pgpcInspection: null,
+        });
+        setPartsStructure({
+          rootFiles: [],
+          folders: []
+        });
+        
+        // No need to reset DOM form elements since we're using controlled inputs
+        
+        if (onSuccess) {
+          onSuccess();
+        }
+      } else {
+        // Handle different types of errors with appropriate toasts
+        if (result.validationError) {
+          toast.error(result.error);
+        } else if (result.authError) {
+          toast.error(result.error);
+        } else if (result.permissionError) {
+          toast.error(result.error);
+        } else if (result.dbError) {
+          toast.error(result.error);
+        } else {
+          toast.error(result.error || "Failed to create vehicle");
+        }
       }
     } catch (error) {
-      console.error("Form submission error:", error);
-      // Error will be handled by the mutation hook's toast
+      console.error("Unexpected form submission error:", error);
+      toast.error("An unexpected error occurred. Please try again.");
     }
   };
 
@@ -150,7 +212,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
   );
 
   return (
-    <form action={handleAction} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Tab Navigation - All Screen Sizes */}
       <div className={`w-full mb-6 ${isMobile ? 'grid grid-cols-4 bg-muted rounded-md p-1' : 'flex justify-center border-b'}`}>
         {isMobile ? (
@@ -239,6 +301,8 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                   <Input
                     id="brand"
                     name="brand"
+                    value={formData.brand}
+                    onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
                     required
                     placeholder="e.g. Toyota, Ford, Caterpillar"
                     className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
@@ -253,6 +317,8 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                   <Input
                     id="model"
                     name="model"
+                    value={formData.model}
+                    onChange={(e) => setFormData(prev => ({ ...prev, model: e.target.value }))}
                     required
                     placeholder="e.g. Hilux, F-150, 320D"
                     className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
@@ -284,6 +350,8 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                   <Input
                     id="plateNumber"
                     name="plateNumber"
+                    value={formData.plateNumber}
+                    onChange={(e) => setFormData(prev => ({ ...prev, plateNumber: e.target.value }))}
                     required
                     placeholder="e.g. ABC-1234"
                     className="font-mono transition-all duration-200 focus:ring-2 focus:ring-blue-500"
@@ -298,6 +366,8 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                   <Input
                     id="owner"
                     name="owner"
+                    value={formData.owner}
+                    onChange={(e) => setFormData(prev => ({ ...prev, owner: e.target.value }))}
                     required
                     placeholder="Owner name or company"
                     className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
@@ -311,11 +381,13 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                       <SelectValue placeholder="Select project" />
                     </SelectTrigger>
                     <SelectContent className="w-full max-h-[200px] overflow-y-auto">
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
+                      {projects
+                        .filter((project) => project.id && project.name)
+                        .map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -354,7 +426,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
               <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
                 <div className="space-y-2">
                   <Label>Last Inspection Date *</Label>
-                  <Popover>
+                  <Popover open={inspectionDateOpen} onOpenChange={setInspectionDateOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         type="button"
@@ -376,8 +448,19 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                       <Calendar
                         mode="single"
                         selected={formData.inspectionDate}
-                        onSelect={(date) => setFormData(prev => ({ ...prev, inspectionDate: date || new Date() }))}
+                        onSelect={(date) => {
+                          setFormData(prev => ({ ...prev, inspectionDate: date || new Date() }));
+                          setInspectionDateOpen(false); // Auto-close after selection
+                        }}
                         initialFocus
+                        captionLayout="dropdown-buttons"
+                        fromYear={1990}
+                        toYear={2030}
+                        classNames={{
+                          caption_dropdowns: "flex gap-2 justify-center",
+                          vhidden: "hidden",
+                          caption_label: "hidden"
+                        }}
                       />
                     </PopoverContent>
                   </Popover>
@@ -385,7 +468,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
 
                 <div className="space-y-2">
                   <Label>Next Inspection Due *</Label>
-                  <Popover>
+                  <Popover open={expiryDateOpen} onOpenChange={setExpiryDateOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         type="button"
@@ -407,8 +490,19 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                       <Calendar
                         mode="single"
                         selected={formData.expiryDate}
-                        onSelect={(date) => setFormData(prev => ({ ...prev, expiryDate: date }))}
+                        onSelect={(date) => {
+                          setFormData(prev => ({ ...prev, expiryDate: date }));
+                          setExpiryDateOpen(false); // Auto-close after selection
+                        }}
                         initialFocus
+                        captionLayout="dropdown-buttons"
+                        fromYear={1990}
+                        toYear={2050}
+                        classNames={{
+                          caption_dropdowns: "flex gap-2 justify-center",
+                          vhidden: "hidden",
+                          caption_label: "hidden"
+                        }}
                       />
                     </PopoverContent>
                   </Popover>
@@ -447,6 +541,8 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                 <Textarea
                   id="remarks"
                   name="remarks"
+                  value={formData.remarks}
+                  onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
                   rows={3}
                   placeholder="Enter any special notes, conditions, or important information about this vehicle..."
                   className="resize-none transition-all duration-200 focus:ring-2 focus:ring-blue-500"
@@ -588,7 +684,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
               </p>
             </CardHeader>
             <CardContent>
-              <PartsFolderManager 
+              <VehiclePartsFolderManager 
                 onChange={setPartsStructure}
                 initialData={partsStructure}
               />

@@ -318,9 +318,9 @@ export default function EquipmentsListModern() {
                     Projects
                   </div>
                   <div className="space-y-1">
-                    {projects?.map((project) => (
+                    {projects?.map((project, index) => (
                       <SelectItem
-                        key={project.uid}
+                        key={project.uid || `project-${index}`}
                         value={`project-${project.uid}`}
                       >
                         {project.name}
@@ -338,8 +338,8 @@ export default function EquipmentsListModern() {
                     {[...new Set(equipments?.map((e) => e.type))]
                       .filter(Boolean)
                       .sort()
-                      .map((type) => (
-                        <SelectItem key={`type-${type}`} value={`type-${type}`}>
+                      .map((type, index) => (
+                        <SelectItem key={`type-${type}-${index}`} value={`type-${type}`}>
                           {type}
                         </SelectItem>
                       ))}
@@ -355,8 +355,8 @@ export default function EquipmentsListModern() {
                     {[...new Set(equipments?.map((e) => e.owner))]
                       .filter(Boolean)
                       .sort()
-                      .map((owner) => (
-                        <SelectItem key={`owner-${owner}`} value={`owner-${owner}`}>
+                      .map((owner, index) => (
+                        <SelectItem key={`owner-${owner}-${index}`} value={`owner-${owner}`}>
                           {owner}
                         </SelectItem>
                       ))}
@@ -678,12 +678,12 @@ export default function EquipmentsListModern() {
             </Card>
           </div>
         ) : (
-          paginatedEquipments.map((equipment) => {
+          paginatedEquipments.map((equipment, index) => {
             const daysUntilExpiry = getDaysUntilExpiry(equipment.insuranceExpirationDate);
             
             return (
               <Card
-                key={equipment.uid}
+                key={equipment.uid || `equipment-${index}`}
                 className="hover:shadow-lg transition-shadow cursor-pointer relative"
                 onClick={() => handleEquipmentClick(equipment)}
               >

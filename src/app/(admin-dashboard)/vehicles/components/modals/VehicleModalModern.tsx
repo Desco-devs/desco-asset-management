@@ -82,6 +82,7 @@ interface Vehicle {
 }
 import EditVehicleModalModern from "./EditVehicleModalModern";
 import VehicleMaintenanceReportsEnhanced from "../VehicleMaintenanceReportsEnhanced";
+import VehiclePartsViewer from "../VehiclePartsViewer";
 
 export default function VehicleModalModern() {
   // Server state from TanStack Query
@@ -1006,6 +1007,9 @@ export default function VehicleModalModern() {
                   />
                 </CardContent>
               </Card>
+
+              {/* Vehicle Parts Viewer */}
+              <VehiclePartsViewer vehicleParts={selectedVehicle.vehicle_parts} />
             </div>
           )}
         </div>

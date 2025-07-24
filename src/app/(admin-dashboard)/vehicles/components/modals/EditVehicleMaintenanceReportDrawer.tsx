@@ -29,37 +29,40 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import {
-  useCreateEquipmentMaintenanceReport,
-  useEquipmentsWithReferenceData,
-} from "@/hooks/useEquipmentsQuery";
-import { useEquipmentsStore, selectIsMobile } from "@/stores/equipmentsStore";
-import { Plus, Trash2, X, Settings, Camera, FileText, Upload, MapPin, Calendar, Clock, Wrench } from "lucide-react";
-import { useState, useCallback } from "react";
+  useUpdateMaintenanceReport,
+  useVehiclesWithReferenceData,
+} from "@/hooks/useVehiclesQuery";
+import { useVehiclesStore, selectIsMobile } from "@/stores/vehiclesStore";
+import { Plus, Trash2, X, Settings, Camera, FileText, Upload, MapPin, Calendar, Clock, Wrench, Loader2 } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase";
 
-interface CreateEquipmentMaintenanceReportModalProps {
-  equipmentId: string;
-}
-
-export default function CreateEquipmentMaintenanceReportModal({
-  equipmentId,
-}: CreateEquipmentMaintenanceReportModalProps) {
-  // State from Zustand (following proper Next.js pattern)
-  const isOpen = useEquipmentsStore((state) => state.isEquipmentMaintenanceModalOpen);
-  const isMobile = useEquipmentsStore(selectIsMobile);
-  const { setIsEquipmentMaintenanceModalOpen, setIsModalOpen } = useEquipmentsStore();
+export default function EditVehicleMaintenanceReportDrawer() {
+  // State from Zustand
+  const isOpen = useVehiclesStore((state) => state.isEditMaintenanceReportDrawerOpen);
+  const isMobile = useVehiclesStore(selectIsMobile);
+  const selectedReport = useVehiclesStore((state) => state.selectedMaintenanceReportForEdit);
+  const { 
+    setIsEditMaintenanceReportDrawerOpen, 
+    setSelectedMaintenanceReportForEdit,
+    setIsMaintenanceReportDetailOpen,
+    setSelectedMaintenanceReportForDetail,
+    setIsModalOpen
+  } = useVehiclesStore();
 
   // Server state from TanStack Query
-  const { locations } = useEquipmentsWithReferenceData();
-  const createMaintenanceReportMutation = useCreateEquipmentMaintenanceReport();
+  const { locations } = useVehiclesWithReferenceData();
+  const updateMaintenanceReportMutation = useUpdateMaintenanceReport();
 
-  // Local form state (client state)
+  // Local form state
   const [activeTab, setActiveTab] = useState<'details' | 'parts' | 'attachments'>('details');
   
   // Stable tab change handler
   const handleTabChange = useCallback((tab: 'details' | 'parts' | 'attachments') => {
     setActiveTab(tab);
   }, []);
+
   const [formData, setFormData] = useState({
     issue_description: "",
     remarks: "",
@@ -74,14 +77,56 @@ export default function CreateEquipmentMaintenanceReportModal({
   });
   const [partsFiles, setPartsFiles] = useState<File[]>([]);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [removedPartImages, setRemovedPartImages] = useState<number[]>([]);
+  const [removedAttachments, setRemovedAttachments] = useState<number[]>([]);
 
-  // Stable event handlers using useCallback (proper Next.js pattern)
+  // Populate form data when selectedReport changes
+  useEffect(() => {
+    if (selectedReport) {
+      console.log('🔍 Populating form with selectedReport:', selectedReport);
+      console.log('📍 Available locations:', locations);
+      
+      // Find the location to verify it exists
+      const selectedLocation = locations.find(loc => loc.uid === selectedReport.location_id);
+      console.log('🔍 Selected location found:', selectedLocation);
+      
+      setFormData({
+        issue_description: selectedReport.issue_description || "",
+        remarks: selectedReport.remarks || "",
+        inspection_details: selectedReport.inspection_details || "",
+        action_taken: selectedReport.action_taken || "",
+        priority: selectedReport.priority || "MEDIUM",
+        status: selectedReport.status || "REPORTED",
+        downtime_hours: selectedReport.downtime_hours?.toString() || "",
+        location_id: selectedReport.location_id || "",
+        parts_replaced: selectedReport.parts_replaced && selectedReport.parts_replaced.length > 0 
+          ? selectedReport.parts_replaced.filter(part => part && part.trim() !== "")
+          : [],
+        attachment_urls: selectedReport.attachment_urls && selectedReport.attachment_urls.length > 0 
+          ? selectedReport.attachment_urls.filter(url => url && url.trim() !== "")
+          : [],
+      });
+      
+      console.log('📝 Form data populated:', {
+        location_id: selectedReport.location_id,
+        location_exists: !!selectedLocation,
+        parts_replaced: selectedReport.parts_replaced,
+        attachment_urls: selectedReport.attachment_urls
+      });
+    }
+  }, [selectedReport, locations]);
+
+  // Stable event handlers using useCallback
   const handleClose = useCallback(() => {
-    setIsEquipmentMaintenanceModalOpen(false);
+    setIsEditMaintenanceReportDrawerOpen(false);
+    const reportToReturn = selectedReport; // Store before clearing
+    setSelectedMaintenanceReportForEdit(null);
     // Reset form state
     setActiveTab('details');
     setPartsFiles([]);
     setAttachmentFiles([]);
+    setRemovedPartImages([]);
+    setRemovedAttachments([]);
     setFormData({
       issue_description: "",
       remarks: "",
@@ -94,9 +139,48 @@ export default function CreateEquipmentMaintenanceReportModal({
       parts_replaced: [""],
       attachment_urls: [""],
     });
-    // Return to detail drawer
-    setIsModalOpen(true);
-  }, [setIsEquipmentMaintenanceModalOpen, setIsModalOpen]);
+    // Reopen maintenance report detail drawer (user came from there)
+    if (reportToReturn) {
+      setSelectedMaintenanceReportForDetail(reportToReturn);
+      setIsMaintenanceReportDetailOpen(true);
+    } else {
+      // Fallback to vehicle modal if no report
+      setIsModalOpen(true);
+    }
+  }, [setIsEditMaintenanceReportDrawerOpen, selectedReport, setSelectedMaintenanceReportForDetail, setIsMaintenanceReportDetailOpen, setIsModalOpen]);
+
+  const handleSaveAndViewDetails = useCallback((updatedReport?: any) => {
+    // Use the updated report if provided, otherwise use selected report
+    const reportToShow = updatedReport || selectedReport;
+    if (reportToShow) {
+      // Set the updated report for detail view
+      setSelectedMaintenanceReportForDetail(reportToShow);
+      setIsMaintenanceReportDetailOpen(true);
+      // Close edit drawer (this will also close vehicle modal via handleClose)
+      setIsEditMaintenanceReportDrawerOpen(false);
+      setSelectedMaintenanceReportForEdit(null);
+      // Reset form state
+      setActiveTab('details');
+      setPartsFiles([]);
+      setAttachmentFiles([]);
+      setRemovedPartImages([]);
+      setRemovedAttachments([]);
+      setFormData({
+        issue_description: "",
+        remarks: "",
+        inspection_details: "",
+        action_taken: "",
+        priority: "MEDIUM",
+        status: "REPORTED",
+        downtime_hours: "",
+        location_id: "",
+        parts_replaced: [""],
+        attachment_urls: [""],
+      });
+      // Vehicle modal stays closed since we're opening detail drawer
+      // (Detail drawer will handle reopening vehicle modal when it closes)
+    }
+  }, [selectedReport, setSelectedMaintenanceReportForDetail, setIsMaintenanceReportDetailOpen, setIsEditMaintenanceReportDrawerOpen, setSelectedMaintenanceReportForEdit, setPartsFiles, setAttachmentFiles, setFormData, setActiveTab]);
 
   const handleInputChange = useCallback((field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -113,60 +197,122 @@ export default function CreateEquipmentMaintenanceReportModal({
     }));
   }, []);
 
-  const addArrayItem = useCallback((field: "parts_replaced" | "attachment_urls") => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: [...prev[field], ""],
-    }));
-  }, []);
+  // File upload helper function  
+  const uploadFileToSupabase = useCallback(async (file: File, prefix: string): Promise<string> => {
+    const supabase = createClient();
+    const timestamp = Date.now();
+    const ext = file.name.split('.').pop();
+    const filename = `${prefix}_${timestamp}.${ext}`;
+    
+    // Create a simple folder structure for maintenance reports
+    const vehicleId = selectedReport?.vehicle_id || 'unknown';
+    const filepath = `vehicles/maintenance-reports/${vehicleId}/${filename}`;
+    
+    const buffer = await file.arrayBuffer();
+    const { data: uploadData, error: uploadErr } = await supabase.storage
+      .from('vehicles')
+      .upload(filepath, buffer, { cacheControl: '3600', upsert: false });
 
-  const removeArrayItem = useCallback((
-    field: "parts_replaced" | "attachment_urls",
-    index: number
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: prev[field].filter((_, i) => i !== index),
-    }));
-  }, []);
+    if (uploadErr || !uploadData) {
+      throw new Error(`Upload failed: ${uploadErr?.message}`);
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('vehicles')
+      .getPublicUrl(uploadData.path);
+
+    return urlData.publicUrl;
+  }, [selectedReport?.vehicle_id]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!selectedReport) {
+      toast.error("No report selected for editing");
+      return;
+    }
 
     if (!formData.issue_description.trim()) {
       toast.error("Issue description is required");
       return;
     }
 
-    const filteredPartsReplaced = formData.parts_replaced.filter(
-      (part) => part.trim() !== ""
-    );
-    const filteredAttachmentUrls = formData.attachment_urls.filter(
-      (url) => url.trim() !== ""
-    );
-
-    const reportData = {
-      equipment_id: equipmentId,
-      issue_description: formData.issue_description,
-      remarks: formData.remarks || undefined,
-      inspection_details: formData.inspection_details || undefined,
-      action_taken: formData.action_taken || undefined,
-      priority: formData.priority,
-      status: formData.status,
-      downtime_hours: formData.downtime_hours || undefined,
-      location_id: formData.location_id || undefined,
-      parts_replaced: filteredPartsReplaced,
-      attachment_urls: filteredAttachmentUrls,
-      date_reported: new Date().toISOString(),
-    };
-
     try {
-      await createMaintenanceReportMutation.mutateAsync(reportData);
-      handleClose();
+      // Step 1: Upload new files first
+      const uploadedUrls: string[] = [...formData.attachment_urls];
+      
+      // Upload parts files and replace URLs
+      for (let i = 0; i < partsFiles.length; i++) {
+        const file = partsFiles[i];
+        if (file) {
+          try {
+            const uploadedUrl = await uploadFileToSupabase(file, `part_${i}`);
+            uploadedUrls[i] = uploadedUrl;
+          } catch (uploadError) {
+            console.error(`Error uploading part ${i + 1} image:`, uploadError);
+            toast.error(`Failed to upload part ${i + 1} image`);
+            return; // Stop if upload fails
+          }
+        }
+      }
+
+      // Upload attachment files
+      for (let i = 0; i < attachmentFiles.length; i++) {
+        const file = attachmentFiles[i];
+        if (file) {
+          try {
+            const uploadedUrl = await uploadFileToSupabase(file, `attachment_${i}`);
+            // Find the next available slot or append
+            const attachmentIndex = partsFiles.length + i;
+            uploadedUrls[attachmentIndex] = uploadedUrl;
+          } catch (uploadError) {
+            console.error(`Error uploading attachment ${i + 1}:`, uploadError);
+            toast.error(`Failed to upload attachment ${i + 1}`);
+            return; // Stop if upload fails
+          }
+        }
+      }
+
+      // Step 2: Filter out empty parts, removed images, and attachment URLs
+      const filteredPartsReplaced = formData.parts_replaced.filter(
+        (part, index) => part.trim() !== "" && !removedPartImages.includes(index)
+      );
+      
+      // Filter attachment URLs, excluding removed ones
+      const filteredAttachmentUrls = uploadedUrls.filter(
+        (url, index) => url && url.trim() !== "" && !removedAttachments.includes(index)
+      );
+
+      // Step 3: Update the maintenance report with new data
+      const reportData = {
+        id: selectedReport.id,
+        vehicle_id: selectedReport.vehicle_id,
+        issue_description: formData.issue_description,
+        remarks: formData.remarks || undefined,
+        inspection_details: formData.inspection_details || undefined,
+        action_taken: formData.action_taken || undefined,
+        priority: formData.priority,
+        status: formData.status,
+        downtime_hours: formData.downtime_hours || undefined,
+        // location_id is required in schema, fallback to existing value if empty
+        location_id: formData.location_id || selectedReport.location_id,
+        parts_replaced: filteredPartsReplaced,
+        attachment_urls: filteredAttachmentUrls,
+        date_repaired: formData.status === "COMPLETED" && !selectedReport.date_repaired 
+          ? new Date().toISOString() 
+          : selectedReport.date_repaired,
+      };
+
+      // Debug: Log the data being sent
+      console.log("Sending report data with uploaded URLs:", reportData);
+
+      const updatedReport = await updateMaintenanceReportMutation.mutateAsync(reportData);
+      handleSaveAndViewDetails(updatedReport);
     } catch (error) {
-      console.error("Error creating maintenance report:", error);
+      console.error("Error updating maintenance report:", error);
+      toast.error("Failed to update maintenance report");
     }
-  }, [formData, equipmentId, createMaintenanceReportMutation, handleClose]);
+  }, [formData, selectedReport, updateMaintenanceReportMutation, handleSaveAndViewDetails, partsFiles, attachmentFiles, uploadFileToSupabase]);
 
   // Stable tab button renderer
   const renderTabButton = useCallback((tab: 'details' | 'parts' | 'attachments', label: string, icon: React.ReactNode) => (
@@ -182,7 +328,7 @@ export default function CreateEquipmentMaintenanceReportModal({
     </Button>
   ), [activeTab, handleTabChange]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !selectedReport) return null;
 
   // Mobile: Drawer pattern
   if (isMobile) {
@@ -196,7 +342,7 @@ export default function CreateEquipmentMaintenanceReportModal({
               </Button>
             </DrawerClose>
             <DrawerTitle className="text-xl font-bold">
-              Create Equipment Maintenance Report
+              Edit Vehicle Maintenance Report
             </DrawerTitle>
           </DrawerHeader>
           <div className="flex-1 overflow-y-auto p-4">
@@ -219,7 +365,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                         Issue Information
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        Describe the maintenance issue or task details
+                        Update the maintenance issue or task details
                       </p>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -372,7 +518,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                       Parts Replaced
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Upload images and details of parts that were replaced during maintenance
+                      Update images and details of parts that were replaced during maintenance
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -381,17 +527,23 @@ export default function CreateEquipmentMaintenanceReportModal({
                         <FileUploadSectionSimple
                           label={`Part ${index + 1} Image`}
                           accept="image/*"
+                          currentFileUrl={removedPartImages.includes(index) ? null : (selectedReport?.attachment_urls?.[index] || null)}
                           onFileChange={(file) => {
                             const newFiles = [...partsFiles];
                             if (file) {
                               newFiles[index] = file;
+                              // Remove from removed list if re-adding
+                              setRemovedPartImages(prev => prev.filter(i => i !== index));
                             } else {
-                              newFiles.splice(index, 1);
+                              // Mark as removed instead of deleting
+                              setRemovedPartImages(prev => [...prev, index]);
+                              newFiles[index] = undefined as any;
                             }
                             setPartsFiles(newFiles);
                           }}
                           onKeepExistingChange={() => {}}
                           required={false}
+                          hideChangeButton={true}
                         />
                         <div className="flex gap-2">
                           <Input
@@ -400,30 +552,9 @@ export default function CreateEquipmentMaintenanceReportModal({
                             placeholder="Part name or description..."
                             className="flex-1"
                           />
-                          {formData.parts_replaced.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeArrayItem("parts_replaced", index)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
                         </div>
                       </div>
                     ))}
-                    <div className="flex justify-center">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => addArrayItem("parts_replaced")}
-                        className="flex items-center gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add Another Part
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -437,7 +568,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                       Attachments & Images
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Upload additional images, documents, or reference materials for this maintenance report
+                      Update additional images, documents, or reference materials for this maintenance report
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -446,17 +577,23 @@ export default function CreateEquipmentMaintenanceReportModal({
                         <FileUploadSectionSimple
                           label={`Attachment ${index + 1}`}
                           accept="image/*,application/pdf,.doc,.docx"
+                          currentFileUrl={removedAttachments.includes(index) ? null : (url || null)}
                           onFileChange={(file) => {
                             const newFiles = [...attachmentFiles];
                             if (file) {
                               newFiles[index] = file;
+                              // Remove from removed list if re-adding
+                              setRemovedAttachments(prev => prev.filter(i => i !== index));
                             } else {
-                              newFiles.splice(index, 1);
+                              // Mark as removed instead of deleting
+                              setRemovedAttachments(prev => [...prev, index]);
+                              newFiles[index] = undefined as any;
                             }
                             setAttachmentFiles(newFiles);
                           }}
                           onKeepExistingChange={() => {}}
                           required={false}
+                          hideChangeButton={true}
                         />
                         <div className="flex gap-2">
                           <Input
@@ -466,30 +603,9 @@ export default function CreateEquipmentMaintenanceReportModal({
                             type="url"
                             className="flex-1"
                           />
-                          {formData.attachment_urls.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeArrayItem("attachment_urls", index)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
                         </div>
                       </div>
                     ))}
-                    <div className="flex justify-center">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => addArrayItem("attachment_urls")}
-                        className="flex items-center gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add Another Attachment
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -503,10 +619,17 @@ export default function CreateEquipmentMaintenanceReportModal({
               <Button
                 type="button"
                 onClick={handleSubmit}
-                disabled={createMaintenanceReportMutation.isPending}
+                disabled={updateMaintenanceReportMutation.isPending}
                 className="flex-1"
               >
-                {createMaintenanceReportMutation.isPending ? "Creating..." : "Create Report"}
+                {updateMaintenanceReportMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Updating...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
               </Button>
             </div>
           </DrawerFooter>
@@ -515,7 +638,7 @@ export default function CreateEquipmentMaintenanceReportModal({
     );
   }
 
-  // Desktop: Dialog pattern  
+  // Desktop: Dialog pattern
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent 
@@ -523,9 +646,9 @@ export default function CreateEquipmentMaintenanceReportModal({
         style={{ maxWidth: '55vw', width: '55vw' }}
       >
         <DialogHeader className="flex-shrink-0 pb-4">
-          <DialogTitle className="text-xl">Create Equipment Maintenance Report</DialogTitle>
+          <DialogTitle className="text-xl">Edit Vehicle Maintenance Report</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Record maintenance activities, parts replacement, and equipment status updates
+            Update vehicle maintenance report details, parts replacement, and attachments
           </p>
         </DialogHeader>
         
@@ -703,7 +826,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                   Parts Replaced
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Upload images and details of parts that were replaced during maintenance
+                  Update images and details of parts that were replaced during maintenance
                 </p>
               </div>
               {formData.parts_replaced.map((part, index) => (
@@ -711,17 +834,23 @@ export default function CreateEquipmentMaintenanceReportModal({
                   <FileUploadSectionSimple
                     label={`Part ${index + 1} Image`}
                     accept="image/*"
+                    currentFileUrl={removedPartImages.includes(index) ? null : (selectedReport?.attachment_urls?.[index] || null)}
                     onFileChange={(file) => {
                       const newFiles = [...partsFiles];
                       if (file) {
                         newFiles[index] = file;
+                        // Remove from removed list if re-adding
+                        setRemovedPartImages(prev => prev.filter(i => i !== index));
                       } else {
-                        newFiles.splice(index, 1);
+                        // Mark as removed instead of deleting
+                        setRemovedPartImages(prev => [...prev, index]);
+                        newFiles[index] = undefined as any;
                       }
                       setPartsFiles(newFiles);
                     }}
                     onKeepExistingChange={() => {}}
                     required={false}
+                    hideChangeButton={true}
                   />
                   <div className="flex gap-2">
                     <Input
@@ -730,30 +859,9 @@ export default function CreateEquipmentMaintenanceReportModal({
                       placeholder="Part name or description..."
                       className="flex-1"
                     />
-                    {formData.parts_replaced.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeArrayItem("parts_replaced", index)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
                   </div>
                 </div>
               ))}
-              <div className="flex justify-center">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => addArrayItem("parts_replaced")}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Another Part
-                </Button>
-              </div>
             </div>
           )}
 
@@ -766,7 +874,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                   Attachments & Images
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Upload additional images, documents, or reference materials for this maintenance report
+                  Update additional images, documents, or reference materials for this maintenance report
                 </p>
               </div>
               {formData.attachment_urls.map((url, index) => (
@@ -774,17 +882,23 @@ export default function CreateEquipmentMaintenanceReportModal({
                   <FileUploadSectionSimple
                     label={`Attachment ${index + 1}`}
                     accept="image/*,application/pdf,.doc,.docx"
+                    currentFileUrl={removedAttachments.includes(index) ? null : (url || null)}
                     onFileChange={(file) => {
                       const newFiles = [...attachmentFiles];
                       if (file) {
                         newFiles[index] = file;
+                        // Remove from removed list if re-adding
+                        setRemovedAttachments(prev => prev.filter(i => i !== index));
                       } else {
-                        newFiles.splice(index, 1);
+                        // Mark as removed instead of deleting
+                        setRemovedAttachments(prev => [...prev, index]);
+                        newFiles[index] = undefined as any;
                       }
                       setAttachmentFiles(newFiles);
                     }}
                     onKeepExistingChange={() => {}}
                     required={false}
+                    hideChangeButton={true}
                   />
                   <div className="flex gap-2">
                     <Input
@@ -794,32 +908,12 @@ export default function CreateEquipmentMaintenanceReportModal({
                       type="url"
                       className="flex-1"
                     />
-                    {formData.attachment_urls.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeArrayItem("attachment_urls", index)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
                   </div>
                 </div>
               ))}
-              <div className="flex justify-center">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => addArrayItem("attachment_urls")}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Another Attachment
-                </Button>
-              </div>
             </div>
           )}
+
             </div>
           </div>
         </div>
@@ -833,10 +927,17 @@ export default function CreateEquipmentMaintenanceReportModal({
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={createMaintenanceReportMutation.isPending}
+              disabled={updateMaintenanceReportMutation.isPending}
               size="lg"
             >
-              {createMaintenanceReportMutation.isPending ? "Creating..." : "Create Report"}
+              {updateMaintenanceReportMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Updating...
+                </>
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </div>
         </DialogFooter>

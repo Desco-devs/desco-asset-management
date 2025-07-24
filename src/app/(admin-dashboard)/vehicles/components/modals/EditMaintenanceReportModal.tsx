@@ -202,7 +202,7 @@ export default function EditMaintenanceReportModal() {
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>
               <SelectContent>
-                {locations.map((location) => (
+                {locations.filter(location => location.id).map((location) => (
                   <SelectItem key={location.id} value={location.id}>
                     {location.address}
                   </SelectItem>

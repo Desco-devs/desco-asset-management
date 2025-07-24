@@ -11,13 +11,13 @@ export const vehicleKeys = {
   all: ['vehicles'] as const,
   vehicles: () => [...vehicleKeys.all, 'list'] as const,
   vehicle: (id: string) => [...vehicleKeys.all, 'item', id] as const,
-  projects: () => ['projects'] as const,
-  clients: () => ['clients'] as const,
-  locations: () => ['locations'] as const,
-  users: () => ['users'] as const,
-  maintenanceReports: () => ['maintenance-reports'] as const,
+  projects: () => ['vehicle-projects'] as const, // Unique key to avoid cache conflicts with equipment
+  clients: () => ['vehicle-clients'] as const,
+  locations: () => ['vehicle-locations'] as const,
+  users: () => ['vehicle-users'] as const,
+  maintenanceReports: () => ['vehicle-maintenance-reports'] as const,
   vehicleMaintenanceReports: (vehicleId: string) => [...vehicleKeys.all, 'maintenance', vehicleId] as const,
-  exports: () => ['exports'] as const,
+  exports: () => ['vehicle-exports'] as const,
 };
 
 // API functions

@@ -153,7 +153,7 @@ export function FileUploadSectionSimple({
 
   const isImage = accept.includes("image");
   const hasFile = selectedFile || (keepExisting && currentFileUrl);
-  const showPreview = Boolean(preview);
+  const showPreview = Boolean(preview && preview.trim() !== "");
   
   
   
@@ -188,7 +188,7 @@ export function FileUploadSectionSimple({
           e.nativeEvent.stopImmediatePropagation();
         }}
       >
-        {showPreview ? (
+        {showPreview && preview ? (
           <div className="space-y-2">
             {isImage ? (
               <div className="relative w-full max-w-[200px] mx-auto group">
@@ -200,11 +200,15 @@ export function FileUploadSectionSimple({
                   }}
                 >
                   <Image
-                    src={preview || ""}
+                    src={preview}
                     alt={label}
                     width={200}
                     height={200}
                     className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
+                    onError={(e) => {
+                      console.error('Image failed to load:', preview);
+                      setPreview(null);
+                    }}
                   />
                   <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
                     <Eye className="h-6 w-6 text-white" />

@@ -18,8 +18,8 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { useEquipmentsStore, selectIsMobile } from "@/stores/equipmentsStore";
-import { useDeleteEquipmentMaintenanceReport } from "@/hooks/useEquipmentsQuery";
+import { useVehiclesStore, selectIsMobile } from "@/stores/vehiclesStore";
+import { useDeleteMaintenanceReport } from "@/hooks/useVehiclesQuery";
 import {
   Calendar,
   Clock,
@@ -39,19 +39,19 @@ import Image from "next/image";
 
 export default function MaintenanceReportDetailDrawer() {
   // State from Zustand
-  const isMobile = useEquipmentsStore(selectIsMobile);
-  const selectedReport = useEquipmentsStore((state) => state.selectedMaintenanceReportForDetail);
-  const isOpen = useEquipmentsStore((state) => state.isMaintenanceReportDetailOpen);
+  const isMobile = useVehiclesStore(selectIsMobile);
+  const selectedReport = useVehiclesStore((state) => state.selectedMaintenanceReportForDetail);
+  const isOpen = useVehiclesStore((state) => state.isMaintenanceReportDetailOpen);
   const { 
     setIsMaintenanceReportDetailOpen, 
     setSelectedMaintenanceReportForDetail,
     setSelectedMaintenanceReportForEdit,
     setIsEditMaintenanceReportDrawerOpen,
     setIsModalOpen 
-  } = useEquipmentsStore();
+  } = useVehiclesStore();
 
   // Server state
-  const deleteMaintenanceReportMutation = useDeleteEquipmentMaintenanceReport();
+  const deleteMaintenanceReportMutation = useDeleteMaintenanceReport();
   
   // Local state for delete confirmation, tab navigation and image viewer
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -73,7 +73,7 @@ export default function MaintenanceReportDetailDrawer() {
   const handleClose = useCallback(() => {
     setIsMaintenanceReportDetailOpen(false);
     setSelectedMaintenanceReportForDetail(null);
-    // Reopen equipment modal after closing detail drawer
+    // Reopen vehicle modal after closing detail drawer
     setIsModalOpen(true);
   }, [setIsMaintenanceReportDetailOpen, setSelectedMaintenanceReportForDetail, setIsModalOpen]);
 
@@ -85,7 +85,7 @@ export default function MaintenanceReportDetailDrawer() {
     // Close this drawer
     setIsMaintenanceReportDetailOpen(false);
     setSelectedMaintenanceReportForDetail(null);
-    // Close equipment modal to prevent navigation conflicts (same as opening detail from main modal)
+    // Close vehicle modal to prevent navigation conflicts (same as opening detail from main modal)
     setIsModalOpen(false);
   }, [selectedReport, setSelectedMaintenanceReportForEdit, setIsEditMaintenanceReportDrawerOpen, setIsMaintenanceReportDetailOpen, setSelectedMaintenanceReportForDetail, setIsModalOpen]);
 
@@ -99,7 +99,7 @@ export default function MaintenanceReportDetailDrawer() {
     try {
       await deleteMaintenanceReportMutation.mutateAsync(selectedReport.id);
       setShowDeleteConfirmation(false);
-      // Close this drawer and reopen equipment modal
+      // Close this drawer and reopen vehicle modal
       setIsMaintenanceReportDetailOpen(false);
       setSelectedMaintenanceReportForDetail(null);
       setIsModalOpen(true);

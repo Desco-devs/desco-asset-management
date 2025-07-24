@@ -31,6 +31,7 @@ export interface MaintenanceAlert {
   nextMaintenance?: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
   message: string;
+  alertType?: 'active_maintenance' | 'non_operational' | 'overdue' | 'insurance_expiry';
 }
 
 interface DashboardState {
@@ -44,7 +45,6 @@ interface DashboardState {
   // Client-side UI state
   selectedTimeRange: 'week' | 'month' | 'year';
   alertsExpanded: boolean;
-  quickActionsExpanded: boolean;
   selectedAssetType: 'all' | 'equipment' | 'vehicles';
   
   // Loading states
@@ -68,7 +68,6 @@ interface DashboardState {
   // Client state actions
   setSelectedTimeRange: (range: 'week' | 'month' | 'year') => void;
   toggleAlertsExpanded: () => void;
-  toggleQuickActionsExpanded: () => void;
   setSelectedAssetType: (type: 'all' | 'equipment' | 'vehicles') => void;
   setLoadingRealtime: (loading: boolean) => void;
   
@@ -90,7 +89,6 @@ const initialState = {
   maintenanceAlerts: [],
   selectedTimeRange: 'month' as const,
   alertsExpanded: true,
-  quickActionsExpanded: false,
   selectedAssetType: 'all' as const,
   isLoadingRealtime: false,
   lastUpdated: null,
@@ -197,9 +195,6 @@ export const useDashboardStore = create<DashboardState>()(
       toggleAlertsExpanded: () =>
         set((state) => ({ alertsExpanded: !state.alertsExpanded }), false, 'toggleAlertsExpanded'),
       
-      toggleQuickActionsExpanded: () =>
-        set((state) => ({ quickActionsExpanded: !state.quickActionsExpanded }), false, 'toggleQuickActionsExpanded'),
-      
       setSelectedAssetType: (type) =>
         set({ selectedAssetType: type }, false, 'setSelectedAssetType'),
       
@@ -254,7 +249,6 @@ export const useMaintenanceAlerts = () => useDashboardStore(state => state.maint
 export const useSelectedTimeRange = () => useDashboardStore(state => state.selectedTimeRange);
 export const useSelectedAssetType = () => useDashboardStore(state => state.selectedAssetType);
 export const useAlertsExpanded = () => useDashboardStore(state => state.alertsExpanded);
-export const useQuickActionsExpanded = () => useDashboardStore(state => state.quickActionsExpanded);
 export const useIsLoadingRealtime = () => useDashboardStore(state => state.isLoadingRealtime);
 export const useLastUpdated = () => useDashboardStore(state => state.lastUpdated);
 

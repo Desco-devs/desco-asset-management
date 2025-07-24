@@ -307,7 +307,7 @@ export default function VehiclesListModern() {
                     Projects
                   </div>
                   <div className="space-y-1">
-                    {projects?.map((project) => (
+                    {projects?.filter(project => project.id).map((project) => (
                       <SelectItem
                         key={project.id}
                         value={`project-${project.id}`}
@@ -327,8 +327,8 @@ export default function VehiclesListModern() {
                     {[...new Set(vehicles?.map((v) => v.type))]
                       .filter(Boolean)
                       .sort()
-                      .map((type) => (
-                        <SelectItem key={type} value={`type-${type}`}>
+                      .map((type, index) => (
+                        <SelectItem key={`type-${type}-${index}`} value={`type-${type}`}>
                           {type}
                         </SelectItem>
                       ))}
@@ -344,8 +344,8 @@ export default function VehiclesListModern() {
                     {[...new Set(vehicles?.map((v) => v.owner))]
                       .filter(Boolean)
                       .sort()
-                      .map((owner) => (
-                        <SelectItem key={owner} value={`owner-${owner}`}>
+                      .map((owner, index) => (
+                        <SelectItem key={`owner-${owner}-${index}`} value={`owner-${owner}`}>
                           {owner}
                         </SelectItem>
                       ))}
@@ -693,7 +693,7 @@ export default function VehiclesListModern() {
             </Card>
           </div>
         ) : (
-          paginatedVehicles.map((vehicle) => (
+          paginatedVehicles.filter(vehicle => vehicle.id).map((vehicle) => (
             <Card
               key={vehicle.id}
               className="hover:shadow-lg transition-shadow cursor-pointer relative"
@@ -886,7 +886,7 @@ export default function VehiclesListModern() {
       <ExportDialog
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
-        vehicles={vehicles.map((v) => ({
+        vehicles={vehicles.filter(v => v.id).map((v) => ({
           id: v.id,
           brand: v.brand,
           model: v.model,

@@ -12,14 +12,9 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 
 // Import new components
 import { OverviewStatsGrid } from "./stats/OverviewStatsGrid";
-import {
-  EquipmentStatusChart,
-  VehicleStatusChart,
-  CombinedAssetStatusChart,
-} from "./charts/AssetStatusChart";
+import { ChartsSection } from "./charts/ChartsSection";
 import { MaintenanceAlertsPanel } from "./alerts/MaintenanceAlertsPanel";
 import { RecentActivityFeed } from "./activity/RecentActivityFeed";
-import { QuickActionsGrid } from "./actions/QuickActionsGrid";
 
 function DashboardSkeleton() {
   return (
@@ -49,31 +44,32 @@ function DashboardSkeleton() {
       </div>
 
       {/* Charts and Activities Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-5 w-32" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-[200px] w-full" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-5 w-40" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-[300px] w-full" />
-            </CardContent>
-          </Card>
+      <div className="space-y-6">
+        {/* Charts Section Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-5 w-32" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-[200px] w-full" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
+        
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[300px] w-full" />
+          </CardContent>
+        </Card>
 
-        <div className="space-y-6">
+        {/* Activity & Alerts Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {Array.from({ length: 2 }).map((_, i) => (
             <Card key={i}>
               <CardHeader>
@@ -152,58 +148,48 @@ function DashboardContent() {
   console.log("✅ Dashboard showing content");
 
   return (
-    <div className="min-h-screen py-6 px-6 space-y-6">
+    <div className="min-h-screen py-4 px-4 sm:py-6 sm:px-6 space-y-4 sm:space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome to your admin dashboard. Monitor and manage your fleet
-            operations.
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-left">
+            Operations Dashboard
+          </h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 text-left">
+            Monitor and manage your energy service operations
           </p>
         </div>
-        <Button
-          onClick={manualRefresh}
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          disabled={isFetching}
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
-          />
-          {isFetching ? "Refreshing..." : "Refresh Data"}
-        </Button>
+        <div className="flex justify-start sm:justify-end">
+          <Button
+            onClick={manualRefresh}
+            variant="outline"
+            size="sm"
+            className="gap-2 min-h-[44px] px-4"
+            disabled={isFetching}
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+            />
+            <span className="hidden sm:inline">
+              {isFetching ? "Refreshing..." : "Refresh Data"}
+            </span>
+            <span className="sm:hidden">
+              {isFetching ? "Refreshing" : "Refresh"}
+            </span>
+          </Button>
+        </div>
       </div>
 
       {/* Overview Statistics */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Overview</h2>
-        <OverviewStatsGrid />
-      </div>
+      <OverviewStatsGrid />
 
-      {/* Main Dashboard Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Charts and Actions */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Status Charts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <EquipmentStatusChart />
-            <VehicleStatusChart />
-          </div>
+      {/* Main Content - Mobile First Layout */}
+      <div className="space-y-4 lg:space-y-6">
+        {/* Charts Section */}
+        <ChartsSection />
 
-          {/* Combined Assets Overview */}
-          <CombinedAssetStatusChart
-            title="Fleet Assets Overview"
-            className="w-full"
-          />
-
-          {/* Quick Actions */}
-          <QuickActionsGrid />
-        </div>
-
-        {/* Right Column - Activity & Alerts */}
-        <div className="space-y-6">
+        {/* Activity & Alerts - Full width layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           <MaintenanceAlertsPanel />
           <RecentActivityFeed />
         </div>

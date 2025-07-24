@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -436,7 +437,7 @@ export default function EquipmentModalModern() {
                 <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
+                      <Wrench className="h-4 w-4" />
                       Brand
                     </Label>
                     <div className="font-medium text-foreground">{selectedEquipment.brand}</div>
@@ -544,7 +545,7 @@ export default function EquipmentModalModern() {
                   <div className="space-y-2">
                     <Label>Last Inspection Date</Label>
                     <div className="font-medium text-foreground">
-                      {new Date(selectedEquipment.inspectionDate).toLocaleDateString()}
+                      {format(new Date(selectedEquipment.inspectionDate), "PPP")}
                     </div>
                   </div>
                 )}
@@ -559,7 +560,26 @@ export default function EquipmentModalModern() {
                         ? "text-orange-600"
                         : "text-foreground"
                     }`}>
-                      {new Date(selectedEquipment.insuranceExpirationDate).toLocaleDateString()}
+                      {format(new Date(selectedEquipment.insuranceExpirationDate), "PPP")}
+                    </div>
+                  </div>
+                )}
+
+                {selectedEquipment.before && (
+                  <div className="space-y-2">
+                    <Label>Inspection Frequency</Label>
+                    <div className="font-medium text-foreground">
+                      {(() => {
+                        const frequency = selectedEquipment.before?.toString();
+                        switch (frequency) {
+                          case '1': return 'Monthly';
+                          case '2': return 'Every 2 months';
+                          case '3': return 'Quarterly';
+                          case '6': return 'Every 6 months';
+                          case '12': return 'Annually';
+                          default: return `Every ${frequency} months`;
+                        }
+                      })()}
                     </div>
                   </div>
                 )}

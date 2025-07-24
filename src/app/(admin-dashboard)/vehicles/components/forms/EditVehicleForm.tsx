@@ -70,8 +70,8 @@ export default function EditVehicleForm({
     try {
       const result = await updateVehicleAction(formData);
 
-      // Update both Zustand store and TanStack Query cache when basic vehicle info is updated
-      if (result && result.vehicle) {
+      // Handle the response
+      if (result.success && result.vehicle) {
         // Convert Date fields to strings and null to undefined for Vehicle type compatibility
         const vehicleWithCompatibleTypes = {
           ...result.vehicle,
@@ -116,25 +116,37 @@ export default function EditVehicleForm({
 
           return updatedData;
         });
-      }
 
-      // Show single success toast
-      const { toast } = await import("sonner");
-      toast.success("Vehicle updated successfully!");
+        // Show single success toast
+        const { toast } = await import("sonner");
+        toast.success("Vehicle updated successfully!");
 
-      if (onSuccess) {
-        // Small delay to prevent focus issues when closing dialog
-        setTimeout(() => {
-          onSuccess();
-        }, 100);
+        if (onSuccess) {
+          // Small delay to prevent focus issues when closing dialog
+          setTimeout(() => {
+            onSuccess();
+          }, 100);
+        }
+      } else {
+        // Handle different types of errors with appropriate toasts
+        const { toast } = await import("sonner");
+        
+        if (result.validationError) {
+          toast.error(result.error);
+        } else if (result.authError) {
+          toast.error(result.error);
+        } else if (result.permissionError) {
+          toast.error(result.error);
+        } else if (result.dbError) {
+          toast.error(result.error);
+        } else {
+          toast.error(result.error || "Failed to update vehicle");
+        }
       }
     } catch (error) {
-      console.error("Form submission error:", error);
+      console.error("Unexpected form submission error:", error);
       const { toast } = await import("sonner");
-      toast.error(
-        "Error: " +
-          (error instanceof Error ? error.message : "Failed to update vehicle")
-      );
+      toast.error("An unexpected error occurred. Please try again.");
     }
   };
 

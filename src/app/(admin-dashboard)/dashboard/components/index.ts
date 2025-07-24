@@ -18,9 +18,6 @@ export { MaintenanceAlertsPanel } from './alerts/MaintenanceAlertsPanel';
 // Activity components
 export { RecentActivityFeed } from './activity/RecentActivityFeed';
 
-// Action components
-export { QuickActionsGrid } from './actions/QuickActionsGrid';
-
 // Legacy components (for backward compatibility - will be removed)
 export { default as ClientDashboard } from './ClientDashboard';
 

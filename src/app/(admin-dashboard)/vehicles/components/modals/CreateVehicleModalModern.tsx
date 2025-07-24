@@ -36,6 +36,9 @@ export default function CreateVehicleModalModern() {
 
   // Get reference data
   const { projects } = useVehiclesWithReferenceData();
+  
+  // Debug: Log projects data
+  console.log('🔍 Projects in modal:', projects);
 
   const handleSuccess = () => {
     setIsCreateModalOpen(false);
@@ -75,10 +78,12 @@ export default function CreateVehicleModalModern() {
           {/* Mobile Content */}
           <div className="flex-1 overflow-y-auto p-4">
             <CreateVehicleForm 
-              projects={projects.map(p => ({
-                id: p.id,
-                name: p.name
-              }))} 
+              projects={projects
+                .filter(p => p && p.id && p.name)
+                .map(p => ({
+                  id: p.id,
+                  name: p.name
+                }))} 
               onSuccess={handleSuccess}
               onCancel={handleClose}
               isMobile={true}
@@ -105,10 +110,12 @@ export default function CreateVehicleModalModern() {
         
         <div className="flex-1 overflow-y-auto">
           <CreateVehicleForm 
-            projects={projects.map(p => ({
-              id: p.id,
-              name: p.name
-            }))} 
+            projects={projects
+              .filter(p => p && p.id && p.name)
+              .map(p => ({
+                id: p.id,
+                name: p.name
+              }))} 
             onSuccess={handleSuccess}
             onCancel={() => setIsCreateModalOpen(false)}
             isMobile={false}

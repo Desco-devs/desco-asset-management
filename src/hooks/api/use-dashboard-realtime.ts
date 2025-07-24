@@ -95,6 +95,30 @@ export function useDashboardRealtime() {
           handleVehicleChange(payload);
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'maintenance_equipment_reports'
+        },
+        (payload) => {
+          console.log('🔧 Equipment maintenance report change:', payload);
+          handleMaintenanceReportChange(payload);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'maintenance_vehicle_reports'
+        },
+        (payload) => {
+          console.log('🚗 Vehicle maintenance report change:', payload);
+          handleMaintenanceReportChange(payload);
+        }
+      )
       .subscribe((status) => {
         console.log('📡 Dashboard channel status:', status);
         if (status === 'SUBSCRIBED') {
@@ -281,6 +305,58 @@ export function useDashboardRealtime() {
       }
     }
 
+    function handleMaintenanceReportChange(payload: any) {
+      try {
+        // For maintenance reports, we should refresh the maintenance alerts
+        // since they're derived from multiple complex queries
+        console.log('🔧 Maintenance report changed, invalidating dashboard data');
+        
+        queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
+        
+        if (payload.eventType === 'INSERT' && payload.new) {
+          const newRecord = payload.new;
+          
+          addRecentActivity({
+            id: `maintenance-${newRecord.id || Date.now()}-${Date.now()}`,
+            type: 'maintenance',
+            action: 'reported',
+            description: `New maintenance report: ${(newRecord.issue_description || 'No description').substring(0, 50)}...`,
+            timestamp: new Date().toISOString(),
+            user: 'System', // In real scenario, would get user from reported_by
+            status: newRecord.status || 'REPORTED',
+            priority: newRecord.priority || 'MEDIUM',
+          });
+        } else if (payload.eventType === 'UPDATE' && payload.new) {
+          const newRecord = payload.new;
+          const oldRecord = payload.old;
+          
+          // Check if status changed
+          if (newRecord.status !== oldRecord.status) {
+            const actionMap = {
+              'IN_PROGRESS': 'started',
+              'COMPLETED': 'completed',
+              'CANCELLED': 'cancelled'
+            };
+            
+            const action = actionMap[newRecord.status as keyof typeof actionMap] || 'updated';
+            
+            addRecentActivity({
+              id: `maintenance-status-${newRecord.id}-${Date.now()}`,
+              type: 'maintenance',
+              action,
+              description: `Maintenance status changed to ${newRecord.status?.toLowerCase().replace('_', ' ')}`,
+              timestamp: new Date().toISOString(),
+              user: 'System', // In real scenario, would get user from repaired_by for completion
+              status: newRecord.status || 'REPORTED',
+              priority: newRecord.priority || 'MEDIUM',
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error handling maintenance report change:', error);
+      }
+    }
+
     // Cleanup function
     return () => {
       console.log('🔌 Cleaning up dashboard realtime subscription');
@@ -330,11 +406,9 @@ export function useDashboardDataSync() {
       setRecentActivity(data.recentActivity);
     }
     
-    // Transform maintenance alerts if needed
-    if (data.detailedData?.equipment || data.detailedData?.vehicles) {
-      // This would need to be implemented based on the maintenance alert logic
-      // For now, we'll set empty array
-      setMaintenanceAlerts([]);
+    // Sync maintenance alerts from API response
+    if (data.maintenanceAlerts) {
+      setMaintenanceAlerts(data.maintenanceAlerts);
     }
   }, [setOverviewStats, setEquipmentCounts, setVehicleCounts, setRecentActivity, setMaintenanceAlerts]);
 }
