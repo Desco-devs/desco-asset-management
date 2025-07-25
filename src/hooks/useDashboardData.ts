@@ -4,6 +4,7 @@ import { useDashboardDataSync } from "@/hooks/api/use-dashboard-realtime";
 import type { ActivityItem } from "@/types/dashboard";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { useSelectedTimeRange } from "@/stores/dashboard-store";
 
 export interface DashboardData {
   equipmentCounts: {
@@ -39,8 +40,8 @@ export interface DashboardData {
   };
 }
 
-async function fetchDashboardData(): Promise<DashboardData> {
-  const response = await fetch("/api/dashboard/data", {
+async function fetchDashboardData(timeRange: string): Promise<DashboardData> {
+  const response = await fetch(`/api/dashboard/data?timeRange=${timeRange}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -56,17 +57,15 @@ async function fetchDashboardData(): Promise<DashboardData> {
 
 export function useDashboardData() {
   const syncData = useDashboardDataSync();
+  const selectedTimeRange = useSelectedTimeRange();
 
   const query = useQuery({
-    queryKey: ["dashboard-data"],
+    queryKey: ["dashboard-data", selectedTimeRange],
     queryFn: async () => {
       try {
-        console.log("🔄 Fetching dashboard data...");
-        const data = await fetchDashboardData();
-        console.log("✅ Dashboard data fetched successfully:", data);
+        const data = await fetchDashboardData(selectedTimeRange);
         return data;
       } catch (error) {
-        console.error("❌ Dashboard data fetch failed:", error);
         // Return empty data structure instead of throwing
         return {
           equipmentCounts: { OPERATIONAL: 0, NON_OPERATIONAL: 0 },

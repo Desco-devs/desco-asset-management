@@ -277,10 +277,18 @@ export function useDeleteVehicle() {
     onSuccess: (_, vehicleId) => {
       // Optimistic update - remove vehicle from cache immediately
       queryClient.setQueryData<Vehicle[]>(vehicleKeys.vehicles(), (oldData) => {
+        const deleted = oldData?.find(vehicle => vehicle.id === vehicleId);
         const filtered = oldData ? oldData.filter(vehicle => vehicle.id !== vehicleId) : [];
+        
+        // Show success toast with vehicle details
+        if (deleted) {
+          toast.success(`Vehicle "${deleted.brand} ${deleted.model}" deleted successfully!`);
+        } else {
+          toast.success('Vehicle deleted successfully!');
+        }
+        
         return deduplicateVehicles(filtered);
       });
-      // Toast moved to realtime listener for unified notification system
     },
     onError: (error) => {
       toast.error('Failed to delete vehicle: ' + error.message);
@@ -556,11 +564,12 @@ export function useSupabaseRealtime() {
                 return deduplicateVehicles([vehicleData, ...oldData]);
               });
               
-              // Simple individual toast with duplicate prevention
+              // Only show toast for vehicles created by other users (not user-initiated)
+              // Skip toast to prevent duplicate with form success toast
               const eventKey = `insert-${vehicleData.id}`;
               if (!processedEvents.current.has(eventKey)) {
                 processedEvents.current.add(eventKey);
-                toast.success(`Vehicle "${vehicleData.brand} ${vehicleData.model}" created successfully!`);
+                // Removed toast to prevent duplicate notifications with form success
                 
                 // Clean up old events (keep only last 100 to prevent memory leak)
                 if (processedEvents.current.size > 100) {
@@ -587,11 +596,11 @@ export function useSupabaseRealtime() {
                 return deduplicateVehicles(updated);
               });
               
-              // Simple individual toast with duplicate prevention
+              // Skip update toast to prevent duplicates with form success toast
               const eventKey = `update-${vehicleData.id}`;
               if (!processedEvents.current.has(eventKey)) {
                 processedEvents.current.add(eventKey);
-                toast.success(`Vehicle "${vehicleData.brand} ${vehicleData.model}" updated successfully!`);
+                // Removed toast to prevent duplicate notifications with form success
               }
             } else if (eventType === 'DELETE') {
               console.log('🗑️ Vehicle deleted:', payload.old || 'Unknown vehicle');
@@ -614,11 +623,11 @@ export function useSupabaseRealtime() {
                   return deduplicateVehicles(filtered);
                 });
                 
-                // Simple individual toast with duplicate prevention
+                // Skip delete toast to prevent duplicates with form success toast
                 const eventKey = `delete-${deletedVehicle.id}`;
                 if (!processedEvents.current.has(eventKey)) {
                   processedEvents.current.add(eventKey);
-                  toast.success(`Vehicle "${deletedVehicle.brand} ${deletedVehicle.model}" deleted successfully!`);
+                  // Removed toast to prevent duplicate notifications with mutation success
                 }
               }
             }

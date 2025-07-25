@@ -1,20 +1,20 @@
 "use client";
 
-import React, { Suspense } from "react";
-import { useDashboardData } from "@/hooks/useDashboardData";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDashboardRealtimeContext } from "@/context/DashboardRealtimeContext";
 import { useManualDashboardRefresh } from "@/hooks/api/use-dashboard-polling";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useDashboardData } from "@/hooks/useDashboardData";
 import { AlertCircle, RefreshCw } from "lucide-react";
+import { Suspense } from "react";
 
 // Import new components
-import { OverviewStatsGrid } from "./stats/OverviewStatsGrid";
-import { ChartsSection } from "./charts/ChartsSection";
-import { MaintenanceAlertsPanel } from "./alerts/MaintenanceAlertsPanel";
 import { RecentActivityFeed } from "./activity/RecentActivityFeed";
+import { MaintenanceAlertsPanel } from "./alerts/MaintenanceAlertsPanel";
+import { ChartsSection } from "./charts/ChartsSection";
+import { OverviewStatsGrid } from "./stats/OverviewStatsGrid";
 
 function DashboardSkeleton() {
   return (
@@ -58,7 +58,7 @@ function DashboardSkeleton() {
             </Card>
           ))}
         </div>
-        
+
         <Card>
           <CardHeader>
             <Skeleton className="h-5 w-40" />
@@ -125,27 +125,17 @@ function DashboardContent() {
   // Use global real-time context (no local setup needed)
   const { isConnected } = useDashboardRealtimeContext();
 
-  console.log("🎯 Dashboard render state:", {
-    isLoading,
-    error: !!error,
-    hasData: !!data,
-    isFetching,
-  });
-
   // Show error immediately if there's an error
   if (error && !data) {
-    console.log("❌ Dashboard showing error boundary");
     return <DashboardErrorBoundary error={error as Error} retry={refetch} />;
   }
 
   // Show skeleton only if we're loading AND have no data
   if (isLoading && !data) {
-    console.log("⏳ Dashboard showing skeleton");
     return <DashboardSkeleton />;
   }
 
   // If we have data, show it even if we're refetching
-  console.log("✅ Dashboard showing content");
 
   return (
     <div className="min-h-screen py-4 px-4 sm:py-6 sm:px-6 space-y-4 sm:space-y-6">

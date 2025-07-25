@@ -28,14 +28,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserProfile = useCallback(async (userId: string) => {
     console.log('🔄 fetchUserProfile: Starting for user:', userId);
     try {
-      // Add timeout to prevent infinite loading
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('User profile fetch timeout')), 10000);
+      // Create abort controller for better timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 10000); // 10 second timeout
+
+      const response = await fetch(`/api/users/${userId}`, {
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
-      
-      const fetchPromise = fetch(`/api/users/${userId}`);
-      
-      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+
+      // Clear timeout if request completed
+      clearTimeout(timeoutId);
       
       if (response.ok) {
         const userData = await response.json();
@@ -57,12 +64,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } else {
-        console.error('❌ fetchUserProfile: HTTP error', response.status);
-        // Still set loading to false even if user fetch fails
+        console.error('❌ fetchUserProfile: HTTP error', response.status, response.statusText);
+        // Try to get error details
+        try {
+          const errorData = await response.json();
+          console.error('❌ fetchUserProfile: Error details', errorData);
+        } catch (parseError) {
+          console.error('❌ fetchUserProfile: Could not parse error response');
+        }
         setLoading(false);
       }
     } catch (error) {
-      console.error("❌ fetchUserProfile: Error:", error);
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.error("❌ fetchUserProfile: Request timeout after 10 seconds");
+        } else {
+          console.error("❌ fetchUserProfile: Error:", error.message);
+        }
+      } else {
+        console.error("❌ fetchUserProfile: Unknown error:", error);
+      }
       // Don't let auth hang if user profile fails
       setLoading(false);
     }
@@ -134,14 +155,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    // Set user offline before signing out
-    setOffline();
-    
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    
-    // State will be cleared by onAuthStateChange event automatically
-    // This prevents race conditions with ClientAuthGuard
+    try {
+      // Set user offline before signing out and wait for it to complete
+      await new Promise<void>((resolve) => {
+        setOffline();
+        // Give a small delay to ensure the offline status is sent
+        setTimeout(resolve, 100);
+      });
+      
+      // Clear user state first to prevent race conditions
+      setUserState(null);
+      setSupabaseUser(null);
+      
+      // Then sign out from Supabase
+      const { error } = await supabase.auth.signOut({
+        scope: 'local' // Only clear local session, not all sessions
+      });
+      
+      if (error) {
+        console.warn('Supabase signOut error:', error);
+        // Don't throw error - we've already cleared local state
+      }
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Even if offline status fails, continue with logout
+      setUserState(null);
+      setSupabaseUser(null);
+      
+      await supabase.auth.signOut({ scope: 'local' });
+    }
   };
 
   const setUser = (u: User | null) => setUserState(u);

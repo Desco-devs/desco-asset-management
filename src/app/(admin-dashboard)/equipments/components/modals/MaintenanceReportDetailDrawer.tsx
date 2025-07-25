@@ -408,9 +408,15 @@ export default function MaintenanceReportDetailDrawer() {
           {selectedReport.parts_replaced && selectedReport.parts_replaced.length > 0 ? (
             <div className="space-y-4">
               {selectedReport.parts_replaced.map((part, index) => {
+                // Debug logging
+                console.log('Part:', part, 'Index:', index);
+                console.log('All attachment_urls:', selectedReport.attachment_urls);
+                
                 // Check if there's an associated image for this part
                 const partImageUrl = selectedReport.attachment_urls?.[index];
                 const isImage = partImageUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(partImageUrl);
+                
+                console.log('Part image URL:', partImageUrl, 'Is image:', isImage);
                 
                 return (
                   <div key={`${selectedReport.id}-part-${index}-${part}`} className="border rounded-lg p-4 space-y-3">

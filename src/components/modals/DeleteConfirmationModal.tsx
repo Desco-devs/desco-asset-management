@@ -39,16 +39,16 @@ export function DeleteConfirmationModal({
 }: DeleteConfirmationModalProps) {
   return (
     <Dialog open={open} onOpenChange={!isLoading ? onOpenChange : undefined}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Trash2 className="h-5 w-5 text-destructive" />
-            {title}
+          <DialogTitle className="flex items-center gap-2 break-words hyphens-auto leading-relaxed">
+            <Trash2 className="h-5 w-5 text-destructive flex-shrink-0" />
+            <span className="break-words">{title}</span>
           </DialogTitle>
           <DialogDescription>
             {description}
             {itemName && (
-              <span className="block mt-2 font-semibold text-foreground">
+              <span className="block mt-2 font-semibold text-foreground break-words hyphens-auto max-w-full overflow-wrap-anywhere">
                 "{itemName}"
               </span>
             )}

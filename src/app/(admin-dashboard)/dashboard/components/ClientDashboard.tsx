@@ -9,7 +9,6 @@ import { OverviewStats } from "./stats/OverviewStats";
 import { VehiclesCount } from "./stats/VehiclesCount";
 import { VehiclesAndEquipments } from "./charts/VehiclesAndEquipments";
 import { MaintenanceAlerts } from "./ui/MaintenanceAlerts";
-import { QuickActions } from "./ui/QuickActions";
 import { RecentActivity } from "./ui/RecentActivity";
 
 function DashboardSkeleton() {
@@ -128,8 +127,6 @@ function DashboardContent() {
             initialEquipmentData={equipmentCounts}
           />
 
-          {/* Quick Actions */}
-          <QuickActions />
         </div>
 
         {/* Right Column - Activity & Alerts */}

@@ -21,6 +21,26 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Suppress UserValidationError from console
+              (function() {
+                const originalConsoleError = console.error;
+                console.error = function(...args) {
+                  const message = args.join(' ');
+                  if (message.includes('UserValidationError') || 
+                      message.includes('A user with this email address has already been registered')) {
+                    return; // Suppress these specific errors
+                  }
+                  originalConsoleError.apply(console, args);
+                };
+              })();
+            `,
+          }}
+        />
+      </head>
       <body>
         <ClientProviders>
           {children}

@@ -34,7 +34,6 @@ import {
   ChartBar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSocketContext } from "@/context/SocketContext";
 import RoomsList from "./RoomsList";
 import CreateRoomModal from "./CreateRoomModal";
 import InviteUsersModal from "./InviteUsersModal";
@@ -81,7 +80,9 @@ const ChatHeader = ({
   onDeleteRoom,
   onInviteUsers,
 }: ChatHeaderProps) => {
-  const { isUserOnline, getUserLastSeen } = useSocketContext();
+  // TODO: Replace with Supabase realtime online status when migrating chat
+  const isUserOnline = (userId: string) => false;
+  const getUserLastSeen = (userId: string) => null;
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
@@ -108,7 +109,8 @@ const ChatHeader = ({
       return "Online";
     } else if (lastSeen) {
       const now = new Date();
-      const diffMs = now.getTime() - lastSeen.getTime();
+      const lastSeenDate = new Date(lastSeen);
+      const diffMs = now.getTime() - lastSeenDate.getTime();
       const diffMinutes = Math.floor(diffMs / (1000 * 60));
       const diffHours = Math.floor(diffMinutes / 60);
       const diffDays = Math.floor(diffHours / 24);

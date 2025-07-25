@@ -325,7 +325,7 @@ async function main() {
       },
     }),
 
-    // Trucks & Specialized Vehicles  
+    // Trucks & Specialized Vehicles
     prisma.equipment.create({
       data: {
         id: "66ea7472-3587-4155-b817-f93122c3491d",

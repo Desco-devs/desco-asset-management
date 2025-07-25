@@ -14,6 +14,13 @@ export async function GET() {
                             }
                         }
                     }
+                },
+                user: {
+                    select: {
+                        id: true,
+                        username: true,
+                        full_name: true
+                    }
                 }
             },
             orderBy: {

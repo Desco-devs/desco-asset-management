@@ -31,7 +31,7 @@ export default function EquipmentClientViewer({
   projects,
   totalEquipmentCount,
 }: EquipmentClientViewerProps) {
-  const [selectedEquipment, setSelectedEquipment] = useState<any | null>(null);
+  const [selectedEquipment, setSelectedEquipment] = useState<unknown | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Zustand store for client state
@@ -119,36 +119,38 @@ export default function EquipmentClientViewer({
             <EquipmentCardSkeleton key={`skeleton-${index}`} />
           ))
         ) : (
-          equipment.map((item: any, index: number) => (
+          equipment.map((item: unknown, index: number) => {
+            const equipmentItem = item as Record<string, unknown>;
+            return (
             <EquipmentCard
-              key={item.id || `equipment-${index}`}
+              key={equipmentItem.id as string || `equipment-${index}`}
               equipment={{
-                uid: item.id,
-                brand: item.brand || "Unknown",
-                model: item.model || "Unknown Model",
-                type: item.type || "Unknown Type",
-                status: item.status,
-                owner: item.owner || "Unknown Owner",
-                image_url: item.image_url,
-                insuranceExpirationDate: item.insurance_expiration_date || "",
-                plateNumber: item.plate_number,
-                remarks: item.remarks,
-                originalReceiptUrl: item.original_receipt_url,
-                equipmentRegistrationUrl: item.equipment_registration_url,
-                thirdpartyInspectionImage: item.thirdparty_inspection_image,
-                pgpcInspectionImage: item.pgpc_inspection_image,
-                project: item.project
+                uid: equipmentItem.id as string,
+                brand: (equipmentItem.brand as string) || "Unknown",
+                model: (equipmentItem.model as string) || "Unknown Model",
+                type: (equipmentItem.type as string) || "Unknown Type",
+                status: equipmentItem.status as string,
+                owner: (equipmentItem.owner as string) || "Unknown Owner",
+                image_url: (equipmentItem.image_url as string) || undefined,
+                insuranceExpirationDate: (equipmentItem.insurance_expiration_date as string) || "",
+                plateNumber: equipmentItem.plate_number as string,
+                remarks: equipmentItem.remarks as string,
+                originalReceiptUrl: (equipmentItem.original_receipt_url as string) || undefined,
+                equipmentRegistrationUrl: (equipmentItem.equipment_registration_url as string) || undefined,
+                thirdpartyInspectionImage: (equipmentItem.thirdparty_inspection_image as string) || undefined,
+                pgpcInspectionImage: (equipmentItem.pgpc_inspection_image as string) || undefined,
+                project: equipmentItem.project
                   ? {
-                      uid: item.project.id,
-                      name: item.project.name,
-                      client: item.project.client
+                      uid: (equipmentItem.project as Record<string, unknown>).id as string,
+                      name: (equipmentItem.project as Record<string, unknown>).name as string,
+                      client: (equipmentItem.project as Record<string, unknown>).client
                         ? {
-                            uid: item.project.client.id,
-                            name: item.project.client.name,
-                            location: item.project.client.location
+                            uid: ((equipmentItem.project as Record<string, unknown>).client as Record<string, unknown>).id as string,
+                            name: ((equipmentItem.project as Record<string, unknown>).client as Record<string, unknown>).name as string,
+                            location: ((equipmentItem.project as Record<string, unknown>).client as Record<string, unknown>).location
                               ? {
-                                  uid: item.project.client.location.id,
-                                  address: item.project.client.location.address,
+                                  uid: (((equipmentItem.project as Record<string, unknown>).client as Record<string, unknown>).location as Record<string, unknown>).id as string,
+                                  address: (((equipmentItem.project as Record<string, unknown>).client as Record<string, unknown>).location as Record<string, unknown>).address as string,
                                 }
                               : {
                                   uid: "unknown",
@@ -177,14 +179,15 @@ export default function EquipmentClientViewer({
                       },
                     },
               }}
-              isNew={newItemIds.has(item.id)}
-              reportCount={item.maintenanceReportCount || 0}
+              isNew={newItemIds.has(equipmentItem.id as string)}
+              reportCount={(equipmentItem.maintenanceReportCount as number) || 0}
               onClick={() => {
-                setSelectedEquipment(item);
+                setSelectedEquipment(equipmentItem);
                 setIsModalOpen(true);
               }}
             />
-          ))
+            );
+          })
         )}
       </div>
 

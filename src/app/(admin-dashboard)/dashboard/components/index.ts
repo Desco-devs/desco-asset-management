@@ -28,5 +28,4 @@ export { EquipmentsCount } from './stats/EquipmentsCount';
 export { OverviewStats } from './stats/OverviewStats';
 export { VehiclesCount } from './stats/VehiclesCount';
 export { MaintenanceAlerts } from './ui/MaintenanceAlerts';
-export { QuickActions } from './ui/QuickActions';
 export { RecentActivity } from './ui/RecentActivity';

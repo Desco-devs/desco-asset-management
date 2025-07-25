@@ -371,6 +371,11 @@ export default function EquipmentModalModern() {
             >
               <Camera className="h-4 w-4" />
               Equipment Images
+              {getImagesCount() > 0 && (
+                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getImagesCount()}
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -383,6 +388,11 @@ export default function EquipmentModalModern() {
             >
               <FileText className="h-4 w-4" />
               Documents
+              {getDocumentsCount() > 0 && (
+                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getDocumentsCount()}
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -395,6 +405,11 @@ export default function EquipmentModalModern() {
             >
               <Wrench className="h-4 w-4" />
               Parts Management
+              {getEquipmentPartsCount() > 0 && (
+                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getEquipmentPartsCount()}
+                </span>
+              )}
             </button>
             <button
               type="button"

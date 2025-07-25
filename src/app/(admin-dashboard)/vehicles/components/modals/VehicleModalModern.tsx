@@ -31,6 +31,7 @@ import {
   selectIsModalOpen,
   selectIsPhotosCollapsed,
   selectSelectedVehicle,
+  selectDeleteConfirmation,
   // selectViewerImage,
   useVehiclesStore,
 } from "@/stores/vehiclesStore";
@@ -97,13 +98,12 @@ export default function VehicleModalModern() {
   const isMobile = useVehiclesStore(selectIsMobile);
   const isPhotosCollapsed = useVehiclesStore(selectIsPhotosCollapsed);
   const isDocumentsCollapsed = useVehiclesStore(selectIsDocumentsCollapsed);
+  const deleteConfirmation = useVehiclesStore(selectDeleteConfirmation);
   // const viewerImage = useVehiclesStore(selectViewerImage);
 
   // Custom tab state - EXACTLY like EquipmentModalModern with 5 tabs
   const [activeTab, setActiveTab] = useState<'details' | 'images' | 'documents' | 'parts' | 'maintenance'>('details');
 
-  // Local delete confirmation state
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Remove debug log that causes re-renders
 
@@ -120,6 +120,7 @@ export default function VehicleModalModern() {
     setIsMobile,
     setIsPhotosCollapsed,
     setIsDocumentsCollapsed,
+    setDeleteConfirmation,
     setViewerImage,
     closeAllModals,
   } = useVehiclesStore();
@@ -302,30 +303,11 @@ export default function VehicleModalModern() {
     }, 100); // Small delay to ensure proper transition
   };
 
-  const handleDeleteClick = () => {
-    if (!selectedVehicle) return;
-    console.log("Delete button clicked, vehicle:", selectedVehicle);
-    setShowDeleteConfirm(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!selectedVehicle) return;
-    console.log("Delete confirmed for vehicle:", selectedVehicle.id);
-
-    try {
-      await deleteVehicleMutation.mutateAsync(selectedVehicle.id);
-      console.log("Vehicle deleted successfully");
-      setShowDeleteConfirm(false);
-      closeAllModals();
-    } catch (error) {
-      console.error("Error deleting vehicle:", error);
-      setShowDeleteConfirm(false);
+  const handleDelete = () => {
+    if (selectedVehicle) {
+      setDeleteConfirmation({ isOpen: true, vehicle: selectedVehicle });
+      setIsModalOpen(false); // Close main modal to show delete confirmation
     }
-  };
-
-  const handleDeleteCancel = () => {
-    console.log("Delete cancelled");
-    setShowDeleteConfirm(false);
   };
 
   const handleClose = () => {
@@ -369,7 +351,7 @@ export default function VehicleModalModern() {
   const getVehiclePartsCount = () => {
     if (!selectedVehicle || !selectedVehicle.vehicle_parts) return 0;
     
-    // Parse vehicle parts data similar to VehiclePartsViewer
+    // Parse vehicle parts data using the same logic as VehiclePartsViewer
     const parsePartsData = (parts: any) => {
       if (!parts) return { rootFiles: [], folders: [] };
 
@@ -393,8 +375,26 @@ export default function VehicleModalModern() {
         }
       }
 
-      // Handle array format (legacy)
+      // Handle array format - NEW: Check if first element is structured JSON (like VehiclePartsViewer)
       if (Array.isArray(parts)) {
+        if (parts.length === 0) {
+          return { rootFiles: [], folders: [] };
+        }
+
+        // NEW: Check if first element contains structured data (JSON)
+        if (parts.length === 1 && typeof parts[0] === 'string') {
+          try {
+            const parsed = JSON.parse(parts[0]);
+            if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
+              // This is the new structured format stored as JSON in array
+              return parsed;
+            }
+          } catch (error) {
+            // First array element is not JSON, treating as legacy URL
+          }
+        }
+
+        // LEGACY: Handle old format where each element is a URL
         return { rootFiles: parts, folders: [] };
       }
 
@@ -517,64 +517,6 @@ export default function VehicleModalModern() {
   // Shared content component
   const VehicleContent = () => (
     <>
-      {/* Delete Confirmation Overlay - Inside the main dialog */}
-      {showDeleteConfirm && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-6">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-xs sm:max-w-lg p-4 sm:p-8">
-            <div className="text-center mb-6">
-              <h3 className="text-lg sm:text-xl font-semibold text-red-600 mb-2">
-                Delete Vehicle
-              </h3>
-              <p className="text-sm sm:text-base text-gray-600">
-                This action cannot be undone
-              </p>
-            </div>
-
-            <div className="mb-6 sm:mb-8">
-              <p className="text-sm sm:text-base text-gray-700 mb-4 text-center">
-                Are you sure you want to delete this vehicle?
-              </p>
-              <div className="bg-gray-50 p-4 sm:p-5 rounded-md text-center">
-                <p className="font-medium text-sm sm:text-base text-gray-900">
-                  {selectedVehicle?.brand} {selectedVehicle?.model}
-                </p>
-                <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                  Plate: {selectedVehicle?.plate_number}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-              <Button
-                variant="outline"
-                onClick={handleDeleteCancel}
-                disabled={deleteVehicleMutation.isPending}
-                className="w-full order-2 sm:order-1 py-2 sm:py-3"
-                size="lg"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteConfirm}
-                disabled={deleteVehicleMutation.isPending}
-                className="w-full order-1 sm:order-2 py-2 sm:py-3"
-                size="lg"
-              >
-                {deleteVehicleMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  "Delete Vehicle"
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Tab Navigation - EXACTLY like EquipmentModalModern */}
       <div className="space-y-4">
         <div className={`w-full mb-6 ${isMobile ? 'grid grid-cols-5 bg-muted rounded-md p-1' : 'flex justify-center border-b'}`}>
@@ -611,6 +553,11 @@ export default function VehicleModalModern() {
               >
                 <Camera className="h-4 w-4" />
                 Vehicle Images
+                {getImagesCount() > 0 && (
+                  <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                    {getImagesCount()}
+                  </span>
+                )}
               </button>
               <button
                 type="button"
@@ -623,6 +570,11 @@ export default function VehicleModalModern() {
               >
                 <FileText className="h-4 w-4" />
                 Documents
+                {getDocumentsCount() > 0 && (
+                  <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                    {getDocumentsCount()}
+                  </span>
+                )}
               </button>
               <button
                 type="button"
@@ -635,6 +587,11 @@ export default function VehicleModalModern() {
               >
                 <Wrench className="h-4 w-4" />
                 Parts Management
+                {getVehiclePartsCount() > 0 && (
+                  <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                    {getVehiclePartsCount()}
+                  </span>
+                )}
               </button>
               <button
                 type="button"
@@ -981,7 +938,15 @@ export default function VehicleModalModern() {
                 View and browse parts documentation organized in folders.
               </p>
             </div>
-            <VehiclePartsViewer vehicleParts={selectedVehicle.vehicle_parts} />
+            <VehiclePartsViewer 
+              vehicleParts={
+                selectedVehicle.vehicle_parts 
+                  ? typeof selectedVehicle.vehicle_parts === 'string'
+                    ? JSON.parse(selectedVehicle.vehicle_parts)
+                    : selectedVehicle.vehicle_parts
+                  : { rootFiles: [], folders: [] }
+              } 
+            />
           </div>
         )}
 
@@ -1044,7 +1009,7 @@ export default function VehicleModalModern() {
                 <Button
                   type="button"
                   variant="destructive"
-                  onClick={handleDeleteClick}
+                  onClick={handleDelete}
                   disabled={deleteVehicleMutation.isPending}
                   className="flex-1"
                   size="lg"
@@ -1052,7 +1017,7 @@ export default function VehicleModalModern() {
                   {deleteVehicleMutation.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                    <X className="h-4 w-4 mr-2" />
+                    <Trash2 className="h-4 w-4 mr-2" />
                   )}
                   Delete Vehicle
                 </Button>
@@ -1103,7 +1068,7 @@ export default function VehicleModalModern() {
               <Button
                 type="button"
                 variant="destructive"
-                onClick={handleDeleteClick}
+                onClick={handleDelete}
                 disabled={deleteVehicleMutation.isPending}
                 className="flex-1"
                 size="lg"
@@ -1111,7 +1076,7 @@ export default function VehicleModalModern() {
                 {deleteVehicleMutation.isPending ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
-                  <X className="h-4 w-4 mr-2" />
+                  <Trash2 className="h-4 w-4 mr-2" />
                 )}
                 Delete Vehicle
               </Button>

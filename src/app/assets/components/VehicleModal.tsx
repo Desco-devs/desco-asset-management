@@ -87,6 +87,7 @@ const VehicleModal = ({
     return new Date(d) < new Date();
   };
 
+  // Helper function to get the first available image
   const getDisplayImage = () => {
     return (
       vehicle.frontImgUrl ||

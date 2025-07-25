@@ -47,24 +47,29 @@ export function useProjectsRealtime() {
 
             if (eventType === 'INSERT' && payload.new) {
               const locationData = payload.new as Location
+              
               queryClient.setQueryData<Location[]>(projectsKeys.locations(), (oldData) => {
-                if (!oldData) return [locationData]
+                if (!oldData || !Array.isArray(oldData)) return [locationData]
                 const existing = oldData.find(loc => loc.id === locationData.id)
                 if (existing) return oldData
                 return [locationData, ...oldData]
               })
             } else if (eventType === 'UPDATE' && payload.new) {
               const locationData = payload.new as Location
+              
               queryClient.setQueryData<Location[]>(projectsKeys.locations(), (oldData) => {
-                if (!oldData) return [locationData]
+                if (!oldData || !Array.isArray(oldData)) return [locationData]
                 return oldData.map(location => 
                   location.id === locationData.id ? locationData : location
                 )
               })
             } else if (eventType === 'DELETE' && payload.old) {
               const deletedLocation = payload.old as Location
+              console.log('🗑️ REALTIME: Processing location delete event for:', deletedLocation.id, '(NO TOAST)')
+              
               queryClient.setQueryData<Location[]>(projectsKeys.locations(), (oldData) => {
-                return oldData ? oldData.filter(location => location.id !== deletedLocation.id) : []
+                if (!oldData || !Array.isArray(oldData)) return []
+                return oldData.filter(location => location.id !== deletedLocation.id)
               })
             }
           } catch (error) {
@@ -102,42 +107,48 @@ export function useProjectsRealtime() {
 
             if (eventType === 'INSERT' && payload.new) {
               const clientData = payload.new as Client
+              
               queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
-                if (!oldData) return [clientData]
+                if (!oldData || !Array.isArray(oldData)) return [clientData]
                 const existing = oldData.find(client => client.id === clientData.id)
                 if (existing) return oldData
                 return [clientData, ...oldData]
               })
               // Update location-specific query too
               queryClient.setQueryData<Client[]>(projectsKeys.clientsByLocation(clientData.location_id), (oldData) => {
-                if (!oldData) return [clientData]
+                if (!oldData || !Array.isArray(oldData)) return [clientData]
                 const existing = oldData.find(client => client.id === clientData.id)
                 if (existing) return oldData
                 return [clientData, ...oldData]
               })
             } else if (eventType === 'UPDATE' && payload.new) {
               const clientData = payload.new as Client
+              
               queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
-                if (!oldData) return [clientData]
+                if (!oldData || !Array.isArray(oldData)) return [clientData]
                 return oldData.map(client => 
                   client.id === clientData.id ? clientData : client
                 )
               })
               // Update location-specific queries
               queryClient.setQueryData<Client[]>(projectsKeys.clientsByLocation(clientData.location_id), (oldData) => {
-                if (!oldData) return [clientData]
+                if (!oldData || !Array.isArray(oldData)) return [clientData]
                 return oldData.map(client => 
                   client.id === clientData.id ? clientData : client
                 )
               })
             } else if (eventType === 'DELETE' && payload.old) {
               const deletedClient = payload.old as Client
+              console.log('🗑️ REALTIME: Processing client delete event for:', deletedClient.id, '(NO TOAST)')
+              
               queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
-                return oldData ? oldData.filter(client => client.id !== deletedClient.id) : []
+                if (!oldData || !Array.isArray(oldData)) return []
+                return oldData.filter(client => client.id !== deletedClient.id)
               })
               // Update location-specific query
               queryClient.setQueryData<Client[]>(projectsKeys.clientsByLocation(deletedClient.location_id), (oldData) => {
-                return oldData ? oldData.filter(client => client.id !== deletedClient.id) : []
+                if (!oldData || !Array.isArray(oldData)) return []
+                return oldData.filter(client => client.id !== deletedClient.id)
               })
             }
           } catch (error) {
@@ -175,42 +186,71 @@ export function useProjectsRealtime() {
 
             if (eventType === 'INSERT' && payload.new) {
               const projectData = payload.new as Project
-              queryClient.setQueryData<Project[]>(projectsKeys.projects(), (oldData) => {
-                if (!oldData) return [projectData]
-                const existing = oldData.find(project => project.id === projectData.id)
+              
+              queryClient.setQueryData(projectsKeys.projects(), (oldData: any) => {
+                if (!oldData) {
+                  return { data: [projectData], permissions: null }
+                }
+                if (!oldData.data || !Array.isArray(oldData.data)) {
+                  return { data: [projectData], permissions: oldData?.permissions || null }
+                }
+                const existing = oldData.data.find((project: Project) => project.id === projectData.id)
                 if (existing) return oldData
-                return [projectData, ...oldData]
+                return { ...oldData, data: [projectData, ...oldData.data] }
               })
               // Update client-specific query too
               queryClient.setQueryData<Project[]>(projectsKeys.projectsByClient(projectData.client_id), (oldData) => {
                 if (!oldData) return [projectData]
+                if (!Array.isArray(oldData)) return [projectData]
                 const existing = oldData.find(project => project.id === projectData.id)
                 if (existing) return oldData
                 return [projectData, ...oldData]
               })
             } else if (eventType === 'UPDATE' && payload.new) {
               const projectData = payload.new as Project
-              queryClient.setQueryData<Project[]>(projectsKeys.projects(), (oldData) => {
-                if (!oldData) return [projectData]
-                return oldData.map(project => 
-                  project.id === projectData.id ? projectData : project
-                )
+              
+              queryClient.setQueryData(projectsKeys.projects(), (oldData: any) => {
+                if (!oldData) {
+                  return { data: [projectData], permissions: null }
+                }
+                if (!oldData.data || !Array.isArray(oldData.data)) {
+                  return { data: [projectData], permissions: oldData?.permissions || null }
+                }
+                return { 
+                  ...oldData, 
+                  data: oldData.data.map((project: Project) => 
+                    project.id === projectData.id ? projectData : project
+                  )
+                }
               })
               // Update client-specific query
               queryClient.setQueryData<Project[]>(projectsKeys.projectsByClient(projectData.client_id), (oldData) => {
                 if (!oldData) return [projectData]
+                if (!Array.isArray(oldData)) return [projectData]
                 return oldData.map(project => 
                   project.id === projectData.id ? projectData : project
                 )
               })
             } else if (eventType === 'DELETE' && payload.old) {
               const deletedProject = payload.old as Project
-              queryClient.setQueryData<Project[]>(projectsKeys.projects(), (oldData) => {
-                return oldData ? oldData.filter(project => project.id !== deletedProject.id) : []
+              console.log('🗑️ REALTIME: Processing project delete event for:', deletedProject.id, '(NO TOAST)')
+              
+              queryClient.setQueryData(projectsKeys.projects(), (oldData: any) => {
+                if (!oldData) {
+                  return { data: [], permissions: null }
+                }
+                if (!oldData.data || !Array.isArray(oldData.data)) {
+                  return { data: [], permissions: oldData?.permissions || null }
+                }
+                return { 
+                  ...oldData, 
+                  data: oldData.data.filter((project: Project) => project.id !== deletedProject.id)
+                }
               })
               // Update client-specific query
               queryClient.setQueryData<Project[]>(projectsKeys.projectsByClient(deletedProject.client_id), (oldData) => {
-                return oldData ? oldData.filter(project => project.id !== deletedProject.id) : []
+                if (!oldData || !Array.isArray(oldData)) return []
+                return oldData.filter(project => project.id !== deletedProject.id)
               })
             }
           } catch (error) {

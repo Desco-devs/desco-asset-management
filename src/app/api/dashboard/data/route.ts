@@ -11,23 +11,24 @@ import {
   transformMaintenanceAlerts,
 } from "@/lib/dashboard-utils";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    console.log('📊 Dashboard API: Starting data fetch...');
+    // Get time range from query parameters
+    const { searchParams } = new URL(request.url);
+    const timeRange = searchParams.get('timeRange') || 'month';
     
     // Add timeout to prevent infinite hanging
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Dashboard data fetch timeout after 10 seconds')), 10000);
     });
     
-    const dataPromise = fetchDashboardData();
+    const dataPromise = fetchDashboardData(timeRange);
     
     // Race between data fetch and timeout
     const result = await Promise.race([dataPromise, timeoutPromise]);
     
     // Fetch maintenance alerts and recent activities separately to avoid slowing down main data
     const maintenanceAlertsPromise = fetchMaintenanceAlerts().catch(err => {
-      console.warn('Maintenance alerts failed:', err);
       return {
         equipmentReports: [],
         vehicleReports: [],
@@ -39,7 +40,6 @@ export async function GET() {
     });
 
     const recentActivitiesPromise = fetchRecentActivities().catch(err => {
-      console.warn('Recent activities failed:', err);
       return {
         recentMaintenance: [],
         recentVehicleMaintenance: [],
@@ -71,7 +71,6 @@ export async function GET() {
       recentActivitiesPromise
     ]);
     
-    console.log('✅ Dashboard API: Data fetched successfully');
 
     // Transform counts using utility functions
     const equipmentData = transformEquipmentCounts(equipmentCounts);
@@ -122,7 +121,6 @@ export async function GET() {
       maintenanceAlerts: transformedMaintenanceAlerts,
     });
   } catch (error) {
-    console.error("Error fetching dashboard data:", error);
     
     // Return empty data structure instead of error
     return NextResponse.json({

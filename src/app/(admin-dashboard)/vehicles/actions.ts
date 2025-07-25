@@ -297,26 +297,34 @@ export async function createVehicleAction(formData: FormData) {
       }
     }
 
-    // 🔥 HANDLE PARTS UPLOADS
-    const partsUrls: string[] = [];
+    // 🔥 HANDLE PARTS UPLOADS - Preserve folder structure
     const partsStructureString = formData.get("partsStructure") as string;
+    let finalPartsStructure = null;
     
     if (partsStructureString) {
       try {
         const partsStructure = JSON.parse(partsStructureString);
+        
+        // Create the final structure with uploaded URLs
+        const processedStructure = {
+          rootFiles: [] as any[],
+          folders: [] as any[]
+        };
         
         // Process root files
         if (partsStructure.rootFiles && Array.isArray(partsStructure.rootFiles)) {
           for (let i = 0; i < partsStructure.rootFiles.length; i++) {
             const partFile = formData.get(`partsFile_root_${i}`) as File;
             const partName = formData.get(`partsFile_root_${i}_name`) as string;
+            const originalFile = partsStructure.rootFiles[i];
             
+            // Check if this is a new file upload
             if (partFile && partFile.size > 0) {
               try {
                 const timestamp = Date.now();
                 const ext = partName.split('.').pop();
                 const filename = `part_${i}_${timestamp}.${ext}`;
-                const filepath = `vehicles/${project.name}/${brand}_${model}_${plateNumber}/parts/root/${filename}`;
+                const filepath = `vehicles/${project.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}/${brand}_${model}_${plateNumber}/parts/root/${filename}`;
                 const buffer = Buffer.from(await partFile.arrayBuffer());
 
                 const { data: uploadData, error: uploadErr } = await supabase
@@ -331,11 +339,28 @@ export async function createVehicleAction(formData: FormData) {
                     .storage
                     .from('vehicles')
                     .getPublicUrl(uploadData.path);
-                  partsUrls.push(urlData.publicUrl);
+                  
+                  // Add to processed structure with URL
+                  processedStructure.rootFiles.push({
+                    id: originalFile.id,
+                    name: partName,
+                    url: urlData.publicUrl,
+                    preview: urlData.publicUrl,
+                    type: partFile.type.startsWith('image/') ? 'image' : 'document'
+                  });
                 }
               } catch (error) {
                 console.error(`❌ Failed to upload part ${i}:`, error);
               }
+            } else if (originalFile && originalFile.url) {
+              // Preserve existing file that wasn't re-uploaded
+              processedStructure.rootFiles.push({
+                id: originalFile.id,
+                name: originalFile.name,
+                url: originalFile.url,
+                preview: originalFile.preview || originalFile.url,
+                type: originalFile.type || (originalFile.url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
+              });
             }
           }
         }
@@ -344,19 +369,28 @@ export async function createVehicleAction(formData: FormData) {
         if (partsStructure.folders && Array.isArray(partsStructure.folders)) {
           for (let folderIndex = 0; folderIndex < partsStructure.folders.length; folderIndex++) {
             const folder = partsStructure.folders[folderIndex];
+            const processedFolder = {
+              id: folder.id,
+              name: folder.name,
+              files: [] as any[],
+              created_at: folder.created_at
+            };
+            
             if (folder.files && Array.isArray(folder.files)) {
               for (let fileIndex = 0; fileIndex < folder.files.length; fileIndex++) {
                 const partFile = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
                 const partName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string;
                 const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
+                const originalFile = folder.files[fileIndex];
                 
+                // Check if this is a new file upload
                 if (partFile && partFile.size > 0) {
                   try {
                     const timestamp = Date.now();
                     const ext = partName.split('.').pop();
                     const filename = `part_${folderIndex}_${fileIndex}_${timestamp}.${ext}`;
                     const sanitizedFolderName = folderName.replace(/[^a-zA-Z0-9_\-]/g, '_');
-                    const filepath = `vehicles/${project.name}/${brand}_${model}_${plateNumber}/parts/${sanitizedFolderName}/${filename}`;
+                    const filepath = `vehicles/${project.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}/${brand}_${model}_${plateNumber}/parts/${sanitizedFolderName}/${filename}`;
                     const buffer = Buffer.from(await partFile.arrayBuffer());
 
                     const { data: uploadData, error: uploadErr } = await supabase
@@ -371,15 +405,42 @@ export async function createVehicleAction(formData: FormData) {
                         .storage
                         .from('vehicles')
                         .getPublicUrl(uploadData.path);
-                      partsUrls.push(urlData.publicUrl);
+                      
+                      // Add to processed folder with URL
+                      processedFolder.files.push({
+                        id: originalFile.id,
+                        name: partName,
+                        url: urlData.publicUrl,
+                        preview: urlData.publicUrl,
+                        type: partFile.type.startsWith('image/') ? 'image' : 'document'
+                      });
                     }
                   } catch (error) {
                     console.error(`❌ Failed to upload folder part ${folderIndex}_${fileIndex}:`, error);
                   }
+                } else if (originalFile && originalFile.url) {
+                  // Preserve existing file that wasn't re-uploaded
+                  processedFolder.files.push({
+                    id: originalFile.id,
+                    name: originalFile.name,
+                    url: originalFile.url,
+                    preview: originalFile.preview || originalFile.url,
+                    type: originalFile.type || (originalFile.url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
+                  });
                 }
               }
             }
+            
+            // Only add folder if it has files
+            if (processedFolder.files.length > 0) {
+              processedStructure.folders.push(processedFolder);
+            }
           }
+        }
+        
+        // Only set final structure if there are files
+        if (processedStructure.rootFiles.length > 0 || processedStructure.folders.length > 0) {
+          finalPartsStructure = processedStructure;
         }
       } catch (error) {
         console.error("❌ Failed to process parts structure:", error);
@@ -388,8 +449,10 @@ export async function createVehicleAction(formData: FormData) {
 
     // Update vehicle with file URLs and parts if any were uploaded
     const updateData = { ...fileUploads };
-    if (partsUrls.length > 0) {
-      updateData.vehicle_parts = partsUrls;
+    if (finalPartsStructure) {
+      // Store structured parts data as JSON string in a single array element for now
+      // This maintains compatibility while preserving folder structure
+      updateData.vehicle_parts = [JSON.stringify(finalPartsStructure)];
     }
     
     if (Object.keys(updateData).length > 0) {
@@ -403,11 +466,17 @@ export async function createVehicleAction(formData: FormData) {
     revalidatePath("/vehicles");
     revalidatePath("/dashboard");
 
+    // Calculate parts count from finalPartsStructure
+    const partsCount = finalPartsStructure 
+      ? (finalPartsStructure.rootFiles?.length || 0) + 
+        (finalPartsStructure.folders?.reduce((total, folder) => total + (folder.files?.length || 0), 0) || 0)
+      : 0;
+
     return { 
       success: true, 
       vehicleId: vehicle.id,
       filesUploaded: Object.keys(fileUploads).length,
-      partsUploaded: partsUrls.length
+      partsUploaded: partsCount
     };
 
   } catch (error) {
@@ -697,12 +766,177 @@ export async function updateVehicleAction(formData: FormData) {
       }
     }
 
-    // Update vehicle with new file URLs if any were uploaded and get final updated vehicle
+    // 🔥 HANDLE PARTS STRUCTURE UPDATES
+    const partsStructureString = formData.get("partsStructure") as string;
+    let finalPartsStructure = null;
+    
+    if (partsStructureString) {
+      try {
+        const partsStructure = JSON.parse(partsStructureString);
+        
+        // Process the parts structure to handle both new uploads and existing files
+        const processedStructure = {
+          rootFiles: [] as any[],
+          folders: [] as any[]
+        };
+        
+        // Process root files
+        if (partsStructure.rootFiles && Array.isArray(partsStructure.rootFiles)) {
+          for (let i = 0; i < partsStructure.rootFiles.length; i++) {
+            const rootFile = partsStructure.rootFiles[i];
+            
+            const partFile = formData.get(`partsFile_root_${i}`) as File;
+            const partName = formData.get(`partsFile_root_${i}_name`) as string || rootFile.name;
+            
+            // Check if this is a new file upload
+            if (partFile && partFile.size > 0) {
+              try {
+                const timestamp = Date.now();
+                const ext = partName.split('.').pop() || 'unknown';
+                const filename = `part_${i}_${timestamp}.${ext}`;
+                const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_');
+                const readableProject = sanitizeForPath(`${project.name}_${project.client.name}`);
+                const readableVehicle = sanitizeForPath(`${brand}_${model}_${plateNumber || 'Vehicle'}`);
+                const filepath = `vehicles/${readableProject}/${readableVehicle}/parts/root/${filename}`;
+                const buffer = Buffer.from(await partFile.arrayBuffer());
+
+                const { data: uploadData, error: uploadErr } = await supabase
+                  .storage
+                  .from('vehicles')
+                  .upload(filepath, buffer, { cacheControl: '3600', upsert: false });
+
+                if (uploadErr || !uploadData) {
+                  console.error(`❌ Failed to upload part ${i}:`, uploadErr);
+                } else {
+                  const { data: urlData } = supabase
+                    .storage
+                    .from('vehicles')
+                    .getPublicUrl(uploadData.path);
+                  
+                  processedStructure.rootFiles.push({
+                    id: rootFile.id,
+                    name: partName,
+                    url: urlData.publicUrl,
+                    preview: urlData.publicUrl,
+                    type: partFile.type.startsWith('image/') ? 'image' : 'document'
+                  });
+                }
+              } catch (error) {
+                console.error(`❌ Failed to upload part ${i}:`, error);
+              }
+            } else if (rootFile && (rootFile.url || rootFile.preview)) {
+              // Preserve existing file that wasn't re-uploaded
+              const fileUrl = rootFile.url || rootFile.preview;
+              processedStructure.rootFiles.push({
+                id: rootFile.id,
+                name: rootFile.name,
+                url: fileUrl,
+                preview: rootFile.preview || fileUrl,
+                type: rootFile.type || (fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
+              });
+            }
+          }
+        }
+        
+        // Process folder files
+        if (partsStructure.folders && Array.isArray(partsStructure.folders)) {
+          for (let folderIndex = 0; folderIndex < partsStructure.folders.length; folderIndex++) {
+            const folder = partsStructure.folders[folderIndex];
+            const processedFolder = {
+              id: folder.id,
+              name: folder.name,
+              files: [] as any[],
+              created_at: folder.created_at
+            };
+            
+            if (folder.files && Array.isArray(folder.files)) {
+              for (let fileIndex = 0; fileIndex < folder.files.length; fileIndex++) {
+                const folderFile = folder.files[fileIndex];
+                
+                const partFile = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
+                const partName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string || folderFile.name;
+                const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string || folder.name;
+                
+                // Check if this is a new file upload
+                if (partFile && partFile.size > 0) {
+                  try {
+                    const timestamp = Date.now();
+                    const ext = partName.split('.').pop() || 'unknown';
+                    const filename = `part_${folderIndex}_${fileIndex}_${timestamp}.${ext}`;
+                    const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_');
+                    const sanitizedFolderName = sanitizeForPath(folderName);
+                    const readableProject = sanitizeForPath(`${project.name}_${project.client.name}`);
+                    const readableVehicle = sanitizeForPath(`${brand}_${model}_${plateNumber || 'Vehicle'}`);
+                    const filepath = `vehicles/${readableProject}/${readableVehicle}/parts/${sanitizedFolderName}/${filename}`;
+                    const buffer = Buffer.from(await partFile.arrayBuffer());
+
+                    const { data: uploadData, error: uploadErr } = await supabase
+                      .storage
+                      .from('vehicles')
+                      .upload(filepath, buffer, { cacheControl: '3600', upsert: false });
+
+                    if (uploadErr || !uploadData) {
+                      console.error(`❌ Failed to upload folder part ${folderIndex}_${fileIndex}:`, uploadErr);
+                    } else {
+                      const { data: urlData } = supabase
+                        .storage
+                        .from('vehicles')
+                        .getPublicUrl(uploadData.path);
+                      
+                      processedFolder.files.push({
+                          id: folderFile.id,
+                          name: partName,
+                          url: urlData.publicUrl,
+                          preview: urlData.publicUrl,
+                          type: partFile.type.startsWith('image/') ? 'image' : 'document'
+                        });
+                      }
+                    } catch (error) {
+                      console.error(`❌ Failed to upload folder part ${folderIndex}_${fileIndex}:`, error);
+                    }
+                  } else if (folderFile && (folderFile.url || folderFile.preview)) {
+                    // Preserve existing file that wasn't re-uploaded
+                    const fileUrl = folderFile.url || folderFile.preview;
+                    processedFolder.files.push({
+                      id: folderFile.id,
+                      name: folderFile.name,
+                      url: fileUrl,
+                      preview: folderFile.preview || fileUrl,
+                      type: folderFile.type || (fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
+                    });
+                  }
+              }
+            }
+            
+            // Only add folder if it has files
+            if (processedFolder.files.length > 0) {
+              processedStructure.folders.push(processedFolder);
+            }
+          }
+        }
+        
+        // Always set the processed structure, even if it's empty
+        finalPartsStructure = processedStructure;
+      } catch (error) {
+        console.error("❌ Failed to process parts structure:", error);
+        // Set empty structure on error to ensure database gets updated
+        finalPartsStructure = { rootFiles: [], folders: [] };
+      }
+    }
+
+    // Update vehicle with file URLs and parts structure
+    const updateData: any = { ...fileUploads };
+    if (finalPartsStructure !== null) {
+      // Always update parts structure if it was processed (even if empty - indicating deletions)
+      updateData.vehicle_parts = [JSON.stringify(finalPartsStructure)];
+    }
+    
+    // Update vehicle with new file URLs and/or parts structure if any changes were made
     let finalUpdatedVehicle: typeof updatedVehicle | null = updatedVehicle;
-    if (Object.keys(fileUploads).length > 0) {
+    if (Object.keys(updateData).length > 0) {
       finalUpdatedVehicle = await prisma.vehicle.update({
         where: { id: vehicleId },
-        data: fileUploads,
+        data: updateData,
         include: {
           project: {
             include: {

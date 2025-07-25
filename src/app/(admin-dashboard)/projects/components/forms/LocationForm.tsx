@@ -69,7 +69,6 @@ export function LocationForm({ location, onSuccess, onCancel }: LocationFormProp
         { id: location.id, address: data.address },
         {
           onSuccess: () => {
-            toast.success('Location updated successfully')
             onSuccess?.()
           },
           onError: (error) => {
@@ -80,7 +79,6 @@ export function LocationForm({ location, onSuccess, onCancel }: LocationFormProp
     } else {
       createLocation(data, {
         onSuccess: () => {
-          toast.success('Location created successfully')
           form.reset()
           onSuccess?.()
         },

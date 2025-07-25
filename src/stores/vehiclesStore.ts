@@ -123,6 +123,7 @@ interface VehiclesState {
   isEditMode: boolean;
   selectedMaintenanceReport: MaintenanceReport | null;
   isMaintenanceModalOpen: boolean;
+  isVehicleMaintenanceModalOpen: boolean;
   selectedMaintenanceReportForDetail: MaintenanceReport | null;
   isMaintenanceReportDetailOpen: boolean;
   selectedMaintenanceReportForEdit: MaintenanceReport | null;
@@ -166,6 +167,7 @@ interface VehiclesState {
   setIsEditMode: (isEdit: boolean) => void;
   setSelectedMaintenanceReport: (report: MaintenanceReport | null) => void;
   setIsMaintenanceModalOpen: (open: boolean) => void;
+  setIsVehicleMaintenanceModalOpen: (open: boolean) => void;
   setSelectedMaintenanceReportForDetail: (report: MaintenanceReport | null) => void;
   setIsMaintenanceReportDetailOpen: (open: boolean) => void;
   setSelectedMaintenanceReportForEdit: (report: MaintenanceReport | null) => void;
@@ -227,6 +229,7 @@ export const useVehiclesStore = create<VehiclesState>()(
         isEditMode: false,
         selectedMaintenanceReport: null,
         isMaintenanceModalOpen: false,
+        isVehicleMaintenanceModalOpen: false,
         selectedMaintenanceReportForDetail: null,
         isMaintenanceReportDetailOpen: false,
         selectedMaintenanceReportForEdit: null,
@@ -266,6 +269,7 @@ export const useVehiclesStore = create<VehiclesState>()(
         setIsEditMode: (isEdit) => set({ isEditMode: isEdit }),
         setSelectedMaintenanceReport: (report) => set({ selectedMaintenanceReport: report }),
         setIsMaintenanceModalOpen: (open) => set({ isMaintenanceModalOpen: open }),
+        setIsVehicleMaintenanceModalOpen: (open) => set({ isVehicleMaintenanceModalOpen: open }),
         setSelectedMaintenanceReportForDetail: (report) => set({ selectedMaintenanceReportForDetail: report }),
         setIsMaintenanceReportDetailOpen: (open) => set({ isMaintenanceReportDetailOpen: open }),
         setSelectedMaintenanceReportForEdit: (report) => set({ selectedMaintenanceReportForEdit: report }),
@@ -544,6 +548,7 @@ export const useVehiclesStore = create<VehiclesState>()(
           isModalOpen: false,
           isCreateModalOpen: false,
           isMaintenanceModalOpen: false,
+          isVehicleMaintenanceModalOpen: false,
           isMaintenanceReportDetailOpen: false,
           isEditMaintenanceReportDrawerOpen: false,
           isExportModalOpen: false,
@@ -574,6 +579,7 @@ export const selectIsCreateModalOpen = (state: VehiclesState) => state.isCreateM
 export const selectIsEditMode = (state: VehiclesState) => state.isEditMode;
 export const selectSelectedMaintenanceReport = (state: VehiclesState) => state.selectedMaintenanceReport;
 export const selectIsMaintenanceModalOpen = (state: VehiclesState) => state.isMaintenanceModalOpen;
+export const selectIsVehicleMaintenanceModalOpen = (state: VehiclesState) => state.isVehicleMaintenanceModalOpen;
 export const selectSelectedMaintenanceReportForDetail = (state: VehiclesState) => state.selectedMaintenanceReportForDetail;
 export const selectIsMaintenanceReportDetailOpen = (state: VehiclesState) => state.isMaintenanceReportDetailOpen;
 export const selectSelectedMaintenanceReportForEdit = (state: VehiclesState) => state.selectedMaintenanceReportForEdit;

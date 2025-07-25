@@ -11,17 +11,15 @@ import type {
 /**
  * Fetch essential dashboard data (counts and basic stats) - FAST
  */
-export async function fetchDashboardData() {
-  console.log('🔄 fetchDashboardData: Starting...');
+export async function fetchDashboardData(timeRange: string = 'month') {
 
   try {
-    console.log('📊 Phase 1: Fetching counts...');
     // Priority 1: Essential counts only (fast queries)
     const countsPromise = Promise.all([
-      fetchEquipmentCounts().catch(err => { console.warn('Equipment counts failed:', err); return []; }),
-      fetchVehicleCounts().catch(err => { console.warn('Vehicle counts failed:', err); return []; }),
-      fetchLocationsTotalCount().catch(err => { console.warn('Locations count failed:', err); return 0; }),
-      fetchClientsTotalCount().catch(err => { console.warn('Clients count failed:', err); return 0; }),
+      fetchEquipmentCounts().catch(err => { return []; }),
+      fetchVehicleCounts().catch(err => { return []; }),
+      fetchLocationsTotalCount().catch(err => { return 0; }),
+      fetchClientsTotalCount().catch(err => { return 0; }),
       fetchProjectsTotalCount().catch(err => { console.warn('Projects count failed:', err); return 0; }),
       fetchMaintenanceReportsTotalCount().catch(err => { console.warn('Maintenance count failed:', err); return 0; }),
       fetchMaintenanceReportsStatusCounts().catch(err => { console.warn('Maintenance status counts failed:', err); return []; }),
@@ -40,8 +38,6 @@ export async function fetchDashboardData() {
       new Promise((_, reject) => setTimeout(() => reject(new Error('Counts timeout')), 5000))
     ]) as any;
 
-    console.log('✅ Phase 1 complete');
-    console.log('📊 Phase 2: Fetching list data...');
 
     // Priority 2: Simple list data without deep joins (still reasonably fast)
     const listsPromise = Promise.all([
@@ -65,7 +61,6 @@ export async function fetchDashboardData() {
       new Promise((_, reject) => setTimeout(() => reject(new Error('Lists timeout')), 8000))
     ]) as any;
 
-    console.log('✅ Phase 2 complete');
 
     const result = {
       equipmentCounts,
@@ -83,7 +78,6 @@ export async function fetchDashboardData() {
       maintenanceReportsStatusCounts,
     };
 
-    console.log('🎉 fetchDashboardData: Complete!', result);
     return result;
   } catch (error) {
     console.error("❌ Error fetching dashboard data:", error);
@@ -393,7 +387,6 @@ export async function fetchMaintenanceReportsStatusCounts() {
  * Fetch maintenance alerts for dashboard
  */
 export async function fetchMaintenanceAlerts() {
-  console.log('🚨 Fetching maintenance alerts...');
   
   const now = new Date();
   const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -603,7 +596,6 @@ export async function fetchMaintenanceAlerts() {
       insuranceExpiringEquipmentPromise
     ]);
 
-    console.log('✅ Maintenance alerts fetched successfully');
     
     return {
       equipmentReports,
@@ -631,7 +623,6 @@ export async function fetchMaintenanceAlerts() {
  * Fetch recent activities for dashboard - more comprehensive data
  */
 export async function fetchRecentActivities() {
-  console.log('📊 Fetching recent activities...');
   
   try {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -806,7 +797,6 @@ export async function fetchRecentActivities() {
       recentProjectsPromise
     ]);
 
-    console.log('✅ Recent activities fetched successfully');
     
     return {
       recentMaintenance,

@@ -82,7 +82,6 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
         { id: client.id, name: data.name, location_id: data.locationId },
         {
           onSuccess: () => {
-            toast.success('Client updated successfully')
             onSuccess?.()
           },
           onError: (error) => {
@@ -95,7 +94,6 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
         { name: data.name, location_id: data.locationId },
         {
           onSuccess: () => {
-            toast.success('Client created successfully')
             form.reset()
             onSuccess?.()
           },

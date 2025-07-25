@@ -18,11 +18,21 @@ class UserValidationError extends Error {
   constructor(message: string, public isValidationError: boolean = true) {
     super(message)
     this.name = 'UserValidationError'
-    // Prevent this error from showing in console
+    // Completely prevent this error from showing in console
     Object.defineProperty(this, 'stack', {
       get() {
-        return undefined
+        return ''
+      },
+      set() {
+        // Do nothing
       }
+    })
+    // Override toString to prevent console logging
+    this.toString = () => ''
+    // Hide from console.log/error
+    Object.defineProperty(this, Symbol.toStringTag, {
+      value: '',
+      writable: false
     })
   }
 }
@@ -297,8 +307,17 @@ export function useCreateUser() {
       toast.success('User created successfully')
     },
     onError: (error: Error) => {
-      // Handle validation errors with user-friendly messages
+      // Completely suppress console logging for validation errors
       if (error instanceof UserValidationError) {
+        // Prevent any logging by overriding console temporarily
+        const originalConsoleError = console.error
+        const originalConsoleLog = console.log
+        const originalConsoleWarn = console.warn
+        
+        console.error = () => {}
+        console.log = () => {}
+        console.warn = () => {}
+        
         // Show validation errors as warning toasts, not error toasts
         if (error.message.includes('email address has already been registered')) {
           toast.warning('This email address is already registered. Please use a different email.')
@@ -309,6 +328,13 @@ export function useCreateUser() {
         } else {
           toast.warning(error.message)
         }
+        
+        // Restore console after a brief delay
+        setTimeout(() => {
+          console.error = originalConsoleError
+          console.log = originalConsoleLog
+          console.warn = originalConsoleWarn
+        }, 100)
       } else {
         // Show actual server errors as error toasts
         toast.error(error.message || 'Failed to create user. Please try again.')
@@ -316,6 +342,10 @@ export function useCreateUser() {
     },
     // Prevent React from logging mutation errors
     throwOnError: false,
+    // Additional meta to prevent logging
+    meta: {
+      suppressErrorLogging: true
+    }
   })
 }
 
@@ -331,8 +361,17 @@ export function useUpdateUser() {
       toast.success('User updated successfully')
     },
     onError: (error: Error) => {
-      // Handle validation errors with user-friendly messages
+      // Completely suppress console logging for validation errors
       if (error instanceof UserValidationError) {
+        // Prevent any logging by overriding console temporarily
+        const originalConsoleError = console.error
+        const originalConsoleLog = console.log
+        const originalConsoleWarn = console.warn
+        
+        console.error = () => {}
+        console.log = () => {}
+        console.warn = () => {}
+        
         // Show validation errors as warning toasts, not error toasts
         if (error.message.includes('Username already exists')) {
           toast.warning('This username is already taken. Please choose a different username.')
@@ -341,6 +380,13 @@ export function useUpdateUser() {
         } else {
           toast.warning(error.message)
         }
+        
+        // Restore console after a brief delay
+        setTimeout(() => {
+          console.error = originalConsoleError
+          console.log = originalConsoleLog
+          console.warn = originalConsoleWarn
+        }, 100)
       } else {
         // Show actual server errors as error toasts
         toast.error(error.message || 'Failed to update user. Please try again.')
@@ -348,6 +394,10 @@ export function useUpdateUser() {
     },
     // Prevent React from logging mutation errors
     throwOnError: false,
+    // Additional meta to prevent logging
+    meta: {
+      suppressErrorLogging: true
+    }
   })
 }
 
@@ -362,8 +412,17 @@ export function useDeleteUser() {
       toast.success('User deleted successfully')
     },
     onError: (error: Error) => {
-      // Handle validation errors with user-friendly messages
+      // Completely suppress console logging for validation errors
       if (error instanceof UserValidationError) {
+        // Prevent any logging by overriding console temporarily
+        const originalConsoleError = console.error
+        const originalConsoleLog = console.log
+        const originalConsoleWarn = console.warn
+        
+        console.error = () => {}
+        console.log = () => {}
+        console.warn = () => {}
+        
         // Show validation errors as warning toasts, not error toasts
         if (error.message.includes('cannot delete your own account')) {
           toast.warning('You cannot delete your own account.')
@@ -374,6 +433,13 @@ export function useDeleteUser() {
         } else {
           toast.warning(error.message)
         }
+        
+        // Restore console after a brief delay
+        setTimeout(() => {
+          console.error = originalConsoleError
+          console.log = originalConsoleLog
+          console.warn = originalConsoleWarn
+        }, 100)
       } else {
         // Show actual server errors as error toasts
         toast.error(error.message || 'Failed to delete user. Please try again.')
@@ -381,5 +447,9 @@ export function useDeleteUser() {
     },
     // Prevent React from logging mutation errors
     throwOnError: false,
+    // Additional meta to prevent logging
+    meta: {
+      suppressErrorLogging: true
+    }
   })
 }

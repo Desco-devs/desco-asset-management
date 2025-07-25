@@ -39,6 +39,7 @@ export interface PartFile {
   name: string;
   file: File;
   preview?: string;
+  type?: 'image' | 'document';
 }
 
 export interface PartFolder {
@@ -223,6 +224,7 @@ export default function VehiclePartsFolderManager({
         name: file.name,
         file,
         preview: preview || undefined,
+        type: file.type.startsWith('image/') ? 'image' : 'document',
       });
     }
 
@@ -253,6 +255,7 @@ export default function VehiclePartsFolderManager({
         name: file.name,
         file,
         preview: preview || undefined,
+        type: file.type.startsWith('image/') ? 'image' : 'document',
       });
     }
 

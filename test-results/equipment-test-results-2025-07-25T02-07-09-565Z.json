@@ -1,0 +1,64 @@
+{
+  "timestamp": "2025-07-25T02-07-09-565Z",
+  "tests": [
+    {
+      "name": "Database Connection & Schema Validation",
+      "status": "FAIL",
+      "duration": 1654,
+      "details": {},
+      "errors": [
+        "Unexpected token 'E', \"Equipment \"... is not valid JSON"
+      ],
+      "fixes": []
+    },
+    {
+      "name": "Equipment Creation Flow",
+      "status": "FAIL",
+      "duration": 30,
+      "details": {},
+      "errors": [
+        "node:internal/modules/cjs/loader:1404\n  throw err;\n  ^\n\nError: Cannot find module './src/app/(admin-dashboard)/equipments/actions'\nRequire stack:\n- /home/tat/Desktop/desco-company/[eval]\n    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)\n    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)\n    at Function._load (node:internal/modules/cjs/loader:1211:37)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Module.require (node:internal/modules/cjs/loader:1487:12)\n    at require (node:internal/modules/helpers:135:16)\n    at [eval]:2:43\n    at runScriptInThisContext (node:internal/vm:209:10) {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: [ '/home/tat/Desktop/desco-company/[eval]' ]\n}\n\nNode.js v22.17.1\n"
+      ],
+      "fixes": []
+    },
+    {
+      "name": "Parts Structure Validation",
+      "status": "FAIL",
+      "duration": 26,
+      "details": {},
+      "errors": [
+        "node:internal/modules/cjs/loader:1404\n  throw err;\n  ^\n\nError: Cannot find module './src/tests/test-utils'\nRequire stack:\n- /home/tat/Desktop/desco-company/[eval]\n    at Function._resolveFilename (node:internal/modules/cjs/loader:1401:15)\n    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)\n    at Function._load (node:internal/modules/cjs/loader:1211:37)\n    at TracingChannel.traceSync (node:diagnostics_channel:322:14)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)\n    at Module.require (node:internal/modules/cjs/loader:1487:12)\n    at require (node:internal/modules/helpers:135:16)\n    at [eval]:2:44\n    at runScriptInThisContext (node:internal/vm:209:10) {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: [ '/home/tat/Desktop/desco-company/[eval]' ]\n}\n\nNode.js v22.17.1\n"
+      ],
+      "fixes": []
+    },
+    {
+      "name": "Equipment Update Flow",
+      "status": "PASS",
+      "duration": 0,
+      "details": {},
+      "errors": [],
+      "fixes": []
+    },
+    {
+      "name": "API Endpoints Validation",
+      "status": "PASS",
+      "duration": 0,
+      "details": {
+        "endpoints": [
+          "/api/equipments/getall",
+          "/api/projects/getall",
+          "/api/equipments"
+        ]
+      },
+      "errors": [],
+      "fixes": []
+    }
+  ],
+  "summary": {
+    "total": 5,
+    "passed": 2,
+    "failed": 3,
+    "fixed": 0,
+    "duration": 1710
+  }
+}

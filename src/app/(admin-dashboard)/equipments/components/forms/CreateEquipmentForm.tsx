@@ -215,6 +215,23 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     });
   };
 
+  // Helper functions to count items for tab badges
+  const getPhotosCount = () => {
+    return Object.values(files).filter(file => file !== null).length;
+  };
+
+  const getDocumentsCount = () => {
+    // Count documents separately from photos
+    const documentFields = ['thirdpartyInspection', 'pgpcInspection', 'originalReceipt', 'equipmentRegistration'];
+    return documentFields.filter(field => files[field as keyof typeof files] !== null).length;
+  };
+
+  const getPartsCount = () => {
+    const totalRootFiles = partsStructure.rootFiles.length;
+    const totalFolderFiles = partsStructure.folders.reduce((sum, folder) => sum + folder.files.length, 0);
+    return totalRootFiles + totalFolderFiles;
+  };
+
   // Tab content components
   const renderTabButton = (tab: 'details' | 'photos' | 'documents' | 'parts', label: string, icon: React.ReactNode) => (
     <Button
@@ -265,6 +282,11 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
             >
               <Camera className="h-4 w-4" />
               Equipment Images
+              {getPhotosCount() > 0 && (
+                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getPhotosCount()}
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -277,6 +299,11 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
             >
               <FileText className="h-4 w-4" />
               Documents
+              {getDocumentsCount() > 0 && (
+                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getDocumentsCount()}
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -289,6 +316,11 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
             >
               <Wrench className="h-4 w-4" />
               Parts Management
+              {getPartsCount() > 0 && (
+                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getPartsCount()}
+                </span>
+              )}
             </button>
           </>
         )}

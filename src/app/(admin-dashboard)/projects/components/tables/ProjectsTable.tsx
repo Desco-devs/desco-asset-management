@@ -102,7 +102,6 @@ export function ProjectsTable() {
 
     deleteProject(projectToDelete.id, {
       onSuccess: () => {
-        toast.success("Project deleted successfully");
         setDeleteModalOpen(false);
         setProjectToDelete(null);
       },

@@ -41,14 +41,26 @@ export default function UserProfile() {
     setLoggingOut(true);
     try {
       toast.loading("Logging out...", { id: "logout" });
+      
+      // Sign out and wait for completion
       await signOut();
+      
+      // Small delay to ensure auth state is cleared
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
       toast.success("Logged out successfully!", { id: "logout" });
-      // Smooth client-side navigation instead of full page reload
+      
+      // Navigate to login page
       router.replace("/login");
     } catch (error) {
       console.error("Logout failed:", error);
       toast.error("Failed to logout. Please try again.", { id: "logout" });
       setLoggingOut(false);
+      
+      // Force navigation even if logout had issues
+      setTimeout(() => {
+        router.replace("/login");
+      }, 1000);
     }
   }
 

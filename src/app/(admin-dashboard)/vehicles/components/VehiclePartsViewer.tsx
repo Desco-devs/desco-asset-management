@@ -51,7 +51,7 @@ export default function VehiclePartsViewer({ vehicleParts = [] }: VehiclePartsVi
   const [isFoldersCollapsed, setIsFoldersCollapsed] = useState(false);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
 
-  // Parse vehicle parts data into folder structure - EXACTLY like EquipmentPartsViewer
+  // Parse vehicle parts data into folder structure - Handle new structured format
   const parsePartsData = (parts: string[] | { rootFiles: any[]; folders: any[] } | string | undefined): ParsedPartData => {
     if (!parts) {
       return { rootFiles: [], folders: [] };
@@ -140,12 +140,27 @@ export default function VehiclePartsViewer({ vehicleParts = [] }: VehiclePartsVi
       }
     }
 
-    // Handle array format (legacy)
+    // Handle array format - NEW: Check if first element is structured JSON
     if (Array.isArray(parts)) {
       if (parts.length === 0) {
         return { rootFiles: [], folders: [] };
       }
 
+      // NEW: Check if first element contains structured data (JSON)
+      if (parts.length === 1 && typeof parts[0] === 'string') {
+        try {
+          const parsed = JSON.parse(parts[0]);
+          if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
+            // This is the new structured format stored as JSON in array
+            console.log('🔍 Found structured vehicle parts data in array format');
+            return parsed;
+          }
+        } catch (error) {
+          console.log('🔍 First array element is not JSON, treating as legacy URL');
+        }
+      }
+
+      // LEGACY: Handle old format where each element is a URL
       const rootFiles: ParsedFile[] = [];
       const folders: ParsedFolder[] = [];
 

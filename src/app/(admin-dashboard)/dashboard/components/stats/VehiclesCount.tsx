@@ -45,7 +45,6 @@ export function VehiclesCount({ initialData }: AssetCountProps) {
     const setupRealtimeSubscription = async () => {
       // Ensure user is authenticated
       if (!user) {
-        console.warn('No authenticated user for vehicle count realtime');
         return;
       }
 
@@ -60,7 +59,6 @@ export function VehiclesCount({ initialData }: AssetCountProps) {
         .on('postgres_changes', 
           { event: '*', schema: 'public', table: 'vehicles' },
           (payload) => {
-            console.log('🚗 Vehicle count update:', payload);
           if (payload.eventType === 'INSERT') {
             const status = payload.new.status as keyof typeof initialData;
             setVehicleData(prev => ({

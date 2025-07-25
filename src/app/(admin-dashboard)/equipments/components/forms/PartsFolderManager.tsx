@@ -37,8 +37,10 @@ import { toast } from "sonner";
 export interface PartFile {
   id: string;
   name: string;
-  file: File;
+  file?: File; // Optional for existing files from database
   preview?: string;
+  url?: string; // For existing files that are already stored
+  type?: 'image' | 'document'; // For existing files type detection
 }
 
 export interface PartFolder {
@@ -96,11 +98,17 @@ export default function PartsFolderManager({
         folders: Array.isArray(initialData.folders) ? initialData.folders : []
       };
       setPartsStructure(safeData);
+    } else {
+      // Clear structure if no initial data
+      setPartsStructure({ rootFiles: [], folders: [] });
     }
-  }, [initialData]);
+  }, [initialData, JSON.stringify(initialData)]);
 
   // Helper function to generate unique IDs
   const generateId = () => Math.random().toString(36).substring(2, 15);
+
+  // Debug logging for parts structure (can be removed in production)
+  console.log('🔧 PartsFolderManager current structure:', partsStructure);
 
   // Helper function to create file preview
   const createFilePreview = (file: File): Promise<string> => {
@@ -301,7 +309,7 @@ export default function PartsFolderManager({
     const [showImageViewer, setShowImageViewer] = useState(false);
 
     const handleImageClick = () => {
-      if (file.preview) {
+      if (file.preview || (file.url && file.type === 'image')) {
         setShowImageViewer(true);
       }
     };
@@ -315,29 +323,43 @@ export default function PartsFolderManager({
       <>
         <div 
           className="relative group border rounded-lg p-2 bg-card hover:bg-muted/50 transition-colors cursor-pointer"
-          onClick={file.preview ? handleImageClick : undefined}
+          onClick={(file.preview || (file.url && file.type === 'image')) ? handleImageClick : undefined}
         >
           <div className="flex items-center gap-2">
-            {file.preview ? (
+            {(file.preview || (file.url && file.type === 'image')) ? (
               <div className="relative group/image">
                 <img
-                  src={file.preview}
+                  src={file.preview || file.url}
                   alt={file.name}
                   className="w-10 h-10 object-cover rounded hover:opacity-80 transition-opacity"
+                  onError={(e) => {
+                    // If image fails to load, show file icon instead
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parentDiv = target.parentElement;
+                    if (parentDiv) {
+                      parentDiv.innerHTML = `<div class="w-10 h-10 flex items-center justify-center border rounded bg-muted text-muted-foreground"><svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>`;
+                    }
+                  }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
                   <Eye className="h-3 w-3 text-white" />
                 </div>
               </div>
             ) : (
-              <File className="h-10 w-10 text-muted-foreground" />
+              <div className="w-10 h-10 flex items-center justify-center border rounded bg-muted">
+                <File className="h-6 w-6 text-muted-foreground" />
+              </div>
             )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate" title={file.name}>
                 {file.name}
               </p>
               <p className="text-xs text-muted-foreground">
-                {(file.file.size / 1024).toFixed(1)} KB
+                {file.file?.size ? (file.file.size / 1024).toFixed(1) + ' KB' : 
+                 file.preview || file.url ? 'Stored file' : 
+                 file.type === 'image' ? 'Image file' : 
+                 file.type === 'document' ? 'Document' : 'File'}
               </p>
             </div>
           </div>
@@ -355,7 +377,7 @@ export default function PartsFolderManager({
         </div>
 
         {/* Image Viewer Modal */}
-        {showImageViewer && file.preview && (
+        {showImageViewer && (file.preview || (file.url && file.type === 'image')) && (
           <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
             <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
               <DialogHeader className="pb-4">
@@ -365,7 +387,7 @@ export default function PartsFolderManager({
               </DialogHeader>
               <div className="flex items-center justify-center">
                 <img
-                  src={file.preview}
+                  src={file.preview || file.url}
                   alt={file.name}
                   className="max-w-full max-h-[70vh] object-contain"
                   onClick={(e) => e.stopPropagation()}
@@ -447,8 +469,10 @@ export default function PartsFolderManager({
           <CardContent>
             <div className="space-y-2">
               {folder.files.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground text-sm">
-                  No files in this folder
+                <div className="text-center py-4 border-2 border-dashed border-gray-200 rounded-lg">
+                  <Folder className="h-6 w-6 mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm text-muted-foreground">No files in this folder</p>
+                  <p className="text-xs text-muted-foreground mt-1">Click "Add Files" below to add files to this folder</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-32 overflow-y-auto">

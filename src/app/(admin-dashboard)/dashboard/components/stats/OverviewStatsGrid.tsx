@@ -123,9 +123,9 @@ export function OverviewStatsGrid() {
 
   // Calculate key summary stats for collapsed view
   const totalAssets = vehicles.total + equipment.total;
-  const operationalRate = Math.round(
-    ((vehicles.operational + equipment.operational) / totalAssets) * 100
-  );
+  const operationalRate = totalAssets > 0 
+    ? Math.round(((vehicles.operational + equipment.operational) / totalAssets) * 100)
+    : 0;
 
   return (
     <div className="space-y-4">

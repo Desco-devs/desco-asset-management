@@ -16,7 +16,6 @@ import {
   ChartBar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSocketContext } from "@/context/SocketContext";
 import { InvitationStatus, RoomListItem, RoomType } from "@/types/chat-app";
 
 interface RoomsListProps {
@@ -35,7 +34,8 @@ const RoomsList = ({
   currentUserId,
 }: RoomsListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const { isUserOnline } = useSocketContext();
+  // TODO: Replace with Supabase realtime online status when migrating chat
+  const isUserOnline = (userId: string) => false;
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())

@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, User, Save, Camera, Upload, X } from "lucide-react";
+import { Loader2, User, Save, Camera, Upload, X, Eye } from "lucide-react";
 import { color } from "@/lib/color";
+import ImagePreviewModal from "@/app/components/custom-reusable/modal/PreviewImage";
 
 interface ProfileFormData {
   username: string;
@@ -23,6 +24,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showImagePreview, setShowImagePreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<ProfileFormData>({
     username: "",
@@ -88,7 +90,7 @@ export default function ProfilePage() {
     };
     reader.readAsDataURL(file);
 
-    toast.success("Image selected! Click 'Save Changes' to upload.");
+    // Remove the immediate success toast - user will see feedback when they save
   };
 
   const uploadImage = async (file: File): Promise<string> => {
@@ -130,23 +132,31 @@ export default function ProfilePage() {
     if (!user) return;
 
     setLoading(true);
+    
+    // Use a single toast ID for the entire operation
+    const toastId = "profile-update";
+    
     try {
       let profileImageUrl = formData.user_profile;
 
+      // Show loading state for the entire operation
+      if (selectedFile) {
+        toast.loading("Uploading image and updating profile...", { id: toastId });
+      } else {
+        toast.loading("Updating profile...", { id: toastId });
+      }
+
       // Upload image if a new file was selected
       if (selectedFile) {
-        toast.loading("Uploading image...", { id: "upload" });
         try {
           profileImageUrl = await uploadImage(selectedFile);
-          toast.success("Image uploaded successfully!", { id: "upload" });
         } catch (uploadError) {
-          toast.error("Failed to upload image", { id: "upload" });
+          toast.error("Failed to upload image", { id: toastId });
           throw uploadError;
         }
       }
 
       // Update profile with form data
-      toast.loading("Updating profile...", { id: "profile" });
       const response = await fetch(`/api/users/${user.id}`, {
         method: "PUT",
         headers: {
@@ -170,11 +180,16 @@ export default function ProfilePage() {
       
       // Refresh user data in context
       await refreshUser();
-      toast.success("Profile updated successfully!", { id: "profile" });
+      
+      // Show single success message
+      const successMessage = selectedFile 
+        ? "Profile and image updated successfully!" 
+        : "Profile updated successfully!";
+      toast.success(successMessage, { id: toastId });
       
     } catch (error) {
       console.error("Profile update error:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to update profile", { id: "profile" });
+      toast.error(error instanceof Error ? error.message : "Failed to update profile", { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -211,17 +226,27 @@ export default function ProfilePage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Profile Avatar */}
             <div className="flex items-center gap-4">
-              <div className="relative">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src={previewImage || undefined} alt={formData.full_name} />
-                  <AvatarFallback className={`${color} text-lg`}>{initials}</AvatarFallback>
-                </Avatar>
+              <div className="relative group">
+                <div 
+                  className={`relative ${previewImage ? 'cursor-pointer' : ''}`}
+                  onClick={() => previewImage && setShowImagePreview(true)}
+                >
+                  <Avatar className="h-20 w-20">
+                    <AvatarImage src={previewImage || undefined} alt={formData.full_name} />
+                    <AvatarFallback className={`${color} text-lg`}>{initials}</AvatarFallback>
+                  </Avatar>
+                  {previewImage && (
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-full">
+                      <Eye className="h-5 w-5 text-white" />
+                    </div>
+                  )}
+                </div>
                 {previewImage && (
                   <Button
                     type="button"
                     variant="destructive"
                     size="icon"
-                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full z-10"
                     onClick={handleRemoveImage}
                   >
                     <X className="h-3 w-3" />
@@ -358,6 +383,15 @@ export default function ProfilePage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <ImagePreviewModal
+          src={previewImage}
+          isOpen={showImagePreview}
+          onOpenChange={setShowImagePreview}
+        />
+      )}
     </div>
   );
 }

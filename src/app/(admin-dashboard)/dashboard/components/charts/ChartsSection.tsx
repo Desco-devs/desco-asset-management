@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   ChevronDown, 
   ChevronUp, 
-  PieChart,
-  TrendingUp
+  PieChart
 } from "lucide-react";
 import {
   EquipmentStatusChart,

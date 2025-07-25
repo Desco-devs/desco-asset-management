@@ -18,7 +18,20 @@ interface AssetStatusChartProps {
 const OPERATIONAL_COLOR = "#10b981"; // emerald-500
 const NON_OPERATIONAL_COLOR = "#ef4444"; // red-500
 
-const CustomTooltip = ({ active, payload }: any) => {
+interface TooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    payload: {
+      name: string;
+      value: number;
+      percentage: number;
+    };
+  }>;
+}
+
+const CustomTooltip = ({ active, payload }: TooltipProps) => {
   if (active && payload && payload.length) {
     const data = payload[0];
     return (

@@ -85,7 +85,6 @@ export function LocationsTable() {
 
     deleteLocation(locationToDelete.id, {
       onSuccess: () => {
-        toast.success("Location deleted successfully");
         setDeleteModalOpen(false);
         setLocationToDelete(null);
       },
@@ -197,7 +196,6 @@ export function LocationsTable() {
             value={(() => {
               if (!locationTable.sortBy) return "clear-sort";
 
-
               if (locationTable.sortBy === "created_at") {
                 return locationTable.sortOrder === "desc"
                   ? "created_at"
@@ -209,7 +207,6 @@ export function LocationsTable() {
                   : "address_desc";
               }
 
-
               return locationTable.sortBy;
             })()}
             onValueChange={(value) => {
@@ -217,7 +214,6 @@ export function LocationsTable() {
                 handleSort("address"); // Reset to default
                 return;
               }
-
 
               if (value === "created_at") {
                 setLocationTable({ sortBy: "created_at", sortOrder: "desc" });
@@ -451,7 +447,6 @@ export function LocationsTable() {
           <Card>
             <CardContent className="p-6 text-center">
               {locationTable.search ? "No locations found" : "No locations yet"}
-              {locationTable.search ? "No locations found" : "No locations yet"}
             </CardContent>
           </Card>
         ) : (
@@ -465,9 +460,6 @@ export function LocationsTable() {
                   {/* Header with title and actions */}
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base leading-tight">
-                        {location.address}
-                      </h3>
                       <h3 className="font-semibold text-base leading-tight">
                         {location.address}
                       </h3>
@@ -513,20 +505,6 @@ export function LocationsTable() {
 
                   {/* Created time */}
                   <div className="text-xs text-gray-400">
-                    {location.created_at
-                      ? (() => {
-                          try {
-                            const date = new Date(location.created_at);
-                            return isNaN(date.getTime())
-                              ? "Just now"
-                              : `Created ${formatDistanceToNow(date, {
-                                  addSuffix: true,
-                                })}`;
-                          } catch {
-                            return "Just now";
-                          }
-                        })()
-                      : "Just now"}
                     {location.created_at
                       ? (() => {
                           try {

@@ -191,12 +191,17 @@ async function deleteMaintenanceReport(id: string): Promise<void> {
 }
 
 async function createEquipmentMaintenanceReport(reportData: Partial<EquipmentMaintenanceReport>): Promise<EquipmentMaintenanceReport> {
+  console.log('Creating equipment maintenance report with data:', reportData);
   const response = await fetch('/api/equipments/maintenance-reports', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(reportData),
   });
-  if (!response.ok) throw new Error('Failed to create equipment maintenance report');
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error('Equipment maintenance report creation failed:', response.status, errorData);
+    throw new Error(`Failed to create equipment maintenance report: ${response.status} ${errorData}`);
+  }
   return response.json();
 }
 
@@ -399,6 +404,82 @@ export function useCreateEquipmentAction() {
       
       console.error('❌ Equipment creation failed:', error);
       toast.error('Failed to create equipment: ' + error.message);
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure cache consistency
+      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
+    },
+  });
+}
+
+// Fast Server Action Equipment Update
+export function useUpdateEquipmentAction() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      // Import server action dynamically for edge compatibility
+      const { updateEquipmentAction } = await import('../app/(admin-dashboard)/equipments/actions');
+      return await updateEquipmentAction(formData);
+    },
+    onMutate: async (formData: FormData) => {
+      // Cancel outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: equipmentKeys.equipments() });
+
+      // Snapshot the previous value for rollback
+      const previousEquipments = queryClient.getQueryData<Equipment[]>(equipmentKeys.equipments());
+
+      // Create optimistic equipment update for instant UI feedback
+      const equipmentId = formData.get("equipmentId") as string;
+      const brand = formData.get("brand") as string;
+      const model = formData.get("model") as string;
+      const type = formData.get("type") as string;
+      const owner = formData.get("owner") as string;
+      const status = formData.get("status") as string;
+      
+      if (equipmentId && brand && model && type && owner) {
+        // Optimistically update cache for instant feedback
+        queryClient.setQueryData<Equipment[]>(equipmentKeys.equipments(), (oldData) => {
+          if (!oldData) return oldData;
+          
+          return oldData.map((equipment) => {
+            if (equipment.uid === equipmentId) {
+              return {
+                ...equipment,
+                brand,
+                model,
+                type,
+                owner,
+                status: (status as "OPERATIONAL" | "NON_OPERATIONAL") || equipment.status,
+                plateNumber: formData.get("plateNumber") as string || equipment.plateNumber,
+                remarks: formData.get("remarks") as string || equipment.remarks,
+                insuranceExpirationDate: formData.get("insuranceExpirationDate") as string || equipment.insuranceExpirationDate,
+                before: formData.get("before") ? parseInt(formData.get("before") as string) : equipment.before,
+                inspectionDate: formData.get("inspectionDate") as string || equipment.inspectionDate,
+              };
+            }
+            return equipment;
+          });
+        });
+      }
+
+      return { previousEquipments };
+    },
+    onSuccess: (result, formData, context) => {
+      // Server action completed successfully - realtime will handle the real data
+      console.log('✅ Equipment update server action completed:', result);
+      
+      // Invalidate to get fresh data with proper relationships
+      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
+    },
+    onError: (error, formData, context) => {
+      // Rollback optimistic update on error
+      if (context?.previousEquipments) {
+        queryClient.setQueryData(equipmentKeys.equipments(), context.previousEquipments);
+      }
+      
+      console.error('❌ Equipment update failed:', error);
+      toast.error('Failed to update equipment: ' + error.message);
     },
     onSettled: () => {
       // Always refetch after error or success to ensure cache consistency

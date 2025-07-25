@@ -18,6 +18,8 @@ import {
   selectIsMobile,
   selectIsModalOpen,
   selectIsMaintenanceReportDetailOpen,
+  selectIsVehicleMaintenanceModalOpen,
+  selectSelectedVehicle,
   selectViewerImage,
   useVehiclesStore,
 } from "@/stores/vehiclesStore";
@@ -28,6 +30,7 @@ import EditVehicleModalModern from "./modals/EditVehicleModalModern";
 import EditVehicleMaintenanceReportDrawer from "./modals/EditVehicleMaintenanceReportDrawer";
 import VehicleModalModern from "./modals/VehicleModalModern";
 import MaintenanceReportDetailDrawer from "./modals/MaintenanceReportDetailDrawer";
+import CreateVehicleMaintenanceReportModal from "./modals/CreateVehicleMaintenanceReportModal";
 import VehiclesListModern from "./VehiclesListModern";
 
 export default function VehiclesPageModern() {
@@ -36,6 +39,8 @@ export default function VehiclesPageModern() {
   const isCreateModalOpen = useVehiclesStore(selectIsCreateModalOpen);
   const isEditMode = useVehiclesStore(selectIsEditMode);
   const isMaintenanceReportDetailOpen = useVehiclesStore(selectIsMaintenanceReportDetailOpen);
+  const isVehicleMaintenanceModalOpen = useVehiclesStore(selectIsVehicleMaintenanceModalOpen);
+  const selectedVehicle = useVehiclesStore(selectSelectedVehicle);
   const viewerImage = useVehiclesStore(selectViewerImage);
   const isMobile = useVehiclesStore(selectIsMobile);
   const deleteConfirmation = useVehiclesStore(selectDeleteConfirmation);
@@ -267,6 +272,11 @@ export default function VehiclesPageModern() {
 
       {/* Edit Vehicle Modal */}
       {isEditMode && <EditVehicleModalModern />}
+
+      {/* Vehicle Maintenance Report Modal */}
+      {isVehicleMaintenanceModalOpen && selectedVehicle && (
+        <CreateVehicleMaintenanceReportModal vehicleId={selectedVehicle.id} />
+      )}
 
       {/* Edit Vehicle Maintenance Report Drawer */}
       <EditVehicleMaintenanceReportDrawer />

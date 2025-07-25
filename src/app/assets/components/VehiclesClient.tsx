@@ -31,7 +31,7 @@ export default function VehicleClientViewer({
   projects,
   totalVehicleCount,
 }: VehicleClientViewerProps) {
-  const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<unknown | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Zustand store for client state
@@ -112,39 +112,41 @@ export default function VehicleClientViewer({
             <VehicleCardSkeleton key={`skeleton-${index}`} />
           ))
         ) : (
-          vehicles.map((vehicle: any, index: number) => (
+          vehicles.map((vehicle: unknown, index: number) => {
+            const vehicleItem = vehicle as Record<string, unknown>;
+            return (
             <VehicleCard
-              key={vehicle.id || `vehicle-${index}`}
+              key={vehicleItem.id as string || `vehicle-${index}`}
               vehicle={{
-                uid: vehicle.id,
-                brand: vehicle.brand || "Unknown",
-                model: vehicle.model || "Unknown Model",
-                type: vehicle.type || "Unknown Type",
-                plateNumber: vehicle.plate_number || "",
-                inspectionDate: vehicle.inspection_date || "",
-                before: vehicle.before,
-                expiryDate: vehicle.expiry_date || "",
-                status: vehicle.status,
-                owner: vehicle.owner || "Unknown Owner",
-                frontImgUrl: vehicle.front_img_url,
-                backImgUrl: vehicle.back_img_url,
-                side1ImgUrl: vehicle.side1_img_url,
-                side2ImgUrl: vehicle.side2_img_url,
-                remarks: vehicle.remarks,
-                originalReceiptUrl: vehicle.original_receipt_url,
-                carRegistrationUrl: vehicle.car_registration_url,
-                project: vehicle.project
+                uid: vehicleItem.id as string,
+                brand: (vehicleItem.brand as string) || "Unknown",
+                model: (vehicleItem.model as string) || "Unknown Model",
+                type: (vehicleItem.type as string) || "Unknown Type",
+                plateNumber: (vehicleItem.plate_number as string) || "",
+                inspectionDate: (vehicleItem.inspection_date as string) || "",
+                before: vehicleItem.before as number,
+                expiryDate: (vehicleItem.expiry_date as string) || "",
+                status: vehicleItem.status as string,
+                owner: (vehicleItem.owner as string) || "Unknown Owner",
+                frontImgUrl: (vehicleItem.front_img_url as string) || undefined,
+                backImgUrl: (vehicleItem.back_img_url as string) || undefined,
+                side1ImgUrl: (vehicleItem.side1_img_url as string) || undefined,
+                side2ImgUrl: (vehicleItem.side2_img_url as string) || undefined,
+                remarks: vehicleItem.remarks as string,
+                originalReceiptUrl: (vehicleItem.original_receipt_url as string) || undefined,
+                carRegistrationUrl: (vehicleItem.car_registration_url as string) || undefined,
+                project: vehicleItem.project
                   ? {
-                      uid: vehicle.project.id,
-                      name: vehicle.project.name,
-                      client: vehicle.project.client
+                      uid: (vehicleItem.project as Record<string, unknown>).id as string,
+                      name: (vehicleItem.project as Record<string, unknown>).name as string,
+                      client: (vehicleItem.project as Record<string, unknown>).client
                         ? {
-                            uid: vehicle.project.client.id,
-                            name: vehicle.project.client.name,
-                            location: vehicle.project.client.location
+                            uid: ((vehicleItem.project as Record<string, unknown>).client as Record<string, unknown>).id as string,
+                            name: ((vehicleItem.project as Record<string, unknown>).client as Record<string, unknown>).name as string,
+                            location: ((vehicleItem.project as Record<string, unknown>).client as Record<string, unknown>).location
                               ? {
-                                  uid: vehicle.project.client.location.id,
-                                  address: vehicle.project.client.location.address,
+                                  uid: (((vehicleItem.project as Record<string, unknown>).client as Record<string, unknown>).location as Record<string, unknown>).id as string,
+                                  address: (((vehicleItem.project as Record<string, unknown>).client as Record<string, unknown>).location as Record<string, unknown>).address as string,
                                 }
                               : {
                                   uid: "unknown",
@@ -173,14 +175,15 @@ export default function VehicleClientViewer({
                       },
                     },
               }}
-              isNew={newItemIds.has(vehicle.id)}
-              reportCount={vehicle.maintenanceReportCount || 0}
+              isNew={newItemIds.has(vehicleItem.id as string)}
+              reportCount={(vehicleItem.maintenanceReportCount as number) || 0}
               onClick={() => {
-                setSelectedVehicle(vehicle);
+                setSelectedVehicle(vehicleItem);
                 setIsModalOpen(true);
               }}
             />
-          ))
+            );
+          })
         )}
       </div>
 

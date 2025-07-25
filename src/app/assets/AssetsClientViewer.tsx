@@ -16,8 +16,6 @@ import EquipmentClientViewer from "./components/EquipmentsClient";
 import VehicleClientViewer from "./components/VehiclesClient";
 
 const AssetsClientViewer = ({
-  initialEquipment,
-  initialVehicles,
   initialClients,
   initialLocations,
   initialProjects,
@@ -30,7 +28,7 @@ const AssetsClientViewer = ({
   const { viewMode, setViewMode } = useAssetsStore();
   
   // TanStack Query for server state
-  const { data: assetsData, isLoading: isAssetsLoading } = useAssetsData();
+  const { data: assetsData } = useAssetsData();
   
   // Real-time updates hook
   useRealTimeUpdates();

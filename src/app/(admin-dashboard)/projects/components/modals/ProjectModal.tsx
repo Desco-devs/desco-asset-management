@@ -31,9 +31,9 @@ export function ProjectModal() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => setModal(open)}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="break-words hyphens-auto leading-relaxed">
             {isEditing ? 'Edit Project' : 'Create New Project'}
           </DialogTitle>
           <DialogDescription>

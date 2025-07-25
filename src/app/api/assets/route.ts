@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { AssetsPageData } from '@/types/assets';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const [
       equipment,

@@ -18,19 +18,17 @@ import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectio
 import VehiclePartsFolderManager, { type PartsStructure } from "./VehiclePartsFolderManager";
 import { toast } from "sonner";
 
-// Submit button component that uses useFormStatus
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  
+// Submit button component that uses local loading state
+function SubmitButton({ isLoading }: { isLoading: boolean }) {
   return (
     <Button 
       type="submit" 
-      disabled={pending}
+      disabled={isLoading}
       className="w-full"
       size="lg"
     >
-      {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-      {pending ? "Creating Vehicle..." : "Create Vehicle"}
+      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      {isLoading ? "Creating Vehicle..." : "Create Vehicle"}
     </Button>
   );
 }
@@ -51,6 +49,9 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
   
   // Tab state for mobile
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'documents' | 'parts'>('details');
+  
+  // Loading state for submit button
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Date picker states
   const [inspectionDateOpen, setInspectionDateOpen] = useState(false);
@@ -97,9 +98,50 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); // Prevent form reset
+    setIsSubmitting(true); // Start loading
     
-    const formDataFromForm = new FormData(e.currentTarget);
     try {
+      // Client-side validation before submission - use setTimeout to ensure state is current
+      await new Promise(resolve => setTimeout(resolve, 0));
+    
+    // Collect all missing fields first, then show single error message
+    const missingFields: string[] = [];
+    
+    if (!formData.brand?.trim()) {
+      missingFields.push("Brand");
+    }
+    if (!formData.model?.trim()) {
+      missingFields.push("Model");
+    }
+    if (!formData.plateNumber?.trim()) {
+      missingFields.push("Plate Number");
+    }
+    if (!formData.owner?.trim()) {
+      missingFields.push("Owner");
+    }
+    if (!formData.type) {
+      missingFields.push("Vehicle Type");
+    }
+    if (!formData.projectId) {
+      missingFields.push("Assigned Project");
+    }
+    
+      // If any fields are missing, show single error and switch to details tab
+      if (missingFields.length > 0) {
+        toast.error(`Please fill in the following required fields: ${missingFields.join(", ")}`);
+        setActiveTab('details'); // Switch to details tab to show the fields
+        return;
+      }
+      
+      // Create FormData and manually add all values (don't rely on form elements)
+      const formDataFromForm = new FormData();
+      // Add all required text fields manually from state
+      formDataFromForm.append('brand', formData.brand.trim());
+      formDataFromForm.append('model', formData.model.trim());
+      formDataFromForm.append('plateNumber', formData.plateNumber.trim());
+      formDataFromForm.append('owner', formData.owner.trim());
+      formDataFromForm.append('remarks', formData.remarks.trim());
+      
       // Add all the files to formData
       Object.entries(files).forEach(([key, file]) => {
         if (file) {
@@ -141,7 +183,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
       const result = await createVehicleAction(formDataFromForm);
       
       if (result.success) {
-        // Success - show success toast and reset form manually
+        // Success - show single success toast and reset form manually
         toast.success("Vehicle created successfully!");
         
         // Reset form state manually only on success
@@ -194,6 +236,8 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
     } catch (error) {
       console.error("Unexpected form submission error:", error);
       toast.error("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false); // Always stop loading
     }
   };
 
@@ -213,6 +257,23 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Hidden fields to ensure all required data is always present in form submission */}
+      <input type="hidden" name="brand" value={formData.brand} />
+      <input type="hidden" name="model" value={formData.model} />
+      <input type="hidden" name="plateNumber" value={formData.plateNumber} />
+      <input type="hidden" name="owner" value={formData.owner} />
+      <input type="hidden" name="type" value={formData.type} />
+      <input type="hidden" name="projectId" value={formData.projectId} />
+      <input type="hidden" name="status" value={formData.status} />
+      <input type="hidden" name="before" value={formData.before} />
+      <input type="hidden" name="remarks" value={formData.remarks} />
+      {formData.inspectionDate && (
+        <input type="hidden" name="inspectionDate" value={format(formData.inspectionDate, 'yyyy-MM-dd')} />
+      )}
+      {formData.expiryDate && (
+        <input type="hidden" name="expiryDate" value={format(formData.expiryDate, 'yyyy-MM-dd')} />
+      )}
+
       {/* Tab Navigation - All Screen Sizes */}
       <div className={`w-full mb-6 ${isMobile ? 'grid grid-cols-4 bg-muted rounded-md p-1' : 'flex justify-center border-b'}`}>
         {isMobile ? (
@@ -707,7 +768,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
           </Button>
         )}
         <div className="flex-1">
-          <SubmitButton />
+          <SubmitButton isLoading={isSubmitting} />
         </div>
       </div>
     </form>

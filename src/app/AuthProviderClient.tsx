@@ -7,8 +7,6 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "./context/AuthContext"; // adjust path
 import TanstackProvider from "./context/TanstackProvider";
 import { DashboardRealtimeProvider } from "@/context/DashboardRealtimeContext";
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-// import { SocketProvider } from "@/context/SocketContext";
 
 export default function ClientProviders({ children }: { children: ReactNode }) {
   return (
@@ -16,10 +14,7 @@ export default function ClientProviders({ children }: { children: ReactNode }) {
       <TanstackProvider>
         <AuthProvider>
           <DashboardRealtimeProvider>
-            {/* CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD */}
-            {/* <SocketProvider> */}
-              {children}
-            {/* </SocketProvider> */}
+            {children}
           </DashboardRealtimeProvider>
         </AuthProvider>
       </TanstackProvider>

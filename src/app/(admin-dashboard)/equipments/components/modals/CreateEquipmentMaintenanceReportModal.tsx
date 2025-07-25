@@ -130,6 +130,19 @@ export default function CreateEquipmentMaintenanceReportModal({
     }));
   }, []);
 
+  // Helper functions to count items for tab badges
+  const getPartsCount = () => {
+    const partsWithFiles = partsFiles.filter(file => file !== null).length;
+    const partsWithText = formData.parts_replaced.filter(part => part.trim() !== '').length;
+    return Math.max(partsWithFiles, partsWithText);
+  };
+
+  const getAttachmentsCount = () => {
+    const filesCount = attachmentFiles.filter(file => file !== null).length;
+    const urlsCount = formData.attachment_urls.filter(url => url.trim() !== '').length;
+    return filesCount + urlsCount;
+  };
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -145,28 +158,81 @@ export default function CreateEquipmentMaintenanceReportModal({
       (url) => url.trim() !== ""
     );
 
-    const reportData = {
-      equipment_id: equipmentId,
-      issue_description: formData.issue_description,
-      remarks: formData.remarks || undefined,
-      inspection_details: formData.inspection_details || undefined,
-      action_taken: formData.action_taken || undefined,
-      priority: formData.priority,
-      status: formData.status,
-      downtime_hours: formData.downtime_hours || undefined,
-      location_id: formData.location_id || undefined,
-      parts_replaced: filteredPartsReplaced,
-      attachment_urls: filteredAttachmentUrls,
-      date_reported: new Date().toISOString(),
-    };
+    // Upload files first
+    const uploadedPartUrls: string[] = [];
+    const uploadedAttachmentUrls: string[] = [];
 
     try {
+      // Upload part images
+      for (let i = 0; i < partsFiles.length; i++) {
+        const file = partsFiles[i];
+        if (file) {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('folder', 'maintenance-parts');
+          
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (uploadResponse.ok) {
+            const result = await uploadResponse.json();
+            uploadedPartUrls[i] = result.url;
+          }
+        }
+      }
+
+      // Upload attachment files
+      for (let i = 0; i < attachmentFiles.length; i++) {
+        const file = attachmentFiles[i];
+        if (file) {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('folder', 'maintenance-attachments');
+          
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (uploadResponse.ok) {
+            const result = await uploadResponse.json();
+            uploadedAttachmentUrls.push(result.url);
+          }
+        }
+      }
+
+      // Combine uploaded file URLs with manual URLs
+      const allAttachmentUrls = [
+        ...uploadedPartUrls.filter(url => url), // Part images first
+        ...uploadedAttachmentUrls, // Then attachment files
+        ...filteredAttachmentUrls // Then manual URLs
+      ];
+
+      const reportData = {
+        equipment_id: equipmentId,
+        issue_description: formData.issue_description,
+        remarks: formData.remarks || undefined,
+        inspection_details: formData.inspection_details || undefined,
+        action_taken: formData.action_taken || undefined,
+        priority: formData.priority,
+        status: formData.status,
+        downtime_hours: formData.downtime_hours || undefined,
+        location_id: formData.location_id || undefined,
+        parts_replaced: filteredPartsReplaced,
+        attachment_urls: allAttachmentUrls,
+        date_reported: new Date().toISOString(),
+      };
+
       await createMaintenanceReportMutation.mutateAsync(reportData);
+      toast.success("Maintenance report created successfully");
       handleClose();
     } catch (error) {
       console.error("Error creating maintenance report:", error);
+      toast.error("Failed to create maintenance report");
     }
-  }, [formData, equipmentId, createMaintenanceReportMutation, handleClose]);
+  }, [formData, equipmentId, createMaintenanceReportMutation, handleClose, partsFiles, attachmentFiles]);
 
   // Stable tab button renderer
   const renderTabButton = useCallback((tab: 'details' | 'parts' | 'attachments', label: string, icon: React.ReactNode) => (
@@ -557,6 +623,11 @@ export default function CreateEquipmentMaintenanceReportModal({
             >
               <Wrench className="h-4 w-4" />
               Parts Replaced
+              {getPartsCount() > 0 && (
+                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getPartsCount()}
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -569,6 +640,11 @@ export default function CreateEquipmentMaintenanceReportModal({
             >
               <Camera className="h-4 w-4" />
               Attachments & Images
+              {getAttachmentsCount() > 0 && (
+                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getAttachmentsCount()}
+                </span>
+              )}
             </button>
           </div>
 

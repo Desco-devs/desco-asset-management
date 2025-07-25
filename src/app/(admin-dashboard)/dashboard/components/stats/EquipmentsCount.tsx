@@ -45,7 +45,6 @@ export function EquipmentsCount({ initialData }: AssetCountProps) {
     const setupRealtimeSubscription = async () => {
       // Ensure user is authenticated
       if (!user) {
-        console.warn('No authenticated user for equipment count realtime');
         return;
       }
 
@@ -60,7 +59,6 @@ export function EquipmentsCount({ initialData }: AssetCountProps) {
         .on('postgres_changes', 
           { event: '*', schema: 'public', table: 'equipment' },
           (payload) => {
-            console.log('🔥 Equipment count update:', payload);
           if (payload.eventType === 'INSERT') {
             const status = payload.new.status as keyof typeof initialData;
             setEquipmentData(prev => ({

@@ -8,7 +8,6 @@ import {
   EquipmentsCount,
   MaintenanceAlerts,
   OverviewStats,
-  QuickActions,
   RecentActivity,
   VehiclesAndEquipments,
   VehiclesCount,
@@ -129,9 +128,6 @@ function DashboardContent() {
             initialVehicleData={vehicleCounts}
             initialEquipmentData={equipmentCounts}
           />
-
-          {/* Quick Actions */}
-          <QuickActions />
         </div>
 
         {/* Right Column - Activity & Alerts */}

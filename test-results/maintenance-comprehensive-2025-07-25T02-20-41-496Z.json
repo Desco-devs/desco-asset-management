@@ -1,0 +1,46 @@
+{
+  "timestamp": "2025-07-25T02:20:41.497Z",
+  "results": [
+    {
+      "test": "Database Integrity",
+      "status": "FAIL",
+      "error": "\nInvalid `prisma.$queryRaw()` invocation:\n\n\nRaw query failed. Code: `42P01`. Message: `relation \"maintenance_vehicle_report\" does not exist`"
+    },
+    {
+      "test": "Server Actions",
+      "status": "PASS",
+      "details": "Server action file structure validated"
+    },
+    {
+      "test": "Component Integrity",
+      "status": "PASS",
+      "details": "7/7 components exist"
+    },
+    {
+      "test": "Workflow Validation",
+      "status": "PASS",
+      "details": "8/8 validations passed"
+    },
+    {
+      "test": "File Handling",
+      "status": "PASS",
+      "details": "4/4 file tests passed"
+    },
+    {
+      "test": "Reporting Analytics",
+      "status": "FAIL",
+      "error": "\nInvalid `this.prisma.maintenance_vehicle_report.aggregate()` invocation in\n/home/tat/Desktop/desco-company/maintenance-comprehensive-test.js:435:72\n\n  432 console.log(`📊 Completion rate: ${completionRate}%`);\n  433 \n  434 // Test downtime analytics\n→ 435 const avgDowntime = await this.prisma.maintenance_vehicle_report.aggregate({\n        select: {\n          _avg: {\n          ~~~~\n            select: {\n              downtime_hours: true\n            }\n          },\n      ?   _count?: true,\n      ?   _min?: true,\n      ?   _max?: true\n        },\n        where: {\n          downtime_hours: {\n            not: null\n          }\n        }\n      })\n\nUnknown field `_avg` for select statement on model `AggregateMaintenance_vehicle_report`. Available options are marked with ?."
+    },
+    {
+      "test": "Performance",
+      "status": "FAIL",
+      "details": "Query: 1541ms, Bulk: 580ms"
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "passed": 4,
+    "failed": 3,
+    "successRate": "57.1"
+  }
+}

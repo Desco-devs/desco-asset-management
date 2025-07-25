@@ -90,7 +90,6 @@ export function ProjectForm({
         { id: project.id, name: data.name, client_id: data.clientId },
         {
           onSuccess: () => {
-            toast.success("Project updated successfully");
             onSuccess?.();
           },
           onError: (error) => {
@@ -103,7 +102,6 @@ export function ProjectForm({
         { name: data.name, client_id: data.clientId },
         {
           onSuccess: () => {
-            toast.success("Project created successfully");
             form.reset();
             onSuccess?.();
           },

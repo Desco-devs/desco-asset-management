@@ -11,8 +11,8 @@ export function useRealTimeUpdates() {
   const cache = useAssetsCache();
   const addNewItemId = useAssetsStore((state) => state.addNewItemId);
   const removeNewItemId = useAssetsStore((state) => state.removeNewItemId);
-  const equipmentChannelRef = useRef<any>(null);
-  const vehicleChannelRef = useRef<any>(null);
+  const equipmentChannelRef = useRef<unknown>(null);
+  const vehicleChannelRef = useRef<unknown>(null);
 
   useEffect(() => {
     // Equipment real-time subscription

@@ -97,7 +97,6 @@ export function ClientsTable() {
 
     deleteClient(clientToDelete.id, {
       onSuccess: () => {
-        toast.success("Client deleted successfully");
         setDeleteModalOpen(false);
         setClientToDelete(null);
       },
@@ -277,9 +276,6 @@ export function ClientsTable() {
                 return clientTable.sortOrder === "desc"
                   ? "created_at"
                   : "created_at_old";
-                return clientTable.sortOrder === "desc"
-                  ? "created_at"
-                  : "created_at_old";
               }
               if (clientTable.sortBy === "name") {
                 return clientTable.sortOrder === "asc" ? "name" : "name_desc";
@@ -293,7 +289,6 @@ export function ClientsTable() {
                 handleSort("name"); // Reset to default
                 return;
               }
-
 
               if (value === "created_at") {
                 setClientTable({ sortBy: "created_at", sortOrder: "desc" });
@@ -491,18 +486,6 @@ export function ClientsTable() {
                           }
                         })()
                       : "Just now"}
-                    {client.created_at
-                      ? (() => {
-                          try {
-                            const date = new Date(client.created_at);
-                            return isNaN(date.getTime())
-                              ? "Just now"
-                              : formatDistanceToNow(date, { addSuffix: true });
-                          } catch {
-                            return "Just now";
-                          }
-                        })()
-                      : "Just now"}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -567,7 +550,6 @@ export function ClientsTable() {
         ) : paginationData.paginatedClients.length === 0 ? (
           <Card>
             <CardContent className="p-6 text-center">
-              {clientTable.search ? "No clients found" : "No clients yet"}
               {clientTable.search ? "No clients found" : "No clients yet"}
             </CardContent>
           </Card>
@@ -637,26 +619,8 @@ export function ClientsTable() {
                     {client.location?.address}
                   </p>
 
-                  <p className="text-sm text-gray-600 font-medium">
-                    {client.location?.address}
-                  </p>
-
                   {/* Created time */}
                   <div className="text-xs text-gray-400">
-                    {client.created_at
-                      ? (() => {
-                          try {
-                            const date = new Date(client.created_at);
-                            return isNaN(date.getTime())
-                              ? "Just now"
-                              : `Created ${formatDistanceToNow(date, {
-                                  addSuffix: true,
-                                })}`;
-                          } catch {
-                            return "Just now";
-                          }
-                        })()
-                      : "Just now"}
                     {client.created_at
                       ? (() => {
                           try {

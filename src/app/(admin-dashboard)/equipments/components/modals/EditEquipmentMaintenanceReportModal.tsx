@@ -18,13 +18,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import {
   useUpdateEquipmentMaintenanceReport,
   useEquipmentsWithReferenceData,
 } from "@/hooks/useEquipmentsQuery";
 import { useEquipmentsStore } from "@/stores/equipmentsStore";
-import { Plus, Trash2, Settings, Clock, MapPin, Wrench, FileText } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Plus, Trash2, Settings, Clock, MapPin, Wrench, FileText, Camera, Upload } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
@@ -47,6 +48,8 @@ export default function EditEquipmentMaintenanceReportModal() {
     parts_replaced: [""] as string[],
     attachment_urls: [""] as string[],
   });
+  const [partsFiles, setPartsFiles] = useState<File[]>([]);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
 
   // Populate form when selectedReport changes
   useEffect(() => {
@@ -66,7 +69,7 @@ export default function EditEquipmentMaintenanceReportModal() {
     }
   }, [selectedReport]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setSelectedEquipmentMaintenanceReport(null);
     // Reset form
     setFormData({
@@ -81,13 +84,15 @@ export default function EditEquipmentMaintenanceReportModal() {
       parts_replaced: [""],
       attachment_urls: [""],
     });
-  };
+    setPartsFiles([]);
+    setAttachmentFiles([]);
+  }, [setSelectedEquipmentMaintenanceReport]);
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = useCallback((field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  }, []);
 
-  const handleArrayChange = (
+  const handleArrayChange = useCallback((
     field: "parts_replaced" | "attachment_urls",
     index: number,
     value: string
@@ -96,16 +101,16 @@ export default function EditEquipmentMaintenanceReportModal() {
       ...prev,
       [field]: prev[field].map((item, i) => (i === index ? value : item)),
     }));
-  };
+  }, []);
 
-  const addArrayItem = (field: "parts_replaced" | "attachment_urls") => {
+  const addArrayItem = useCallback((field: "parts_replaced" | "attachment_urls") => {
     setFormData((prev) => ({
       ...prev,
       [field]: [...prev[field], ""],
     }));
-  };
+  }, []);
 
-  const removeArrayItem = (
+  const removeArrayItem = useCallback((
     field: "parts_replaced" | "attachment_urls",
     index: number
   ) => {
@@ -113,9 +118,9 @@ export default function EditEquipmentMaintenanceReportModal() {
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index),
     }));
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!selectedReport) return;
@@ -133,32 +138,85 @@ export default function EditEquipmentMaintenanceReportModal() {
       (url) => url.trim() !== ""
     );
 
-    const reportData = {
-      id: selectedReport.id,
-      issue_description: formData.issue_description,
-      remarks: formData.remarks || undefined,
-      inspection_details: formData.inspection_details || undefined,
-      action_taken: formData.action_taken || undefined,
-      priority: formData.priority,
-      status: formData.status,
-      downtime_hours: formData.downtime_hours || undefined,
-      location_id: formData.location_id || undefined,
-      parts_replaced: filteredPartsReplaced,
-      attachment_urls: filteredAttachmentUrls,
-      // Set repair date if status is completed and no repair date exists
-      date_repaired: 
-        formData.status === "COMPLETED" && !selectedReport.date_repaired
-          ? new Date().toISOString()
-          : selectedReport.date_repaired,
-    };
+    // Upload files first
+    const uploadedPartUrls: string[] = [];
+    const uploadedAttachmentUrls: string[] = [];
 
     try {
+      // Upload part images
+      for (let i = 0; i < partsFiles.length; i++) {
+        const file = partsFiles[i];
+        if (file) {
+          const formDataUpload = new FormData();
+          formDataUpload.append('file', file);
+          formDataUpload.append('folder', 'maintenance-parts');
+          
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formDataUpload,
+          });
+          
+          if (uploadResponse.ok) {
+            const result = await uploadResponse.json();
+            uploadedPartUrls[i] = result.url;
+          }
+        }
+      }
+
+      // Upload attachment files
+      for (let i = 0; i < attachmentFiles.length; i++) {
+        const file = attachmentFiles[i];
+        if (file) {
+          const formDataUpload = new FormData();
+          formDataUpload.append('file', file);
+          formDataUpload.append('folder', 'maintenance-attachments');
+          
+          const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            body: formDataUpload,
+          });
+          
+          if (uploadResponse.ok) {
+            const result = await uploadResponse.json();
+            uploadedAttachmentUrls.push(result.url);
+          }
+        }
+      }
+
+      // Combine uploaded file URLs with manual URLs
+      const allAttachmentUrls = [
+        ...uploadedPartUrls.filter(url => url), // Part images first
+        ...uploadedAttachmentUrls, // Then attachment files
+        ...filteredAttachmentUrls // Then manual URLs
+      ];
+
+      const reportData = {
+        id: selectedReport.id,
+        issue_description: formData.issue_description,
+        remarks: formData.remarks || undefined,
+        inspection_details: formData.inspection_details || undefined,
+        action_taken: formData.action_taken || undefined,
+        priority: formData.priority,
+        status: formData.status,
+        downtime_hours: formData.downtime_hours || undefined,
+        location_id: formData.location_id || undefined,
+        parts_replaced: filteredPartsReplaced,
+        attachment_urls: allAttachmentUrls,
+        // Set repair date if status is completed and no repair date exists
+        date_repaired: 
+          formData.status === "COMPLETED" && !selectedReport.date_repaired
+            ? new Date().toISOString()
+            : selectedReport.date_repaired,
+      };
+
       await updateMaintenanceReportMutation.mutateAsync(reportData);
+      toast.success("Equipment maintenance report updated successfully");
       handleClose();
     } catch (error) {
       console.error("Error updating maintenance report:", error);
+      toast.error("Failed to update maintenance report");
     }
-  };
+  }, [formData, selectedReport, updateMaintenanceReportMutation, handleClose, partsFiles, attachmentFiles]);
 
   if (!selectedReport) return null;
 
@@ -338,155 +396,52 @@ export default function EditEquipmentMaintenanceReportModal() {
                   </CardContent>
                 </Card>
 
-                {/* Parts Replaced Card */}
-                <Card>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Wrench className="h-5 w-5" />
-                      Parts Replaced
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Manage the list of parts that were replaced during maintenance
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label>Parts List</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addArrayItem("parts_replaced")}
-                        className="flex items-center gap-1"
-                      >
-                        <Plus className="h-3 w-3" />
-                        Add Part
-                      </Button>
-                    </div>
-                    <div className="space-y-3">
-                      {formData.parts_replaced.length === 0 ? (
-                        <div className="text-center py-4 text-muted-foreground text-sm border-2 border-dashed border-gray-300 rounded-lg">
-                          No parts replaced. Click "Add Part" to add parts.
+                    {/* Additional Remarks Card */}
+                    <Card>
+                      <CardHeader className="pb-4">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <FileText className="h-5 w-5" />
+                          Additional Remarks
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          Add any additional notes or comments
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <Label htmlFor="remarks">Remarks</Label>
+                          <Textarea
+                            id="remarks"
+                            value={formData.remarks}
+                            onChange={(e) => handleInputChange("remarks", e.target.value)}
+                            placeholder="Additional remarks or notes..."
+                            className="min-h-[100px]"
+                          />
                         </div>
-                      ) : (
-                        formData.parts_replaced.map((part, index) => (
-                          <div key={index} className="flex gap-2">
-                            <Input
-                              value={part}
-                              onChange={(e) =>
-                                handleArrayChange("parts_replaced", index, e.target.value)
-                              }
-                              placeholder="Part name or description..."
-                              className="flex-1"
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => removeArrayItem("parts_replaced", index)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Attachments & Additional Information Card */}
-                <Card>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Attachments & Additional Information
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Add attachment URLs and any additional remarks
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Attachment URLs */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Label>Attachment URLs</Label>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => addArrayItem("attachment_urls")}
-                          className="flex items-center gap-1"
-                        >
-                          <Plus className="h-3 w-3" />
-                          Add URL
-                        </Button>
-                      </div>
-                      <div className="space-y-3">
-                        {formData.attachment_urls.length === 0 ? (
-                          <div className="text-center py-4 text-muted-foreground text-sm border-2 border-dashed border-gray-300 rounded-lg">
-                            No attachment URLs. Click "Add URL" to add attachments.
-                          </div>
-                        ) : (
-                          formData.attachment_urls.map((url, index) => (
-                            <div key={index} className="flex gap-2">
-                              <Input
-                                value={url}
-                                onChange={(e) =>
-                                  handleArrayChange("attachment_urls", index, e.target.value)
-                                }
-                                placeholder="https://example.com/image.jpg"
-                                type="url"
-                                className="flex-1"
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => removeArrayItem("attachment_urls", index)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Remarks */}
-                    <div className="space-y-2">
-                      <Label htmlFor="remarks">Additional Remarks</Label>
-                      <Textarea
-                        id="remarks"
-                        value={formData.remarks}
-                        onChange={(e) => handleInputChange("remarks", e.target.value)}
-                        placeholder="Additional remarks or notes..."
-                        className="min-h-[100px]"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
+                      </CardContent>
+                    </Card>
+                </div>
               </div>
             </div>
-          </div>
-          
-          {/* Desktop Action Buttons in Footer */}
-          <DialogFooter className="pt-4 border-t bg-background">
-            <div className="flex gap-2 w-full justify-end">
-              <Button type="button" variant="outline" onClick={handleClose} size="lg">
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={updateMaintenanceReportMutation.isPending}
-                size="lg"
-              >
-                {updateMaintenanceReportMutation.isPending
-                  ? "Updating..."
-                  : "Update Report"}
-              </Button>
-            </div>
-          </DialogFooter>
-        </form>
+            
+            {/* Desktop Action Buttons in Footer */}
+            <DialogFooter className="pt-4 border-t bg-background">
+              <div className="flex gap-2 w-full justify-end">
+                <Button type="button" variant="outline" onClick={handleClose} size="lg">
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateMaintenanceReportMutation.isPending}
+                  size="lg"
+                >
+                  {updateMaintenanceReportMutation.isPending
+                    ? "Updating..."
+                    : "Update Report"}
+                </Button>
+              </div>
+            </DialogFooter>
+          </form>
       </DialogContent>
     </Dialog>
   );

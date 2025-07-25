@@ -334,12 +334,15 @@ export function useCreateLocation() {
       // Optimistically add to cache immediately, checking for duplicates
       queryClient.setQueryData<Location[]>(projectsKeys.locations(), (oldData) => {
         if (!oldData) return [newLocation]
+        if (!Array.isArray(oldData)) return [newLocation]
         // Check if location already exists to prevent duplicates
         const exists = oldData.some(location => location.id === newLocation.id)
         if (exists) return oldData
         return [newLocation, ...oldData]
       })
-      toast.success('Location created successfully')
+      // Show toast immediately for better UX with deduplication
+      const toastId = `location-create-${newLocation.id}`
+      toast.success('Location created successfully', { id: toastId })
     },
     onError: (error: Error) => {
       if (error instanceof ProjectValidationError) {
@@ -366,6 +369,7 @@ export function useUpdateLocation() {
       // Optimistically update in cache immediately
       queryClient.setQueryData<Location[]>(projectsKeys.locations(), (oldData) => {
         if (!oldData) return [updatedLocation]
+        if (!Array.isArray(oldData)) return [updatedLocation]
         return oldData.map(location => 
           location.id === updatedLocation.id ? updatedLocation : location
         )
@@ -374,7 +378,9 @@ export function useUpdateLocation() {
       queryClient.invalidateQueries({ queryKey: projectsKeys.locations() })
       // Also invalidate clients cache since client location data might be affected
       queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
-      toast.success('Location updated successfully')
+      // Show toast immediately for better UX with deduplication
+      const toastId = `location-update-${updatedLocation.id}`
+      toast.success('Location updated successfully', { id: toastId })
     },
     onError: (error: Error) => {
       if (error instanceof ProjectValidationError) {
@@ -398,13 +404,17 @@ export function useDeleteLocation() {
   return useMutation({
     mutationFn: api.deleteLocation,
     onSuccess: (_, locationId) => {
-      // Optimistically remove from cache immediately
+      // Optimistically remove from cache immediately for better UX
       queryClient.setQueryData<Location[]>(projectsKeys.locations(), (oldData) => {
-        return oldData ? oldData.filter(location => location.id !== locationId) : []
+        if (!oldData || !Array.isArray(oldData)) return []
+        return oldData.filter(location => location.id !== locationId)
       })
       // Also invalidate dependent data
       queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
-      toast.success('Location deleted successfully')
+      // Show toast immediately for better UX with deduplication
+      console.log('🚀 MUTATION: Location delete successful, showing toast')
+      const toastId = `location-delete-${locationId}`
+      toast.success('Location deleted successfully', { id: toastId })
     },
     onError: (error: Error) => {
       if (error instanceof ProjectValidationError) {
@@ -431,6 +441,7 @@ export function useCreateClient() {
       // Optimistically add to cache immediately, checking for duplicates
       queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
         if (!oldData) return [newClient]
+        if (!Array.isArray(oldData)) return [newClient]
         // Check if client already exists to prevent duplicates
         const exists = oldData.some(client => client.id === newClient.id)
         if (exists) return oldData
@@ -439,12 +450,15 @@ export function useCreateClient() {
       // Also update location-specific queries if applicable
       queryClient.setQueryData<Client[]>(projectsKeys.clientsByLocation(newClient.location_id), (oldData) => {
         if (!oldData) return [newClient]
+        if (!Array.isArray(oldData)) return [newClient]
         // Check if client already exists to prevent duplicates
         const exists = oldData.some(client => client.id === newClient.id)
         if (exists) return oldData
         return [newClient, ...oldData]
       })
-      toast.success('Client created successfully')
+      // Show toast immediately for better UX with deduplication
+      const toastId = `client-create-${newClient.id}`
+      toast.success('Client created successfully', { id: toastId })
     },
     onError: (error: Error) => {
       if (error instanceof ProjectValidationError) {
@@ -471,6 +485,7 @@ export function useUpdateClient() {
       // Optimistically update in cache immediately
       queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
         if (!oldData) return [updatedClient]
+        if (!Array.isArray(oldData)) return [updatedClient]
         return oldData.map(client => 
           client.id === updatedClient.id ? updatedClient : client
         )
@@ -478,6 +493,7 @@ export function useUpdateClient() {
       // Update location-specific queries
       queryClient.setQueryData<Client[]>(projectsKeys.clientsByLocation(updatedClient.location_id), (oldData) => {
         if (!oldData) return [updatedClient]
+        if (!Array.isArray(oldData)) return [updatedClient]
         return oldData.map(client => 
           client.id === updatedClient.id ? updatedClient : client
         )
@@ -486,6 +502,7 @@ export function useUpdateClient() {
       queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
       // Also invalidate projects cache since project client data might be affected
       queryClient.invalidateQueries({ queryKey: projectsKeys.projects() })
+      // Show toast immediately for better UX
       toast.success('Client updated successfully')
     },
     onError: (error: Error) => {
@@ -510,13 +527,17 @@ export function useDeleteClient() {
   return useMutation({
     mutationFn: api.deleteClient,
     onSuccess: (_, clientId) => {
-      // Optimistically remove from cache immediately
+      // Optimistically remove from cache immediately for better UX
       queryClient.setQueryData<Client[]>(projectsKeys.clients(), (oldData) => {
-        return oldData ? oldData.filter(client => client.id !== clientId) : []
+        if (!oldData || !Array.isArray(oldData)) return []
+        return oldData.filter(client => client.id !== clientId)
       })
       // Also invalidate dependent data
       queryClient.invalidateQueries({ queryKey: projectsKeys.projects() })
-      toast.success('Client deleted successfully')
+      // Show toast immediately for better UX with deduplication
+      console.log('🚀 MUTATION: Client delete successful, showing toast')
+      const toastId = `client-delete-${clientId}`
+      toast.success('Client deleted successfully', { id: toastId })
     },
     onError: (error: Error) => {
       if (error instanceof ProjectValidationError) {
@@ -541,12 +562,13 @@ export function useCreateProject() {
     mutationFn: api.createProject,
     onSuccess: (newProject) => {
       // Optimistically add to cache immediately, checking for duplicates
-      queryClient.setQueryData<Project[]>(projectsKeys.projects(), (oldData) => {
-        if (!oldData) return [newProject]
+      queryClient.setQueryData(projectsKeys.projects(), (oldData: any) => {
+        if (!oldData) return { data: [newProject], permissions: null }
+        if (!oldData.data || !Array.isArray(oldData.data)) return { data: [newProject], permissions: oldData?.permissions || null }
         // Check if project already exists to prevent duplicates
-        const exists = oldData.some(project => project.id === newProject.id)
+        const exists = oldData.data.some((project: Project) => project.id === newProject.id)
         if (exists) return oldData
-        return [newProject, ...oldData]
+        return { ...oldData, data: [newProject, ...oldData.data] }
       })
       // Also update client-specific queries if applicable
       queryClient.setQueryData<Project[]>(projectsKeys.projectsByClient(newProject.client_id), (oldData) => {
@@ -573,6 +595,7 @@ export function useCreateProject() {
       
       // Also invalidate clients queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
+      // Show toast immediately for better UX
       toast.success('Project created successfully')
     },
     onError: (error: Error) => {
@@ -598,11 +621,15 @@ export function useUpdateProject() {
     mutationFn: api.updateProject,
     onSuccess: (updatedProject) => {
       // Optimistically update in cache immediately
-      queryClient.setQueryData<Project[]>(projectsKeys.projects(), (oldData) => {
-        if (!oldData) return [updatedProject]
-        return oldData.map(project => 
-          project.id === updatedProject.id ? updatedProject : project
-        )
+      queryClient.setQueryData(projectsKeys.projects(), (oldData: any) => {
+        if (!oldData) return { data: [updatedProject], permissions: null }
+        if (!oldData.data || !Array.isArray(oldData.data)) return { data: [updatedProject], permissions: oldData?.permissions || null }
+        return {
+          ...oldData,
+          data: oldData.data.map((project: Project) => 
+            project.id === updatedProject.id ? updatedProject : project
+          )
+        }
       })
       // Update client-specific queries
       queryClient.setQueryData<Project[]>(projectsKeys.projectsByClient(updatedProject.client_id), (oldData) => {
@@ -611,6 +638,7 @@ export function useUpdateProject() {
           project.id === updatedProject.id ? updatedProject : project
         )
       })
+      // Show toast immediately for better UX
       toast.success('Project updated successfully')
     },
     onError: (error: Error) => {
@@ -636,12 +664,17 @@ export function useDeleteProject() {
     mutationFn: api.deleteProject,
     onSuccess: (_, projectId) => {
       // Get the project that was deleted to update client cache
-      const projectsData = queryClient.getQueryData<Project[]>(projectsKeys.projects())
-      const deletedProject = projectsData?.find(p => p.id === projectId)
+      const projectsData = queryClient.getQueryData(projectsKeys.projects()) as any
+      const deletedProject = projectsData?.data?.find((p: Project) => p.id === projectId)
       
       // Optimistically remove from cache immediately
-      queryClient.setQueryData<Project[]>(projectsKeys.projects(), (oldData) => {
-        return oldData ? oldData.filter(project => project.id !== projectId) : []
+      queryClient.setQueryData(projectsKeys.projects(), (oldData: any) => {
+        if (!oldData) return { data: [], permissions: null }
+        if (!oldData.data || !Array.isArray(oldData.data)) return { data: [], permissions: oldData?.permissions || null }
+        return {
+          ...oldData,
+          data: oldData.data.filter((project: Project) => project.id !== projectId)
+        }
       })
       
       // Update clients cache to reflect removed project
@@ -662,7 +695,10 @@ export function useDeleteProject() {
         // Also invalidate clients queries to ensure fresh data
         queryClient.invalidateQueries({ queryKey: projectsKeys.clients() })
       }
-      toast.success('Project deleted successfully')
+      // Show toast immediately for better UX with deduplication
+      console.log('🚀 MUTATION: Project delete successful, showing toast')
+      const toastId = `project-delete-${projectId}`
+      toast.success('Project deleted successfully', { id: toastId })
     },
     onError: (error: Error) => {
       if (error instanceof ProjectValidationError) {

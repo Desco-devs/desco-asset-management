@@ -61,7 +61,6 @@ export function VehiclesAndEquipments({
     const setupRealtimeSubscriptions = async () => {
       // Ensure user is authenticated
       if (!user) {
-        console.warn('No authenticated user for assets overview realtime');
         return;
       }
 
@@ -76,7 +75,6 @@ export function VehiclesAndEquipments({
         .on('postgres_changes', 
           { event: '*', schema: 'public', table: 'equipment' },
           (payload) => {
-            console.log('🚀 Assets equipment update:', payload);
           if (payload.eventType === 'INSERT') {
             const status = payload.new.status as keyof AssetCounts;
             setEquipmentData(prev => ({
@@ -111,7 +109,6 @@ export function VehiclesAndEquipments({
         .on('postgres_changes', 
           { event: '*', schema: 'public', table: 'vehicles' },
           (payload) => {
-            console.log('🚗 Assets vehicle update:', payload);
           if (payload.eventType === 'INSERT') {
             const status = payload.new.status as keyof AssetCounts;
             setVehicleData(prev => ({

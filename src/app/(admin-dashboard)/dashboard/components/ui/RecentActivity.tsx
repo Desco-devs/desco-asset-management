@@ -24,7 +24,6 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
     const setupRealtimeSubscriptions = async () => {
       // Ensure user is authenticated
       if (!user) {
-        console.warn('No authenticated user for recent activity realtime');
         return;
       }
 
@@ -42,7 +41,6 @@ export function RecentActivity({ initialData }: RecentActivityProps) {
           schema: 'public', 
           table: 'equipment' 
         }, (payload) => {
-          console.log("🔥 Equipment payload:", payload);
           
           if (payload.new && Object.keys(payload.new).length > 0) {
             const newEquipment = payload.new;

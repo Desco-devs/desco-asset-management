@@ -42,8 +42,8 @@ export function UserSearchAndActions({
 
   // Helper to get the current grouped filter value
   const getFilterValue = () => {
-    if (filters.role && filters.role !== ('all' as any)) return `role-${filters.role}`
-    if (filters.status && filters.status !== ('all' as any)) return `status-${filters.status}`
+    if (filters.role && filters.role !== 'all') return `role-${filters.role}`
+    if (filters.status && filters.status !== 'all') return `status-${filters.status}`
     return ""
   }
 
@@ -130,7 +130,7 @@ export function UserSearchAndActions({
           <SelectContent className="w-80">
             <div className="p-3 max-h-96 overflow-y-auto">
               {/* Clear Filters */}
-              {(filters.role !== ('all' as any) || filters.status !== ('all' as any)) && (
+              {(filters.role !== 'all' || filters.status !== 'all') && (
                 <div className="mb-4">
                   <SelectItem value="clear-all" className="text-red-600 font-medium">
                     Clear All Filters
@@ -200,7 +200,7 @@ export function UserSearchAndActions({
       </div>
 
       {/* Active Filter Badges */}
-      {(filters.role !== ('all' as any) || filters.status !== ('all' as any) || filters.search) && (
+      {(filters.role !== 'all' || filters.status !== 'all' || filters.search) && (
         <div className="flex flex-wrap gap-2">
           {/* Search Badge */}
           {filters.search && (
@@ -218,7 +218,7 @@ export function UserSearchAndActions({
           )}
 
           {/* Role Filter Badge */}
-          {filters.role && filters.role !== ('all' as any) && (
+          {filters.role && filters.role !== 'all' && (
             <Badge variant="secondary" className="gap-1 pr-1">
               Role: {(() => {
                 const roleMap = {
@@ -240,7 +240,7 @@ export function UserSearchAndActions({
           )}
 
           {/* Status Filter Badge */}
-          {filters.status && filters.status !== ('all' as any) && (
+          {filters.status && filters.status !== 'all' && (
             <Badge variant="secondary" className="gap-1 pr-1">
               Status: {filters.status === 'ACTIVE' ? 'Active' : 'Inactive'}
               <Button

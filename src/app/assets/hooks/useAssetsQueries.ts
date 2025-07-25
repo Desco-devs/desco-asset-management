@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import type { AssetsPageData, EquipmentWithRelations, VehicleWithRelations } from '@/types/assets';
 
@@ -81,7 +81,7 @@ export function useEquipmentList(filters: Record<string, string>, page: number) 
     queryFn: () => fetchEquipmentList(filters, page),
     staleTime: 1000 * 60 * 2, // 2 minutes
     gcTime: 1000 * 60 * 5, // 5 minutes
-    placeholderData: 'keepPreviousData' as any, // For smooth pagination
+    placeholderData: undefined, // For smooth pagination
   });
 }
 
@@ -91,7 +91,7 @@ export function useVehiclesList(filters: Record<string, string>, page: number) {
     queryFn: () => fetchVehiclesList(filters, page),
     staleTime: 1000 * 60 * 2, // 2 minutes
     gcTime: 1000 * 60 * 5, // 5 minutes
-    placeholderData: 'keepPreviousData' as any, // For smooth pagination
+    placeholderData: undefined, // For smooth pagination
   });
 }
 
@@ -125,7 +125,7 @@ export function useAssetsCache() {
           queryKey: assetsKeys.equipment(),
           type: 'active',
         },
-        (oldData: any) => {
+        (oldData: Record<string, unknown> | undefined) => {
           if (!oldData?.equipment) return oldData;
           
           return {
@@ -148,7 +148,7 @@ export function useAssetsCache() {
           queryKey: assetsKeys.vehicles(),
           type: 'active',
         },
-        (oldData: any) => {
+        (oldData: Record<string, unknown> | undefined) => {
           if (!oldData?.vehicles) return oldData;
           
           return {
@@ -171,7 +171,7 @@ export function useAssetsCache() {
           queryKey: assetsKeys.equipment(),
           type: 'active',
         },
-        (oldData: any) => {
+        (oldData: Record<string, unknown> | undefined) => {
           if (!oldData?.equipment || oldData.page !== 1) return oldData;
           
           return {
@@ -193,7 +193,7 @@ export function useAssetsCache() {
           queryKey: assetsKeys.vehicles(),
           type: 'active',
         },
-        (oldData: any) => {
+        (oldData: Record<string, unknown> | undefined) => {
           if (!oldData?.vehicles || oldData.page !== 1) return oldData;
           
           return {
@@ -215,7 +215,7 @@ export function useAssetsCache() {
           queryKey: assetsKeys.equipment(),
           type: 'active',
         },
-        (oldData: any) => {
+        (oldData: Record<string, unknown> | undefined) => {
           if (!oldData?.equipment) return oldData;
           
           return {
@@ -237,7 +237,7 @@ export function useAssetsCache() {
           queryKey: assetsKeys.vehicles(),
           type: 'active',
         },
-        (oldData: any) => {
+        (oldData: Record<string, unknown> | undefined) => {
           if (!oldData?.vehicles) return oldData;
           
           return {

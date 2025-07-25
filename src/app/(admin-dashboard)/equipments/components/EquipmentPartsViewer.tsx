@@ -29,6 +29,7 @@ interface ParsedFile {
   url: string;
   preview?: string;
   type: 'image' | 'document';
+  file?: File; // For new uploaded files that have size info
 }
 
 interface ParsedFolder {
@@ -90,10 +91,10 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
 
     // Handle object format (already parsed)
     if (typeof parts === 'object' && !Array.isArray(parts)) {
-      if (parts.rootFiles && parts.folders) {
+      if (parts.rootFiles !== undefined && parts.folders !== undefined) {
         // Ensure files have proper structure with type detection
         const processedData = {
-          rootFiles: parts.rootFiles.map((file: any, index: number) => {
+          rootFiles: Array.isArray(parts.rootFiles) ? parts.rootFiles.map((file: any, index: number) => {
             const fileUrl = file.preview || file.url || '';
             const fileName = file.name || fileUrl.split('/').pop() || `File ${index + 1}`;
             
@@ -109,10 +110,11 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
               name: fileName,
               url: fileUrl,
               preview: file.preview || fileUrl,
-              type: isImage ? 'image' : 'document'
+              type: isImage ? 'image' : 'document',
+              file: file.file // Preserve original File object if it exists
             } as ParsedFile;
-          }),
-          folders: parts.folders.map((folder: any) => ({
+          }) : [],
+          folders: Array.isArray(parts.folders) ? parts.folders.map((folder: any) => ({
             ...folder,
             files: folder.files?.map((file: any, index: number) => {
               const fileUrl = file.preview || file.url || '';
@@ -130,10 +132,11 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
                 name: fileName,
                 url: fileUrl,
                 preview: file.preview || fileUrl,
-                type: isImage ? 'image' : 'document'
+                type: isImage ? 'image' : 'document',
+                file: file.file // Preserve original File object if it exists
               } as ParsedFile;
             }) || []
-          }))
+          })) : []
         };
         
         return processedData;
@@ -172,7 +175,7 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
 
   const parsedData = parsePartsData(equipmentParts);
   
-  // Debug logging to see what we're receiving
+  // Debug logging to see what we're receiving (can be removed in production)
   console.log('🔍 EquipmentPartsViewer received equipmentParts:', equipmentParts);
   console.log('🔍 Parsed data:', parsedData);
 
@@ -199,33 +202,59 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
     const isImage = file.type === 'image';
     const fileUrl = file.preview || file.url;
     
+    // For stored files, try to get file size from name or estimate
+    const getFileDisplayInfo = (file: ParsedFile) => {
+      // If it's a new file with File object
+      if (file.file?.size) {
+        return `${(file.file.size / 1024).toFixed(1)} KB`;
+      }
+      
+      // If it's an existing stored file, show appropriate label
+      return file.preview || file.url ? 'Stored file' : isImage ? 'Image file' : 'Document';
+    };
+    
     return (
       <div 
         className="relative group border rounded-lg p-2 bg-card hover:bg-muted/50 transition-colors cursor-pointer"
         onClick={() => handleImageClick(fileUrl, file.name)}
       >
         <div className="flex items-center gap-2">
-          {isImage ? (
+          {isImage && fileUrl ? (
             <div className="relative group/image">
               <img
                 src={fileUrl}
                 alt={file.name}
                 className="w-10 h-10 object-cover rounded hover:opacity-80 transition-opacity"
+                onError={(e) => {
+                  // If image fails to load, show file icon instead
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parentDiv = target.parentElement;
+                  if (parentDiv) {
+                    parentDiv.innerHTML = `<div class="w-10 h-10 flex items-center justify-center border rounded bg-muted"><svg class="h-6 w-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>`;
+                  }
+                }}
               />
               <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
                 <Eye className="h-3 w-3 text-white" />
               </div>
             </div>
           ) : (
-            <File className="h-10 w-10 text-muted-foreground" />
+            <div className="w-10 h-10 flex items-center justify-center border rounded bg-muted">
+              <File className="h-6 w-6 text-muted-foreground" />
+            </div>
           )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate" title={file.name}>
               {file.name}
             </p>
             <p className="text-xs text-muted-foreground">
-              {isImage ? 'Image' : 'Document'}
+              {getFileDisplayInfo(file)}
             </p>
+          </div>
+          {/* Click to view indicator */}
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+            <Eye className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>
       </div>
@@ -259,8 +288,10 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
           <CardContent>
             <div className="space-y-2">
               {folder.files.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground text-sm">
-                  No files in this folder
+                <div className="text-center py-4 border-2 border-dashed border-gray-200 rounded-lg">
+                  <Folder className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                  <p className="text-sm text-muted-foreground">No files in this folder</p>
+                  <p className="text-xs text-muted-foreground mt-1">This folder is empty</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-32 overflow-y-auto">

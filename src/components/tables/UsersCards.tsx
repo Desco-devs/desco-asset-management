@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Edit, Trash2, Eye, UserPlus, Phone, Mail, Globe, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Edit, Trash2, Eye, UserPlus, Phone, Mail, Globe, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -545,8 +545,12 @@ export function UsersCards({
                       disabled={!!loadingUserId}
                       className="flex-1 gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                     >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
+                      {loadingUserId === selectedUser.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                      {loadingUserId === selectedUser.id ? 'Deleting...' : 'Delete'}
                     </Button>
                   )}
                   {canEdit && selectedUser.role !== 'SUPERADMIN' && (
@@ -706,8 +710,12 @@ export function UsersCards({
                         disabled={!!loadingUserId}
                         className="flex-1 gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                       >
-                        <Trash2 className="h-4 w-4" />
-                        Delete
+                        {loadingUserId === selectedUser.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                        {loadingUserId === selectedUser.id ? 'Deleting...' : 'Delete'}
                       </Button>
                     )}
                     {canEdit && (
@@ -766,11 +774,14 @@ export function UsersCards({
             >
               {loadingUserId === deleteUser?.id ? (
                 <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Deleting...
                 </div>
               ) : (
-                'Delete User'
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete User
+                </>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
