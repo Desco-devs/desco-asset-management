@@ -241,7 +241,6 @@ export const GET = withResourcePermission(
       // Apply pagination if provided
       const queryOptions: Prisma.equipmentFindManyArgs = {
         where,
-        orderBy: { updated_at: 'desc' }, // Fast sorting by indexed field
         include: {
           project: {
             include: {
@@ -414,7 +413,7 @@ export const POST = withResourcePermission(
 
       // 3) handle equipment parts with new standardized structure (matching server actions) - CRITICAL FIX: Support empty folders
       const partsStructureData = formData.get('partsStructure') as string;
-      let partsStructureWithUrls = null;
+      let partsStructureWithUrls: any = null;
       
       if (partsStructureData) {
         try {
@@ -770,7 +769,7 @@ export const PUT = withResourcePermission(
 
       // Handle equipment parts updates - support both new and legacy formats - CRITICAL FIX: Support empty folders
       const partsStructureData = formData.get('partsStructure') as string;
-      let partsStructureWithUrls = null;
+      let partsStructureWithUrls: any = null;
       
       if (partsStructureData) {
         // Handle new parts structure (matching server actions)

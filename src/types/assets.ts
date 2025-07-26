@@ -80,7 +80,7 @@ export interface Project {
   client: {
     uid: string;
     name: string;
-  };
+  } | null;
 }
 
 export interface FilterState {

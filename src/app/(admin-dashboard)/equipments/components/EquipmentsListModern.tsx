@@ -172,7 +172,7 @@ export default function EquipmentsListModern() {
   };
 
   // Helper function to calculate days until expiry
-  const getDaysUntilExpiry = (expiryDate: string) => {
+  const getDaysUntilExpiry = (expiryDate: string | undefined) => {
     if (!expiryDate) return null;
     const now = new Date();
     const expiry = new Date(expiryDate);

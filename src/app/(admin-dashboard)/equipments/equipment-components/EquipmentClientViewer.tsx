@@ -148,10 +148,10 @@ export default function EquipmentClientViewer({
     return initialProjects.filter((project) => {
       const matchesClient =
         filterState.selectedClient === "all" ||
-        project.client.uid === filterState.selectedClient;
-      const projectClient = initialClients.find(
-        (c) => c.uid === project.client.uid
-      );
+        (project.client && project.client.uid === filterState.selectedClient);
+      const projectClient = project.client ? initialClients.find(
+        (c) => c.uid === project.client!.uid
+      ) : null;
       const matchesLocation =
         filterState.selectedLocation === "all" ||
         (projectClient && projectClient.location &&
@@ -414,8 +414,8 @@ export default function EquipmentClientViewer({
             const project = initialProjects.find(
               (p) => p.uid === payload.new.project_id
             );
-            const client = project
-              ? initialClients.find((c) => c.uid === project.client.uid)
+            const client = project && project.client
+              ? initialClients.find((c) => c.uid === project.client!.uid)
               : null;
 
             const newEquipment: Equipment = {

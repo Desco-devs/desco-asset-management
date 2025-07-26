@@ -519,9 +519,9 @@ function EditVehicleDrawer() {
       }
       
       if (typeof rawParts === 'object') {
-        const rootCount = Array.isArray(rawParts?.rootFiles) ? rawParts.rootFiles.length : 0;
-        const folderCount = Array.isArray(rawParts?.folders) 
-          ? rawParts.folders.reduce((acc: number, folder: any) => {
+        const rootCount = Array.isArray((rawParts as any)?.rootFiles) ? (rawParts as any).rootFiles.length : 0;
+        const folderCount = Array.isArray((rawParts as any)?.folders) 
+          ? (rawParts as any).folders.reduce((acc: number, folder: any) => {
               return acc + (Array.isArray(folder?.files) ? folder.files.length : 0);
             }, 0)
           : 0;

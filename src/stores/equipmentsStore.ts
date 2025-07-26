@@ -7,6 +7,9 @@ export interface Equipment {
   model: string;
   type: string;
   insuranceExpirationDate: string;
+  registrationExpiry?: string;
+  created_at?: string;
+  created_by?: string;
   before?: string | number;
   status: 'OPERATIONAL' | 'NON_OPERATIONAL';
   remarks?: string;
@@ -182,7 +185,7 @@ interface EquipmentsState {
   
   // Pagination & filtering settings (persisted to localStorage)
   itemsPerPage: number;
-  sortBy: 'created_at' | 'brand' | 'status' | 'insuranceExpirationDate' | 'model' | 'type' | 'owner' | '';
+  sortBy: 'created_at' | 'brand' | 'status' | 'insuranceExpirationDate' | 'registrationExpiry' | 'model' | 'type' | 'owner' | '';
   sortOrder: 'asc' | 'desc';
   filterStatus: 'all' | 'OPERATIONAL' | 'NON_OPERATIONAL';
   filterProject: string; // 'all' or project ID

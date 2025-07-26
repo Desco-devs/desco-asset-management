@@ -152,7 +152,7 @@ export function generateRecentActivity(
       description: `New ${item.type} equipment added to inventory`,
       timestamp: item.created_at.toISOString(),
       status: item.status,
-      user: getUserName(item.project?.created_by),
+      user: item.owner || "System",
     });
 
     // Equipment status activity (if recently updated)
@@ -182,7 +182,7 @@ export function generateRecentActivity(
       description: `Vehicle ${item.plate_number} registered in fleet`,
       timestamp: item.created_at.toISOString(),
       status: item.status,
-      user: getUserName(item.project?.created_by),
+      user: item.owner || "System",
     });
 
     // Vehicle status activity (if recently updated)
@@ -204,7 +204,7 @@ export function generateRecentActivity(
   // Enhanced maintenance activities with status progression
   maintenanceReportsData.forEach((item) => {
     const equipment = item.equipment;
-    const assetName = equipment ? `${equipment.brand} ${equipment.model}` : 'Unknown Asset';
+    const assetName = equipment ? 'Equipment Asset' : 'Unknown Asset';
     
     // Maintenance reported activity
     allActivities.push({

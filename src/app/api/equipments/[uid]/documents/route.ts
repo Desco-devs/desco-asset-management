@@ -82,17 +82,14 @@ const uploadFileToSupabase = async (
  * PATCH /api/equipments/[uid]/documents
  * Updates equipment documents with file upload support
  */
-export const PATCH = withResourcePermission(
-  'equipment',
-  'update',
-  async (
-    request: NextRequest,
-    user: AuthenticatedUser,
-    context: { params: Promise<{ uid: string }> }
-  ) => {
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ uid: string }> }
+) {
+  const handler = withResourcePermission('equipment', 'update', async (req: NextRequest, _user: AuthenticatedUser) => {
     try {
       const { uid } = await context.params
-      const formData = await request.formData()
+      const formData = await req.formData()
 
       // Check if equipment exists and get related data for file paths
       const existing = await prisma.equipment.findUnique({
@@ -287,5 +284,7 @@ export const PATCH = withResourcePermission(
         { status: 500 }
       )
     }
-  }
-)
+  })
+  
+  return handler(request)
+}

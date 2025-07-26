@@ -157,8 +157,8 @@ export async function PUT(
     return NextResponse.json(
       { 
         error: 'Failed to update equipment maintenance report',
-        details: error?.message || 'Unknown error',
-        code: error?.code
+        details: error instanceof Error ? error.message : 'Unknown error',
+        code: error instanceof Error && 'code' in error ? (error as any).code : undefined
       },
       { status: 500 }
     );

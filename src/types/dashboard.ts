@@ -53,7 +53,7 @@ export interface LocationData {
   name?: string;
   address: string;
   created_at: Date;
-  created_by?: string;
+  created_by?: string | null;
   clients?: { id: string; name: string }[];
   user?: { full_name: string } | null;
 }
@@ -63,7 +63,7 @@ export interface ClientData {
   id: string;
   name: string;
   created_at: Date;
-  created_by?: string;
+  created_by?: string | null;
   location?: { id: string; address: string; created_at: Date };
   projects?: { id: string }[];
 }
@@ -72,7 +72,7 @@ export interface ProjectData {
   id: string;
   name: string;
   created_at: Date;
-  created_by?: string;
+  created_by?: string | null;
   client?: {
     name: string;
     location?: { address: string };

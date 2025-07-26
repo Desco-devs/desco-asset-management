@@ -31,20 +31,20 @@ export async function GET(
 
     const serializedEquipment = {
       ...equipment,
-      createdAt: equipment.createdAt.toISOString(),
-      updatedAt: equipment.updatedAt.toISOString(),
+      createdAt: equipment.created_at.toISOString(),
+      updatedAt: equipment.updated_at.toISOString(),
       project: equipment.project ? {
         ...equipment.project,
-        createdAt: equipment.project.createdAt.toISOString(),
-        updatedAt: equipment.project.updatedAt.toISOString(),
+        createdAt: equipment.project.created_at.toISOString(),
+        updatedAt: equipment.project.updated_at.toISOString(),
         client: equipment.project.client ? {
           ...equipment.project.client,
-          createdAt: equipment.project.client.createdAt.toISOString(),
-          updatedAt: equipment.project.client.updatedAt.toISOString(),
+          createdAt: equipment.project.client.created_at.toISOString(),
+          updatedAt: equipment.project.client.updated_at.toISOString(),
           location: equipment.project.client.location ? {
             ...equipment.project.client.location,
-            createdAt: equipment.project.client.location.createdAt.toISOString(),
-            updatedAt: equipment.project.client.location.updatedAt.toISOString(),
+            createdAt: equipment.project.client.location.created_at.toISOString(),
+            updatedAt: equipment.project.client.location.updated_at.toISOString(),
           } : null,
         } : null,
       } : null,

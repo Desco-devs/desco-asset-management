@@ -58,7 +58,7 @@ import {
   Save,
   CheckCircle,
 } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import EditEquipmentModalModern from "./EditEquipmentModalModern";
 import EquipmentMaintenanceReportsEnhanced from "../EquipmentMaintenanceReportsEnhanced";
 import EquipmentPartsViewer from "../EquipmentPartsViewer";
@@ -97,6 +97,18 @@ export default function EquipmentModalModern() {
   const [maintenanceEdit, setMaintenanceEdit] = useState(false);
   const [inspectionEdit, setInspectionEdit] = useState(false);
 
+  // Equipment type state for dynamic input
+  const [selectedEquipmentType, setSelectedEquipmentType] = useState<string>("");
+  const customEquipmentTypeRef = useRef<HTMLInputElement>(null);
+
+  // Dirty field tracking for Equipment Information - use refs to avoid re-renders
+  const originalEquipmentDataRef = useRef<any>({});
+  const [dirtyEquipmentFields, setDirtyEquipmentFields] = useState<Set<string>>(new Set());
+
+  // Dirty field tracking for Dates & Inspection - use refs to avoid re-renders
+  const originalInspectionDataRef = useRef<any>({});
+  const [dirtyInspectionFields, setDirtyInspectionFields] = useState<Set<string>>(new Set());
+
   // Date picker states for auto-close functionality
   const [registrationExpiryDateOpen, setRegistrationExpiryDateOpen] = useState(false);
   const [insuranceExpiryDateOpen, setInsuranceExpiryDateOpen] = useState(false);
@@ -107,8 +119,7 @@ export default function EquipmentModalModern() {
     registrationExpiry: undefined as Date | undefined,
     insuranceExpirationDate: undefined as Date | undefined,
     inspectionDate: undefined as Date | undefined,
-    before: '6',
-    remarks: ''
+    before: '6'
   });
 
   // Form refs and state for each tab
@@ -135,11 +146,35 @@ export default function EquipmentModalModern() {
   // Mutations
   const deleteEquipmentMutation = useDeleteEquipment();
 
-  // CRITICAL FIX: Always prioritize fresh server data over store data
-  // This ensures view and edit always show the same, most up-to-date information
-  const selectedEquipment = selectedEquipmentFromStore
-    ? equipments.find((e) => e.uid === selectedEquipmentFromStore.uid) || selectedEquipmentFromStore
-    : null;
+  // CRITICAL FIX: Memoize selectedEquipment to prevent re-renders and focus loss
+  const selectedEquipment = useMemo(() => {
+    if (!selectedEquipmentFromStore) return null;
+    return equipments.find((e) => e.uid === selectedEquipmentFromStore.uid) || selectedEquipmentFromStore;
+  }, [selectedEquipmentFromStore?.uid, equipments]);
+
+  // CRITICAL FIX: Memoize default values to prevent input re-creation and focus loss
+  const defaultValues = useMemo(() => {
+    if (!selectedEquipment) return {};
+    return {
+      brand: selectedEquipment.brand || '',
+      model: selectedEquipment.model || '',
+      type: selectedEquipment.type || '',
+      plateNumber: selectedEquipment.plateNumber || '',
+      owner: selectedEquipment.owner || '',
+      projectId: selectedEquipment.project?.uid || '',
+      status: selectedEquipment.status || 'OPERATIONAL',
+      remarks: selectedEquipment.remarks || ''
+    };
+  }, [
+    selectedEquipment?.brand,
+    selectedEquipment?.model, 
+    selectedEquipment?.type,
+    selectedEquipment?.plateNumber,
+    selectedEquipment?.owner,
+    selectedEquipment?.project?.uid,
+    selectedEquipment?.status,
+    selectedEquipment?.remarks
+  ]);
 
   useEffect(() => {
     if (!isModalOpen) {
@@ -154,6 +189,13 @@ export default function EquipmentModalModern() {
       // Reset date picker states
       setRegistrationExpiryDateOpen(false);
       setLastInspectionDateOpen(false);
+      // Reset equipment type state
+      setSelectedEquipmentType("");
+      // Reset dirty field tracking
+      originalEquipmentDataRef.current = {};
+      setDirtyEquipmentFields(new Set());
+      originalInspectionDataRef.current = {};
+      setDirtyInspectionFields(new Set());
     }
   }, [isModalOpen]);
 
@@ -164,9 +206,41 @@ export default function EquipmentModalModern() {
         registrationExpiry: selectedEquipment.registrationExpiry ? new Date(selectedEquipment.registrationExpiry) : undefined,
         insuranceExpirationDate: selectedEquipment.insuranceExpirationDate ? new Date(selectedEquipment.insuranceExpirationDate) : undefined,
         inspectionDate: selectedEquipment.inspectionDate ? new Date(selectedEquipment.inspectionDate) : undefined,
-        before: selectedEquipment.before?.toString() || '6',
-        remarks: selectedEquipment.remarks || ''
+        before: selectedEquipment.before?.toString() || '6'
       });
+
+      // Initialize equipment type state
+      const equipmentType = selectedEquipment.type || "";
+      const predefinedTypes = ["Excavator", "Bulldozer", "Crane", "Loader", "Grader", "Compactor", "Dump Truck", "Mixer", "Generator", "Pump"];
+      
+      if (predefinedTypes.includes(equipmentType)) {
+        setSelectedEquipmentType(equipmentType);
+      } else {
+        setSelectedEquipmentType("Other");
+      }
+
+      // Initialize original data for dirty tracking
+      originalEquipmentDataRef.current = {
+        brand: selectedEquipment.brand || '',
+        model: selectedEquipment.model || '',
+        type: selectedEquipment.type || '',
+        plateNumber: selectedEquipment.plateNumber || '',
+        owner: selectedEquipment.owner || '',
+        projectId: selectedEquipment.project?.uid || '',
+        status: selectedEquipment.status || 'OPERATIONAL',
+        remarks: selectedEquipment.remarks || ''
+      };
+
+      originalInspectionDataRef.current = {
+        registrationExpiry: selectedEquipment.registrationExpiry || null,
+        insuranceExpirationDate: selectedEquipment.insuranceExpirationDate || null,
+        inspectionDate: selectedEquipment.inspectionDate || null,
+        before: selectedEquipment.before?.toString() || '6'
+      };
+
+      // Reset dirty fields
+      setDirtyEquipmentFields(new Set());
+      setDirtyInspectionFields(new Set());
     }
   }, [selectedEquipment]);
 
@@ -196,6 +270,90 @@ export default function EquipmentModalModern() {
       setIsModalOpen(false); // Close main modal to show delete confirmation
     }
   };
+
+  // Helper function to mark equipment field as dirty - using ref for stable access
+  const markEquipmentFieldDirty = useCallback((fieldName: string, newValue: any) => {
+    const originalValue = originalEquipmentDataRef.current[fieldName];
+    setDirtyEquipmentFields(prev => {
+      if (newValue !== originalValue) {
+        return new Set(prev).add(fieldName);
+      } else {
+        const newSet = new Set(prev);
+        newSet.delete(fieldName);
+        return newSet;
+      }
+    });
+  }, []);
+
+  // Helper function to mark inspection field as dirty - using ref for stable access
+  const markInspectionFieldDirty = useCallback((fieldName: string, newValue: any) => {
+    const originalValue = originalInspectionDataRef.current[fieldName];
+    // Handle date comparison
+    const originalFormatted = originalValue ? (originalValue instanceof Date ? originalValue.toISOString().split('T')[0] : originalValue) : null;
+    const newFormatted = newValue ? (newValue instanceof Date ? newValue.toISOString().split('T')[0] : newValue) : null;
+    
+    setDirtyInspectionFields(prev => {
+      if (newFormatted !== originalFormatted) {
+        return new Set(prev).add(fieldName);
+      } else {
+        const newSet = new Set(prev);
+        newSet.delete(fieldName);
+        return newSet;
+      }
+    });
+  }, []);
+
+  // Stable callback handlers for equipment type - NO DEPENDENCIES
+  const handleEquipmentTypeChange = useCallback((value: string) => {
+    setSelectedEquipmentType(value);
+    if (value !== "Other") {
+      if (customEquipmentTypeRef.current) {
+        customEquipmentTypeRef.current.value = "";
+      }
+      markEquipmentFieldDirty('type', value);
+    } else {
+      // For "Other", we'll mark dirty when custom input changes
+    }
+  }, []);
+
+  const handleCustomTypeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    markEquipmentFieldDirty('type', e.target.value);
+  }, []);
+
+  // Stable change handlers for equipment fields - NO DEPENDENCIES
+  const handleBrandChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    markEquipmentFieldDirty('brand', e.target.value);
+  }, []);
+
+  const handleModelChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    markEquipmentFieldDirty('model', e.target.value);
+  }, []);
+
+  const handlePlateNumberChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    markEquipmentFieldDirty('plateNumber', e.target.value);
+  }, []);
+
+  const handleOwnerChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    markEquipmentFieldDirty('owner', e.target.value);
+  }, []);
+
+  const handleProjectIdChange = useCallback((value: string) => {
+    markEquipmentFieldDirty('projectId', value);
+  }, []);
+
+  const handleStatusChange = useCallback((value: string) => {
+    markEquipmentFieldDirty('status', value);
+  }, []);
+
+  const handleRemarksChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    markEquipmentFieldDirty('remarks', e.target.value);
+  }, []);
+
+  // Stable handler for inspection frequency
+  const handleInspectionFrequencyChange = useCallback((value: string) => {
+    setInspectionFormData(prev => ({ ...prev, before: value }));
+    markInspectionFieldDirty('before', value);
+  }, []);
 
   // Individual tab edit handlers
   const handleTabEditToggle = (tab: 'overview' | 'images' | 'documents' | 'parts' | 'maintenance' | 'inspection', editState: boolean) => {
@@ -230,8 +388,7 @@ export default function EquipmentModalModern() {
         registrationExpiry: selectedEquipment.registrationExpiry ? new Date(selectedEquipment.registrationExpiry) : undefined,
         insuranceExpirationDate: selectedEquipment.insuranceExpirationDate ? new Date(selectedEquipment.insuranceExpirationDate) : undefined,
         inspectionDate: selectedEquipment.inspectionDate ? new Date(selectedEquipment.inspectionDate) : undefined,
-        before: selectedEquipment.before?.toString() || '6',
-        remarks: selectedEquipment.remarks || ''
+        before: selectedEquipment.before?.toString() || '6'
       });
       // Close any open date pickers
       setRegistrationExpiryDateOpen(false);
@@ -266,22 +423,56 @@ export default function EquipmentModalModern() {
 
     if (!formRef.current) return;
 
-    const formData = new FormData(formRef.current);
+    const formData = new FormData();
     formData.append('equipmentId', selectedEquipment.uid);
 
-    // Special handling for inspection tab - use state data instead of form data
+    // Handle dirty fields for Equipment Information (overview tab)
+    if (tab === 'overview') {
+      if (dirtyEquipmentFields.size === 0) {
+        toast.info("No changes detected");
+        return;
+      }
+      
+      // Only append changed fields
+      const formEl = formRef.current as HTMLFormElement;
+      const formDataFromForm = new FormData(formEl);
+      
+      dirtyEquipmentFields.forEach(fieldName => {
+        const value = formDataFromForm.get(fieldName);
+        if (value !== null) {
+          formData.append(fieldName, value);
+        }
+      });
+    }
+
+    // Handle dirty fields for Dates & Inspection
     if (tab === 'inspection') {
-      if (inspectionFormData.registrationExpiry) {
-        formData.append('registrationExpiry', format(inspectionFormData.registrationExpiry, 'yyyy-MM-dd'));
+      if (dirtyInspectionFields.size === 0) {
+        toast.info("No changes detected");
+        return;
       }
-      if (inspectionFormData.insuranceExpirationDate) {
-        formData.append('insuranceExpirationDate', format(inspectionFormData.insuranceExpirationDate, 'yyyy-MM-dd'));
+
+      // Only append changed inspection fields
+      dirtyInspectionFields.forEach(fieldName => {
+        if (fieldName === 'registrationExpiry' && inspectionFormData.registrationExpiry) {
+          formData.append('registrationExpiry', format(inspectionFormData.registrationExpiry, 'yyyy-MM-dd'));
+        } else if (fieldName === 'insuranceExpirationDate' && inspectionFormData.insuranceExpirationDate) {
+          formData.append('insuranceExpirationDate', format(inspectionFormData.insuranceExpirationDate, 'yyyy-MM-dd'));
+        } else if (fieldName === 'inspectionDate' && inspectionFormData.inspectionDate) {
+          formData.append('inspectionDate', format(inspectionFormData.inspectionDate, 'yyyy-MM-dd'));
+        } else if (fieldName === 'before') {
+          formData.append('before', inspectionFormData.before);
+        }
+      });
+    }
+
+    // For other tabs (images, documents, parts), use existing logic
+    if (tab !== 'overview' && tab !== 'inspection') {
+      const formEl = formRef.current as HTMLFormElement;
+      const formDataFromForm = new FormData(formEl);
+      for (const [key, value] of formDataFromForm.entries()) {
+        formData.append(key, value);
       }
-      if (inspectionFormData.inspectionDate) {
-        formData.append('inspectionDate', format(inspectionFormData.inspectionDate, 'yyyy-MM-dd'));
-      }
-      formData.append('before', inspectionFormData.before);
-      formData.append('remarks', inspectionFormData.remarks);
     }
 
     // Special handling for parts tab - get data from PartsFolderManager
@@ -303,6 +494,14 @@ export default function EquipmentModalModern() {
     try {
       await updateEquipmentMutation.mutateAsync(formData);
       handleTabEditToggle(tab, false);
+      
+      // Clear dirty fields after successful save
+      if (tab === 'overview') {
+        setDirtyEquipmentFields(new Set());
+      } else if (tab === 'inspection') {
+        setDirtyInspectionFields(new Set());
+      }
+      
       toast.success(`${tab.charAt(0).toUpperCase() + tab.slice(1)} updated successfully`);
     } catch (error) {
       console.error(`Error updating ${tab}:`, error);
@@ -737,8 +936,9 @@ export default function EquipmentModalModern() {
                         </Label>
                         <Input
                           name="brand"
-                          defaultValue={selectedEquipment.brand}
+                          defaultValue={defaultValues.brand}
                           placeholder="Enter equipment brand"
+                          onChange={handleBrandChange}
                           required
                         />
                       </div>
@@ -750,19 +950,56 @@ export default function EquipmentModalModern() {
                         </Label>
                         <Input
                           name="model"
-                          defaultValue={selectedEquipment.model}
+                          defaultValue={defaultValues.model}
                           placeholder="Enter equipment model"
+                          onChange={handleModelChange}
                           required
                         />
                       </div>
 
                       <div className="space-y-2">
                         <Label>Equipment Type</Label>
-                        <Input
-                          name="type"
-                          defaultValue={selectedEquipment.type}
-                          placeholder="Enter equipment type"
+                        <Select 
+                          value={selectedEquipmentType} 
+                          onValueChange={handleEquipmentTypeChange}
                           required
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select equipment type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Excavator">Excavator</SelectItem>
+                            <SelectItem value="Bulldozer">Bulldozer</SelectItem>
+                            <SelectItem value="Crane">Crane</SelectItem>
+                            <SelectItem value="Loader">Loader</SelectItem>
+                            <SelectItem value="Grader">Grader</SelectItem>
+                            <SelectItem value="Compactor">Compactor</SelectItem>
+                            <SelectItem value="Dump Truck">Dump Truck</SelectItem>
+                            <SelectItem value="Mixer">Mixer</SelectItem>
+                            <SelectItem value="Generator">Generator</SelectItem>
+                            <SelectItem value="Pump">Pump</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        
+                        {/* Custom type input when "Other" is selected */}
+                        {selectedEquipmentType === "Other" && (
+                          <Input
+                            ref={customEquipmentTypeRef}
+                            name="customType"
+                            defaultValue={defaultValues.type}
+                            onChange={handleCustomTypeChange}
+                            placeholder="Enter custom equipment type"
+                            required
+                            autoFocus
+                          />
+                        )}
+                        
+                        {/* Hidden input to submit the correct value */}
+                        <input
+                          type="hidden"
+                          name="type"
+                          value={selectedEquipmentType === "Other" ? (customEquipmentTypeRef.current?.value || "") : selectedEquipmentType}
                         />
                       </div>
 
@@ -773,8 +1010,9 @@ export default function EquipmentModalModern() {
                         </Label>
                         <Input
                           name="plateNumber"
-                          defaultValue={selectedEquipment.plateNumber || ''}
+                          defaultValue={defaultValues.plateNumber}
                           placeholder="Enter plate/serial number"
+                          onChange={handlePlateNumberChange}
                         />
                       </div>
                     </div>
@@ -790,15 +1028,20 @@ export default function EquipmentModalModern() {
                         </Label>
                         <Input
                           name="owner"
-                          defaultValue={selectedEquipment.owner}
+                          defaultValue={defaultValues.owner}
                           placeholder="Enter equipment owner"
+                          onChange={handleOwnerChange}
                           required
                         />
                       </div>
 
                       <div className="space-y-2">
                         <Label>Assigned Project</Label>
-                        <Select name="projectId" defaultValue={selectedEquipment.project?.uid}>
+                        <Select 
+                          name="projectId" 
+                          defaultValue={defaultValues.projectId}
+                          onValueChange={handleProjectIdChange}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select a project" />
                           </SelectTrigger>
@@ -822,7 +1065,11 @@ export default function EquipmentModalModern() {
                           <Shield className="h-4 w-4" />
                           Operational Status
                         </Label>
-                        <Select name="status" defaultValue={selectedEquipment.status}>
+                        <Select 
+                          name="status" 
+                          defaultValue={defaultValues.status}
+                          onValueChange={handleStatusChange}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
@@ -833,23 +1080,6 @@ export default function EquipmentModalModern() {
                         </Select>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label>Insurance Expiration Date</Label>
-                        <Input
-                          name="insuranceExpirationDate"
-                          type="date"
-                          defaultValue={selectedEquipment.insuranceExpirationDate ? new Date(selectedEquipment.insuranceExpirationDate).toISOString().split('T')[0] : ''}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Inspection Date</Label>
-                        <Input
-                          name="inspectionDate"
-                          type="date"
-                          defaultValue={selectedEquipment.inspectionDate ? new Date(selectedEquipment.inspectionDate).toISOString().split('T')[0] : ''}
-                        />
-                      </div>
                     </div>
                   </div>
 
@@ -858,8 +1088,9 @@ export default function EquipmentModalModern() {
                     <Label>Remarks</Label>
                     <Textarea
                       name="remarks"
-                      defaultValue={selectedEquipment.remarks || ''}
+                      defaultValue={defaultValues.remarks}
                       placeholder="Enter any additional notes or remarks"
+                      onChange={handleRemarksChange}
                       rows={3}
                     />
                   </div>
@@ -960,6 +1191,16 @@ export default function EquipmentModalModern() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Remarks Section */}
+                  {selectedEquipment.remarks && (
+                    <div className="space-y-2 pt-4 border-t">
+                      <Label className="text-sm font-medium text-muted-foreground">Remarks:</Label>
+                      <div className="p-3 bg-muted/50 rounded-lg text-sm text-foreground">
+                        {selectedEquipment.remarks}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </CardContent>
@@ -1015,6 +1256,7 @@ export default function EquipmentModalModern() {
                             selected={inspectionFormData.registrationExpiry}
                             onSelect={(date) => {
                               setInspectionFormData(prev => ({ ...prev, registrationExpiry: date }));
+                              markInspectionFieldDirty('registrationExpiry', date);
                               setRegistrationExpiryDateOpen(false); // Auto-close after selection
                             }}
                             initialFocus
@@ -1057,6 +1299,7 @@ export default function EquipmentModalModern() {
                             selected={inspectionFormData.insuranceExpirationDate}
                             onSelect={(date) => {
                               setInspectionFormData(prev => ({ ...prev, insuranceExpirationDate: date }));
+                              markInspectionFieldDirty('insuranceExpirationDate', date);
                               setInsuranceExpiryDateOpen(false); // Auto-close after selection
                             }}
                             initialFocus
@@ -1102,6 +1345,7 @@ export default function EquipmentModalModern() {
                             selected={inspectionFormData.inspectionDate}
                             onSelect={(date) => {
                               setInspectionFormData(prev => ({ ...prev, inspectionDate: date }));
+                              markInspectionFieldDirty('inspectionDate', date);
                               setLastInspectionDateOpen(false); // Auto-close after selection
                             }}
                             initialFocus
@@ -1123,7 +1367,7 @@ export default function EquipmentModalModern() {
                       <Label>Inspection Frequency</Label>
                       <Select 
                         value={inspectionFormData.before} 
-                        onValueChange={(value) => setInspectionFormData(prev => ({ ...prev, before: value }))}
+                        onValueChange={handleInspectionFrequencyChange}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select frequency" />
@@ -1139,20 +1383,6 @@ export default function EquipmentModalModern() {
                     </div>
                   </div>
 
-                  {/* Additional Notes */}
-                  <div className="space-y-2 pt-4 border-t">
-                    <Label>Additional Notes</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Add any additional information or special notes about this equipment
-                    </p>
-                    <Textarea
-                      value={inspectionFormData.remarks}
-                      onChange={(e) => setInspectionFormData(prev => ({ ...prev, remarks: e.target.value }))}
-                      placeholder="Enter any special notes, conditions, or important information about this equipment..."
-                      rows={3}
-                      className="min-h-[80px]"
-                    />
-                  </div>
                 </form>
               ) : (
                 // View Mode
@@ -1261,19 +1491,6 @@ export default function EquipmentModalModern() {
                     )}
                   </div>
 
-                  {/* Additional Notes */}
-                  <div className="space-y-2 pt-4 border-t">
-                    <Label className="text-sm font-medium text-muted-foreground">Additional Notes:</Label>
-                    {selectedEquipment.remarks ? (
-                      <div className="p-3 bg-muted/50 rounded-lg text-sm text-foreground">
-                        {selectedEquipment.remarks}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground italic">
-                        No additional notes
-                      </div>
-                    )}
-                  </div>
                 </div>
               )}
             </CardContent>

@@ -7,17 +7,14 @@ import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth'
  * PATCH /api/equipments/[uid]/overview
  * Updates basic equipment details (overview tab fields only)
  */
-export const PATCH = withResourcePermission(
-  'equipment',
-  'update',
-  async (
-    request: NextRequest,
-    user: AuthenticatedUser,
-    context: { params: Promise<{ uid: string }> }
-  ) => {
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ uid: string }> }
+) {
+  const handler = withResourcePermission('equipment', 'update', async (req: NextRequest, _user: AuthenticatedUser) => {
     try {
       const { uid } = await context.params
-      const body = await request.json()
+      const body = await req.json()
 
       // Check if equipment exists
       const existing = await prisma.equipment.findUnique({
@@ -186,5 +183,7 @@ export const PATCH = withResourcePermission(
         { status: 500 }
       )
     }
-  }
-)
+  })
+  
+  return handler(request)
+}

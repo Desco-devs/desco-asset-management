@@ -87,7 +87,7 @@ export default function EditVehicleMaintenanceReportDrawer() {
       console.log('📍 Available locations:', locations);
       
       // Find the location to verify it exists
-      const selectedLocation = locations.find(loc => loc.uid === selectedReport.location_id);
+      const selectedLocation = locations.find(loc => loc.id === selectedReport.location_id);
       console.log('🔍 Selected location found:', selectedLocation);
       
       setFormData({
@@ -453,7 +453,7 @@ export default function EditVehicleMaintenanceReportDrawer() {
                           </SelectTrigger>
                           <SelectContent>
                             {locations.map((location) => (
-                              <SelectItem key={location.uid} value={location.uid}>
+                              <SelectItem key={location.id} value={location.id}>
                                 {location.address}
                               </SelectItem>
                             ))}
@@ -772,7 +772,7 @@ export default function EditVehicleMaintenanceReportDrawer() {
                       </SelectTrigger>
                       <SelectContent>
                         {locations.map((location) => (
-                          <SelectItem key={location.uid} value={location.uid}>
+                          <SelectItem key={location.id} value={location.id}>
                             {location.address}
                           </SelectItem>
                         ))}

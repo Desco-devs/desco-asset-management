@@ -144,7 +144,7 @@ export default function VehicleModalModern() {
   }, [setIsMobile]);
 
   // Helper functions
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | Date) => {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return "Invalid Date";
@@ -160,7 +160,7 @@ export default function VehicleModalModern() {
       : "bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900 dark:text-red-300";
   };
 
-  const isExpiringSoon = (expiryDate: string, beforeMonths: number) => {
+  const isExpiringSoon = (expiryDate: string | Date, beforeMonths: number) => {
     try {
       const expiry = new Date(expiryDate);
       if (isNaN(expiry.getTime())) return false;
@@ -175,7 +175,7 @@ export default function VehicleModalModern() {
     }
   };
 
-  const isExpired = (expiryDate: string) => {
+  const isExpired = (expiryDate: string | Date) => {
     try {
       const expiry = new Date(expiryDate);
       if (isNaN(expiry.getTime())) return false;
@@ -188,7 +188,7 @@ export default function VehicleModalModern() {
   };
 
   const getNextInspectionDate = (
-    lastInspection: string,
+    lastInspection: string | Date,
     beforeMonths: number
   ) => {
     try {

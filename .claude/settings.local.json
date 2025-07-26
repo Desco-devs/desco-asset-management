@@ -56,7 +56,10 @@
       "Bash(npx prisma db execute:*)",
       "Bash(npm run test:*)",
       "Bash(npm test:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:silvestri.co)",
+      "Bash(git checkout:*)"
     ],
     "deny": []
   }
