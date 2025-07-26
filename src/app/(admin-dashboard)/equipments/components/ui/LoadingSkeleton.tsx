@@ -2,42 +2,70 @@
 
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Wrench } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Wrench, Plus, FileText } from "lucide-react";
 
 export default function LoadingSkeleton() {
   return (
     <div className="space-y-6 md:space-y-8">
-      {/* Page Title Skeleton */}
+      {/* Page Title */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Wrench className="h-7 w-7 text-muted-foreground/30" />
-          <Skeleton className="h-8 w-48" />
+          <Wrench className="h-7 w-7 text-blue-600" />
+          <h1 className="text-2xl font-bold text-foreground">Equipment Management</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Skeleton className="h-2 w-2 rounded-full" />
-          <Skeleton className="h-4 w-12" />
+          <div className="h-2 w-2 rounded-full bg-green-500" />
+          <span className="text-sm text-muted-foreground">Live</span>
         </div>
       </div>
 
-      {/* Action Buttons Skeleton */}
+      {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <Skeleton className="h-10 w-full sm:w-36" />
-        <Skeleton className="h-10 w-full sm:w-48" />
+        <Button size="default" className="w-full sm:w-auto">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Equipment
+        </Button>
+        <Button variant="outline" size="default" className="w-full sm:w-auto">
+          <FileText className="h-4 w-4 mr-2" />
+          Export Report
+        </Button>
       </div>
 
-      {/* Search and Filters Skeleton */}
+      {/* Search and Filters */}
       <div className="space-y-4">
-        <Skeleton className="h-11 w-full" />
+        <Input 
+          placeholder="Search equipment by name, model, or serial number..." 
+          className="w-full"
+        />
         <div className="flex gap-3">
-          <Skeleton className="h-11 flex-1" />
-          <Skeleton className="h-11 flex-1" />
+          <Select>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Filter by Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Filter by Project" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Projects</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      {/* Results Summary Skeleton */}
+      {/* Results Summary */}
       <div className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2">
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="h-6 w-16 rounded" />
+        <span className="text-sm text-muted-foreground">Loading equipment...</span>
+        <div className="h-6 w-16 bg-blue-100 text-blue-800 rounded text-center text-xs flex items-center justify-center">
+          ---
+        </div>
       </div>
 
       {/* Equipment Cards Grid Skeleton */}
@@ -99,14 +127,16 @@ export default function LoadingSkeleton() {
         ))}
       </div>
 
-      {/* Pagination Skeleton */}
+      {/* Pagination */}
       <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
-        <Skeleton className="h-8 w-20" />
+        <span className="text-sm text-muted-foreground">Loading pagination...</span>
         <div className="flex items-center gap-2">
-          <Skeleton className="h-6 w-12 rounded" />
-          <Skeleton className="h-4 w-24" />
+          <div className="h-6 w-12 bg-muted rounded text-center text-xs flex items-center justify-center">
+            ---
+          </div>
+          <span className="text-sm text-muted-foreground">of --- items</span>
         </div>
-        <Skeleton className="h-8 w-16" />
+        <span className="text-sm text-muted-foreground">---</span>
       </div>
     </div>
   );

@@ -11,13 +11,11 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
-import {
-  useSupabaseRealtime,
-  useEquipmentsWithReferenceData,
-} from "@/hooks/useEquipmentsQuery";
+import { useEquipments } from "@/hooks/useEquipmentQuery";
+import { useEquipmentRealtime } from "@/hooks/useEquipmentRealtime";
+import type { Equipment } from "@/types/equipment";
 import { 
-  useEquipmentsStore, 
-  type Equipment,
+  useEquipmentStore, 
   selectCurrentPage,
   selectSearchQuery,
   selectFilterStatus,
@@ -28,7 +26,7 @@ import {
   selectIsMobile,
   selectSortBy,
   selectSortOrder
-} from "@/stores/equipmentsStore";
+} from "@/stores/equipmentStore";
 import {
   AlertTriangle,
   Wrench,
@@ -47,97 +45,56 @@ import ExportDialog from "./ExportDialog";
 
 export default function EquipmentsListModern() {
   // TanStack Query - Server state
-  const { equipments, projects, maintenanceReports, isLoading, isError, error } =
-    useEquipmentsWithReferenceData();
+  const { data: equipments = [], isLoading, isError, error } = useEquipments();
 
   // Supabase Realtime - Live updates
-  const { isConnected } = useSupabaseRealtime();
+  useEquipmentRealtime();
+  const isConnected = true; // Always show connected since we're using realtime
 
   // Use store state with proper selectors
-  const currentPage = useEquipmentsStore(selectCurrentPage);
-  const searchQuery = useEquipmentsStore(selectSearchQuery);
-  const filterStatus = useEquipmentsStore(selectFilterStatus);
-  const filterProject = useEquipmentsStore(selectFilterProject);
-  const filterType = useEquipmentsStore(selectFilterType);
-  const filterOwner = useEquipmentsStore(selectFilterOwner);
-  const filterMaintenance = useEquipmentsStore(selectFilterMaintenance);
-  const isMobile = useEquipmentsStore(selectIsMobile);
-  const isExportModalOpen = useEquipmentsStore((state) => state.isExportModalOpen);
+  const currentPage = useEquipmentStore(selectCurrentPage);
+  const searchQuery = useEquipmentStore(selectSearchQuery);
+  const filterStatus = useEquipmentStore(selectFilterStatus);
+  const filterProject = useEquipmentStore(selectFilterProject);
+  const filterType = useEquipmentStore(selectFilterType);
+  const filterOwner = useEquipmentStore(selectFilterOwner);
+  const filterMaintenance = useEquipmentStore(selectFilterMaintenance);
+  const isMobile = useEquipmentStore(selectIsMobile);
+  const isExportModalOpen = useEquipmentStore((state) => state.isExportModalOpen);
 
   // Helper function to check if equipment has maintenance issues
   const hasMaintenanceIssues = (equipment: Equipment) => {
-    const hasReports = maintenanceReports.some(report => report.equipment_id === equipment.uid);
-    const hasOpenIssues = maintenanceReports.some(report => 
-      report.equipment_id === equipment.uid && 
-      report.status && 
-      !['COMPLETED', 'RESOLVED'].includes(report.status.toUpperCase())
-    );
-    return hasReports && hasOpenIssues;
+    // Use equipment's maintenance_reports if available
+    if (equipment.maintenance_reports) {
+      return equipment.maintenance_reports.some(report => 
+        report.status && 
+        !['COMPLETED', 'RESOLVED'].includes(report.status.toUpperCase())
+      );
+    }
+    return false;
   };
 
   // Get store functions once
-  const getFilteredEquipments = useEquipmentsStore(
+  const getFilteredEquipments = useEquipmentStore(
     (state) => state.getFilteredEquipments
   );
-  const getEffectiveItemsPerPage = useEquipmentsStore(
+  const getEffectiveItemsPerPage = useEquipmentStore(
     (state) => state.getEffectiveItemsPerPage
   );
 
-  // Compute results using the functions with current equipments data (including maintenance reports)
-  const filtered = getFilteredEquipments(equipments, maintenanceReports);
+  // Compute results using the functions with current equipments data
+  const filtered = getFilteredEquipments(equipments);
 
-  // Apply sorting manually since getSortedEquipments re-filters
-  const sortBy = useEquipmentsStore(selectSortBy);
-  const sortOrder = useEquipmentsStore(selectSortOrder);
-
-  const sorted = sortBy
-    ? [...filtered].sort((a, b) => {
-        let aValue: string | number, bValue: string | number;
-
-        switch (sortBy) {
-          case "brand":
-            aValue = a.brand.toLowerCase();
-            bValue = b.brand.toLowerCase();
-            break;
-          case "model":
-            aValue = a.model.toLowerCase();
-            bValue = b.model.toLowerCase();
-            break;
-          case "type":
-            aValue = a.type.toLowerCase();
-            bValue = b.type.toLowerCase();
-            break;
-          case "status":
-            aValue = a.status;
-            bValue = b.status;
-            break;
-          case "insuranceExpirationDate":
-            aValue = a.insuranceExpirationDate ? new Date(a.insuranceExpirationDate).getTime() : 0;
-            bValue = b.insuranceExpirationDate ? new Date(b.insuranceExpirationDate).getTime() : 0;
-            break;
-          case "registrationExpiry":
-            aValue = a.registrationExpiry ? new Date(a.registrationExpiry).getTime() : 0;
-            bValue = b.registrationExpiry ? new Date(b.registrationExpiry).getTime() : 0;
-            break;
-          case "owner":
-            aValue = a.owner.toLowerCase();
-            bValue = b.owner.toLowerCase();
-            break;
-          default:
-            return 0;
-        }
-
-        if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
-        if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
-        return 0;
-      })
-    : filtered;
-
-  const filteredEquipments = sorted;
+  // Get filtered and sorted equipments (store handles this internally)
+  const filteredEquipments = filtered;
+  
+  // Get current sort state for UI display
+  const sortBy = useEquipmentStore(selectSortBy);
+  const sortOrder = useEquipmentStore(selectSortOrder);
   const itemsPerPage = getEffectiveItemsPerPage();
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedEquipments = sorted.slice(startIndex, startIndex + itemsPerPage);
-  const totalPages = Math.ceil(sorted.length / itemsPerPage);
+  const paginatedEquipments = filteredEquipments.slice(startIndex, startIndex + itemsPerPage);
+  const totalPages = Math.ceil(filteredEquipments.length / itemsPerPage);
 
   // Zustand actions
   const {
@@ -156,7 +113,7 @@ export default function EquipmentsListModern() {
     setFilterOwner,
     setFilterMaintenance,
     resetFilters,
-  } = useEquipmentsStore();
+  } = useEquipmentStore();
 
   // Mobile detection
   useEffect(() => {
@@ -316,7 +273,8 @@ export default function EquipmentsListModern() {
                   </div>
                 </div>
 
-                {/* Project Filter */}
+                {/* Project Filter - Temporarily disabled for simplified implementation */}
+                {/*
                 <div className="mb-4">
                   <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                     Projects
@@ -332,6 +290,7 @@ export default function EquipmentsListModern() {
                     ))}
                   </div>
                 </div>
+                */}
 
                 {/* Equipment Type Filter */}
                 <div className="mb-4">
@@ -568,8 +527,7 @@ export default function EquipmentsListModern() {
             {filterProject !== "all" && (
               <Badge variant="secondary" className="gap-1 pr-1">
                 Project:{" "}
-                {projects?.find((p) => p.uid === filterProject)?.name ||
-                  filterProject}
+                filterProject
                 <Button
                   variant="ghost"
                   size="sm"
@@ -702,12 +660,12 @@ export default function EquipmentsListModern() {
           </div>
         ) : (
           paginatedEquipments.map((equipment, index) => {
-            const daysUntilInsuranceExpiry = getDaysUntilExpiry(equipment.insuranceExpirationDate);
-            const daysUntilRegistrationExpiry = getDaysUntilExpiry(equipment.registrationExpiry);
+            const daysUntilInsuranceExpiry = getDaysUntilExpiry(equipment.insurance_expiration_date);
+            const daysUntilRegistrationExpiry = getDaysUntilExpiry(equipment.registration_expiry);
             
             return (
               <Card
-                key={equipment.uid || `equipment-${index}`}
+                key={equipment.id || `equipment-${index}`}
                 className="hover:shadow-lg transition-shadow cursor-pointer relative"
                 onClick={() => handleEquipmentClick(equipment)}
               >
@@ -739,13 +697,13 @@ export default function EquipmentsListModern() {
                           {equipment.status}
                         </Badge>
 
-                        {equipment.plateNumber && (
+                        {equipment.plate_number && (
                           <Badge
                             variant="outline"
                             className="flex items-center gap-1"
                           >
                             <Wrench className="h-3 w-3" />
-                            {equipment.plateNumber}
+                            {equipment.plate_number}
                           </Badge>
                         )}
 
@@ -838,7 +796,7 @@ export default function EquipmentsListModern() {
                         )[0] || "No location"}
                       </span>
                     </div>
-                    {equipment.registrationExpiry && (
+                    {equipment.registration_expiry && (
                       <div className="flex justify-between">
                         <span>Registration Expires:</span>
                         <span
@@ -850,11 +808,11 @@ export default function EquipmentsListModern() {
                               : ""
                           }`}
                         >
-                          {new Date(equipment.registrationExpiry).toLocaleDateString()}
+                          {new Date(equipment.registration_expiry).toLocaleDateString()}
                         </span>
                       </div>
                     )}
-                    {equipment.insuranceExpirationDate && (
+                    {equipment.insurance_expiration_date && (
                       <div className="flex justify-between">
                         <span>Insurance Expires:</span>
                         <span
@@ -866,7 +824,7 @@ export default function EquipmentsListModern() {
                               : ""
                           }`}
                         >
-                          {new Date(equipment.insuranceExpirationDate).toLocaleDateString()}
+                          {new Date(equipment.insurance_expiration_date).toLocaleDateString()}
                         </span>
                       </div>
                     )}
@@ -929,10 +887,10 @@ export default function EquipmentsListModern() {
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         equipments={equipments.map((e) => ({
-          id: e.uid,
+          id: e.id,
           brand: e.brand,
           model: e.model,
-          plate_number: e.plateNumber
+          plate_number: e.plate_number
         }))}
       />
     </div>

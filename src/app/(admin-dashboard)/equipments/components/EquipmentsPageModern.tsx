@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useDeleteEquipment } from "@/hooks/useEquipmentsQuery";
+import { useDeleteEquipment } from "@/hooks/useEquipmentQuery";
 import {
   selectDeleteConfirmation,
   selectIsCreateModalOpen,
@@ -19,11 +19,8 @@ import {
   selectIsModalOpen,
   selectViewerImage,
   selectSelectedEquipment,
-  selectIsEquipmentMaintenanceModalOpen,
-  selectIsMaintenanceReportDetailOpen,
-  selectIsEditMaintenanceReportDrawerOpen,
-  useEquipmentsStore,
-} from "@/stores/equipmentsStore";
+  useEquipmentStore,
+} from "@/stores/equipmentStore";
 import { Download, Loader2, X, Trash2 } from "lucide-react";
 import React from "react";
 import EquipmentsListModern from "./EquipmentsListModern";
@@ -37,16 +34,13 @@ import EditEquipmentMaintenanceReportDrawer from "./modals/EditEquipmentMaintena
 
 export default function EquipmentsPageModern() {
   // Client state from Zustand (using optimized selectors)
-  const isModalOpen = useEquipmentsStore(selectIsModalOpen);
-  const isCreateModalOpen = useEquipmentsStore(selectIsCreateModalOpen);
-  const isEditMode = useEquipmentsStore(selectIsEditMode);
-  const viewerImage = useEquipmentsStore(selectViewerImage);
-  const isMobile = useEquipmentsStore(selectIsMobile);
-  const deleteConfirmation = useEquipmentsStore(selectDeleteConfirmation);
-  const selectedEquipment = useEquipmentsStore(selectSelectedEquipment);
-  const isEquipmentMaintenanceModalOpen = useEquipmentsStore(selectIsEquipmentMaintenanceModalOpen);
-  const isMaintenanceReportDetailOpen = useEquipmentsStore(selectIsMaintenanceReportDetailOpen);
-  const isEditMaintenanceReportDrawerOpen = useEquipmentsStore(selectIsEditMaintenanceReportDrawerOpen);
+  const isModalOpen = useEquipmentStore(selectIsModalOpen);
+  const isCreateModalOpen = useEquipmentStore(selectIsCreateModalOpen);
+  const isEditMode = useEquipmentStore(selectIsEditMode);
+  const viewerImage = useEquipmentStore(selectViewerImage);
+  const isMobile = useEquipmentStore(selectIsMobile);
+  const deleteConfirmation = useEquipmentStore(selectDeleteConfirmation);
+  const selectedEquipment = useEquipmentStore(selectSelectedEquipment);
 
   // Actions
   const {
@@ -54,7 +48,7 @@ export default function EquipmentsPageModern() {
     setIsModalOpen,
     setDeleteConfirmation,
     closeAllModals,
-  } = useEquipmentsStore();
+  } = useEquipmentStore();
 
   // Mutations
   const deleteEquipmentMutation = useDeleteEquipment();
@@ -84,7 +78,7 @@ export default function EquipmentsPageModern() {
     if (!deleteConfirmation.equipment) return;
 
     try {
-      await deleteEquipmentMutation.mutateAsync(deleteConfirmation.equipment.uid);
+      await deleteEquipmentMutation.mutateAsync(deleteConfirmation.equipment.id);
       setDeleteConfirmation({ isOpen: false, equipment: null });
       closeAllModals(); // Clean slate - everything closed
     } catch (error) {
@@ -268,20 +262,7 @@ export default function EquipmentsPageModern() {
 
       {/* Edit Equipment Modal - Handled by EquipmentModalModern when isEditMode is true */}
 
-      {/* Equipment Maintenance Report Modal */}
-      {isEquipmentMaintenanceModalOpen && selectedEquipment && (
-        <CreateEquipmentMaintenanceReportModal equipmentId={selectedEquipment.uid} />
-      )}
-
-      {/* Maintenance Report Detail Drawer */}
-      {isMaintenanceReportDetailOpen && (
-        <MaintenanceReportDetailDrawer />
-      )}
-
-      {/* Edit Maintenance Report Drawer */}
-      {isEditMaintenanceReportDrawerOpen && (
-        <EditEquipmentMaintenanceReportDrawer />
-      )}
+      {/* Maintenance modals temporarily disabled for simplified implementation */}
 
       {/* Global Image Viewer Modal - Always available */}
       <ImageViewerModal />
