@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,20 +10,25 @@ import { useEquipmentsStore, type EquipmentMaintenanceReport, selectIsEquipmentM
 import {
   Calendar,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Loader2,
   MapPin,
   Plus,
   User,
   Wrench,
 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import EditEquipmentMaintenanceReportModal from "./modals/EditEquipmentMaintenanceReportModal";
 
 interface EquipmentMaintenanceReportsEnhancedProps {
   equipmentId: string;
+  isEditMode?: boolean;
 }
 
 export default function EquipmentMaintenanceReportsEnhanced({
   equipmentId,
+  isEditMode = false,
 }: EquipmentMaintenanceReportsEnhancedProps) {
   const { data: maintenanceReports = [], isLoading } = useEquipmentMaintenanceReports();
   const isMaintenanceModalOpen = useEquipmentsStore(selectIsEquipmentMaintenanceModalOpen);
@@ -30,8 +36,13 @@ export default function EquipmentMaintenanceReportsEnhanced({
     setIsEquipmentMaintenanceModalOpen, 
     setIsModalOpen,
     setSelectedMaintenanceReportForDetail,
-    setIsMaintenanceReportDetailOpen
+    setIsMaintenanceReportDetailOpen,
+    setIsEditMaintenanceReportModalOpen,
+    setSelectedMaintenanceReportForEdit
   } = useEquipmentsStore();
+  
+  // State for expanded reports
+  const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
 
   // Filter reports for this specific equipment
   const equipmentReports = Array.isArray(maintenanceReports)
@@ -84,10 +95,12 @@ export default function EquipmentMaintenanceReportsEnhanced({
           <p className="text-sm text-muted-foreground">
             Loading maintenance reports...
           </p>
-          <Button disabled className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Report
-          </Button>
+          {isEditMode && (
+            <Button disabled className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add Report
+            </Button>
+          )}
         </div>
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, index) => (
@@ -128,33 +141,7 @@ export default function EquipmentMaintenanceReportsEnhanced({
               {equipmentReports.length !== 1 ? "s" : ""} found
             </p>
           </div>
-          <Button
-            onClick={() => {
-              setIsModalOpen(false);
-              setIsEquipmentMaintenanceModalOpen(true);
-            }}
-            disabled={isMaintenanceModalOpen}
-            className="gap-2"
-          >
-            {isMaintenanceModalOpen ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
-            Add Report
-          </Button>
-        </div>
-
-        {equipmentReports.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
-            <Wrench className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No maintenance reports yet
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Track equipment maintenance, repairs, and inspections by creating
-              your first report
-            </p>
+          {isEditMode && (
             <Button
               onClick={() => {
                 setIsModalOpen(false);
@@ -168,75 +155,141 @@ export default function EquipmentMaintenanceReportsEnhanced({
               ) : (
                 <Plus className="h-4 w-4" />
               )}
-              Create First Report
+              Add Report
             </Button>
+          )}
+        </div>
+
+        {equipmentReports.length === 0 ? (
+          <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
+            <Wrench className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No maintenance reports yet
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Track equipment maintenance, repairs, and inspections by creating
+              your first report
+            </p>
+            {isEditMode && (
+              <Button
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setIsEquipmentMaintenanceModalOpen(true);
+                }}
+                disabled={isMaintenanceModalOpen}
+                className="gap-2"
+              >
+                {isMaintenanceModalOpen ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                Create First Report
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
-            {equipmentReports.map((report) => (
-              <div
-                key={report.id}
-                onClick={() => {
-                  setSelectedMaintenanceReportForDetail(report);
-                  setIsMaintenanceReportDetailOpen(true);
-                  // Close equipment modal in mobile to prevent navigation conflicts
-                  setIsModalOpen(false);
-                }}
-                className="border rounded-lg p-4 hover:bg-muted/50 transition-all cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  {/* Left side - Main info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-3 mb-2">
-                      <h4 className="font-medium text-sm flex-1 leading-tight">
-                        {report.issue_description}
-                      </h4>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Badge className={getStatusColor(report.status)} variant="outline">
-                          {report.status || "REPORTED"}
-                        </Badge>
-                        <Badge className={getPriorityColor(report.priority)} variant="outline">
-                          {report.priority || "MEDIUM"}
-                        </Badge>
+            {equipmentReports.map((report) => {
+              const isExpanded = expandedReports.has(report.id);
+              
+              const toggleExpanded = () => {
+                const newExpanded = new Set(expandedReports);
+                if (isExpanded) {
+                  newExpanded.delete(report.id);
+                } else {
+                  newExpanded.add(report.id);
+                }
+                setExpandedReports(newExpanded);
+              };
+
+              return (
+                <Card key={report.id} className="overflow-hidden">
+                  <CardHeader 
+                    className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      if (isEditMode) {
+                        toggleExpanded();
+                      } else {
+                        setSelectedMaintenanceReportForDetail(report);
+                        setIsMaintenanceReportDetailOpen(true);
+                        setIsModalOpen(false);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      {/* Left side - Main info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-3 mb-2">
+                          <CardTitle className="text-sm flex-1 leading-tight">
+                            {report.issue_description}
+                          </CardTitle>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <Badge className={getStatusColor(report.status)} variant="outline">
+                              {report.status || "REPORTED"}
+                            </Badge>
+                            <Badge className={getPriorityColor(report.priority)} variant="outline">
+                              {report.priority || "MEDIUM"}
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {/* Secondary info */}
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>{formatDate(report.date_reported)}</span>
+                          </div>
+                          
+                          {report.reported_user && (
+                            <div className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              <span className="truncate max-w-[100px] sm:max-w-[120px]">{report.reported_user.full_name}</span>
+                            </div>
+                          )}
+
+                          {report.parts_replaced && report.parts_replaced.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              <Wrench className="h-3 w-3" />
+                              <span>{report.parts_replaced.length} part{report.parts_replaced.length !== 1 ? 's' : ''}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right side - Expand/collapse indicator */}
+                      <div className="ml-4 flex-shrink-0">
+                        {isEditMode ? (
+                          isExpanded ? (
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                        )}
                       </div>
                     </div>
-                    
-                    {/* Secondary info */}
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        <span>{formatDate(report.date_reported)}</span>
+                  </CardHeader>
+                  
+                  {/* Collapsible content for edit mode */}
+                  {isEditMode && isExpanded && (
+                    <CardContent className="pt-0">
+                      <div className="bg-muted/30 rounded-lg p-4">
+                        <p className="text-sm text-muted-foreground mb-2">Edit mode interface will be implemented here</p>
+                        <p className="text-xs text-muted-foreground">This will include editable fields and tabs for the maintenance report</p>
                       </div>
-                      
-                      {report.reported_user && (
-                        <div className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          <span className="truncate max-w-[100px] sm:max-w-[120px]">{report.reported_user.full_name}</span>
-                        </div>
-                      )}
-
-                      {report.parts_replaced && report.parts_replaced.length > 0 && (
-                        <div className="flex items-center gap-1">
-                          <Wrench className="h-3 w-3" />
-                          <span>{report.parts_replaced.length} part{report.parts_replaced.length !== 1 ? 's' : ''}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right side - Arrow indicator */}
-                  <div className="ml-4 flex-shrink-0">
-                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                  </div>
-                </div>
-              </div>
-            ))}
+                    </CardContent>
+                  )}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Edit Modal */}
-      <EditEquipmentMaintenanceReportModal />
+      {/* Edit Modal - only show when not in edit mode */}
+      {!isEditMode && <EditEquipmentMaintenanceReportModal />}
     </>
   );
 }

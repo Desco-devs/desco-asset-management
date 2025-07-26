@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -8,6 +8,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Folder,
   Receipt,
@@ -16,11 +28,20 @@ import {
   ChevronDown,
   ChevronUp,
   File,
+  X,
+  Trash2,
+  Edit3,
+  Check,
+  Upload,
+  FolderPlus,
+  Plus,
 } from "lucide-react";
 import Image from "next/image";
 
 interface EquipmentPartsViewerProps {
   equipmentParts?: string[] | { rootFiles: any[]; folders: any[] } | string;
+  isEditable?: boolean;
+  onPartsChange?: (newParts: { rootFiles: any[]; folders: any[] }) => void;
 }
 
 interface ParsedFile {
@@ -43,11 +64,32 @@ interface ParsedPartData {
   folders: ParsedFolder[];
 }
 
-export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentPartsViewerProps) {
+export default function EquipmentPartsViewer({ 
+  equipmentParts = [], 
+  isEditable = false, 
+  onPartsChange 
+}: EquipmentPartsViewerProps) {
   // Collapsible states - same as PartsFolderManager
   const [isRootCollapsed, setIsRootCollapsed] = useState(false);
   const [isFoldersCollapsed, setIsFoldersCollapsed] = useState(false);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  
+  // Edit states
+  const [editingFolder, setEditingFolder] = useState<string | null>(null);
+  const [editingFolderName, setEditingFolderName] = useState("");
+  const [deleteDialog, setDeleteDialog] = useState<{ 
+    isOpen: boolean; 
+    type: 'file' | 'folder'; 
+    itemId: string;
+    folderName?: string;
+    fileName?: string;
+    hasFiles?: boolean;
+  }>({ isOpen: false, type: 'file', itemId: '' });
+  
+  // File upload states
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Parse equipment parts data into folder structure
   const parsePartsData = (parts: string[] | { rootFiles: any[]; folders: any[] } | string | undefined): ParsedPartData => {
@@ -187,6 +229,98 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
 
   const parsedData = parsePartsData(equipmentParts);
 
+  // Edit helper functions
+  const removeFile = (fileId: string, folderId?: string) => {
+    const newData = { ...parsedData };
+    
+    if (folderId) {
+      // Remove from folder
+      const folder = newData.folders.find(f => f.id === folderId);
+      if (folder) {
+        folder.files = folder.files.filter(f => f.id !== fileId);
+      }
+    } else {
+      // Remove from root
+      newData.rootFiles = newData.rootFiles.filter(f => f.id !== fileId);
+    }
+    
+    if (onPartsChange) {
+      onPartsChange(newData);
+    }
+  };
+  
+  const deleteFolder = (folderId: string) => {
+    const newData = { ...parsedData };
+    newData.folders = newData.folders.filter(f => f.id !== folderId);
+    
+    if (onPartsChange) {
+      onPartsChange(newData);
+    }
+  };
+  
+  const renameFolder = (folderId: string, newName: string) => {
+    const newData = { ...parsedData };
+    const folder = newData.folders.find(f => f.id === folderId);
+    if (folder) {
+      folder.name = newName.trim();
+    }
+    
+    if (onPartsChange) {
+      onPartsChange(newData);
+    }
+  };
+  
+  // Add file helper function
+  const addFile = (files: FileList | null, folderId?: string) => {
+    if (!files || files.length === 0) return;
+    
+    const newData = { ...parsedData };
+    const newFiles: ParsedFile[] = Array.from(files).map((file, index) => {
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
+      const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension) || file.type.startsWith('image/');
+      
+      return {
+        id: `file-${Date.now()}-${index}`,
+        name: file.name,
+        url: URL.createObjectURL(file),
+        preview: URL.createObjectURL(file),
+        type: isImage ? 'image' : 'document',
+        file: file
+      } as ParsedFile;
+    });
+    
+    if (folderId) {
+      // Add to specific folder
+      const folder = newData.folders.find(f => f.id === folderId);
+      if (folder) {
+        folder.files = [...folder.files, ...newFiles];
+      }
+    } else {
+      // Add to root
+      newData.rootFiles = [...newData.rootFiles, ...newFiles];
+    }
+    
+    if (onPartsChange) {
+      onPartsChange(newData);
+    }
+  };
+  
+  // Create folder helper function
+  const createFolder = (name: string) => {
+    const newData = { ...parsedData };
+    const newFolder: ParsedFolder = {
+      id: `folder-${Date.now()}`,
+      name: name.trim(),
+      files: []
+    };
+    
+    newData.folders = [...newData.folders, newFolder];
+    
+    if (onPartsChange) {
+      onPartsChange(newData);
+    }
+  };
+
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [viewerImageUrl, setViewerImageUrl] = useState<string>('');
   const [viewerImageName, setViewerImageName] = useState<string>('');
@@ -211,7 +345,11 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
   };
 
   // File preview component - enhanced for better preview functionality
-  const FilePreview = ({ file }: { file: ParsedFile }) => {
+  const FilePreview = ({ file, folderId, onRemove }: { 
+    file: ParsedFile; 
+    folderId?: string; 
+    onRemove?: (fileId: string, folderId?: string) => void; 
+  }) => {
     const fileUrl = file.preview || file.url;
     
     // Better image detection - check file extension and MIME type
@@ -281,32 +419,149 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
           <div className="opacity-60 group-hover:opacity-100 transition-opacity">
             <Eye className="h-4 w-4 text-muted-foreground" />
           </div>
+          
+          {/* Remove button - only show in edit mode */}
+          {isEditable && onRemove && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent triggering the file preview
+                setDeleteDialog({
+                  isOpen: true,
+                  type: 'file',
+                  itemId: file.id,
+                  fileName: file.name,
+                  folderName: folderId
+                });
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     );
   };
 
-  // Folder component - EXACT COPY from PartsFolderManager structure
+  // Folder component - Enhanced with edit functionality
   const FolderComponent = ({ folder }: { folder: ParsedFolder }) => {
     const isCollapsed = collapsedFolders.has(folder.id);
     
     return (
-      <Card className="hover:shadow-md transition-shadow">
+      <Card className="group hover:shadow-md transition-shadow">
         <CardHeader className="pb-3">
-          <CardTitle 
-            className="text-base flex items-center gap-2 cursor-pointer hover:bg-muted/50 -m-4 p-4 rounded-lg transition-colors"
-            onClick={() => toggleFolderCollapse(folder.id)}
-          >
-            <Folder className="h-5 w-5 text-blue-600" />
-            {folder.name}
-            <span className="text-xs text-muted-foreground ml-auto flex items-center gap-2">
-              ({folder.files.length} files)
-              {isCollapsed ? (
-                <ChevronDown className="h-4 w-4" />
+          <CardTitle className="text-base flex items-center gap-2">
+            <div 
+              className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 -m-4 p-4 rounded-lg transition-colors flex-1"
+              onClick={() => toggleFolderCollapse(folder.id)}
+            >
+              <Folder className="h-5 w-5 text-blue-600" />
+              {editingFolder === folder.id ? (
+                <Input
+                  value={editingFolderName}
+                  onChange={(e) => setEditingFolderName(e.target.value)}
+                  className="h-6 text-base font-semibold"
+                  onBlur={() => {
+                    if (editingFolderName.trim() && editingFolderName.trim() !== folder.name) {
+                      renameFolder(folder.id, editingFolderName.trim());
+                    }
+                    setEditingFolder(null);
+                    setEditingFolderName("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur();
+                    }
+                    if (e.key === 'Escape') {
+                      setEditingFolder(null);
+                      setEditingFolderName("");
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  autoFocus
+                />
               ) : (
-                <ChevronUp className="h-4 w-4" />
+                <span>{folder.name}</span>
               )}
-            </span>
+              <span className="text-xs text-muted-foreground ml-auto flex items-center gap-2">
+                ({folder.files.length} files)
+                {isCollapsed ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
+              </span>
+            </div>
+            
+            {/* Edit buttons - only show in edit mode */}
+            {isEditable && editingFolder !== folder.id && (
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingFolder(folder.id);
+                    setEditingFolderName(folder.name);
+                  }}
+                >
+                  <Edit3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteDialog({
+                      isOpen: true,
+                      type: 'folder',
+                      itemId: folder.id,
+                      folderName: folder.name,
+                      hasFiles: folder.files.length > 0
+                    });
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            {/* Save/Cancel buttons when editing */}
+            {isEditable && editingFolder === folder.id && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (editingFolderName.trim() && editingFolderName.trim() !== folder.name) {
+                      renameFolder(folder.id, editingFolderName.trim());
+                    }
+                    setEditingFolder(null);
+                    setEditingFolderName("");
+                  }}
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingFolder(null);
+                    setEditingFolderName("");
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </CardTitle>
         </CardHeader>
         {!isCollapsed && (
@@ -317,15 +572,70 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
                 <Folder className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
                 <p className="text-sm font-medium text-muted-foreground">"{folder.name}" is empty</p>
                 <p className="text-xs text-muted-foreground mt-1">This folder exists but contains no files yet</p>
-                <p className="text-xs text-muted-foreground/80 mt-2">
-                  Files can be added to this folder using the edit mode
-                </p>
+                {isEditable ? (
+                  <div className="mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.multiple = true;
+                        input.accept = 'image/*,application/pdf,.doc,.docx,.txt';
+                        input.onchange = (e) => {
+                          const target = e.target as HTMLInputElement;
+                          addFile(target.files, folder.id);
+                        };
+                        input.click();
+                      }}
+                      className="gap-2"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Add Files
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground/80 mt-2">
+                    Files can be added to this folder using the edit mode
+                  </p>
+                )}
               </div>
             ) : (
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {folder.files.map((file) => (
-                  <FilePreview key={file.id} file={file} />
-                ))}
+              <div className="space-y-2">
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {folder.files.map((file) => (
+                    <FilePreview 
+                      key={file.id} 
+                      file={file} 
+                      folderId={folder.id}
+                      onRemove={isEditable ? removeFile : undefined}
+                    />
+                  ))}
+                </div>
+                {/* Add files button when folder has files and in edit mode */}
+                {isEditable && (
+                  <div className="pt-2 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.multiple = true;
+                        input.accept = 'image/*,application/pdf,.doc,.docx,.txt';
+                        input.onchange = (e) => {
+                          const target = e.target as HTMLInputElement;
+                          addFile(target.files, folder.id);
+                        };
+                        input.click();
+                      }}
+                      className="gap-2 w-full"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add More Files
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -390,13 +700,67 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
                   <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg bg-muted/20">
                     <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
                     <p className="text-sm font-medium text-muted-foreground">Root folder is empty</p>
-                    <p className="text-xs text-muted-foreground mt-1">Files can be added to the root folder using edit mode</p>
+                    {isEditable ? (
+                      <div className="mt-4 space-y-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.multiple = true;
+                            input.accept = 'image/*,application/pdf,.doc,.docx,.txt';
+                            input.onchange = (e) => {
+                              const target = e.target as HTMLInputElement;
+                              addFile(target.files);
+                            };
+                            input.click();
+                          }}
+                          className="gap-2 mr-2"
+                        >
+                          <Upload className="h-4 w-4" />
+                          Add Files
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1">Files can be added to the root folder using edit mode</p>
+                    )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {parsedData.rootFiles.map((file) => (
-                      <FilePreview key={file.id} file={file} />
-                    ))}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {parsedData.rootFiles.map((file) => (
+                        <FilePreview 
+                          key={file.id} 
+                          file={file} 
+                          onRemove={isEditable ? removeFile : undefined}
+                        />
+                      ))}
+                    </div>
+                    {/* Add files button when root has files and in edit mode */}
+                    {isEditable && (
+                      <div className="pt-2 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.multiple = true;
+                            input.accept = 'image/*,application/pdf,.doc,.docx,.txt';
+                            input.onchange = (e) => {
+                              const target = e.target as HTMLInputElement;
+                              addFile(target.files);
+                            };
+                            input.click();
+                          }}
+                          className="gap-2"
+                        >
+                          <Plus className="h-4 w-4" />
+                          Add More Files
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -404,25 +768,119 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
           )}
         </Card>
 
-        {/* Folders Section - Always show if folders exist, even if empty */}
-        {parsedData.folders.length > 0 && (
+        {/* Folders Section - Always show if folders exist, even if empty, or if in edit mode */}
+        {(parsedData.folders.length > 0 || isEditable) && (
           <div className="space-y-4">
             <div 
               className="flex items-center justify-between cursor-pointer"
               onClick={() => setIsFoldersCollapsed(!isFoldersCollapsed)}
             >
               <h4 className="font-medium">Folders ({parsedData.folders.length})</h4>
-              {isFoldersCollapsed ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronUp className="h-4 w-4" />
-              )}
+              <div className="flex items-center gap-2">
+                {isEditable && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsCreatingFolder(true);
+                      setNewFolderName("");
+                    }}
+                    className="gap-2"
+                  >
+                    <FolderPlus className="h-4 w-4" />
+                    Create Folder
+                  </Button>
+                )}
+                {isFoldersCollapsed ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
+              </div>
             </div>
             {!isFoldersCollapsed && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                {parsedData.folders.map((folder) => (
-                  <FolderComponent key={folder.id} folder={folder} />
-                ))}
+              <div className="space-y-4">
+                {/* Inline folder creation */}
+                {isEditable && isCreatingFolder && (
+                  <Card className="border-dashed border-2 border-primary/50 bg-primary/5">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2">
+                        <FolderPlus className="h-5 w-5 text-primary" />
+                        <Input
+                          value={newFolderName}
+                          onChange={(e) => setNewFolderName(e.target.value)}
+                          placeholder="Enter folder name..."
+                          className="flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newFolderName.trim()) {
+                              createFolder(newFolderName);
+                              setIsCreatingFolder(false);
+                              setNewFolderName("");
+                            }
+                            if (e.key === 'Escape') {
+                              setIsCreatingFolder(false);
+                              setNewFolderName("");
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (newFolderName.trim()) {
+                              createFolder(newFolderName);
+                              setIsCreatingFolder(false);
+                              setNewFolderName("");
+                            }
+                          }}
+                          disabled={!newFolderName.trim()}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setIsCreatingFolder(false);
+                            setNewFolderName("");
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {/* Existing folders */}
+                {parsedData.folders.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                    {parsedData.folders.map((folder) => (
+                      <FolderComponent key={folder.id} folder={folder} />
+                    ))}
+                  </div>
+                ) : !isCreatingFolder && isEditable ? (
+                  <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg bg-muted/20">
+                    <FolderPlus className="h-12 w-12 mx-auto text-muted-foreground/60 mb-3" />
+                    <p className="text-sm font-medium text-muted-foreground">No folders yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">Create your first folder to organize files</p>
+                    <div className="mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setIsCreatingFolder(true);
+                          setNewFolderName("");
+                        }}
+                        className="gap-2"
+                      >
+                        <FolderPlus className="h-4 w-4" />
+                        Create First Folder
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
@@ -449,6 +907,51 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Confirmation Dialog for Deletions */}
+      <AlertDialog open={deleteDialog.isOpen} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, isOpen: open })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteDialog.type === 'folder' ? 'Delete Folder' : 'Delete File'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteDialog.type === 'folder' ? (
+                <>
+                  Are you sure you want to delete the folder "{deleteDialog.folderName}"?
+                  {deleteDialog.hasFiles && (
+                    <span className="block mt-2 text-destructive font-medium">
+                      This folder contains {deleteDialog.hasFiles ? 'files' : 'no files'}. All files in this folder will also be deleted.
+                    </span>
+                  )}
+                  <span className="block mt-2">This action cannot be undone.</span>
+                </>
+              ) : (
+                <>
+                  Are you sure you want to delete "{deleteDialog.fileName}"?
+                  <span className="block mt-2">This action cannot be undone.</span>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteDialog.type === 'folder') {
+                  deleteFolder(deleteDialog.itemId);
+                } else {
+                  removeFile(deleteDialog.itemId, deleteDialog.folderName);
+                }
+                setDeleteDialog({ isOpen: false, type: 'file', itemId: '' });
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

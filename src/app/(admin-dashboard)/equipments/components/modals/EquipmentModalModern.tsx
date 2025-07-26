@@ -27,6 +27,7 @@ import {
 } from "@/hooks/useEquipmentQuery";
 import { useEquipmentMaintenanceReports } from "@/hooks/useEquipmentsQuery";
 import { useProjects } from "@/hooks/api/use-projects";
+import { useUsers } from "@/hooks/api/use-users";
 import {
   selectIsEditMode,
   selectIsMobile,
@@ -50,18 +51,26 @@ import {
   Receipt,
   Settings,
   Shield,
+  Trash2,
+  Upload,
   User,
   Wrench,
   X,
   ZoomIn,
-  Trash2,
   CalendarIcon,
   Save,
   CheckCircle,
+  FolderPlus,
+  Plus,
+  File,
+  Folder,
 } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import EditEquipmentModalModern from "./EditEquipmentModalModern";
 import EquipmentMaintenanceReportsEnhanced from "../EquipmentMaintenanceReportsEnhanced";
+import EquipmentPartsViewer from "../EquipmentPartsViewer";
+import PartsFolderManager from "../forms/PartsFolderManager";
+import type { PartsStructure } from "../forms/PartsFolderManager";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,7 +85,9 @@ export default function EquipmentModalModern() {
   const { data: equipments = [] } = useEquipments();
   const { data: projectsData } = useProjects();
   const { data: maintenanceReports = [] } = useEquipmentMaintenanceReports();
+  const { data: usersData } = useUsers();
   const projects = projectsData?.data || [];
+  const users = usersData?.data || [];
 
   // Client state from Zustand
   const selectedEquipmentFromStore = useEquipmentStore(selectSelectedEquipment);
@@ -87,48 +98,242 @@ export default function EquipmentModalModern() {
   // Custom tab state - EXACTLY like CreateEquipmentForm with Images and Documents tabs
   const [activeTab, setActiveTab] = useState<'details' | 'images' | 'documents' | 'parts' | 'maintenance'>('details');
 
-  // Individual edit states for each tab
-  const [overviewEdit, setOverviewEdit] = useState(false);
-  const [imagesEdit, setImagesEdit] = useState(false);
-  const [documentsEdit, setDocumentsEdit] = useState(false);
-  const [partsEdit, setPartsEdit] = useState(false);
-  const [maintenanceEdit, setMaintenanceEdit] = useState(false);
-  const [inspectionEdit, setInspectionEdit] = useState(false);
-
-  // Equipment type state for dynamic input
-  const [selectedEquipmentType, setSelectedEquipmentType] = useState<string>("");
-  const customEquipmentTypeRef = useRef<HTMLInputElement>(null);
-
-  // Dirty field tracking for Equipment Information - use refs to avoid re-renders
-  const originalEquipmentDataRef = useRef<any>({});
-  const [dirtyEquipmentFields, setDirtyEquipmentFields] = useState<Set<string>>(new Set());
-
-  // Dirty field tracking for Dates & Inspection - use refs to avoid re-renders
-  const originalInspectionDataRef = useRef<any>({});
-  const [dirtyInspectionFields, setDirtyInspectionFields] = useState<Set<string>>(new Set());
-
-  // Date picker states for auto-close functionality
-  const [registrationExpiryDateOpen, setRegistrationExpiryDateOpen] = useState(false);
-  const [insuranceExpiryDateOpen, setInsuranceExpiryDateOpen] = useState(false);
-  const [lastInspectionDateOpen, setLastInspectionDateOpen] = useState(false);
-
-  // Form state for inspection dates - initialized with default values
-  const [inspectionFormData, setInspectionFormData] = useState({
-    registrationExpiry: undefined as Date | undefined,
-    insuranceExpirationDate: undefined as Date | undefined,
-    inspectionDate: undefined as Date | undefined,
-    before: '6'
+  // Global edit mode state
+  const [isGlobalEditMode, setIsGlobalEditMode] = useState(false);
+  
+  // State to track removed images/documents so they don't show in preview
+  const [removedItems, setRemovedItems] = useState<Set<string>>(new Set());
+  
+  // CRITICAL FIX: Use ref for form data to prevent re-renders entirely
+  const editFormDataRef = useRef({
+    brand: '',
+    model: '',
+    type: '',
+    plate_number: '',
+    owner: '',
+    status: 'OPERATIONAL',
+    remarks: '',
+    project_id: '',
+    before: 6,
+    inspection_date: undefined as Date | undefined,
+    registration_expiry: undefined as Date | undefined,
+    insurance_expiration_date: undefined as Date | undefined,
+    created_by: ''
   });
+  
+  // Force re-render trigger for controlled inputs
+  const [, forceUpdate] = useState({});
+  
+  // Equipment parts state for PartsFolderManager
+  const [partsStructure, setPartsStructure] = useState<PartsStructure>({
+    rootFiles: [],
+    folders: []
+  });
+  
+  // CRITICAL FIX: Memoize dynamic classNames to prevent DOM re-creation and focus loss
+  const gridClassName = useMemo(() => 
+    `grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`, 
+    [isMobile]
+  );
+  
+  const gridClassName2 = useMemo(() => 
+    `grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`, 
+    [isMobile]
+  );
+  
+  const gridClassName3 = useMemo(() => 
+    `grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`, 
+    [isMobile]
+  );
+  
+  const gridClassName4 = useMemo(() => 
+    `grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-3'}`, 
+    [isMobile]
+  );
+  
+  // CRITICAL FIX: Memoize selectedEquipment to prevent re-renders and focus loss
+  const selectedEquipment = useMemo(() => {
+    if (!selectedEquipmentFromStore) return null;
+    return equipments.find((e) => e.id === selectedEquipmentFromStore.id) || selectedEquipmentFromStore;
+  }, [selectedEquipmentFromStore?.id, equipments]);
 
-  // Form refs and state for each tab
-  const overviewFormRef = useRef<HTMLFormElement>(null);
-  const imagesFormRef = useRef<HTMLFormElement>(null);
-  const documentsFormRef = useRef<HTMLFormElement>(null);
-  const partsFormRef = useRef<HTMLFormElement>(null);
-  const inspectionFormRef = useRef<HTMLFormElement>(null);
+  // Initialize equipment parts when entering edit mode
+  useEffect(() => {
+    if (isGlobalEditMode && selectedEquipment?.equipment_parts) {
+      // Parse the equipment_parts from the database format
+      try {
+        let parsedParts: any = selectedEquipment.equipment_parts;
+        
+        // Handle array with JSON string format
+        if (Array.isArray(parsedParts) && parsedParts.length > 0 && typeof parsedParts[0] === 'string') {
+          parsedParts = JSON.parse(parsedParts[0]);
+        }
+        
+        // Handle string format
+        if (typeof parsedParts === 'string') {
+          parsedParts = JSON.parse(parsedParts);
+        }
+        
+        // Initialize parts structure if it exists
+        if (parsedParts && typeof parsedParts === 'object') {
+          const initialData: PartsStructure = {
+            rootFiles: Array.isArray(parsedParts.rootFiles) ? parsedParts.rootFiles.map((file: any) => ({
+              id: file.id || `file-${Date.now()}-${Math.random()}`,
+              name: file.name || 'Unknown file',
+              url: file.url || file.preview,
+              type: file.type || (file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document')
+            })) : [],
+            folders: Array.isArray(parsedParts.folders) ? parsedParts.folders.map((folder: any) => ({
+              id: folder.id || `folder-${Date.now()}-${Math.random()}`,
+              name: folder.name,
+              files: Array.isArray(folder.files) ? folder.files.map((file: any) => ({
+                id: file.id || `file-${Date.now()}-${Math.random()}`,
+                name: file.name || 'Unknown file',
+                url: file.url || file.preview,
+                type: file.type || (file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document')
+              })) : [],
+              created_at: new Date(folder.created_at || Date.now())
+            })) : []
+          };
+          setPartsStructure(initialData);
+        } else {
+          // Reset if no valid data
+          setPartsStructure({ rootFiles: [], folders: [] });
+        }
+      } catch (error) {
+        console.warn('Error parsing equipment parts:', error);
+        setPartsStructure({ rootFiles: [], folders: [] });
+      }
+    } else if (!isGlobalEditMode) {
+      // Clear state when exiting edit mode
+      setPartsStructure({ rootFiles: [], folders: [] });
+    }
+  }, [isGlobalEditMode, selectedEquipment?.equipment_parts]);
 
-  // Update mutation
+  // Initialize form data when entering edit mode - using ref to prevent re-renders
+  useEffect(() => {
+    if (isGlobalEditMode && selectedEquipment?.id) {
+      editFormDataRef.current = {
+        brand: selectedEquipment.brand || '',
+        model: selectedEquipment.model || '',
+        type: selectedEquipment.type || '',
+        plate_number: selectedEquipment.plate_number || '',
+        owner: selectedEquipment.owner || '',
+        status: selectedEquipment.status || 'OPERATIONAL',
+        remarks: selectedEquipment.remarks || '',
+        project_id: selectedEquipment.project_id || '',
+        before: selectedEquipment.before || 6,
+        inspection_date: selectedEquipment.inspection_date ? new Date(selectedEquipment.inspection_date) : undefined,
+        registration_expiry: selectedEquipment.registration_expiry ? new Date(selectedEquipment.registration_expiry) : undefined,
+        insurance_expiration_date: selectedEquipment.insurance_expiration_date ? new Date(selectedEquipment.insurance_expiration_date) : undefined,
+        created_by: selectedEquipment.created_by || ''
+      };
+      forceUpdate({}); // Single re-render to update input values
+    }
+  }, [isGlobalEditMode, selectedEquipment?.id]); // Only depend on ID to prevent constant re-renders
+  
+  // Update mutation - declared before callbacks that use it
   const updateEquipmentMutation = useUpdateEquipment();
+
+  // CRITICAL FIX: Update form data via ref without causing re-renders
+  const handleFieldChange = useCallback((field: string, value: any) => {
+    editFormDataRef.current = { ...editFormDataRef.current, [field]: value };
+    // Don't trigger re-render - just update the ref
+  }, []); // No dependencies - function is stable
+  
+  // Handle form submission - using ref to avoid editFormData dependency and prevent re-renders
+  const handleSaveChanges = useCallback(async () => {
+    if (!selectedEquipment) return;
+    
+    try {
+      // Access current form data from ref - this prevents callback recreation on form changes
+      const currentFormData = editFormDataRef.current;
+      
+      // Custom validation since we're using uncontrolled inputs
+      const requiredFields = {
+        brand: 'Brand is required',
+        model: 'Model is required', 
+        type: 'Equipment type is required',
+        owner: 'Owner is required'
+      };
+      
+      for (const [field, message] of Object.entries(requiredFields)) {
+        const value = currentFormData[field as keyof typeof currentFormData];
+        if (!value || (typeof value === 'string' && value.trim() === '')) {
+          toast.error(message);
+          return;
+        }
+      }
+      
+      const formData = new FormData();
+      
+      // Map form data to API expected field names
+      const fieldMapping: Record<string, string> = {
+        'insurance_expiration_date': 'insuranceExpirationDate',
+        'registration_expiry': 'registrationExpiry',
+        'project_id': 'projectId',
+        'plate_number': 'plateNumber',
+        'inspection_date': 'inspectionDate'
+      };
+
+      // Add all form fields with proper field name mapping
+      Object.entries(currentFormData).forEach(([key, value]) => {
+        // Get the correct API field name
+        const apiFieldName = fieldMapping[key] || key;
+        
+        // Handle removed items
+        if (removedItems.has(key)) {
+          formData.append(apiFieldName, ''); // Send empty string for removed items
+        } else if (value !== undefined && value !== null) {
+          if (value instanceof Date) {
+            formData.append(apiFieldName, value.toISOString().split('T')[0]);
+          } else {
+            formData.append(apiFieldName, value.toString());
+          }
+        } else {
+          // For null/undefined values, send empty string to avoid missing field errors
+          formData.append(apiFieldName, '');
+        }
+      });
+      
+      // Convert equipment parts back to database format
+      if (isGlobalEditMode) {
+        const equipmentPartsData = {
+          rootFiles: partsStructure.rootFiles.map((file) => ({
+            id: file.id,
+            name: file.name,
+            url: file.url || file.preview,
+            preview: file.preview,
+            type: file.type || (file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document')
+          })),
+          folders: partsStructure.folders.map(folder => ({
+            id: folder.id,
+            name: folder.name,
+            files: folder.files.map((file) => ({
+              id: file.id,
+              name: file.name,
+              url: file.url || file.preview,
+              preview: file.preview,
+              type: file.type || (file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document')
+            })),
+            created_at: folder.created_at.toISOString()
+          }))
+        };
+        
+        formData.append('equipment_parts', JSON.stringify(equipmentPartsData));
+      }
+      
+      formData.append('equipmentId', selectedEquipment.id);
+      
+      await updateEquipmentMutation.mutateAsync(formData);
+      setIsGlobalEditMode(false);
+      setRemovedItems(new Set()); // Clear removed items after successful save
+      toast.success('Equipment updated successfully!');
+    } catch (error) {
+      console.error('Failed to update equipment:', error);
+      toast.error('Failed to update equipment. Please try again.');
+    }
+  }, [selectedEquipment, updateEquipmentMutation, setIsGlobalEditMode, isGlobalEditMode, partsStructure]); // No editFormData dependency!
 
   // Actions
   const {
@@ -141,116 +346,29 @@ export default function EquipmentModalModern() {
   // Mutations
   const deleteEquipmentMutation = useDeleteEquipment();
 
-  // CRITICAL FIX: Memoize selectedEquipment to prevent re-renders and focus loss
-  const selectedEquipment = useMemo(() => {
-    if (!selectedEquipmentFromStore) return null;
-    return equipments.find((e) => e.id === selectedEquipmentFromStore.id) || selectedEquipmentFromStore;
-  }, [selectedEquipmentFromStore?.id, equipments]);
-
-  // CRITICAL FIX: Memoize default values to prevent input re-creation and focus loss
-  const defaultValues = useMemo(() => {
-    if (!selectedEquipment) return {};
-    return {
-      brand: selectedEquipment.brand || '',
-      model: selectedEquipment.model || '',
-      type: selectedEquipment.type || '',
-      plateNumber: selectedEquipment.plate_number || '',
-      owner: selectedEquipment.owner || '',
-      projectId: selectedEquipment.project?.id || '',
-      status: selectedEquipment.status || 'OPERATIONAL',
-      remarks: selectedEquipment.remarks || ''
-    };
-  }, [
-    selectedEquipment?.brand,
-    selectedEquipment?.model, 
-    selectedEquipment?.type,
-    selectedEquipment?.plate_number,
-    selectedEquipment?.owner,
-    selectedEquipment?.project?.id,
-    selectedEquipment?.status,
-    selectedEquipment?.remarks
-  ]);
+  // Removed defaultValues - no longer needed with global edit approach
 
   useEffect(() => {
     if (!isModalOpen) {
       setActiveTab("details");
-      // Reset all edit states when modal closes
-      setOverviewEdit(false);
-      setImagesEdit(false);
-      setDocumentsEdit(false);
-      setPartsEdit(false);
-      setMaintenanceEdit(false);
-      setInspectionEdit(false);
-      // Reset date picker states
-      setRegistrationExpiryDateOpen(false);
-      setLastInspectionDateOpen(false);
-      // Reset equipment type state
-      setSelectedEquipmentType("");
-      // Reset dirty field tracking
-      originalEquipmentDataRef.current = {};
-      setDirtyEquipmentFields(new Set());
-      originalInspectionDataRef.current = {};
-      setDirtyInspectionFields(new Set());
+      // Reset global edit mode when modal closes
+      setIsGlobalEditMode(false);
+      // Reset removed items when modal closes
+      setRemovedItems(new Set());
     }
   }, [isModalOpen]);
 
-  // Update inspection form data when selectedEquipment changes
-  useEffect(() => {
-    if (selectedEquipment) {
-      setInspectionFormData({
-        registrationExpiry: selectedEquipment.registration_expiry ? new Date(selectedEquipment.registration_expiry) : undefined,
-        insuranceExpirationDate: selectedEquipment.insurance_expiration_date ? new Date(selectedEquipment.insurance_expiration_date) : undefined,
-        inspectionDate: selectedEquipment.inspection_date ? new Date(selectedEquipment.inspection_date) : undefined,
-        before: selectedEquipment.before?.toString() || '6'
-      });
-
-      // Initialize equipment type state
-      const equipmentType = selectedEquipment.type || "";
-      const predefinedTypes = ["Excavator", "Bulldozer", "Crane", "Loader", "Grader", "Compactor", "Dump Truck", "Mixer", "Generator", "Pump"];
-      
-      if (predefinedTypes.includes(equipmentType)) {
-        setSelectedEquipmentType(equipmentType);
-      } else {
-        setSelectedEquipmentType("Other");
-      }
-
-      // Initialize original data for dirty tracking
-      originalEquipmentDataRef.current = {
-        brand: selectedEquipment.brand || '',
-        model: selectedEquipment.model || '',
-        type: selectedEquipment.type || '',
-        plateNumber: selectedEquipment.plate_number || '',
-        owner: selectedEquipment.owner || '',
-        projectId: selectedEquipment.project?.id || '',
-        status: selectedEquipment.status || 'OPERATIONAL',
-        remarks: selectedEquipment.remarks || ''
-      };
-
-      originalInspectionDataRef.current = {
-        registrationExpiry: selectedEquipment.registration_expiry || null,
-        insuranceExpirationDate: selectedEquipment.insurance_expiration_date || null,
-        inspectionDate: selectedEquipment.inspection_date || null,
-        before: selectedEquipment.before?.toString() || '6'
-      };
-
-      // Reset dirty fields
-      setDirtyEquipmentFields(new Set());
-      setDirtyInspectionFields(new Set());
-    }
-  }, [selectedEquipment]);
+  // Form data is now managed by the global edit state and editFormData
 
 
   const handleClose = () => {
     setIsModalOpen(false);
     setSelectedEquipment(null);
     setIsEditMode(false);
-    // Reset all edit states
-    setOverviewEdit(false);
-    setImagesEdit(false);
-    setDocumentsEdit(false);
-    setPartsEdit(false);
-    setMaintenanceEdit(false);
-    setInspectionEdit(false);
+    // Reset global edit state
+    setIsGlobalEditMode(false);
+    // Reset removed items when closing
+    setRemovedItems(new Set());
   };
 
   const handleEdit = () => {
@@ -264,232 +382,15 @@ export default function EquipmentModalModern() {
     }
   };
 
-  // Helper function to mark equipment field as dirty - using ref for stable access
-  const markEquipmentFieldDirty = useCallback((fieldName: string, newValue: any) => {
-    const originalValue = originalEquipmentDataRef.current[fieldName];
-    setDirtyEquipmentFields(prev => {
-      if (newValue !== originalValue) {
-        return new Set(prev).add(fieldName);
-      } else {
-        const newSet = new Set(prev);
-        newSet.delete(fieldName);
-        return newSet;
-      }
-    });
-  }, []);
+  // Dirty tracking is no longer needed with global edit approach
 
-  // Helper function to mark inspection field as dirty - using ref for stable access
-  const markInspectionFieldDirty = useCallback((fieldName: string, newValue: any) => {
-    const originalValue = originalInspectionDataRef.current[fieldName];
-    // Handle date comparison
-    const originalFormatted = originalValue ? (originalValue instanceof Date ? originalValue.toISOString().split('T')[0] : originalValue) : null;
-    const newFormatted = newValue ? (newValue instanceof Date ? newValue.toISOString().split('T')[0] : newValue) : null;
-    
-    setDirtyInspectionFields(prev => {
-      if (newFormatted !== originalFormatted) {
-        return new Set(prev).add(fieldName);
-      } else {
-        const newSet = new Set(prev);
-        newSet.delete(fieldName);
-        return newSet;
-      }
-    });
-  }, []);
+  // Old handlers removed - now using global edit form with handleFieldChange
 
-  // Stable callback handlers for equipment type - NO DEPENDENCIES
-  const handleEquipmentTypeChange = useCallback((value: string) => {
-    setSelectedEquipmentType(value);
-    if (value !== "Other") {
-      if (customEquipmentTypeRef.current) {
-        customEquipmentTypeRef.current.value = "";
-      }
-      markEquipmentFieldDirty('type', value);
-    } else {
-      // For "Other", we'll mark dirty when custom input changes
-    }
-  }, []);
-
-  const handleCustomTypeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    markEquipmentFieldDirty('type', e.target.value);
-  }, []);
-
-  // Stable change handlers for equipment fields - NO DEPENDENCIES
-  const handleBrandChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    markEquipmentFieldDirty('brand', e.target.value);
-  }, []);
-
-  const handleModelChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    markEquipmentFieldDirty('model', e.target.value);
-  }, []);
-
-  const handlePlateNumberChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    markEquipmentFieldDirty('plateNumber', e.target.value);
-  }, []);
-
-  const handleOwnerChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    markEquipmentFieldDirty('owner', e.target.value);
-  }, []);
-
-  const handleProjectIdChange = useCallback((value: string) => {
-    markEquipmentFieldDirty('projectId', value);
-  }, []);
-
-  const handleStatusChange = useCallback((value: string) => {
-    markEquipmentFieldDirty('status', value);
-  }, []);
-
-  const handleRemarksChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    markEquipmentFieldDirty('remarks', e.target.value);
-  }, []);
-
-  // Stable handler for inspection frequency
-  const handleInspectionFrequencyChange = useCallback((value: string) => {
-    setInspectionFormData(prev => ({ ...prev, before: value }));
-    markInspectionFieldDirty('before', value);
-  }, []);
-
-  // Individual tab edit handlers
-  const handleTabEditToggle = (tab: 'overview' | 'images' | 'documents' | 'parts' | 'maintenance' | 'inspection', editState: boolean) => {
-    switch (tab) {
-      case 'overview':
-        setOverviewEdit(editState);
-        break;
-      case 'images':
-        setImagesEdit(editState);
-        break;
-      case 'documents':
-        setDocumentsEdit(editState);
-        break;
-      case 'parts':
-        setPartsEdit(editState);
-        break;
-      case 'maintenance':
-        setMaintenanceEdit(editState);
-        break;
-      case 'inspection':
-        setInspectionEdit(editState);
-        break;
-    }
-  };
-
-  const handleTabCancel = (tab: 'overview' | 'images' | 'documents' | 'parts' | 'maintenance' | 'inspection') => {
-    handleTabEditToggle(tab, false);
-    
-    // Reset form data when canceling inspection edit
-    if (tab === 'inspection' && selectedEquipment) {
-      setInspectionFormData({
-        registrationExpiry: selectedEquipment.registration_expiry ? new Date(selectedEquipment.registration_expiry) : undefined,
-        insuranceExpirationDate: selectedEquipment.insurance_expiration_date ? new Date(selectedEquipment.insurance_expiration_date) : undefined,
-        inspectionDate: selectedEquipment.inspection_date ? new Date(selectedEquipment.inspection_date) : undefined,
-        before: selectedEquipment.before?.toString() || '6'
-      });
-      // Close any open date pickers
-      setRegistrationExpiryDateOpen(false);
-      setInsuranceExpiryDateOpen(false);
-      setLastInspectionDateOpen(false);
-    }
-  };
-
-  const handleTabSave = async (tab: 'overview' | 'images' | 'documents' | 'parts' | 'maintenance' | 'inspection') => {
-    if (!selectedEquipment) return;
-
-    let formRef: React.RefObject<HTMLFormElement | null>;
-    switch (tab) {
-      case 'overview':
-        formRef = overviewFormRef;
-        break;
-      case 'inspection':
-        formRef = inspectionFormRef;
-        break;
-      default:
-        toast.info("Save functionality not implemented for this tab yet");
-        return;
-    }
-
-    if (!formRef.current) return;
-
-    // Handle dirty fields for Equipment Information (overview tab)
-    if (tab === 'overview') {
-      if (dirtyEquipmentFields.size === 0) {
-        toast.info("No changes detected");
-        return;
-      }
-      
-      // Get form data
-      const formEl = formRef.current as HTMLFormElement;
-      const formDataFromForm = new FormData(formEl);
-      
-      // Prepare update data
-      const updateData: any = { id: selectedEquipment.id };
-      
-      dirtyEquipmentFields.forEach(fieldName => {
-        const value = formDataFromForm.get(fieldName);
-        if (value !== null) {
-          // Map form field names to equipment properties
-          switch (fieldName) {
-            case 'plateNumber':
-              updateData.plate_number = value;
-              break;
-            case 'projectId':
-              updateData.project_id = value;
-              break;
-            case 'type':
-              updateData.type = selectedEquipmentType === "Other" ? 
-                formDataFromForm.get('customType') || value : value;
-              break;
-            default:
-              updateData[fieldName] = value;
-          }
-        }
-      });
-
-      try {
-        await updateEquipmentMutation.mutateAsync(updateData);
-        handleTabEditToggle(tab, false);
-        setDirtyEquipmentFields(new Set());
-        toast.success("Equipment updated successfully");
-      } catch (error) {
-        console.error("Error updating equipment:", error);
-        toast.error("Failed to update equipment");
-      }
-    }
-
-    // Handle inspection tab
-    if (tab === 'inspection') {
-      if (dirtyInspectionFields.size === 0) {
-        toast.info("No changes detected");
-        return;
-      }
-
-      const updateData: any = { id: selectedEquipment.id };
-      
-      dirtyInspectionFields.forEach(fieldName => {
-        if (fieldName === 'registrationExpiry' && inspectionFormData.registrationExpiry) {
-          updateData.registration_expiry = format(inspectionFormData.registrationExpiry, 'yyyy-MM-dd');
-        } else if (fieldName === 'insuranceExpirationDate' && inspectionFormData.insuranceExpirationDate) {
-          updateData.insurance_expiration_date = format(inspectionFormData.insuranceExpirationDate, 'yyyy-MM-dd');
-        } else if (fieldName === 'inspectionDate' && inspectionFormData.inspectionDate) {
-          updateData.inspection_date = format(inspectionFormData.inspectionDate, 'yyyy-MM-dd');
-        } else if (fieldName === 'before') {
-          updateData.before = parseInt(inspectionFormData.before);
-        }
-      });
-
-      try {
-        await updateEquipmentMutation.mutateAsync(updateData);
-        handleTabEditToggle(tab, false);
-        setDirtyInspectionFields(new Set());
-        toast.success("Inspection dates updated successfully");
-      } catch (error) {
-        console.error("Error updating inspection dates:", error);
-        toast.error("Failed to update inspection dates");
-      }
-    }
-  };
+  // Old tab handlers removed - now using global edit with handleSaveChanges
 
 
   // Helper function to calculate days until expiry
-  const getDaysUntilExpiry = (expiryDate: string) => {
+  const getDaysUntilExpiry = (expiryDate: string | null | undefined) => {
     if (!expiryDate) return null;
     const now = new Date();
     const expiry = new Date(expiryDate);
@@ -498,9 +399,34 @@ export default function EquipmentModalModern() {
     return diffDays;
   };
 
+  // Helper function to get user full name from ID
+  const getUserFullName = (userId: string | null | undefined) => {
+    if (!userId) return 'Unknown User';
+    const user = users.find(u => u.id === userId);
+    return user ? user.full_name : 'Unknown User';
+  };
+
   if (!selectedEquipment) return null;
 
-  const daysUntilExpiry = getDaysUntilExpiry(selectedEquipment.insuranceExpirationDate);
+  const daysUntilExpiry = getDaysUntilExpiry(selectedEquipment.insurance_expiration_date);
+
+  // Dynamic descriptions based on active tab
+  const getTabDescription = () => {
+    switch (activeTab) {
+      case 'details':
+        return 'View equipment specifications, project assignment, and inspection schedules';
+      case 'images':
+        return 'View equipment photos and inspection images';
+      case 'documents':
+        return 'View official documents and certificates';
+      case 'parts':
+        return 'View equipment parts and components';
+      case 'maintenance':
+        return 'View maintenance history and service reports';
+      default:
+        return 'View equipment details and maintenance records';
+    }
+  };
 
   // Equipment images
   const images = [
@@ -514,12 +440,12 @@ export default function EquipmentModalModern() {
   // Inspection images
   const inspectionImages = [
     {
-      url: selectedEquipment.thirdpartyInspectionImage,
+      url: selectedEquipment.thirdparty_inspection_image,
       title: "Third-party Inspection",
       icon: Shield,
     },
     {
-      url: selectedEquipment.pgpcInspectionImage,
+      url: selectedEquipment.pgpc_inspection_image,
       title: "PGPC Inspection",
       icon: Shield,
     },
@@ -528,19 +454,24 @@ export default function EquipmentModalModern() {
   // Equipment documents (PDFs and downloadable files)
   const documents = [
     {
-      url: selectedEquipment.originalReceiptUrl,
+      url: selectedEquipment.original_receipt_url,
       title: "Original Receipt",
       icon: Receipt,
     },
     {
-      url: selectedEquipment.equipmentRegistrationUrl,
+      url: selectedEquipment.equipment_registration_url,
       title: "Equipment Registration",
       icon: FileText,
     },
   ].filter(doc => doc.url);
 
   // Image/Document Viewer Component - EXACTLY like FileUploadSectionSimple
-  const ImageViewerSection = ({ url, label, description }: { url: string; label: string; description: string }) => {
+  const ImageViewerSection = ({ url, label, description, onRemove }: { 
+    url: string; 
+    label: string; 
+    description: string; 
+    onRemove?: () => void 
+  }) => {
     const [showImageViewer, setShowImageViewer] = useState(false);
     
     return (
@@ -565,6 +496,22 @@ export default function EquipmentModalModern() {
                   <Eye className="h-6 w-6 text-white" />
                 </div>
               </div>
+              
+              {/* Remove button - only show in edit mode */}
+              {isGlobalEditMode && onRemove && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove();
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -603,6 +550,115 @@ export default function EquipmentModalModern() {
             </DialogContent>
           </Dialog>
         )}
+      </div>
+    );
+  };
+
+  // Document Viewer Component - EXACTLY like ImageViewerSection
+  const DocumentViewerSection = ({ url, label, description, onRemove }: { 
+    url: string; 
+    label: string; 
+    description: string; 
+    onRemove?: () => void 
+  }) => {
+    const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+    
+    return (
+      <div className="space-y-2">
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+          <div className="space-y-2">
+            <div className="relative w-full max-w-[200px] mx-auto group">
+              <div 
+                className="relative cursor-pointer"
+                onClick={() => {
+                  setShowDocumentViewer(true);
+                }}
+              >
+                <Image
+                  src={url}
+                  alt={label}
+                  width={200}
+                  height={200}
+                  className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
+                />
+                <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
+                  <Eye className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              
+              {/* Remove button - only show in edit mode */}
+              {isGlobalEditMode && onRemove && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove();
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground text-center">{description}</p>
+
+        {/* Document Viewer Modal - EXACTLY like ImageViewerSection */}
+        {showDocumentViewer && (
+          <Dialog open={showDocumentViewer} onOpenChange={setShowDocumentViewer}>
+            <DialogContent 
+              className="!max-w-none p-4 
+                w-[95vw] max-h-[85vh] sm:w-[80vw] sm:max-h-[70vh] lg:w-[60vw] lg:max-h-[65vh] xl:w-[40vw] xl:max-h-[60vh]" 
+              style={{ 
+                maxWidth: 'min(95vw, 800px)', 
+                width: 'min(95vw, 800px)'
+              }}
+            >
+              <DialogHeader className="pb-4">
+                <DialogTitle className="text-center">
+                  {label}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="flex items-center justify-center">
+                <Image
+                  src={url}
+                  alt={label}
+                  width={800}
+                  height={600}
+                  className="max-w-full max-h-[70vh] sm:max-h-[55vh] lg:max-h-[50vh] xl:max-h-[45vh] object-contain"
+                  onClick={(e) => e.stopPropagation()}
+                  onError={(e) => {
+                  }}
+                  onLoad={() => {
+                  }}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+    );
+  };
+
+  // Empty Document Placeholder Component
+  const EmptyDocumentPlaceholder = ({ icon: Icon, label, description }: { icon: any; label: string; description: string }) => {
+    return (
+      <div className="space-y-2">
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+          <div className="space-y-2">
+            <div className="relative w-full max-w-[200px] mx-auto">
+              <div className="w-full h-[200px] bg-gray-50 rounded border-2 border-dashed border-gray-300 flex flex-col items-center justify-center">
+                <Icon className="h-12 w-12 text-gray-400 mb-3" />
+                <p className="text-sm font-medium text-gray-500 text-center px-2">{label}</p>
+                <p className="text-xs text-gray-400 text-center px-2 mt-1">Click edit to upload</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground text-center">{description}</p>
       </div>
     );
   };
@@ -648,177 +704,35 @@ export default function EquipmentModalModern() {
     </Button>
   );
 
-  // Helper function to render edit button for each tab
-  const renderTabEditButton = (tab: 'overview' | 'images' | 'documents' | 'parts' | 'maintenance' | 'inspection', editState: boolean) => {
-    if (editState) {
-      return (
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => handleTabCancel(tab)}
-            disabled={updateEquipmentMutation.isPending}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => handleTabSave(tab)}
-            disabled={updateEquipmentMutation.isPending}
-            className="flex items-center gap-2"
-          >
-            {updateEquipmentMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Save Changes
-          </Button>
-        </div>
-      );
-    }
-
-    return (
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        onClick={() => handleTabEditToggle(tab, true)}
-        className="flex items-center gap-2"
-      >
-        <Edit className="h-4 w-4" />
-        Edit
-      </Button>
-    );
-  };
 
   const ModalContent = () => (
     <div className="space-y-4">
 
-      {/* Tab Navigation - EXACTLY like CreateEquipmentForm */}
-      <div className={`w-full mb-6 ${isMobile ? 'grid grid-cols-5 bg-muted rounded-md p-1' : 'flex justify-center border-b'}`}>
-        {isMobile ? (
-          <>
-            {renderTabButton('details', 'Details', <Settings className="h-4 w-4" />)}
-            {renderTabButton('images', 'Images', <Camera className="h-4 w-4" />, getImagesCount() > 0 ? getImagesCount() : undefined)}
-            {renderTabButton('documents', 'Docs', <FileText className="h-4 w-4" />, getDocumentsCount() > 0 ? getDocumentsCount() : undefined)}
-            {renderTabButton('parts', 'Parts', <Wrench className="h-4 w-4" />, getEquipmentPartsCount() > 0 ? getEquipmentPartsCount() : undefined)}
-            {renderTabButton('maintenance', 'Maintenance', <ClipboardList className="h-4 w-4" />, getMaintenanceReportsCount())}
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => setActiveTab('details')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
-                activeTab === 'details'
-                  ? 'border-primary text-primary bg-primary/5'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
-              }`}
-            >
-              <Settings className="h-4 w-4" />
-              Equipment Details
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('images')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
-                activeTab === 'images'
-                  ? 'border-primary text-primary bg-primary/5'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
-              }`}
-            >
-              <Camera className="h-4 w-4" />
-              Equipment Images
-              {getImagesCount() > 0 && (
-                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
-                  {getImagesCount()}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('documents')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
-                activeTab === 'documents'
-                  ? 'border-primary text-primary bg-primary/5'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
-              }`}
-            >
-              <FileText className="h-4 w-4" />
-              Documents
-              {getDocumentsCount() > 0 && (
-                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
-                  {getDocumentsCount()}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('parts')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
-                activeTab === 'parts'
-                  ? 'border-primary text-primary bg-primary/5'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
-              }`}
-            >
-              <Wrench className="h-4 w-4" />
-              Parts Management
-              {getEquipmentPartsCount() > 0 && (
-                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
-                  {getEquipmentPartsCount()}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('maintenance')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
-                activeTab === 'maintenance'
-                  ? 'border-primary text-primary bg-primary/5'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
-              }`}
-            >
-              <ClipboardList className="h-4 w-4" />
-              Maintenance Reports
-              {getMaintenanceReportsCount() > 0 && (
-                <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
-                  {getMaintenanceReportsCount()}
-                </span>
-              )}
-            </button>
-          </>
-        )}
-      </div>
-
       {/* Details Tab */}
       {activeTab === 'details' && (
-        <div className={`${isMobile ? 'space-y-6' : 'space-y-8'}`}>
-          {/* Equipment Details */}
+        <div>
+          {/* Tab Title and Description */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
+              <Settings className="h-5 w-5" />
+              Equipment Details
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Complete equipment information including specifications, project assignment, and inspection schedules
+            </p>
+          </div>
+
           <Card>
             <CardHeader className="pb-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    Equipment Information
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {overviewEdit ? 'Edit equipment details' : 'View detailed information about this equipment'}
-                  </p>
-                </div>
-                {renderTabEditButton('overview', overviewEdit)}
-              </div>
             </CardHeader>
             <CardContent className="space-y-8">
-              {overviewEdit ? (
-                // Edit Mode Form
-                <form ref={overviewFormRef} className="space-y-8">
+              {/* Equipment Information Section */}
+              {isGlobalEditMode ? (
+                // Global Edit Mode Form
+                <form className="space-y-8">
                   {/* Equipment Identity Section */}
                   <div className="space-y-4">
-                    <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+                    <div className={gridClassName}>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-2">
                           <Wrench className="h-4 w-4" />
@@ -826,10 +740,9 @@ export default function EquipmentModalModern() {
                         </Label>
                         <Input
                           name="brand"
-                          defaultValue={defaultValues.brand}
                           placeholder="Enter equipment brand"
-                          onChange={handleBrandChange}
-                          required
+                          onChange={(e) => handleFieldChange('brand', e.target.value)}
+                          defaultValue={editFormDataRef.current.brand}
                         />
                       </div>
 
@@ -840,19 +753,17 @@ export default function EquipmentModalModern() {
                         </Label>
                         <Input
                           name="model"
-                          defaultValue={defaultValues.model}
                           placeholder="Enter equipment model"
-                          onChange={handleModelChange}
-                          required
+                          onChange={(e) => handleFieldChange('model', e.target.value)}
+                          defaultValue={editFormDataRef.current.model}
                         />
                       </div>
 
                       <div className="space-y-2">
                         <Label>Equipment Type</Label>
                         <Select 
-                          value={selectedEquipmentType} 
-                          onValueChange={handleEquipmentTypeChange}
-                          required
+                          defaultValue={editFormDataRef.current.type} 
+                          onValueChange={(value) => handleFieldChange('type', value)}
                         >
                           <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select equipment type" />
@@ -873,24 +784,14 @@ export default function EquipmentModalModern() {
                         </Select>
                         
                         {/* Custom type input when "Other" is selected */}
-                        {selectedEquipmentType === "Other" && (
+                        {editFormDataRef.current.type === "Other" && (
                           <Input
-                            ref={customEquipmentTypeRef}
                             name="customType"
-                            defaultValue={defaultValues.type}
-                            onChange={handleCustomTypeChange}
+                            defaultValue={editFormDataRef.current.type === "Other" ? editFormDataRef.current.type : ''}
+                            onChange={(e) => handleFieldChange('type', e.target.value)}
                             placeholder="Enter custom equipment type"
-                            required
-                            autoFocus
                           />
                         )}
-                        
-                        {/* Hidden input to submit the correct value */}
-                        <input
-                          type="hidden"
-                          name="type"
-                          value={selectedEquipmentType === "Other" ? (customEquipmentTypeRef.current?.value || "") : selectedEquipmentType}
-                        />
                       </div>
 
                       <div className="space-y-2">
@@ -900,9 +801,9 @@ export default function EquipmentModalModern() {
                         </Label>
                         <Input
                           name="plateNumber"
-                          defaultValue={defaultValues.plateNumber}
                           placeholder="Enter plate/serial number"
-                          onChange={handlePlateNumberChange}
+                          onChange={(e) => handleFieldChange('plate_number', e.target.value)}
+                          defaultValue={editFormDataRef.current.plate_number}
                         />
                       </div>
                     </div>
@@ -910,7 +811,7 @@ export default function EquipmentModalModern() {
 
                   {/* Ownership & Project Section */}
                   <div className="space-y-4">
-                    <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                    <div className={gridClassName2}>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-2">
                           <User className="h-4 w-4" />
@@ -918,10 +819,9 @@ export default function EquipmentModalModern() {
                         </Label>
                         <Input
                           name="owner"
-                          defaultValue={defaultValues.owner}
                           placeholder="Enter equipment owner"
-                          onChange={handleOwnerChange}
-                          required
+                          onChange={(e) => handleFieldChange('owner', e.target.value)}
+                          defaultValue={editFormDataRef.current.owner}
                         />
                       </div>
 
@@ -929,16 +829,16 @@ export default function EquipmentModalModern() {
                         <Label>Assigned Project</Label>
                         <Select 
                           name="projectId" 
-                          defaultValue={defaultValues.projectId}
-                          onValueChange={handleProjectIdChange}
+                          defaultValue={editFormDataRef.current.project_id}
+                          onValueChange={(value) => handleFieldChange('project_id', value)}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select a project" />
                           </SelectTrigger>
                           <SelectContent>
                             {projects.map((project) => (
-                              <SelectItem key={project.uid} value={project.uid}>
-                                {project.name} - {project.client.name}
+                              <SelectItem key={project.id} value={project.id}>
+                                {project.name} - {project.client?.name || 'No Client'}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -949,7 +849,7 @@ export default function EquipmentModalModern() {
 
                   {/* Status & Additional Fields Section */}
                   <div className="space-y-4">
-                    <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
+                    <div className={gridClassName3}>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-2">
                           <Shield className="h-4 w-4" />
@@ -957,8 +857,8 @@ export default function EquipmentModalModern() {
                         </Label>
                         <Select 
                           name="status" 
-                          defaultValue={defaultValues.status}
-                          onValueChange={handleStatusChange}
+                          defaultValue={editFormDataRef.current.status}
+                          onValueChange={(value) => handleFieldChange('status', value)}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select status" />
@@ -970,6 +870,141 @@ export default function EquipmentModalModern() {
                         </Select>
                       </div>
 
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <CalendarDays className="h-4 w-4" />
+                          Before (months)
+                        </Label>
+                        <Input
+                          name="before"
+                          type="number"
+                          min="1"
+                          max="24"
+                          defaultValue={editFormDataRef.current.before}
+                          onChange={(e) => handleFieldChange('before', parseInt(e.target.value) || 6)}
+                          placeholder="Months before inspection"
+                        />
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Date Fields Section */}
+                  <div className="space-y-4">
+                    <div className={gridClassName4}>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <CalendarIcon className="h-4 w-4" />
+                          Inspection Date
+                        </Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !editFormDataRef.current.inspection_date && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {editFormDataRef.current.inspection_date ? format(editFormDataRef.current.inspection_date, "PPP") : "Pick inspection date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={editFormDataRef.current.inspection_date}
+                              onSelect={(date) => handleFieldChange('inspection_date', date)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <CalendarIcon className="h-4 w-4" />
+                          Registration Expiry
+                        </Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !editFormDataRef.current.registration_expiry && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {editFormDataRef.current.registration_expiry ? format(editFormDataRef.current.registration_expiry, "PPP") : "Pick registration expiry"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={editFormDataRef.current.registration_expiry}
+                              onSelect={(date) => handleFieldChange('registration_expiry', date)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Shield className="h-4 w-4" />
+                          Insurance Expiration
+                        </Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !editFormDataRef.current.insurance_expiration_date && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {editFormDataRef.current.insurance_expiration_date ? format(editFormDataRef.current.insurance_expiration_date, "PPP") : "Pick insurance expiry"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar
+                              mode="single"
+                              selected={editFormDataRef.current.insurance_expiration_date}
+                              onSelect={(date) => handleFieldChange('insurance_expiration_date', date)}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Additional Fields Section */}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Added by
+                      </Label>
+                      <Select 
+                        name="created_by" 
+                        defaultValue={editFormDataRef.current.created_by}
+                        onValueChange={(value) => handleFieldChange('created_by', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select who added this equipment" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.full_name} ({user.username})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -978,9 +1013,9 @@ export default function EquipmentModalModern() {
                     <Label>Remarks</Label>
                     <Textarea
                       name="remarks"
-                      defaultValue={defaultValues.remarks}
                       placeholder="Enter any additional notes or remarks"
-                      onChange={handleRemarksChange}
+                      defaultValue={editFormDataRef.current.remarks}
+                      onChange={(e) => handleFieldChange('remarks', e.target.value)}
                       rows={3}
                     />
                   </div>
@@ -990,7 +1025,7 @@ export default function EquipmentModalModern() {
                 <>
                   {/* Equipment Identity Section */}
                   <div className="space-y-4">
-                    <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+                    <div className={gridClassName}>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-2">
                           <Wrench className="h-4 w-4" />
@@ -1026,7 +1061,7 @@ export default function EquipmentModalModern() {
 
                   {/* Ownership & Project Section */}
                   <div className="space-y-4">
-                    <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                    <div className={gridClassName2}>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-2">
                           <User className="h-4 w-4" />
@@ -1093,503 +1128,621 @@ export default function EquipmentModalModern() {
                   )}
                 </>
               )}
-            </CardContent>
-          </Card>
 
-          {/* Dates & Inspection Card */}
-          <Card>
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <CalendarDays className="h-4 w-4" />
-                    Dates & Inspection
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {inspectionEdit ? 'Edit equipment dates and inspection schedule' : 'Equipment registration, inspection dates and scheduling information'}
-                  </p>
+              {/* Separator */}
+              <div className="border-t"></div>
+
+              {/* Dates & Inspection Section - Hide in edit mode */}
+              {!isGlobalEditMode && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4" />
+                  <h3 className="font-medium">Dates & Inspection</h3>
                 </div>
-                {renderTabEditButton('inspection', inspectionEdit)}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {inspectionEdit ? (
-                // Edit Mode Form
-                <form ref={inspectionFormRef} className="space-y-6">
-                  <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
-                    {/* Registration Expires */}
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <CalendarIcon className="h-4 w-4" />
-                        Registration Expires
-                      </Label>
-                      <Popover open={registrationExpiryDateOpen} onOpenChange={setRegistrationExpiryDateOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !inspectionFormData.registrationExpiry && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {inspectionFormData.registrationExpiry ? (
-                              format(inspectionFormData.registrationExpiry, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={inspectionFormData.registrationExpiry}
-                            onSelect={(date) => {
-                              setInspectionFormData(prev => ({ ...prev, registrationExpiry: date }));
-                              markInspectionFieldDirty('registrationExpiry', date);
-                              setRegistrationExpiryDateOpen(false); // Auto-close after selection
-                            }}
-                            initialFocus
-                            captionLayout="dropdown-buttons"
-                            fromYear={1990}
-                            toYear={2050}
-                            classNames={{
-                              caption_dropdowns: "flex gap-2 justify-center",
-                              vhidden: "hidden",
-                              caption_label: "hidden"
-                            }}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    {/* Insurance Expiration */}
-                    <div className="space-y-2">
-                      <Label>Insurance Expires</Label>
-                      <Popover open={insuranceExpiryDateOpen} onOpenChange={setInsuranceExpiryDateOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !inspectionFormData.insuranceExpirationDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {inspectionFormData.insuranceExpirationDate ? (
-                              format(inspectionFormData.insuranceExpirationDate, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={inspectionFormData.insuranceExpirationDate}
-                            onSelect={(date) => {
-                              setInspectionFormData(prev => ({ ...prev, insuranceExpirationDate: date }));
-                              markInspectionFieldDirty('insuranceExpirationDate', date);
-                              setInsuranceExpiryDateOpen(false); // Auto-close after selection
-                            }}
-                            initialFocus
-                            captionLayout="dropdown-buttons"
-                            fromYear={1990}
-                            toYear={2050}
-                            classNames={{
-                              caption_dropdowns: "flex gap-2 justify-center",
-                              vhidden: "hidden",
-                              caption_label: "hidden"
-                            }}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    {/* Last Inspection */}
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <CalendarIcon className="h-4 w-4" />
-                        Last Inspection
-                      </Label>
-                      <Popover open={lastInspectionDateOpen} onOpenChange={setLastInspectionDateOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !inspectionFormData.inspectionDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {inspectionFormData.inspectionDate ? (
-                              format(inspectionFormData.inspectionDate, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={inspectionFormData.inspectionDate}
-                            onSelect={(date) => {
-                              setInspectionFormData(prev => ({ ...prev, inspectionDate: date }));
-                              markInspectionFieldDirty('inspectionDate', date);
-                              setLastInspectionDateOpen(false); // Auto-close after selection
-                            }}
-                            initialFocus
-                            captionLayout="dropdown-buttons"
-                            fromYear={1990}
-                            toYear={2030}
-                            classNames={{
-                              caption_dropdowns: "flex gap-2 justify-center",
-                              vhidden: "hidden",
-                              caption_label: "hidden"
-                            }}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    {/* Inspection Frequency */}
-                    <div className="space-y-2">
-                      <Label>Inspection Frequency</Label>
-                      <Select 
-                        value={inspectionFormData.before} 
-                        onValueChange={handleInspectionFrequencyChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">Every 1 month</SelectItem>
-                          <SelectItem value="2">Every 2 months</SelectItem>
-                          <SelectItem value="3">Every 3 months</SelectItem>
-                          <SelectItem value="6">Every 6 months</SelectItem>
-                          <SelectItem value="12">Every 12 months</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                </form>
-              ) : (
-                // View Mode
+                
+                {/* Inspection tab shows actual date information */}
                 <div className="space-y-4">
-                  <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
-                    {/* Registration Expires */}
-                    {selectedEquipment.registration_expiry && (
-                      <div className="space-y-1">
-                        <Label className="text-sm font-medium text-muted-foreground">Registration Expires:</Label>
-                        <div className={`font-medium ${
-                          (() => {
-                            if (!selectedEquipment.registration_expiry) return "text-foreground";
-                            const now = new Date();
-                            const expiry = new Date(selectedEquipment.registration_expiry);
-                            const diffTime = expiry.getTime() - now.getTime();
-                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                            return diffDays <= 0 ? "text-red-600" : diffDays <= 30 ? "text-orange-600" : "text-foreground";
-                          })()
-                        }`}>
-                          {format(new Date(selectedEquipment.registration_expiry), "M/d/yyyy")}
-                          {(() => {
-                            if (!selectedEquipment.registration_expiry) return null;
-                            const now = new Date();
-                            const expiry = new Date(selectedEquipment.registration_expiry);
-                            const diffTime = expiry.getTime() - now.getTime();
-                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                            return diffDays <= 0 ? <span className="text-red-600 ml-2">(Expired)</span> : null;
-                          })()}
+                  {!isGlobalEditMode && (
+                    <p className="text-sm text-muted-foreground">
+                      Use the Edit Equipment button to modify inspection dates and frequency.
+                    </p>
+                  )}
+                  
+                  {/* Date Information Display */}
+                  <div className="space-y-4">
+                    <div className={gridClassName3}>
+                      {/* Registration Expires */}
+                      {selectedEquipment.registration_expiry && (
+                        <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Registration Expires:</Label>
+                          <div className={`font-medium ${
+                            (() => {
+                              if (!selectedEquipment.registration_expiry) return "text-foreground";
+                              const now = new Date();
+                              const expiry = new Date(selectedEquipment.registration_expiry);
+                              const diffTime = expiry.getTime() - now.getTime();
+                              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                              return diffDays <= 0 ? "text-red-600" : diffDays <= 30 ? "text-orange-600" : "text-foreground";
+                            })()
+                          }`}>
+                            {format(new Date(selectedEquipment.registration_expiry), "M/d/yyyy")}
+                            {(() => {
+                              if (!selectedEquipment.registration_expiry) return null;
+                              const now = new Date();
+                              const expiry = new Date(selectedEquipment.registration_expiry);
+                              const diffTime = expiry.getTime() - now.getTime();
+                              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                              return diffDays <= 0 ? <span className="text-red-600 ml-2">(Expired)</span> : null;
+                            })()}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Insurance Expires */}
-                    {selectedEquipment.insurance_expiration_date && (
-                      <div className="space-y-1">
-                        <Label className="text-sm font-medium text-muted-foreground">Insurance Expires:</Label>
-                        <div className={`font-medium ${
-                          daysUntilExpiry !== null && daysUntilExpiry <= 0
-                            ? "text-red-600"
-                            : daysUntilExpiry !== null && daysUntilExpiry <= 30
-                            ? "text-orange-600"
-                            : "text-foreground"
-                        }`}>
-                          {format(new Date(selectedEquipment.insurance_expiration_date), "M/d/yyyy")}
-                          {daysUntilExpiry !== null && daysUntilExpiry <= 0 && (
-                            <span className="text-red-600 ml-2">(Expired)</span>
-                          )}
+                      {/* Insurance Expires */}
+                      {selectedEquipment.insurance_expiration_date && (
+                        <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Insurance Expires:</Label>
+                          <div className={`font-medium ${
+                            daysUntilExpiry !== null && daysUntilExpiry <= 0
+                              ? "text-red-600"
+                              : daysUntilExpiry !== null && daysUntilExpiry <= 30
+                              ? "text-orange-600"
+                              : "text-foreground"
+                          }`}>
+                            {format(new Date(selectedEquipment.insurance_expiration_date), "M/d/yyyy")}
+                            {daysUntilExpiry !== null && daysUntilExpiry <= 0 && (
+                              <span className="text-red-600 ml-2">(Expired)</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Last Inspection */}
-                    {selectedEquipment.inspection_date && (
-                      <div className="space-y-1">
-                        <Label className="text-sm font-medium text-muted-foreground">Last Inspection:</Label>
-                        <div className="font-medium text-foreground">
-                          {format(new Date(selectedEquipment.inspection_date), "M/d/yyyy")}
+                      {/* Last Inspection */}
+                      {selectedEquipment.inspection_date && (
+                        <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Last Inspection:</Label>
+                          <div className="font-medium text-foreground">
+                            {format(new Date(selectedEquipment.inspection_date), "M/d/yyyy")}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Next Inspection Due */}
-                    {selectedEquipment.inspection_date && selectedEquipment.before && (
-                      <div className="space-y-1">
-                        <Label className="text-sm font-medium text-muted-foreground">Next Inspection Due:</Label>
-                        <div className="font-medium text-foreground">
-                          {(() => {
-                            const lastInspection = new Date(selectedEquipment.inspection_date);
-                            const frequency = parseInt(selectedEquipment.before.toString());
-                            const nextInspection = new Date(lastInspection);
-                            nextInspection.setMonth(nextInspection.getMonth() + frequency);
-                            return format(nextInspection, "M/d/yyyy");
-                          })()}
+                      {/* Next Inspection Due */}
+                      {selectedEquipment.inspection_date && selectedEquipment.before && (
+                        <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Next Inspection Due:</Label>
+                          <div className="font-medium text-foreground">
+                            {(() => {
+                              const lastInspection = new Date(selectedEquipment.inspection_date);
+                              const frequency = parseInt(selectedEquipment.before.toString());
+                              const nextInspection = new Date(lastInspection);
+                              nextInspection.setMonth(nextInspection.getMonth() + frequency);
+                              return format(nextInspection, "M/d/yyyy");
+                            })()}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Inspection Frequency */}
-                    {selectedEquipment.before && (
-                      <div className="space-y-1">
-                        <Label className="text-sm font-medium text-muted-foreground">Inspection Frequency:</Label>
-                        <div className="font-medium text-foreground">
-                          Every {selectedEquipment.before} month{parseInt(selectedEquipment.before.toString()) > 1 ? 's' : ''}
+                      {/* Inspection Frequency */}
+                      {selectedEquipment.before && (
+                        <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Inspection Frequency:</Label>
+                          <div className="font-medium text-foreground">
+                            Every {selectedEquipment.before} month{parseInt(selectedEquipment.before.toString()) > 1 ? 's' : ''}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Date Added */}
-                    {selectedEquipment.created_at && (
-                      <div className="space-y-1">
-                        <Label className="text-sm font-medium text-muted-foreground">Date Added:</Label>
-                        <div className="font-medium text-foreground">
-                          {format(new Date(selectedEquipment.created_at), "M/d/yyyy")}
+                      {/* Date Added */}
+                      {selectedEquipment.created_at && (
+                        <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Date Added:</Label>
+                          <div className="font-medium text-foreground">
+                            {format(new Date(selectedEquipment.created_at), "M/d/yyyy")}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Added by */}
-                    {(selectedEquipment.user || selectedEquipment.created_by) && (
-                      <div className="space-y-1">
-                        <Label className="text-sm font-medium text-muted-foreground">Added by:</Label>
-                        <div className="font-medium text-foreground">
-                          {selectedEquipment.user?.full_name || selectedEquipment.user?.username || selectedEquipment.created_by}
+                      {/* Added by */}
+                      {selectedEquipment.created_by && (
+                        <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Added by:</Label>
+                          <div className="font-medium text-foreground">
+                            {getUserFullName(selectedEquipment.created_by)}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-
                 </div>
+              </div>
               )}
             </CardContent>
           </Card>
-
         </div>
       )}
 
       {/* Images Tab */}
       {activeTab === 'images' && (
-        <div className={`space-y-6 ${isMobile ? '' : 'border-t pt-4'}`}>
-          {/* Equipment Image */}
-          {selectedEquipment.image_url && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Camera className="h-5 w-5" />
-                  Equipment Image
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ImageViewerSection 
-                  url={selectedEquipment.image_url}
-                  label="Equipment Image"
-                  description="Main equipment photo"
-                />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Inspection Images */}
-          {(selectedEquipment.thirdparty_inspection_image || selectedEquipment.pgpc_inspection_image) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Inspection Images
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {selectedEquipment.thirdparty_inspection_image && (
-                  <div>
-                    <h4 className="font-medium mb-3">Third-party Inspection</h4>
-                    <ImageViewerSection 
-                      url={selectedEquipment.thirdparty_inspection_image}
-                      label="Third-party Inspection"
-                      description="Third-party inspection documentation"
-                    />
-                  </div>
-                )}
-                
-                {selectedEquipment.pgpc_inspection_image && (
-                  <div>
-                    <h4 className="font-medium mb-3">PGPC Inspection</h4>
-                    <ImageViewerSection 
-                      url={selectedEquipment.pgpc_inspection_image}
-                      label="PGPC Inspection"
-                      description="PGPC inspection documentation"
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* No Images State */}
-          {!selectedEquipment.image_url && !selectedEquipment.thirdparty_inspection_image && !selectedEquipment.pgpc_inspection_image && (
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center py-8">
-                  <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">No images available for this equipment</p>
+        <div>
+          {/* Tab Title and Description */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
+              <Camera className="h-5 w-5" />
+              Equipment Images
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Visual documentation of the equipment including main photo and inspection images
+            </p>
+          </div>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
+                {/* Equipment Image */}
+                <div className="space-y-2">
+                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
+                    <Camera className="h-4 w-4" />
+                    Equipment Image
+                  </h3>
+                  {selectedEquipment.image_url && !removedItems.has('image_url') ? (
+                    <div>
+                      <ImageViewerSection 
+                        url={selectedEquipment.image_url}
+                        label="Equipment Image"
+                        description="Main equipment photo"
+                        onRemove={undefined}
+                      />
+                      {/* Single toggle button - Remove if image exists */}
+                      {isGlobalEditMode && (
+                        <div className="mt-3">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              setRemovedItems(prev => new Set([...prev, 'image_url']));
+                              handleFieldChange('image_url', null);
+                              toast.success('Equipment image will be removed when you save changes');
+                            }}
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Remove Image
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <EmptyDocumentPlaceholder 
+                        icon={Camera}
+                        label="Equipment Image"
+                        description="Click upload to add new image"
+                      />
+                      {/* Single toggle button - Upload if no image */}
+                      {isGlobalEditMode && (
+                        <div className="mt-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = 'image/*';
+                              input.onchange = (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
+                                if (file) {
+                                  setRemovedItems(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete('image_url');
+                                    return newSet;
+                                  });
+                                  toast.success('New image will be uploaded when you save changes');
+                                }
+                              };
+                              input.click();
+                            }}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload New Image
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+
+                {/* Third-party Inspection */}
+                <div className="space-y-2">
+                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Third-party Inspection
+                  </h3>
+                  {selectedEquipment.thirdparty_inspection_image && !removedItems.has('thirdparty_inspection_image') ? (
+                    <div>
+                      <ImageViewerSection 
+                        url={selectedEquipment.thirdparty_inspection_image}
+                        label="Third-party Inspection"
+                        description="Third-party inspection documentation"
+                        onRemove={undefined}
+                      />
+                      {/* Single toggle button - Remove if image exists */}
+                      {isGlobalEditMode && (
+                        <div className="mt-3">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              setRemovedItems(prev => new Set([...prev, 'thirdparty_inspection_image']));
+                              handleFieldChange('thirdparty_inspection_image', null);
+                              toast.success('Third-party inspection image will be removed when you save changes');
+                            }}
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Remove Image
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <EmptyDocumentPlaceholder 
+                        icon={Shield}
+                        label="Third-party Inspection"
+                        description="Click upload to add new image"
+                      />
+                      {/* Single toggle button - Upload if no image */}
+                      {isGlobalEditMode && (
+                        <div className="mt-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = 'image/*';
+                              input.onchange = (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
+                                if (file) {
+                                  setRemovedItems(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete('thirdparty_inspection_image');
+                                    return newSet;
+                                  });
+                                  toast.success('New third-party inspection image will be uploaded when you save changes');
+                                }
+                              };
+                              input.click();
+                            }}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload New Image
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* PGPC Inspection */}
+                <div className="space-y-2">
+                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    PGPC Inspection
+                  </h3>
+                  {selectedEquipment.pgpc_inspection_image && !removedItems.has('pgpc_inspection_image') ? (
+                    <div>
+                      <ImageViewerSection 
+                        url={selectedEquipment.pgpc_inspection_image}
+                        label="PGPC Inspection"
+                        description="PGPC inspection documentation"
+                        onRemove={undefined}
+                      />
+                      {/* Single toggle button - Remove if image exists */}
+                      {isGlobalEditMode && (
+                        <div className="mt-3">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              setRemovedItems(prev => new Set([...prev, 'pgpc_inspection_image']));
+                              handleFieldChange('pgpc_inspection_image', null);
+                              toast.success('PGPC inspection image will be removed when you save changes');
+                            }}
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Remove Image
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <EmptyDocumentPlaceholder 
+                        icon={Shield}
+                        label="PGPC Inspection"
+                        description="Click upload to add new image"
+                      />
+                      {/* Single toggle button - Upload if no image */}
+                      {isGlobalEditMode && (
+                        <div className="mt-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = 'image/*';
+                              input.onchange = (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
+                                if (file) {
+                                  setRemovedItems(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete('pgpc_inspection_image');
+                                    return newSet;
+                                  });
+                                  toast.success('New PGPC inspection image will be uploaded when you save changes');
+                                }
+                              };
+                              input.click();
+                            }}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload New Image
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Documents Tab */}
       {activeTab === 'documents' && (
-        <div className={`space-y-6 ${isMobile ? '' : 'border-t pt-4'}`}>
-          {/* Document Links */}
-          {(selectedEquipment.original_receipt_url || selectedEquipment.equipment_registration_url) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Equipment Documents
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {selectedEquipment.original_receipt_url && (
-                  <div className="border rounded-lg p-4 bg-muted/30">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Receipt className="h-8 w-8 text-green-600" />
-                        <div>
-                          <h4 className="font-medium">Original Receipt</h4>
-                          <p className="text-sm text-muted-foreground">Equipment purchase receipt</p>
+        <div>
+          {/* Tab Title and Description */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
+              <FileText className="h-5 w-5" />
+              Equipment Documents
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Official documents and certificates related to equipment purchase and registration
+            </p>
+          </div>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                {/* Purchase Receipt */}
+                <div className="space-y-2">
+                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
+                    <Receipt className="h-4 w-4" />
+                    Purchase Receipt
+                  </h3>
+                  {selectedEquipment.original_receipt_url && !removedItems.has('original_receipt_url') ? (
+                    <div>
+                      <DocumentViewerSection 
+                        url={selectedEquipment.original_receipt_url}
+                        label="Purchase Receipt"
+                        description="Equipment purchase documentation"
+                        onRemove={undefined}
+                      />
+                      {/* Single toggle button - Remove if document exists */}
+                      {isGlobalEditMode && (
+                        <div className="mt-3">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              setRemovedItems(prev => new Set([...prev, 'original_receipt_url']));
+                              handleFieldChange('original_receipt_url', null);
+                              toast.success('Purchase receipt will be removed when you save changes');
+                            }}
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Remove Document
+                          </Button>
                         </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(selectedEquipment.original_receipt_url, '_blank')}
-                        className="flex items-center gap-2"
-                      >
-                        <Eye className="h-4 w-4" />
-                        View
-                      </Button>
+                      )}
                     </div>
-                  </div>
-                )}
-
-                {selectedEquipment.equipment_registration_url && (
-                  <div className="border rounded-lg p-4 bg-muted/30">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-8 w-8 text-blue-600" />
-                        <div>
-                          <h4 className="font-medium">Equipment Registration</h4>
-                          <p className="text-sm text-muted-foreground">Official registration document</p>
+                  ) : (
+                    <div>
+                      <EmptyDocumentPlaceholder 
+                        icon={Receipt}
+                        label="Purchase Receipt"
+                        description="Click upload to add new document"
+                      />
+                      {/* Single toggle button - Upload if no document */}
+                      {isGlobalEditMode && (
+                        <div className="mt-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = '.pdf,.doc,.docx,.jpg,.jpeg,.png';
+                              input.onchange = (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
+                                if (file) {
+                                  setRemovedItems(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete('original_receipt_url');
+                                    return newSet;
+                                  });
+                                  toast.success('New purchase receipt will be uploaded when you save changes');
+                                }
+                              };
+                              input.click();
+                            }}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload New Document
+                          </Button>
                         </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(selectedEquipment.equipment_registration_url, '_blank')}
-                        className="flex items-center gap-2"
-                      >
-                        <Eye className="h-4 w-4" />
-                        View
-                      </Button>
+                      )}
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* No Documents State */}
-          {!selectedEquipment.original_receipt_url && !selectedEquipment.equipment_registration_url && (
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">No documents available for this equipment</p>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+
+                {/* Registration Document */}
+                <div className="space-y-2">
+                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Registration Document
+                  </h3>
+                  {selectedEquipment.equipment_registration_url && !removedItems.has('equipment_registration_url') ? (
+                    <div>
+                      <DocumentViewerSection 
+                        url={selectedEquipment.equipment_registration_url}
+                        label="Registration Document"
+                        description="Official equipment registration certificate"
+                        onRemove={undefined}
+                      />
+                      {/* Single toggle button - Remove if document exists */}
+                      {isGlobalEditMode && (
+                        <div className="mt-3">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              setRemovedItems(prev => new Set([...prev, 'equipment_registration_url']));
+                              handleFieldChange('equipment_registration_url', null);
+                              toast.success('Registration document will be removed when you save changes');
+                            }}
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Remove Document
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <EmptyDocumentPlaceholder 
+                        icon={FileText}
+                        label="Registration Document"
+                        description="Click upload to add new document"
+                      />
+                      {/* Single toggle button - Upload if no document */}
+                      {isGlobalEditMode && (
+                        <div className="mt-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = '.pdf,.doc,.docx,.jpg,.jpeg,.png';
+                              input.onchange = (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
+                                if (file) {
+                                  setRemovedItems(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete('equipment_registration_url');
+                                    return newSet;
+                                  });
+                                  toast.success('New registration document will be uploaded when you save changes');
+                                }
+                              };
+                              input.click();
+                            }}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload New Document
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Parts Tab */}
       {activeTab === 'parts' && (
-        <div className={`space-y-6 ${isMobile ? '' : 'border-t pt-4'}`}>
-          {/* Equipment Parts */}
-          {selectedEquipment.equipment_parts && selectedEquipment.equipment_parts.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Wrench className="h-5 w-5" />
-                  Equipment Parts ({selectedEquipment.equipment_parts.length})
-                </CardTitle>
+        <div className="space-y-6">
+          {/* Tab Title and Description */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
+              <Wrench className="h-5 w-5" />
+              Equipment Parts
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Components and parts associated with this equipment for inventory tracking
+            </p>
+          </div>
+          {isGlobalEditMode ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Equipment Parts Management (Optional)</h3>
                 <p className="text-sm text-muted-foreground">
-                  Parts and components associated with this equipment
+                  Organize parts documentation in folders or upload directly to root. This creates a structured file system for easy parts management.
                 </p>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-2">
-                  {selectedEquipment.equipment_parts.map((part, index) => (
-                    <div 
-                      key={index}
-                      className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30"
-                    >
-                      <div className="p-2 bg-blue-100 rounded-full">
-                        <Wrench className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{part}</p>
-                        <p className="text-sm text-muted-foreground">Part #{index + 1}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* No Parts State */}
-          {(!selectedEquipment.equipment_parts || selectedEquipment.equipment_parts.length === 0) && (
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center py-8">
-                  <Wrench className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">No parts recorded for this equipment</p>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+              <PartsFolderManager
+                onChange={setPartsStructure}
+                initialData={partsStructure}
+              />
+            </div>
+          ) : (
+            <EquipmentPartsViewer 
+              equipmentParts={selectedEquipment.equipment_parts} 
+              isEditable={false}
+            />
           )}
         </div>
       )}
 
       {/* Maintenance Tab */}
       {activeTab === 'maintenance' && (
-        <div className={`space-y-6 ${isMobile ? '' : 'border-t pt-4'}`}>
-          <EquipmentMaintenanceReportsEnhanced equipmentId={selectedEquipment.id} />
+        <div className="space-y-6">
+          {/* Tab Title and Description */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
+              <ClipboardList className="h-5 w-5" />
+              Maintenance Reports
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Maintenance history, service reports, and repair records for this equipment
+            </p>
+          </div>
+          
+          <Card>
+            <CardContent className="p-6">
+              <EquipmentMaintenanceReportsEnhanced 
+                equipmentId={selectedEquipment.id} 
+                isEditMode={isGlobalEditMode}
+              />
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -1601,14 +1754,14 @@ export default function EquipmentModalModern() {
     return <EditEquipmentModalModern />;
   }
 
-  // Mobile drawer implementation
+  // Mobile drawer implementation with fixed tabs in header
   if (isMobile) {
     return (
       <>
         <Drawer open={isModalOpen} onOpenChange={handleClose}>
-          <DrawerContent className="!max-h-[95dvh]">
-            {/* Mobile Header - Exact copy from CreateEquipmentModalModern */}
-            <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
+          <DrawerContent className="!max-h-[95dvh] flex flex-col">
+            {/* Mobile Header */}
+            <DrawerHeader className="flex-shrink-0 p-4 pb-0 border-b relative">
               <DrawerClose asChild>
                 <Button 
                   variant="ghost" 
@@ -1618,18 +1771,71 @@ export default function EquipmentModalModern() {
                   <X className="h-4 w-4" />
                 </Button>
               </DrawerClose>
-              <div className="text-center space-y-2">
-                <DrawerTitle className="text-xl font-bold">
-                  {selectedEquipment.brand} {selectedEquipment.model}
-                </DrawerTitle>
-                <p className="text-sm text-muted-foreground">
-                  View equipment details and maintenance records
-                </p>
+              <div className="text-center space-y-3">
+                <div>
+                  <DrawerTitle className="text-xl font-bold">
+                    {selectedEquipment.brand} {selectedEquipment.model}
+                  </DrawerTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {isGlobalEditMode ? 'Edit equipment information across all tabs' : getTabDescription()}
+                  </p>
+                </div>
+                
+                {/* Mobile Edit Controls */}
+                <div className="pt-2">
+                  {!isGlobalEditMode ? (
+                    <Button
+                      type="button"
+                      onClick={() => setIsGlobalEditMode(true)}
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit Equipment
+                    </Button>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsGlobalEditMode(false)}
+                        size="sm"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleSaveChanges}
+                        disabled={updateEquipmentMutation.isPending}
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        {updateEquipmentMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                        Save Changes
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </DrawerHeader>
+
+            {/* Mobile Tab Navigation - Fixed in header */}
+            <div className="flex-shrink-0 p-4 pt-3 pb-3">
+              <div className="w-full grid grid-cols-5 bg-muted rounded-md p-1">
+                {renderTabButton('details', 'Details', <Settings className="h-4 w-4" />)}
+                {renderTabButton('images', 'Images', <Camera className="h-4 w-4" />, getImagesCount() > 0 ? getImagesCount() : undefined)}
+                {renderTabButton('documents', 'Docs', <FileText className="h-4 w-4" />, getDocumentsCount() > 0 ? getDocumentsCount() : undefined)}
+                {renderTabButton('parts', 'Parts', <Wrench className="h-4 w-4" />, getEquipmentPartsCount() > 0 ? getEquipmentPartsCount() : undefined)}
+                {renderTabButton('maintenance', 'Maintenance', <ClipboardList className="h-4 w-4" />, getMaintenanceReportsCount())}
+              </div>
+            </div>
             
             {/* Mobile Content - Enhanced to ensure footer visibility */}
-            <div className="flex-1 overflow-y-auto p-4 pb-6">
+            <div className="flex-1 overflow-y-auto p-4 pt-0 pb-6">
               <ModalContent />
             </div>
             
@@ -1669,27 +1875,157 @@ export default function EquipmentModalModern() {
     );
   }
 
-  // Desktop dialog implementation - Exact copy from CreateEquipmentModalModern
+  // Desktop dialog implementation - With fixed tab navigation in header
   return (
     <>
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent 
-          className="!max-w-none !w-[55vw] max-h-[95dvh] overflow-hidden flex flex-col p-6"
+          className="!max-w-none !w-[55vw] max-h-[95dvh] overflow-hidden flex flex-col p-0"
           style={{ maxWidth: '55vw', width: '55vw' }}
         >
-          <DialogHeader className="flex-shrink-0 pb-4">
-            <DialogTitle className="text-xl">{selectedEquipment.brand} {selectedEquipment.model}</DialogTitle>
-            <p className="text-sm text-muted-foreground">
-              View equipment details, maintenance records, and documentation
-            </p>
+          <DialogHeader className="flex-shrink-0 p-6 pb-0">
+            <div className="space-y-4">
+              <div>
+                <DialogTitle className="text-xl">{selectedEquipment.brand} {selectedEquipment.model}</DialogTitle>
+                <p className="text-sm text-muted-foreground">
+                  {isGlobalEditMode ? 'Edit equipment information across all tabs' : getTabDescription()}
+                </p>
+              </div>
+              
+              {/* Edit Controls Row */}
+              <div className="flex items-center justify-end">
+                {!isGlobalEditMode ? (
+                  <Button
+                    type="button"
+                    onClick={() => setIsGlobalEditMode(true)}
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Edit className="h-4 w-4" />
+                    Edit Equipment
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsGlobalEditMode(false)}
+                      size="sm"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleSaveChanges}
+                      disabled={updateEquipmentMutation.isPending}
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      {updateEquipmentMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      Save Changes
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
           </DialogHeader>
+
+          {/* Desktop Tab Navigation - Fixed in header */}
+          <div className="flex-shrink-0 px-6 pt-4">
+            <div className="flex justify-center border-b">
+              <button
+                type="button"
+                onClick={() => setActiveTab('details')}
+                className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                  activeTab === 'details'
+                    ? 'border-primary text-primary bg-primary/5'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                }`}
+              >
+                <Settings className="h-4 w-4" />
+                Equipment Details
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('images')}
+                className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                  activeTab === 'images'
+                    ? 'border-primary text-primary bg-primary/5'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                }`}
+              >
+                <Camera className="h-4 w-4" />
+                Equipment Images
+                {getImagesCount() > 0 && (
+                  <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                    {getImagesCount()}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('documents')}
+                className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                  activeTab === 'documents'
+                    ? 'border-primary text-primary bg-primary/5'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                }`}
+              >
+                <FileText className="h-4 w-4" />
+                Documents
+                {getDocumentsCount() > 0 && (
+                  <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                    {getDocumentsCount()}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('parts')}
+                className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                  activeTab === 'parts'
+                    ? 'border-primary text-primary bg-primary/5'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                }`}
+              >
+                <Wrench className="h-4 w-4" />
+                Parts Management
+                {getEquipmentPartsCount() > 0 && (
+                  <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                    {getEquipmentPartsCount()}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('maintenance')}
+                className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                  activeTab === 'maintenance'
+                    ? 'border-primary text-primary bg-primary/5'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                }`}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Maintenance Reports
+                {getMaintenanceReportsCount() > 0 && (
+                  <span className="ml-2 bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                    {getMaintenanceReportsCount()}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
           
-          <div className="flex-1 overflow-y-auto pb-4">
+          <div className="flex-1 overflow-y-auto px-6 pb-4">
             <ModalContent />
           </div>
           
           {/* Desktop Action Buttons in Footer */}
-          <DialogFooter className="flex-shrink-0 pt-4 border-t bg-background">
+          <DialogFooter className="flex-shrink-0 pt-4 border-t bg-background px-6 pb-6">
             <div className="flex gap-2 w-full">
               <Button
                 type="button"

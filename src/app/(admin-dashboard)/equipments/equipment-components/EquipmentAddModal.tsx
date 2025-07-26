@@ -118,8 +118,8 @@ const AddEquipmentModal = ({
 
   // Initialize equipment parts for editing
   useEffect(() => {
-    if (editEquipment?.equipmentParts?.length) {
-      const existingParts: EquipmentPart[] = editEquipment.equipmentParts.map(
+    if (editEquipment?.equipment_parts?.length) {
+      const existingParts: EquipmentPart[] = editEquipment.equipment_parts.map(
         (url) => ({
           file: null,
           preview: url,

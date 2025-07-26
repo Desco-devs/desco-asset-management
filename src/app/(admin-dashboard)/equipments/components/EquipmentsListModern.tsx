@@ -660,8 +660,8 @@ export default function EquipmentsListModern() {
           </div>
         ) : (
           paginatedEquipments.map((equipment, index) => {
-            const daysUntilInsuranceExpiry = getDaysUntilExpiry(equipment.insurance_expiration_date);
-            const daysUntilRegistrationExpiry = getDaysUntilExpiry(equipment.registration_expiry);
+            const daysUntilInsuranceExpiry = getDaysUntilExpiry(equipment.insurance_expiration_date || undefined);
+            const daysUntilRegistrationExpiry = getDaysUntilExpiry(equipment.registration_expiry || undefined);
             
             return (
               <Card
@@ -890,7 +890,7 @@ export default function EquipmentsListModern() {
           id: e.id,
           brand: e.brand,
           model: e.model,
-          plate_number: e.plate_number
+          plate_number: e.plate_number || undefined
         }))}
       />
     </div>
