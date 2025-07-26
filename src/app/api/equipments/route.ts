@@ -251,6 +251,13 @@ export const GET = withResourcePermission(
               },
             },
           },
+          user: {
+            select: {
+              id: true,
+              username: true,
+              full_name: true,
+            },
+          },
           maintenance_reports: {
             orderBy: {
               date_reported: "desc",

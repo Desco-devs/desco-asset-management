@@ -25,6 +25,7 @@ import {
   useEquipments,
   useUpdateEquipment,
 } from "@/hooks/useEquipmentQuery";
+import { useEquipmentMaintenanceReports } from "@/hooks/useEquipmentsQuery";
 import { useProjects } from "@/hooks/api/use-projects";
 import {
   selectIsEditMode,
@@ -60,6 +61,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import EditEquipmentModalModern from "./EditEquipmentModalModern";
+import EquipmentMaintenanceReportsEnhanced from "../EquipmentMaintenanceReportsEnhanced";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,6 +75,7 @@ export default function EquipmentModalModern() {
   // Server state from TanStack Query
   const { data: equipments = [] } = useEquipments();
   const { data: projectsData } = useProjects();
+  const { data: maintenanceReports = [] } = useEquipmentMaintenanceReports();
   const projects = projectsData?.data || [];
 
   // Client state from Zustand
@@ -605,10 +608,24 @@ export default function EquipmentModalModern() {
   };
 
   // Simple helper functions for tab counts
-  const getImagesCount = () => selectedEquipment?.image_url ? 1 : 0;
-  const getDocumentsCount = () => 0; // Simplified for now
-  const getEquipmentPartsCount = () => 0; // Simplified for now  
-  const getMaintenanceReportsCount = () => 0; // Simplified for now
+  const getImagesCount = () => {
+    let count = 0;
+    if (selectedEquipment?.image_url) count++;
+    if (selectedEquipment?.thirdparty_inspection_image) count++;
+    if (selectedEquipment?.pgpc_inspection_image) count++;
+    return count;
+  };
+  const getDocumentsCount = () => {
+    let count = 0;
+    if (selectedEquipment?.original_receipt_url) count++;
+    if (selectedEquipment?.equipment_registration_url) count++;
+    return count;
+  };
+  const getEquipmentPartsCount = () => selectedEquipment?.equipment_parts?.length || 0;  
+  const getMaintenanceReportsCount = () => {
+    if (!selectedEquipment?.id || !Array.isArray(maintenanceReports)) return 0;
+    return maintenanceReports.filter(report => report.equipment_id === selectedEquipment.id).length;
+  };
 
   // Tab content components - EXACTLY like CreateEquipmentForm
   const renderTabButton = (tab: 'details' | 'images' | 'documents' | 'parts' | 'maintenance', label: string, icon: React.ReactNode, count?: number) => (
@@ -1354,11 +1371,11 @@ export default function EquipmentModalModern() {
                     )}
 
                     {/* Added by */}
-                    {selectedEquipment.created_by && (
+                    {(selectedEquipment.user || selectedEquipment.created_by) && (
                       <div className="space-y-1">
                         <Label className="text-sm font-medium text-muted-foreground">Added by:</Label>
                         <div className="font-medium text-foreground">
-                          {selectedEquipment.created_by}
+                          {selectedEquipment.user?.full_name || selectedEquipment.user?.username || selectedEquipment.created_by}
                         </div>
                       </div>
                     )}
@@ -1374,70 +1391,205 @@ export default function EquipmentModalModern() {
 
       {/* Images Tab */}
       {activeTab === 'images' && (
-        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
-          <Card>
-            <CardContent className="p-6">
-              {selectedEquipment.image_url ? (
-                <div className="text-center">
-                  <Image
-                    src={selectedEquipment.image_url}
-                    alt="Equipment Image"
-                    width={400}
-                    height={300}
-                    className="mx-auto rounded-lg object-cover"
-                  />
-                  <p className="text-sm text-muted-foreground mt-2">Equipment Image</p>
-                </div>
-              ) : (
+        <div className={`space-y-6 ${isMobile ? '' : 'border-t pt-4'}`}>
+          {/* Equipment Image */}
+          {selectedEquipment.image_url && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Camera className="h-5 w-5" />
+                  Equipment Image
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ImageViewerSection 
+                  url={selectedEquipment.image_url}
+                  label="Equipment Image"
+                  description="Main equipment photo"
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Inspection Images */}
+          {(selectedEquipment.thirdparty_inspection_image || selectedEquipment.pgpc_inspection_image) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Inspection Images
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {selectedEquipment.thirdparty_inspection_image && (
+                  <div>
+                    <h4 className="font-medium mb-3">Third-party Inspection</h4>
+                    <ImageViewerSection 
+                      url={selectedEquipment.thirdparty_inspection_image}
+                      label="Third-party Inspection"
+                      description="Third-party inspection documentation"
+                    />
+                  </div>
+                )}
+                
+                {selectedEquipment.pgpc_inspection_image && (
+                  <div>
+                    <h4 className="font-medium mb-3">PGPC Inspection</h4>
+                    <ImageViewerSection 
+                      url={selectedEquipment.pgpc_inspection_image}
+                      label="PGPC Inspection"
+                      description="PGPC inspection documentation"
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* No Images State */}
+          {!selectedEquipment.image_url && !selectedEquipment.thirdparty_inspection_image && !selectedEquipment.pgpc_inspection_image && (
+            <Card>
+              <CardContent className="p-6">
                 <div className="text-center py-8">
                   <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">No image available for this equipment</p>
+                  <p className="text-muted-foreground">No images available for this equipment</p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
       {/* Documents Tab */}
       {activeTab === 'documents' && (
-        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center py-8">
-                <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground">Documents functionality coming soon</p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className={`space-y-6 ${isMobile ? '' : 'border-t pt-4'}`}>
+          {/* Document Links */}
+          {(selectedEquipment.original_receipt_url || selectedEquipment.equipment_registration_url) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Equipment Documents
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {selectedEquipment.original_receipt_url && (
+                  <div className="border rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Receipt className="h-8 w-8 text-green-600" />
+                        <div>
+                          <h4 className="font-medium">Original Receipt</h4>
+                          <p className="text-sm text-muted-foreground">Equipment purchase receipt</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(selectedEquipment.original_receipt_url, '_blank')}
+                        className="flex items-center gap-2"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {selectedEquipment.equipment_registration_url && (
+                  <div className="border rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-8 w-8 text-blue-600" />
+                        <div>
+                          <h4 className="font-medium">Equipment Registration</h4>
+                          <p className="text-sm text-muted-foreground">Official registration document</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(selectedEquipment.equipment_registration_url, '_blank')}
+                        className="flex items-center gap-2"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* No Documents State */}
+          {!selectedEquipment.original_receipt_url && !selectedEquipment.equipment_registration_url && (
+            <Card>
+              <CardContent className="p-6">
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <p className="text-muted-foreground">No documents available for this equipment</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
       {/* Parts Tab */}
       {activeTab === 'parts' && (
-        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center py-8">
-                <Wrench className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground">Parts management functionality coming soon</p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className={`space-y-6 ${isMobile ? '' : 'border-t pt-4'}`}>
+          {/* Equipment Parts */}
+          {selectedEquipment.equipment_parts && selectedEquipment.equipment_parts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Wrench className="h-5 w-5" />
+                  Equipment Parts ({selectedEquipment.equipment_parts.length})
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Parts and components associated with this equipment
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-2">
+                  {selectedEquipment.equipment_parts.map((part, index) => (
+                    <div 
+                      key={index}
+                      className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30"
+                    >
+                      <div className="p-2 bg-blue-100 rounded-full">
+                        <Wrench className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium">{part}</p>
+                        <p className="text-sm text-muted-foreground">Part #{index + 1}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* No Parts State */}
+          {(!selectedEquipment.equipment_parts || selectedEquipment.equipment_parts.length === 0) && (
+            <Card>
+              <CardContent className="p-6">
+                <div className="text-center py-8">
+                  <Wrench className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <p className="text-muted-foreground">No parts recorded for this equipment</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
       {/* Maintenance Tab */}
       {activeTab === 'maintenance' && (
-        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center py-8">
-                <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <p className="text-muted-foreground">Maintenance reports functionality coming soon</p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className={`space-y-6 ${isMobile ? '' : 'border-t pt-4'}`}>
+          <EquipmentMaintenanceReportsEnhanced equipmentId={selectedEquipment.id} />
         </div>
       )}
 
