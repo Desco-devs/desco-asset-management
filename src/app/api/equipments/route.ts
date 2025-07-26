@@ -209,13 +209,13 @@ const getFieldName = (prefix: string): string => {
     case "image":
       return "image_url";
     case "receipt":
-      return "originalReceiptUrl";
+      return "original_receipt_url";
     case "registration":
-      return "equipmentRegistrationUrl";
+      return "equipment_registration_url";
     case "thirdparty_inspection":
-      return "thirdpartyInspectionImage";
+      return "thirdparty_inspection_image";
     case "pgpc_inspection":
-      return "pgpcInspectionImage";
+      return "pgpc_inspection_image";
     default:
       throw new Error(`Unknown prefix: ${prefix}`);
   }
@@ -297,7 +297,7 @@ export const GET = withResourcePermission(
 export const POST = withResourcePermission(
   "equipment",
   "create",
-  async (request: NextRequest) => {
+  async (request: NextRequest, user: AuthenticatedUser) => {
     try {
       const formData = await request.formData();
 
@@ -305,6 +305,7 @@ export const POST = withResourcePermission(
       const model = formData.get("model") as string;
       const type = formData.get("type") as string;
       const insExp = formData.get("insuranceExpirationDate") as string | null; // Changed to allow null
+      const regExp = formData.get("registrationExpiry") as string | null; // Add registration expiry
       const status = formData.get("status") as keyof typeof EquipmentStatus;
       const remarks = (formData.get("remarks") as string) || null;
       const owner = formData.get("owner") as string;
@@ -361,10 +362,13 @@ export const POST = withResourcePermission(
         plate_number: plateNum,
         project: { connect: { id: projectId } },
         equipment_parts: [], // Initialize empty array
+        user: { connect: { id: user.id } }, // Connect to the user who created this equipment
         // only include `before` if provided
         ...(beforeStr !== "" ? { before: parseInt(beforeStr, 10) } : {}),
         // only include insurance date if provided
         ...(insExp ? { insurance_expiration_date: new Date(insExp) } : {}),
+        // only include registration expiry if provided
+        ...(regExp ? { registration_expiry: new Date(regExp) } : {}),
       };
 
       if (inspDateStr) {
@@ -589,11 +593,116 @@ export const POST = withResourcePermission(
         });
       }
 
+      // Handle maintenance report creation if provided
+      const maintenanceReportData = formData.get("maintenanceReport") as string;
+      if (maintenanceReportData) {
+        try {
+          const maintenanceData = JSON.parse(maintenanceReportData);
+          
+          // Get project info for location_id
+          const projectInfo = await prisma.project.findUnique({
+            where: { id: projectId },
+            include: { client: { include: { location: true } } },
+          });
+          
+          if (projectInfo) {
+            // Validate required fields for maintenance report
+            if (!maintenanceData.issueDescription || maintenanceData.issueDescription.trim() === '') {
+              console.log('Skipping maintenance report creation: issue_description is required but empty');
+              return; // Skip maintenance report creation if issue description is empty
+            }
+            
+            // Upload part images and collect attachment URLs
+            const attachmentUrls: string[] = [];
+            
+            // Handle part images
+            for (let i = 0; formData.get(`partImage_${i}`); i++) {
+              const partImage = formData.get(`partImage_${i}`) as File;
+              const partName = formData.get(`partImageName_${i}`) as string;
+              
+              if (partImage && partImage.size > 0) {
+                try {
+                  const url = await uploadEquipmentPart(
+                    partImage,
+                    projectId,
+                    equipment.id,
+                    i + 1,
+                    'maintenance/parts',
+                    projectName,
+                    clientName,
+                    brand,
+                    model,
+                    type
+                  );
+                  attachmentUrls.push(url);
+                } catch (error) {
+                  // Continue if individual part image upload fails
+                }
+              }
+            }
+            
+            // Handle maintenance attachments
+            for (let i = 0; formData.get(`maintenanceAttachment_${i}`); i++) {
+              const attachment = formData.get(`maintenanceAttachment_${i}`) as File;
+              
+              if (attachment && attachment.size > 0) {
+                try {
+                  const url = await uploadEquipmentPart(
+                    attachment,
+                    projectId,
+                    equipment.id,
+                    i + 1,
+                    'maintenance/attachments',
+                    projectName,
+                    clientName,
+                    brand,
+                    model,
+                    type
+                  );
+                  attachmentUrls.push(url);
+                } catch (error) {
+                  // Continue if individual attachment upload fails
+                }
+              }
+            }
+            
+            // Create maintenance report
+            await prisma.maintenance_equipment_report.create({
+              data: {
+                equipment_id: equipment.id,
+                location_id: projectInfo.client.location.id,
+                issue_description: maintenanceData.issueDescription || '',
+                remarks: maintenanceData.remarks || null,
+                inspection_details: maintenanceData.inspectionDetails || null,
+                action_taken: maintenanceData.actionTaken || null,
+                parts_replaced: maintenanceData.partsReplaced || [],
+                priority: maintenanceData.priority || 'MEDIUM',
+                status: maintenanceData.status || 'REPORTED',
+                downtime_hours: maintenanceData.downtimeHours || null,
+                date_reported: maintenanceData.dateReported ? new Date(maintenanceData.dateReported) : new Date(),
+                date_repaired: maintenanceData.dateRepaired ? new Date(maintenanceData.dateRepaired) : null,
+                reported_by: user.id,
+                repaired_by: maintenanceData.status === 'COMPLETED' && maintenanceData.repairedBy ? maintenanceData.repairedBy : null,
+                attachment_urls: attachmentUrls,
+              },
+            });
+          }
+        } catch (error) {
+          // Failed to create maintenance report, but equipment was created successfully
+          // Log error but don't fail the whole request
+          console.error('Failed to create maintenance report:', error);
+        }
+      }
+
       const result = await prisma.equipment.findUnique({
         where: { id: equipment.id },
         include: {
           project: {
             include: { client: { include: { location: true } } },
+          },
+          maintenance_reports: {
+            orderBy: { date_reported: 'desc' },
+            take: 5,
           },
         },
       });

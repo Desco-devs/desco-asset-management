@@ -22,17 +22,17 @@ import {
 } from "@/components/ui/drawer";
 import {
   useDeleteEquipment,
-  useEquipmentsWithReferenceData,
-} from "@/hooks/useEquipmentsQuery";
+  useEquipments,
+  useUpdateEquipment,
+} from "@/hooks/useEquipmentQuery";
+import { useProjects } from "@/hooks/api/use-projects";
 import {
-  selectIsDocumentsCollapsed,
   selectIsEditMode,
   selectIsMobile,
   selectIsModalOpen,
-  selectIsPhotosCollapsed,
   selectSelectedEquipment,
-  useEquipmentsStore,
-} from "@/stores/equipmentsStore";
+  useEquipmentStore,
+} from "@/stores/equipmentStore";
 import {
   Building2,
   CalendarDays,
@@ -60,11 +60,6 @@ import {
 } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import EditEquipmentModalModern from "./EditEquipmentModalModern";
-import EquipmentMaintenanceReportsEnhanced from "../EquipmentMaintenanceReportsEnhanced";
-import EquipmentPartsViewer from "../EquipmentPartsViewer";
-import { ImageDisplayWithRemove } from "@/components/equipment/ImageDisplayWithRemove";
-import PartsFolderManager, { type PartsStructure } from "../forms/PartsFolderManager";
-import { useUpdateEquipmentAction } from "@/hooks/useEquipmentsQuery";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,15 +71,15 @@ import { format } from "date-fns";
 
 export default function EquipmentModalModern() {
   // Server state from TanStack Query
-  const { equipments, maintenanceReports, projects } = useEquipmentsWithReferenceData();
+  const { data: equipments = [] } = useEquipments();
+  const { data: projectsData } = useProjects();
+  const projects = projectsData?.data || [];
 
   // Client state from Zustand
-  const selectedEquipmentFromStore = useEquipmentsStore(selectSelectedEquipment);
-  const isModalOpen = useEquipmentsStore(selectIsModalOpen);
-  const isEditMode = useEquipmentsStore(selectIsEditMode);
-  const isMobile = useEquipmentsStore(selectIsMobile);
-  const isPhotosCollapsed = useEquipmentsStore(selectIsPhotosCollapsed);
-  const isDocumentsCollapsed = useEquipmentsStore(selectIsDocumentsCollapsed);
+  const selectedEquipmentFromStore = useEquipmentStore(selectSelectedEquipment);
+  const isModalOpen = useEquipmentStore(selectIsModalOpen);
+  const isEditMode = useEquipmentStore(selectIsEditMode);
+  const isMobile = useEquipmentStore(selectIsMobile);
 
   // Custom tab state - EXACTLY like CreateEquipmentForm with Images and Documents tabs
   const [activeTab, setActiveTab] = useState<'details' | 'images' | 'documents' | 'parts' | 'maintenance'>('details');
@@ -130,18 +125,15 @@ export default function EquipmentModalModern() {
   const inspectionFormRef = useRef<HTMLFormElement>(null);
 
   // Update mutation
-  const updateEquipmentMutation = useUpdateEquipmentAction();
+  const updateEquipmentMutation = useUpdateEquipment();
 
   // Actions
   const {
     setIsModalOpen,
     setIsEditMode,
     setSelectedEquipment,
-    setIsPhotosCollapsed,
-    setIsDocumentsCollapsed,
     setDeleteConfirmation,
-    setIsEquipmentMaintenanceModalOpen,
-  } = useEquipmentsStore();
+  } = useEquipmentStore();
 
   // Mutations
   const deleteEquipmentMutation = useDeleteEquipment();
@@ -149,8 +141,8 @@ export default function EquipmentModalModern() {
   // CRITICAL FIX: Memoize selectedEquipment to prevent re-renders and focus loss
   const selectedEquipment = useMemo(() => {
     if (!selectedEquipmentFromStore) return null;
-    return equipments.find((e) => e.uid === selectedEquipmentFromStore.uid) || selectedEquipmentFromStore;
-  }, [selectedEquipmentFromStore?.uid, equipments]);
+    return equipments.find((e) => e.id === selectedEquipmentFromStore.id) || selectedEquipmentFromStore;
+  }, [selectedEquipmentFromStore?.id, equipments]);
 
   // CRITICAL FIX: Memoize default values to prevent input re-creation and focus loss
   const defaultValues = useMemo(() => {
@@ -159,9 +151,9 @@ export default function EquipmentModalModern() {
       brand: selectedEquipment.brand || '',
       model: selectedEquipment.model || '',
       type: selectedEquipment.type || '',
-      plateNumber: selectedEquipment.plateNumber || '',
+      plateNumber: selectedEquipment.plate_number || '',
       owner: selectedEquipment.owner || '',
-      projectId: selectedEquipment.project?.uid || '',
+      projectId: selectedEquipment.project?.id || '',
       status: selectedEquipment.status || 'OPERATIONAL',
       remarks: selectedEquipment.remarks || ''
     };
@@ -169,9 +161,9 @@ export default function EquipmentModalModern() {
     selectedEquipment?.brand,
     selectedEquipment?.model, 
     selectedEquipment?.type,
-    selectedEquipment?.plateNumber,
+    selectedEquipment?.plate_number,
     selectedEquipment?.owner,
-    selectedEquipment?.project?.uid,
+    selectedEquipment?.project?.id,
     selectedEquipment?.status,
     selectedEquipment?.remarks
   ]);
@@ -203,9 +195,9 @@ export default function EquipmentModalModern() {
   useEffect(() => {
     if (selectedEquipment) {
       setInspectionFormData({
-        registrationExpiry: selectedEquipment.registrationExpiry ? new Date(selectedEquipment.registrationExpiry) : undefined,
-        insuranceExpirationDate: selectedEquipment.insuranceExpirationDate ? new Date(selectedEquipment.insuranceExpirationDate) : undefined,
-        inspectionDate: selectedEquipment.inspectionDate ? new Date(selectedEquipment.inspectionDate) : undefined,
+        registrationExpiry: selectedEquipment.registration_expiry ? new Date(selectedEquipment.registration_expiry) : undefined,
+        insuranceExpirationDate: selectedEquipment.insurance_expiration_date ? new Date(selectedEquipment.insurance_expiration_date) : undefined,
+        inspectionDate: selectedEquipment.inspection_date ? new Date(selectedEquipment.inspection_date) : undefined,
         before: selectedEquipment.before?.toString() || '6'
       });
 
@@ -224,17 +216,17 @@ export default function EquipmentModalModern() {
         brand: selectedEquipment.brand || '',
         model: selectedEquipment.model || '',
         type: selectedEquipment.type || '',
-        plateNumber: selectedEquipment.plateNumber || '',
+        plateNumber: selectedEquipment.plate_number || '',
         owner: selectedEquipment.owner || '',
-        projectId: selectedEquipment.project?.uid || '',
+        projectId: selectedEquipment.project?.id || '',
         status: selectedEquipment.status || 'OPERATIONAL',
         remarks: selectedEquipment.remarks || ''
       };
 
       originalInspectionDataRef.current = {
-        registrationExpiry: selectedEquipment.registrationExpiry || null,
-        insuranceExpirationDate: selectedEquipment.insuranceExpirationDate || null,
-        inspectionDate: selectedEquipment.inspectionDate || null,
+        registrationExpiry: selectedEquipment.registration_expiry || null,
+        insuranceExpirationDate: selectedEquipment.insurance_expiration_date || null,
+        inspectionDate: selectedEquipment.inspection_date || null,
         before: selectedEquipment.before?.toString() || '6'
       };
 
@@ -249,8 +241,6 @@ export default function EquipmentModalModern() {
     setIsModalOpen(false);
     setSelectedEquipment(null);
     setIsEditMode(false);
-    // Close any open maintenance modals
-    setIsEquipmentMaintenanceModalOpen(false);
     // Reset all edit states
     setOverviewEdit(false);
     setImagesEdit(false);
@@ -265,7 +255,7 @@ export default function EquipmentModalModern() {
   };
 
   const handleDelete = () => {
-    if (selectedEquipment && !selectedEquipment.uid.startsWith('temp_')) {
+    if (selectedEquipment && !selectedEquipment.id.startsWith('temp_')) {
       setDeleteConfirmation({ isOpen: true, equipment: selectedEquipment });
       setIsModalOpen(false); // Close main modal to show delete confirmation
     }
@@ -385,9 +375,9 @@ export default function EquipmentModalModern() {
     // Reset form data when canceling inspection edit
     if (tab === 'inspection' && selectedEquipment) {
       setInspectionFormData({
-        registrationExpiry: selectedEquipment.registrationExpiry ? new Date(selectedEquipment.registrationExpiry) : undefined,
-        insuranceExpirationDate: selectedEquipment.insuranceExpirationDate ? new Date(selectedEquipment.insuranceExpirationDate) : undefined,
-        inspectionDate: selectedEquipment.inspectionDate ? new Date(selectedEquipment.inspectionDate) : undefined,
+        registrationExpiry: selectedEquipment.registration_expiry ? new Date(selectedEquipment.registration_expiry) : undefined,
+        insuranceExpirationDate: selectedEquipment.insurance_expiration_date ? new Date(selectedEquipment.insurance_expiration_date) : undefined,
+        inspectionDate: selectedEquipment.inspection_date ? new Date(selectedEquipment.inspection_date) : undefined,
         before: selectedEquipment.before?.toString() || '6'
       });
       // Close any open date pickers
@@ -405,26 +395,15 @@ export default function EquipmentModalModern() {
       case 'overview':
         formRef = overviewFormRef;
         break;
-      case 'images':
-        formRef = imagesFormRef;
-        break;
-      case 'documents':
-        formRef = documentsFormRef;
-        break;
-      case 'parts':
-        formRef = partsFormRef;
-        break;
       case 'inspection':
         formRef = inspectionFormRef;
         break;
       default:
+        toast.info("Save functionality not implemented for this tab yet");
         return;
     }
 
     if (!formRef.current) return;
-
-    const formData = new FormData();
-    formData.append('equipmentId', selectedEquipment.uid);
 
     // Handle dirty fields for Equipment Information (overview tab)
     if (tab === 'overview') {
@@ -433,79 +412,75 @@ export default function EquipmentModalModern() {
         return;
       }
       
-      // Only append changed fields
+      // Get form data
       const formEl = formRef.current as HTMLFormElement;
       const formDataFromForm = new FormData(formEl);
+      
+      // Prepare update data
+      const updateData: any = { id: selectedEquipment.id };
       
       dirtyEquipmentFields.forEach(fieldName => {
         const value = formDataFromForm.get(fieldName);
         if (value !== null) {
-          formData.append(fieldName, value);
+          // Map form field names to equipment properties
+          switch (fieldName) {
+            case 'plateNumber':
+              updateData.plate_number = value;
+              break;
+            case 'projectId':
+              updateData.project_id = value;
+              break;
+            case 'type':
+              updateData.type = selectedEquipmentType === "Other" ? 
+                formDataFromForm.get('customType') || value : value;
+              break;
+            default:
+              updateData[fieldName] = value;
+          }
         }
       });
+
+      try {
+        await updateEquipmentMutation.mutateAsync(updateData);
+        handleTabEditToggle(tab, false);
+        setDirtyEquipmentFields(new Set());
+        toast.success("Equipment updated successfully");
+      } catch (error) {
+        console.error("Error updating equipment:", error);
+        toast.error("Failed to update equipment");
+      }
     }
 
-    // Handle dirty fields for Dates & Inspection
+    // Handle inspection tab
     if (tab === 'inspection') {
       if (dirtyInspectionFields.size === 0) {
         toast.info("No changes detected");
         return;
       }
 
-      // Only append changed inspection fields
+      const updateData: any = { id: selectedEquipment.id };
+      
       dirtyInspectionFields.forEach(fieldName => {
         if (fieldName === 'registrationExpiry' && inspectionFormData.registrationExpiry) {
-          formData.append('registrationExpiry', format(inspectionFormData.registrationExpiry, 'yyyy-MM-dd'));
+          updateData.registration_expiry = format(inspectionFormData.registrationExpiry, 'yyyy-MM-dd');
         } else if (fieldName === 'insuranceExpirationDate' && inspectionFormData.insuranceExpirationDate) {
-          formData.append('insuranceExpirationDate', format(inspectionFormData.insuranceExpirationDate, 'yyyy-MM-dd'));
+          updateData.insurance_expiration_date = format(inspectionFormData.insuranceExpirationDate, 'yyyy-MM-dd');
         } else if (fieldName === 'inspectionDate' && inspectionFormData.inspectionDate) {
-          formData.append('inspectionDate', format(inspectionFormData.inspectionDate, 'yyyy-MM-dd'));
+          updateData.inspection_date = format(inspectionFormData.inspectionDate, 'yyyy-MM-dd');
         } else if (fieldName === 'before') {
-          formData.append('before', inspectionFormData.before);
+          updateData.before = parseInt(inspectionFormData.before);
         }
       });
-    }
 
-    // For other tabs (images, documents, parts), use existing logic
-    if (tab !== 'overview' && tab !== 'inspection') {
-      const formEl = formRef.current as HTMLFormElement;
-      const formDataFromForm = new FormData(formEl);
-      for (const [key, value] of formDataFromForm.entries()) {
-        formData.append(key, value);
-      }
-    }
-
-    // Special handling for parts tab - get data from PartsFolderManager
-    if (tab === 'parts') {
-      // Note: PartsFolderManager handles its own state internally
-      // The parts data will be handled by the component's internal logic
-      // For now, we'll use the existing structure
-      const currentPartsStructure = selectedEquipment.equipmentParts 
-        ? (Array.isArray(selectedEquipment.equipmentParts) && selectedEquipment.equipmentParts.length > 0
-            ? JSON.parse(selectedEquipment.equipmentParts[0])
-            : typeof selectedEquipment.equipmentParts === 'string'
-            ? JSON.parse(selectedEquipment.equipmentParts)
-            : selectedEquipment.equipmentParts)
-        : { rootFiles: [], folders: [] };
-      
-      formData.append('partsStructure', JSON.stringify(currentPartsStructure));
-    }
-
-    try {
-      await updateEquipmentMutation.mutateAsync(formData);
-      handleTabEditToggle(tab, false);
-      
-      // Clear dirty fields after successful save
-      if (tab === 'overview') {
-        setDirtyEquipmentFields(new Set());
-      } else if (tab === 'inspection') {
+      try {
+        await updateEquipmentMutation.mutateAsync(updateData);
+        handleTabEditToggle(tab, false);
         setDirtyInspectionFields(new Set());
+        toast.success("Inspection dates updated successfully");
+      } catch (error) {
+        console.error("Error updating inspection dates:", error);
+        toast.error("Failed to update inspection dates");
       }
-      
-      toast.success(`${tab.charAt(0).toUpperCase() + tab.slice(1)} updated successfully`);
-    } catch (error) {
-      console.error(`Error updating ${tab}:`, error);
-      toast.error(`Failed to update ${tab}`);
     }
   };
 
@@ -629,113 +604,11 @@ export default function EquipmentModalModern() {
     );
   };
 
-  // Helper function to count maintenance issues for selected equipment
-  const getMaintenanceIssueCount = () => {
-    if (!selectedEquipment || !maintenanceReports) return 0;
-    
-    return maintenanceReports.filter(report => 
-      report.equipment_id === selectedEquipment.uid && 
-      report.status && 
-      !['COMPLETED', 'RESOLVED'].includes(report.status.toUpperCase())
-    ).length;
-  };
-
-  // Helper function to count total maintenance reports for selected equipment
-  const getMaintenanceReportsCount = () => {
-    if (!selectedEquipment || !maintenanceReports) return 0;
-    
-    return maintenanceReports.filter(report => 
-      report.equipment_id === selectedEquipment.uid
-    ).length;
-  };
-
-  // Helper function to count images for selected equipment
-  const getImagesCount = () => {
-    if (!selectedEquipment) return 0;
-    
-    let count = 0;
-    if (selectedEquipment.image_url) count++;
-    if (selectedEquipment.thirdpartyInspectionImage) count++;
-    if (selectedEquipment.pgpcInspectionImage) count++;
-    
-    return count;
-  };
-
-  // Helper function to count documents for selected equipment
-  const getDocumentsCount = () => {
-    if (!selectedEquipment) return 0;
-    
-    let count = 0;
-    if (selectedEquipment.originalReceiptUrl) count++;
-    if (selectedEquipment.equipmentRegistrationUrl) count++;
-    
-    return count;
-  };
-
-  // Helper function to count equipment parts for selected equipment
-  const getEquipmentPartsCount = () => {
-    if (!selectedEquipment || !selectedEquipment.equipmentParts) return 0;
-    
-    try {
-      let partsData;
-      
-      // Handle different storage formats
-      if (typeof selectedEquipment.equipmentParts === 'string') {
-        partsData = JSON.parse(selectedEquipment.equipmentParts);
-      } else if (Array.isArray(selectedEquipment.equipmentParts)) {
-        if (selectedEquipment.equipmentParts.length === 0) return 0;
-        // Parse the first element which contains the JSON string - with safety check
-        try {
-          const rawData = selectedEquipment.equipmentParts[0];
-          
-          // Safety check - ensure it's a valid JSON string
-          if (typeof rawData !== 'string') {
-            return 0;
-          }
-          
-          // Additional safety - check if it starts with bucket (corrupted data)
-          if (rawData.startsWith('bucket') || rawData.includes('"bucket"')) {
-            return 0;
-          }
-          
-          partsData = JSON.parse(rawData);
-        } catch (error) {
-          return 0;
-        }
-      } else if (typeof selectedEquipment.equipmentParts === 'object') {
-        partsData = selectedEquipment.equipmentParts;
-      } else {
-        return 0;
-      }
-      
-      if (!partsData) return 0;
-    
-      // Count only actual files with content (url, preview, or file), not empty structures
-      let count = 0;
-      
-      // Count root files that have actual content
-      if (partsData.rootFiles && Array.isArray(partsData.rootFiles)) {
-        count += partsData.rootFiles.filter((file: any) => 
-          file && (file.url || file.preview || file.file)
-        ).length;
-      }
-      
-      // Count files in folders that have actual content
-      if (partsData.folders && Array.isArray(partsData.folders)) {
-        partsData.folders.forEach((folder: any) => {
-          if (folder && folder.files && Array.isArray(folder.files)) {
-            count += folder.files.filter((file: any) => 
-              file && (file.url || file.preview || file.file)
-            ).length;
-          }
-        });
-      }
-      
-      return count;
-    } catch (error) {
-      return 0;
-    }
-  };
+  // Simple helper functions for tab counts
+  const getImagesCount = () => selectedEquipment?.image_url ? 1 : 0;
+  const getDocumentsCount = () => 0; // Simplified for now
+  const getEquipmentPartsCount = () => 0; // Simplified for now  
+  const getMaintenanceReportsCount = () => 0; // Simplified for now
 
   // Tab content components - EXACTLY like CreateEquipmentForm
   const renderTabButton = (tab: 'details' | 'images' | 'documents' | 'parts' | 'maintenance', label: string, icon: React.ReactNode, count?: number) => (
@@ -1122,13 +995,13 @@ export default function EquipmentModalModern() {
                         <div className="font-medium text-foreground">{selectedEquipment.type}</div>
                       </div>
 
-                      {selectedEquipment.plateNumber && (
+                      {selectedEquipment.plate_number && (
                         <div className="space-y-2">
                           <Label className="flex items-center gap-2">
                             <Hash className="h-4 w-4" />
                             Plate/Serial Number
                           </Label>
-                          <div className="font-medium text-foreground font-mono">{selectedEquipment.plateNumber}</div>
+                          <div className="font-medium text-foreground font-mono">{selectedEquipment.plate_number}</div>
                         </div>
                       )}
                     </div>
@@ -1170,10 +1043,10 @@ export default function EquipmentModalModern() {
                           {selectedEquipment.status}
                         </Badge>
 
-                        {selectedEquipment.plateNumber && (
+                        {selectedEquipment.plate_number && (
                           <Badge variant="outline" className="flex items-center gap-1">
                             <Hash className="h-3 w-3" />
-                            {selectedEquipment.plateNumber}
+                            {selectedEquipment.plate_number}
                           </Badge>
                         )}
 
@@ -1389,24 +1262,24 @@ export default function EquipmentModalModern() {
                 <div className="space-y-4">
                   <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
                     {/* Registration Expires */}
-                    {selectedEquipment.registrationExpiry && (
+                    {selectedEquipment.registration_expiry && (
                       <div className="space-y-1">
                         <Label className="text-sm font-medium text-muted-foreground">Registration Expires:</Label>
                         <div className={`font-medium ${
                           (() => {
-                            if (!selectedEquipment.registrationExpiry) return "text-foreground";
+                            if (!selectedEquipment.registration_expiry) return "text-foreground";
                             const now = new Date();
-                            const expiry = new Date(selectedEquipment.registrationExpiry);
+                            const expiry = new Date(selectedEquipment.registration_expiry);
                             const diffTime = expiry.getTime() - now.getTime();
                             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                             return diffDays <= 0 ? "text-red-600" : diffDays <= 30 ? "text-orange-600" : "text-foreground";
                           })()
                         }`}>
-                          {format(new Date(selectedEquipment.registrationExpiry), "M/d/yyyy")}
+                          {format(new Date(selectedEquipment.registration_expiry), "M/d/yyyy")}
                           {(() => {
-                            if (!selectedEquipment.registrationExpiry) return null;
+                            if (!selectedEquipment.registration_expiry) return null;
                             const now = new Date();
-                            const expiry = new Date(selectedEquipment.registrationExpiry);
+                            const expiry = new Date(selectedEquipment.registration_expiry);
                             const diffTime = expiry.getTime() - now.getTime();
                             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                             return diffDays <= 0 ? <span className="text-red-600 ml-2">(Expired)</span> : null;
@@ -1416,7 +1289,7 @@ export default function EquipmentModalModern() {
                     )}
 
                     {/* Insurance Expires */}
-                    {selectedEquipment.insuranceExpirationDate && (
+                    {selectedEquipment.insurance_expiration_date && (
                       <div className="space-y-1">
                         <Label className="text-sm font-medium text-muted-foreground">Insurance Expires:</Label>
                         <div className={`font-medium ${
@@ -1426,7 +1299,7 @@ export default function EquipmentModalModern() {
                             ? "text-orange-600"
                             : "text-foreground"
                         }`}>
-                          {format(new Date(selectedEquipment.insuranceExpirationDate), "M/d/yyyy")}
+                          {format(new Date(selectedEquipment.insurance_expiration_date), "M/d/yyyy")}
                           {daysUntilExpiry !== null && daysUntilExpiry <= 0 && (
                             <span className="text-red-600 ml-2">(Expired)</span>
                           )}
@@ -1435,22 +1308,22 @@ export default function EquipmentModalModern() {
                     )}
 
                     {/* Last Inspection */}
-                    {selectedEquipment.inspectionDate && (
+                    {selectedEquipment.inspection_date && (
                       <div className="space-y-1">
                         <Label className="text-sm font-medium text-muted-foreground">Last Inspection:</Label>
                         <div className="font-medium text-foreground">
-                          {format(new Date(selectedEquipment.inspectionDate), "M/d/yyyy")}
+                          {format(new Date(selectedEquipment.inspection_date), "M/d/yyyy")}
                         </div>
                       </div>
                     )}
 
                     {/* Next Inspection Due */}
-                    {selectedEquipment.inspectionDate && selectedEquipment.before && (
+                    {selectedEquipment.inspection_date && selectedEquipment.before && (
                       <div className="space-y-1">
                         <Label className="text-sm font-medium text-muted-foreground">Next Inspection Due:</Label>
                         <div className="font-medium text-foreground">
                           {(() => {
-                            const lastInspection = new Date(selectedEquipment.inspectionDate);
+                            const lastInspection = new Date(selectedEquipment.inspection_date);
                             const frequency = parseInt(selectedEquipment.before.toString());
                             const nextInspection = new Date(lastInspection);
                             nextInspection.setMonth(nextInspection.getMonth() + frequency);
@@ -1499,123 +1372,26 @@ export default function EquipmentModalModern() {
         </div>
       )}
 
-      {/* Images Tab - EXACTLY like CreateEquipmentForm */}
+      {/* Images Tab */}
       {activeTab === 'images' && (
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
           <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Camera className="h-4 w-4" />
-                    Equipment Images {isMobile ? '' : ''}
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {imagesEdit ? 'Upload or replace equipment images' : 'Photos and inspection images for this equipment. These images help with identification, insurance claims, and maintenance records.'}
-                  </p>
+            <CardContent className="p-6">
+              {selectedEquipment.image_url ? (
+                <div className="text-center">
+                  <Image
+                    src={selectedEquipment.image_url}
+                    alt="Equipment Image"
+                    width={400}
+                    height={300}
+                    className="mx-auto rounded-lg object-cover"
+                  />
+                  <p className="text-sm text-muted-foreground mt-2">Equipment Image</p>
                 </div>
-                {renderTabEditButton('images', imagesEdit)}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {imagesEdit ? (
-                // Edit Mode Form
-                <form ref={imagesFormRef} className="space-y-6">
-                  <div className="space-y-4">
-                    <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                      {/* Equipment Image */}
-                      <div className="space-y-3">
-                        <Label className="text-sm font-medium">Equipment Image</Label>
-                        {selectedEquipment.image_url ? (
-                          <ImageDisplayWithRemove
-                            url={selectedEquipment.image_url}
-                            onRemove={() => {}}
-                            label="Equipment Image"
-                            description="Equipment image for identification"
-                          />
-                        ) : (
-                          <div className="text-center py-8">
-                            <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                            <p className="text-muted-foreground">No equipment image available</p>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Third-party Inspection */}
-                      <div className="space-y-3">
-                        <Label className="text-sm font-medium">Third-party Inspection</Label>
-                        {selectedEquipment.thirdpartyInspectionImage ? (
-                          <ImageDisplayWithRemove
-                            url={selectedEquipment.thirdpartyInspectionImage}
-                            onRemove={() => {}}
-                            label="Third-party Inspection"
-                            description="Third-party inspection certificate"
-                          />
-                        ) : (
-                          <div className="text-center py-8">
-                            <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                            <p className="text-muted-foreground">No third-party inspection available</p>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* PGPC Inspection */}
-                      <div className="space-y-3">
-                        <Label className="text-sm font-medium">PGPC Inspection</Label>
-                        {selectedEquipment.pgpcInspectionImage ? (
-                          <ImageDisplayWithRemove
-                            url={selectedEquipment.pgpcInspectionImage}
-                            onRemove={() => {}}
-                            label="PGPC Inspection"
-                            description="PGPC inspection certificate"
-                          />
-                        ) : (
-                          <div className="text-center py-8">
-                            <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                            <p className="text-muted-foreground">No PGPC inspection available</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </form>
               ) : (
-                // View Mode
-                <div className="space-y-4">
-                  <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                    {/* Equipment Image */}
-                    {selectedEquipment.image_url && (
-                      <ImageViewerSection 
-                        url={selectedEquipment.image_url}
-                        label="Equipment Image" 
-                        description="Equipment Image"
-                      />
-                    )}
-                    
-                    {/* Third-party Inspection */}
-                    {selectedEquipment.thirdpartyInspectionImage && (
-                      <ImageViewerSection 
-                        url={selectedEquipment.thirdpartyInspectionImage}
-                        label="Third-party Inspection" 
-                        description="Third-party Inspection"
-                      />
-                    )}
-                    
-                    {/* PGPC Inspection */}
-                    {selectedEquipment.pgpcInspectionImage && (
-                      <ImageViewerSection 
-                        url={selectedEquipment.pgpcInspectionImage}
-                        label="PGPC Inspection" 
-                        description="PGPC Inspection"
-                      />
-                    )}
-                  </div>
-                  {!selectedEquipment.image_url && !selectedEquipment.thirdpartyInspectionImage && !selectedEquipment.pgpcInspectionImage && (
-                    <div className="text-center py-8">
-                      <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                      <p className="text-muted-foreground">No images available for this equipment</p>
-                    </div>
-                  )}
+                <div className="text-center py-8">
+                  <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <p className="text-muted-foreground">No image available for this equipment</p>
                 </div>
               )}
             </CardContent>
@@ -1623,98 +1399,15 @@ export default function EquipmentModalModern() {
         </div>
       )}
 
-      {/* Documents Tab - EXACTLY like CreateEquipmentForm */}
+      {/* Documents Tab */}
       {activeTab === 'documents' && (
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
           <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Documents {isMobile ? '' : ''}
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {documentsEdit ? 'Upload or replace equipment documents' : 'Important equipment documents for compliance and record-keeping. Accepted formats: PDF and image files.'}
-                  </p>
-                </div>
-                {renderTabEditButton('documents', documentsEdit)}
+            <CardContent className="p-6">
+              <div className="text-center py-8">
+                <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground">Documents functionality coming soon</p>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {documentsEdit ? (
-                // Edit Mode Form
-                <form ref={documentsFormRef} className="space-y-6">
-                  <div className="space-y-4">
-                    <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                      {/* Original Receipt (OR) */}
-                      <div className="space-y-3">
-                        <Label className="text-sm font-medium">Original Receipt (OR)</Label>
-                        {selectedEquipment.originalReceiptUrl ? (
-                          <ImageDisplayWithRemove
-                            url={selectedEquipment.originalReceiptUrl}
-                            onRemove={() => {}}
-                            label="Original Receipt"
-                            description="Proof of purchase document"
-                          />
-                        ) : (
-                          <div className="text-center py-8">
-                            <Receipt className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                            <p className="text-muted-foreground">No original receipt available</p>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Equipment Registration */}
-                      <div className="space-y-3">
-                        <Label className="text-sm font-medium">Equipment Registration</Label>
-                        {selectedEquipment.equipmentRegistrationUrl ? (
-                          <ImageDisplayWithRemove
-                            url={selectedEquipment.equipmentRegistrationUrl}
-                            onRemove={() => {}}
-                            label="Equipment Registration"
-                            description="Official equipment registration certificate"
-                          />
-                        ) : (
-                          <div className="text-center py-8">
-                            <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                            <p className="text-muted-foreground">No equipment registration available</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </form>
-              ) : (
-                // View Mode
-                <div className="space-y-4">
-                  <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                    {/* Original Receipt (OR) */}
-                    {selectedEquipment.originalReceiptUrl && (
-                      <ImageViewerSection 
-                        url={selectedEquipment.originalReceiptUrl}
-                        label="Original Receipt (OR)" 
-                        description="Proof of purchase document"
-                      />
-                    )}
-                    
-                    {/* Equipment Registration */}
-                    {selectedEquipment.equipmentRegistrationUrl && (
-                      <ImageViewerSection 
-                        url={selectedEquipment.equipmentRegistrationUrl}
-                        label="Equipment Registration" 
-                        description="Official equipment registration certificate"
-                      />
-                    )}
-                  </div>
-                  {!selectedEquipment.originalReceiptUrl && !selectedEquipment.equipmentRegistrationUrl && (
-                    <div className="text-center py-8">
-                      <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                      <p className="text-muted-foreground">No documents available for this equipment</p>
-                    </div>
-                  )}
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -1724,51 +1417,11 @@ export default function EquipmentModalModern() {
       {activeTab === 'parts' && (
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
           <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Wrench className="h-4 w-4" />
-                    Equipment Parts
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {partsEdit ? 'Manage parts documentation with folders and files' : 'View and browse parts documentation organized in folders.'}
-                  </p>
-                </div>
-                {renderTabEditButton('parts', partsEdit)}
+            <CardContent className="p-6">
+              <div className="text-center py-8">
+                <Wrench className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground">Parts management functionality coming soon</p>
               </div>
-            </CardHeader>
-            <CardContent>
-              {partsEdit ? (
-                // Edit Mode Form
-                <form ref={partsFormRef} className="space-y-6">
-                  <PartsFolderManager
-                    initialData={
-                      selectedEquipment.equipmentParts 
-                        ? (Array.isArray(selectedEquipment.equipmentParts) && selectedEquipment.equipmentParts.length > 0
-                            ? JSON.parse(selectedEquipment.equipmentParts[0])
-                            : typeof selectedEquipment.equipmentParts === 'string'
-                            ? JSON.parse(selectedEquipment.equipmentParts)
-                            : selectedEquipment.equipmentParts)
-                        : { rootFiles: [], folders: [] }
-                    }
-                    onChange={() => {}} // Parts manager handles its own state
-                  />
-                </form>
-              ) : (
-                // View Mode
-                <EquipmentPartsViewer 
-                  equipmentParts={
-                    selectedEquipment.equipmentParts 
-                      ? (Array.isArray(selectedEquipment.equipmentParts) && selectedEquipment.equipmentParts.length > 0
-                          ? JSON.parse(selectedEquipment.equipmentParts[0])
-                          : typeof selectedEquipment.equipmentParts === 'string'
-                          ? JSON.parse(selectedEquipment.equipmentParts)
-                          : selectedEquipment.equipmentParts)
-                      : { rootFiles: [], folders: [] }
-                  } 
-                />
-              )}
             </CardContent>
           </Card>
         </div>
@@ -1777,7 +1430,14 @@ export default function EquipmentModalModern() {
       {/* Maintenance Tab */}
       {activeTab === 'maintenance' && (
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
-          <EquipmentMaintenanceReportsEnhanced equipmentId={selectedEquipment.uid} />
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center py-8">
+                <ClipboardList className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground">Maintenance reports functionality coming soon</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -1828,7 +1488,7 @@ export default function EquipmentModalModern() {
                   type="button"
                   variant="destructive"
                   onClick={handleDelete}
-                  disabled={deleteEquipmentMutation.isPending || selectedEquipment?.uid.startsWith('temp_')}
+                  disabled={deleteEquipmentMutation.isPending || selectedEquipment?.id.startsWith('temp_')}
                   className="flex-1"
                   size="lg"
                 >
@@ -1883,7 +1543,7 @@ export default function EquipmentModalModern() {
                 type="button"
                 variant="destructive"
                 onClick={handleDelete}
-                disabled={deleteEquipmentMutation.isPending || selectedEquipment?.uid.startsWith('temp_')}
+                disabled={deleteEquipmentMutation.isPending || selectedEquipment?.id.startsWith('temp_')}
                 className="flex-1"
                 size="lg"
               >

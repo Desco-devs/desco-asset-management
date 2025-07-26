@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { Settings, Camera, FileText, Upload, CalendarIcon, User, Building2, Car, Hash, Shield, Loader2, Wrench } from "lucide-react";
+import { Settings, Camera, FileText, Upload, CalendarIcon, User, Building2, Car, Hash, Shield, Loader2, Wrench, ClipboardCheck, Package, ImageIcon, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import VehiclePartsFolderManager, { type PartsStructure } from "./VehiclePartsFolderManager";
 import { toast } from "sonner";
@@ -38,17 +39,21 @@ interface CreateVehicleFormProps {
     id: string;
     name: string;
   }>;
+  locations?: Array<{
+    id: string;
+    address: string;
+  }>;
   onSuccess?: () => void;
   onCancel?: () => void;
   isMobile?: boolean;
 }
 
-export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMobile = false }: CreateVehicleFormProps) {
+export default function CreateVehicleForm({ projects, locations = [], onSuccess, onCancel, isMobile = false }: CreateVehicleFormProps) {
   // Debug: Log projects data
   console.log('🔍 Projects in form:', projects);
   
   // Tab state for mobile
-  const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'documents' | 'parts'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'documents' | 'parts' | 'maintenance'>('details');
   
   // Loading state for submit button
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,6 +61,14 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
   // Date picker states
   const [inspectionDateOpen, setInspectionDateOpen] = useState(false);
   const [expiryDateOpen, setExpiryDateOpen] = useState(false);
+  const [dateRepairedOpen, setDateRepairedOpen] = useState(false);
+  
+  // Maintenance-specific state
+  const [dateRepaired, setDateRepaired] = useState<Date | undefined>();
+  const [isPartsReplacedOpen, setIsPartsReplacedOpen] = useState(true);
+  const [openParts, setOpenParts] = useState<{ [key: number]: boolean }>({});
+  const [isAttachmentsOpen, setIsAttachmentsOpen] = useState(true);
+  const [openAttachments, setOpenAttachments] = useState<{ [key: number]: boolean }>({});
   
   // Form state for all form fields to prevent reset on tab switch or validation error
   const [formData, setFormData] = useState({
@@ -83,12 +96,26 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
     originalReceipt: null as File | null,
     carRegistration: null as File | null,
     pgpcInspection: null as File | null,
+    maintenanceAttachments: [null] as Array<File | null>,
   });
 
   // Parts structure state
   const [partsStructure, setPartsStructure] = useState<PartsStructure>({
     rootFiles: [],
     folders: []
+  });
+  
+  // Maintenance report form state
+  const [maintenanceData, setMaintenanceData] = useState({
+    issueDescription: '',
+    remarks: '',
+    inspectionDetails: '',
+    actionTaken: '',
+    partsReplaced: [{ name: '', image: null }] as Array<{ name: string; image: File | null }>,
+    priority: 'MEDIUM',
+    status: 'REPORTED',
+    downtimeHours: '',
+    dateReported: new Date()
   });
   
   // File change handlers
@@ -180,6 +207,27 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
         formDataFromForm.append('expiryDate', format(formData.expiryDate, 'yyyy-MM-dd'));
       }
       
+      // Add maintenance report data
+      formDataFromForm.append('maintenanceData', JSON.stringify(maintenanceData));
+      if (dateRepaired) {
+        formDataFromForm.append('dateRepaired', format(dateRepaired, 'yyyy-MM-dd'));
+      }
+      
+      // Add maintenance attachments
+      files.maintenanceAttachments.forEach((file, index) => {
+        if (file) {
+          formDataFromForm.append(`maintenanceAttachment_${index}`, file);
+        }
+      });
+      
+      // Add parts replaced images
+      maintenanceData.partsReplaced.forEach((part, index) => {
+        if (part.image) {
+          formDataFromForm.append(`partReplacedImage_${index}`, part.image);
+          formDataFromForm.append(`partReplacedName_${index}`, part.name);
+        }
+      });
+      
       const result = await createVehicleAction(formDataFromForm);
       
       if (result.success) {
@@ -208,7 +256,20 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
           originalReceipt: null,
           carRegistration: null,
           pgpcInspection: null,
+          maintenanceAttachments: [null],
         });
+        setMaintenanceData({
+          issueDescription: '',
+          remarks: '',
+          inspectionDetails: '',
+          actionTaken: '',
+          partsReplaced: [{ name: '', image: null }],
+          priority: 'MEDIUM',
+          status: 'REPORTED',
+          downtimeHours: '',
+          dateReported: new Date()
+        });
+        setDateRepaired(undefined);
         setPartsStructure({
           rootFiles: [],
           folders: []
@@ -242,7 +303,7 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
   };
 
   // Tab content components
-  const renderTabButton = (tab: 'details' | 'photos' | 'documents' | 'parts', label: string, icon: React.ReactNode) => (
+  const renderTabButton = (tab: 'details' | 'photos' | 'documents' | 'parts' | 'maintenance', label: string, icon: React.ReactNode) => (
     <Button
       type="button"
       variant={activeTab === tab ? 'default' : 'ghost'}
@@ -275,13 +336,14 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
       )}
 
       {/* Tab Navigation - All Screen Sizes */}
-      <div className={`w-full mb-6 ${isMobile ? 'grid grid-cols-4 bg-muted rounded-md p-1' : 'flex justify-center border-b'}`}>
+      <div className={`w-full mb-6 ${isMobile ? 'grid grid-cols-5 bg-muted rounded-md p-1' : 'flex justify-center border-b'}`}>
         {isMobile ? (
           <>
             {renderTabButton('details', 'Details', <Settings className="h-4 w-4" />)}
             {renderTabButton('photos', 'Photos', <Camera className="h-4 w-4" />)}
             {renderTabButton('documents', 'Documents', <FileText className="h-4 w-4" />)}
             {renderTabButton('parts', 'Parts', <Wrench className="h-4 w-4" />)}
+            {renderTabButton('maintenance', 'Maintenance', <ClipboardCheck className="h-4 w-4" />)}
           </>
         ) : (
           <>
@@ -332,6 +394,18 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
             >
               <Wrench className="h-4 w-4" />
               Parts Management
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('maintenance')}
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'maintenance'
+                  ? 'border-primary text-primary bg-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+              }`}
+            >
+              <ClipboardCheck className="h-4 w-4" />
+              Maintenance Report
             </button>
           </>
         )}
@@ -749,6 +823,337 @@ export default function CreateVehicleForm({ projects, onSuccess, onCancel, isMob
                 onChange={setPartsStructure}
                 initialData={partsStructure}
               />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Maintenance Tab */}
+      {activeTab === 'maintenance' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ClipboardCheck className="h-4 w-4" />
+                Maintenance Report {isMobile ? '' : '(Optional)'}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Create an initial maintenance report for this vehicle. This is useful for documenting any pre-existing conditions or immediate maintenance needs.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="issueDescription">Issue Description *</Label>
+                  <Textarea
+                    id="issueDescription"
+                    value={maintenanceData.issueDescription}
+                    onChange={(e) => setMaintenanceData(prev => ({ ...prev, issueDescription: e.target.value }))}
+                    placeholder="Describe the issue or maintenance requirement..."
+                    rows={3}
+                    className="resize-none"
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select value={maintenanceData.priority} onValueChange={(value) => setMaintenanceData(prev => ({ ...prev, priority: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="LOW">Low</SelectItem>
+                        <SelectItem value="MEDIUM">Medium</SelectItem>
+                        <SelectItem value="HIGH">High</SelectItem>
+                        <SelectItem value="CRITICAL">Critical</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select value={maintenanceData.status} onValueChange={(value) => setMaintenanceData(prev => ({ ...prev, status: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="REPORTED">Reported</SelectItem>
+                        <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                        <SelectItem value="RESOLVED">Resolved</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="inspectionDetails">Inspection Details</Label>
+                  <Textarea
+                    id="inspectionDetails"
+                    value={maintenanceData.inspectionDetails}
+                    onChange={(e) => setMaintenanceData(prev => ({ ...prev, inspectionDetails: e.target.value }))}
+                    placeholder="Detail the inspection findings..."
+                    rows={2}
+                    className="resize-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="actionTaken">Action Taken</Label>
+                  <Textarea
+                    id="actionTaken"
+                    value={maintenanceData.actionTaken}
+                    onChange={(e) => setMaintenanceData(prev => ({ ...prev, actionTaken: e.target.value }))}
+                    placeholder="Describe the action taken or planned..."
+                    rows={2}
+                    className="resize-none"
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="downtimeHours">Downtime Hours</Label>
+                    <Input
+                      id="downtimeHours"
+                      value={maintenanceData.downtimeHours}
+                      onChange={(e) => setMaintenanceData(prev => ({ ...prev, downtimeHours: e.target.value }))}
+                      placeholder="e.g., 4.5"
+                      type="number"
+                      step="0.5"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Date Repaired</Label>
+                    <Popover open={dateRepairedOpen} onOpenChange={setDateRepairedOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !dateRepaired && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dateRepaired ? (
+                            format(dateRepaired, "PPP")
+                          ) : (
+                            <span>Pick date (if completed)</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={dateRepaired}
+                          onSelect={(date) => {
+                            setDateRepaired(date);
+                            setDateRepairedOpen(false);
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="maintenanceRemarks">Additional Remarks</Label>
+                  <Textarea
+                    id="maintenanceRemarks"
+                    value={maintenanceData.remarks}
+                    onChange={(e) => setMaintenanceData(prev => ({ ...prev, remarks: e.target.value }))}
+                    placeholder="Any additional notes or comments..."
+                    rows={2}
+                    className="resize-none"
+                  />
+                </div>
+
+                {/* Parts Replaced Section */}
+                <Collapsible open={isPartsReplacedOpen} onOpenChange={setIsPartsReplacedOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex w-full items-center justify-between p-4"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Parts Replaced ({maintenanceData.partsReplaced.filter(p => p.name.trim()).length})
+                      </span>
+                      {isPartsReplacedOpen ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4 pt-4">
+                    {maintenanceData.partsReplaced.map((part, index) => (
+                      <Collapsible
+                        key={index}
+                        open={openParts[index]}
+                        onOpenChange={(open) => setOpenParts(prev => ({ ...prev, [index]: open }))}
+                      >
+                        <div className="rounded-lg border p-4">
+                          <div className="flex items-center justify-between">
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                                {openParts[index] ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                                Part {index + 1}
+                              </Button>
+                            </CollapsibleTrigger>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newParts = maintenanceData.partsReplaced.filter((_, i) => i !== index);
+                                setMaintenanceData(prev => ({ ...prev, partsReplaced: newParts }));
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <CollapsibleContent className="space-y-4 pt-4">
+                            <div className="space-y-2">
+                              <Label htmlFor={`partName_${index}`}>Part Name</Label>
+                              <Input
+                                id={`partName_${index}`}
+                                value={part.name}
+                                onChange={(e) => {
+                                  const newParts = [...maintenanceData.partsReplaced];
+                                  newParts[index] = { ...newParts[index], name: e.target.value };
+                                  setMaintenanceData(prev => ({ ...prev, partsReplaced: newParts }));
+                                }}
+                                placeholder="Enter part name..."
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`partImage_${index}`}>Part Image</Label>
+                              <FileUploadSectionSimple
+                                label=""
+                                accept="image/*"
+                                onFileChange={(file) => {
+                                  const newParts = [...maintenanceData.partsReplaced];
+                                  newParts[index] = { ...newParts[index], image: file };
+                                  setMaintenanceData(prev => ({ ...prev, partsReplaced: newParts }));
+                                }}
+                                onKeepExistingChange={() => {}}
+                                selectedFile={part.image}
+                                icon={<ImageIcon className="h-4 w-4" />}
+                              />
+                            </div>
+                          </CollapsibleContent>
+                        </div>
+                      </Collapsible>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setMaintenanceData(prev => ({
+                          ...prev,
+                          partsReplaced: [...prev.partsReplaced, { name: '', image: null }]
+                        }));
+                      }}
+                      className="w-full"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Part
+                    </Button>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {/* Maintenance Attachments Section */}
+                <Collapsible open={isAttachmentsOpen} onOpenChange={setIsAttachmentsOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex w-full items-center justify-between p-4"
+                    >
+                      <span className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Maintenance Attachments ({files.maintenanceAttachments.filter(f => f).length})
+                      </span>
+                      {isAttachmentsOpen ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4 pt-4">
+                    {files.maintenanceAttachments.map((attachment, index) => (
+                      <Collapsible
+                        key={index}
+                        open={openAttachments[index]}
+                        onOpenChange={(open) => setOpenAttachments(prev => ({ ...prev, [index]: open }))}
+                      >
+                        <div className="rounded-lg border p-4">
+                          <div className="flex items-center justify-between">
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                                {openAttachments[index] ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                                Attachment {index + 1}
+                              </Button>
+                            </CollapsibleTrigger>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newAttachments = files.maintenanceAttachments.filter((_, i) => i !== index);
+                                setFiles(prev => ({ ...prev, maintenanceAttachments: newAttachments }));
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <CollapsibleContent className="pt-4">
+                            <FileUploadSectionSimple
+                              label=""
+                              accept="image/*,.pdf,.doc,.docx"
+                              onFileChange={(file) => {
+                                const newAttachments = [...files.maintenanceAttachments];
+                                newAttachments[index] = file;
+                                setFiles(prev => ({ ...prev, maintenanceAttachments: newAttachments }));
+                              }}
+                              onKeepExistingChange={() => {}}
+                              selectedFile={attachment}
+                              icon={<Upload className="h-4 w-4" />}
+                            />
+                          </CollapsibleContent>
+                        </div>
+                      </Collapsible>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setFiles(prev => ({
+                          ...prev,
+                          maintenanceAttachments: [...prev.maintenanceAttachments, null]
+                        }));
+                      }}
+                      className="w-full"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Attachment
+                    </Button>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
             </CardContent>
           </Card>
         </div>

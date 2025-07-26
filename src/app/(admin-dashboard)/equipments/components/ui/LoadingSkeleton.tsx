@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Wrench, Plus, FileText } from "lucide-react";
+import { useEquipmentStore } from "@/stores/equipmentStore";
 
 export default function LoadingSkeleton() {
+  const { setIsCreateModalOpen } = useEquipmentStore();
+
   return (
     <div className="space-y-6 md:space-y-8">
       {/* Page Title */}
@@ -24,7 +27,11 @@ export default function LoadingSkeleton() {
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <Button size="default" className="w-full sm:w-auto">
+        <Button 
+          onClick={() => setIsCreateModalOpen(true)}
+          size="default" 
+          className="w-full sm:w-auto"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Add Equipment
         </Button>

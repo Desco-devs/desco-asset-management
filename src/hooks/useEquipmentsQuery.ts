@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import type { Equipment, MaintenanceReport, EquipmentMaintenanceReport, Project, Client, Location, User, ExportFilters } from "@/stores/equipmentsStore";
 
 // Query keys for consistent cache management
-export const equipmentKeys = {
+const equipmentKeys = {
   all: ['equipments'] as const,
   equipments: () => [...equipmentKeys.all, 'list'] as const,
   equipment: (id: string) => [...equipmentKeys.all, 'item', id] as const,
@@ -573,7 +573,7 @@ export function useUpdateEquipmentAction() {
 }
 
 // Legacy API Equipment Mutations (kept for compatibility)
-export function useCreateEquipment() {
+export function useCreateEquipmentLegacy() {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -599,7 +599,7 @@ export function useCreateEquipment() {
   });
 }
 
-export function useUpdateEquipment() {
+export function useUpdateEquipmentLegacy() {
   const queryClient = useQueryClient();
   
   return useMutation({
@@ -622,7 +622,7 @@ export function useUpdateEquipment() {
   });
 }
 
-export function useDeleteEquipment() {
+export function useDeleteEquipmentLegacy() {
   const queryClient = useQueryClient();
   
   return useMutation({

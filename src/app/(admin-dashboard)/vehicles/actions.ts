@@ -462,6 +462,122 @@ export async function createVehicleAction(formData: FormData) {
       });
     }
 
+    // 🔥 HANDLE MAINTENANCE REPORT CREATION (if provided)
+    let maintenanceReportId = null;
+    const maintenanceDataString = formData.get("maintenanceData") as string;
+    
+    if (maintenanceDataString) {
+      try {
+        const maintenanceData = JSON.parse(maintenanceDataString);
+        const dateRepaired = formData.get("dateRepaired") as string;
+        
+        // Only create maintenance report if there's meaningful data
+        if (maintenanceData.issueDescription?.trim() || 
+            maintenanceData.remarks?.trim() || 
+            maintenanceData.inspectionDetails?.trim() || 
+            maintenanceData.actionTaken?.trim()) {
+          
+          // Upload maintenance attachments
+          const attachmentUrls: string[] = [];
+          for (let i = 0; formData.get(`maintenanceAttachment_${i}`); i++) {
+            const file = formData.get(`maintenanceAttachment_${i}`) as File;
+            if (file && file.size > 0) {
+              try {
+                const timestamp = Date.now();
+                const ext = file.name.split('.').pop();
+                const filename = `maintenance_attachment_${i}_${timestamp}.${ext}`;
+                const filepath = `vehicles/${project.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}/${brand}_${model}_${plateNumber}/maintenance/${filename}`;
+                const buffer = Buffer.from(await file.arrayBuffer());
+
+                const { data: uploadData, error: uploadErr } = await supabase
+                  .storage
+                  .from('vehicles')
+                  .upload(filepath, buffer, { cacheControl: '3600', upsert: false });
+
+                if (!uploadErr && uploadData) {
+                  const { data: urlData } = supabase.storage
+                    .from('vehicles')
+                    .getPublicUrl(uploadData.path);
+                  attachmentUrls.push(urlData.publicUrl);
+                }
+              } catch (error) {
+                console.error(`❌ Failed to upload maintenance attachment ${i}:`, error);
+              }
+            }
+          }
+          
+          // Upload parts replaced images and build parts array
+          const partsReplaced: string[] = [];
+          for (let i = 0; formData.get(`partReplacedImage_${i}`); i++) {
+            const partImage = formData.get(`partReplacedImage_${i}`) as File;
+            const partName = formData.get(`partReplacedName_${i}`) as string;
+            
+            if (partName?.trim()) {
+              if (partImage && partImage.size > 0) {
+                try {
+                  const timestamp = Date.now();
+                  const ext = partImage.name.split('.').pop();
+                  const filename = `part_${i}_${timestamp}.${ext}`;
+                  const filepath = `vehicles/${project.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}/${brand}_${model}_${plateNumber}/maintenance/parts/${filename}`;
+                  const buffer = Buffer.from(await partImage.arrayBuffer());
+
+                  const { data: uploadData, error: uploadErr } = await supabase
+                    .storage
+                    .from('vehicles')
+                    .upload(filepath, buffer, { cacheControl: '3600', upsert: false });
+
+                  if (!uploadErr && uploadData) {
+                    const { data: urlData } = supabase.storage
+                      .from('vehicles')
+                      .getPublicUrl(uploadData.path);
+                    partsReplaced.push(`${partName} [${urlData.publicUrl}]`);
+                  } else {
+                    partsReplaced.push(partName);
+                  }
+                } catch (error) {
+                  console.error(`❌ Failed to upload part image ${i}:`, error);
+                  partsReplaced.push(partName);
+                }
+              } else {
+                partsReplaced.push(partName);
+              }
+            }
+          }
+          
+          // Create maintenance report
+          try {
+            const maintenanceReport = await prisma.maintenance_vehicle_report.create({
+              data: {
+                vehicle_id: vehicle.id,
+                location_id: project.client.location.id,
+                issue_description: maintenanceData.issueDescription || '',
+                remarks: maintenanceData.remarks || null,
+                inspection_details: maintenanceData.inspectionDetails || null,
+                action_taken: maintenanceData.actionTaken || null,
+                parts_replaced: partsReplaced,
+                priority: maintenanceData.priority || 'MEDIUM',
+                status: maintenanceData.status || 'REPORTED',
+                downtime_hours: maintenanceData.downtimeHours || null,
+                date_repaired: dateRepaired ? new Date(dateRepaired) : null,
+                date_reported: maintenanceData.dateReported ? new Date(maintenanceData.dateReported) : new Date(),
+                attachment_urls: attachmentUrls,
+                reported_by: userProfile.id,
+                repaired_by: dateRepaired ? userProfile.id : null,
+              },
+            });
+            
+            maintenanceReportId = maintenanceReport.id;
+          } catch (error) {
+            console.error("❌ Failed to create maintenance report:", error);
+            // Don't fail vehicle creation if maintenance report fails
+          }
+        }
+      } catch (error) {
+        console.error("❌ Failed to process maintenance data:", error);
+        // Don't fail vehicle creation if maintenance processing fails
+      }
+    }
+
     // Revalidate the vehicles page
     revalidatePath("/vehicles");
     revalidatePath("/dashboard");
@@ -476,7 +592,9 @@ export async function createVehicleAction(formData: FormData) {
       success: true, 
       vehicleId: vehicle.id,
       filesUploaded: Object.keys(fileUploads).length,
-      partsUploaded: partsCount
+      partsUploaded: partsCount,
+      maintenanceReportCreated: !!maintenanceReportId,
+      maintenanceReportId: maintenanceReportId
     };
 
   } catch (error) {

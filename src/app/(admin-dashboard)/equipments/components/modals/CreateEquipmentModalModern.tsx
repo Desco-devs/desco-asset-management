@@ -11,14 +11,14 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import { useEquipmentsStore, selectIsCreateModalOpen, selectIsMobile } from "@/stores/equipmentsStore";
-import { useEquipmentsWithReferenceData } from "@/hooks/useEquipmentsQuery";
+import { useEquipmentStore, selectIsCreateModalOpen, selectIsMobile } from "@/stores/equipmentStore";
+import { useProjects } from "@/hooks/api/use-projects";
 import CreateEquipmentForm from "../forms/CreateEquipmentForm";
 
 export default function CreateEquipmentModalModern() {
-  const isCreateModalOpen = useEquipmentsStore(selectIsCreateModalOpen);
-  const isMobile = useEquipmentsStore(selectIsMobile);
-  const { setIsCreateModalOpen, setIsMobile } = useEquipmentsStore();
+  const isCreateModalOpen = useEquipmentStore(selectIsCreateModalOpen);
+  const isMobile = useEquipmentStore(selectIsMobile);
+  const { setIsCreateModalOpen, setIsMobile } = useEquipmentStore();
   
   // Mobile detection using Zustand
   useEffect(() => {
@@ -35,7 +35,8 @@ export default function CreateEquipmentModalModern() {
   }, [setIsMobile]);
 
   // Get reference data
-  const { projects } = useEquipmentsWithReferenceData();
+  const { data: projectsData } = useProjects();
+  const projects = projectsData?.data || [];
 
   const handleSuccess = () => {
     setIsCreateModalOpen(false);
@@ -76,7 +77,7 @@ export default function CreateEquipmentModalModern() {
           <div className="flex-1 overflow-y-auto p-4">
             <CreateEquipmentForm 
               projects={projects.map(p => ({
-                id: p.uid,
+                id: p.id,
                 name: p.name
               }))} 
               onSuccess={handleSuccess}
@@ -106,7 +107,7 @@ export default function CreateEquipmentModalModern() {
         <div className="flex-1 overflow-y-auto">
           <CreateEquipmentForm 
             projects={projects.map(p => ({
-              id: p.uid,
+              id: p.id,
               name: p.name
             }))} 
             onSuccess={handleSuccess}

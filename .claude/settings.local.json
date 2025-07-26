@@ -59,7 +59,10 @@
       "Bash(npx prisma:*)",
       "WebFetch(domain:supabase.com)",
       "WebFetch(domain:silvestri.co)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(chmod:*)",
+      "Bash(./scripts/run-equipment-test.sh:*)",
+      "Bash(npx playwright test:*)"
     ],
     "deny": []
   }

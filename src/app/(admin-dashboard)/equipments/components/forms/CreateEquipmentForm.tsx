@@ -2,7 +2,8 @@
 
 import { useState, useRef } from "react";
 import { format } from "date-fns";
-import { useCreateEquipmentAction } from "@/hooks/useEquipmentsQuery";
+import { useCreateEquipment } from "@/hooks/useEquipmentQuery";
+import { useUsers } from "@/hooks/api/use-users";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -49,7 +50,10 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
   const { handleError } = useErrorHandler();
   
   // Fast server action mutation hook
-  const createEquipmentMutation = useCreateEquipmentAction();
+  const createEquipmentMutation = useCreateEquipment();
+  
+  // Fetch users for repaired by selection
+  const { data: usersData } = useUsers();
   
   // Form reference for resetting
   const formRef = useRef<HTMLFormElement>(null);
@@ -96,7 +100,8 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     priority: 'MEDIUM',
     status: 'REPORTED',
     downtimeHours: '',
-    dateReported: new Date()
+    dateReported: new Date(),
+    repairedBy: ''
   });
   
   // File state for images and documents
@@ -283,10 +288,17 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       formDataFromForm.append('insuranceExpirationDate', format(formData.insuranceExpirationDate, 'yyyy-MM-dd'));
     }
     
-    // Add maintenance report data if any field is filled
-    const hasMaintenanceData = Object.values(maintenanceData).some(value => 
-      Array.isArray(value) ? value.length > 0 : value && value.toString().trim() !== ''
-    ) || files.maintenanceAttachments.length > 0;
+    // Add maintenance report data if any meaningful field is filled
+    const hasMaintenanceData = (
+      maintenanceData.issueDescription.trim() !== '' ||
+      maintenanceData.remarks.trim() !== '' ||
+      maintenanceData.inspectionDetails.trim() !== '' ||
+      maintenanceData.actionTaken.trim() !== '' ||
+      maintenanceData.downtimeHours.trim() !== '' ||
+      dateRepaired ||
+      maintenanceData.partsReplaced.some(part => part.name.trim() !== '' || part.image) ||
+      files.maintenanceAttachments.some(file => file !== null)
+    );
     
     if (hasMaintenanceData) {
       // Add parts images to formData
@@ -310,9 +322,6 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       // Use fast mutation with optimistic updates
       createEquipmentMutation.mutate(formDataFromForm, {
         onSuccess: () => {
-          // Show success toast
-          toast.success(`Equipment "${formData.brand} ${formData.model}" created successfully!`);
-          
           // Reset form state only on successful submission
           setFormData({
             brand: '',
@@ -345,7 +354,8 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
             priority: 'MEDIUM',
             status: 'REPORTED',
             downtimeHours: '',
-            dateReported: new Date()
+            dateReported: new Date(),
+            repairedBy: ''
           });
           setDateRepaired(undefined);
           setPartsStructure({
@@ -1121,8 +1131,8 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
                 </div>
               </div>
               
-              {/* Priority, Status, and Downtime */}
-              <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-4'}`}>
+              {/* Priority, Status, and Smart Fields */}
+              <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
                 <div className="space-y-2">
                   <Label className={isMobile ? 'text-sm font-medium' : ''}>Priority</Label>
                   <Select value={maintenanceData.priority} onValueChange={(value) => setMaintenanceData(prev => ({ ...prev, priority: value }))}>
@@ -1133,7 +1143,6 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
                       <SelectItem value="LOW">Low</SelectItem>
                       <SelectItem value="MEDIUM">Medium</SelectItem>
                       <SelectItem value="HIGH">High</SelectItem>
-                      <SelectItem value="CRITICAL">Critical</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1153,63 +1162,87 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
                   </Select>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="downtimeHours" className={isMobile ? 'text-sm font-medium' : ''}>Downtime (Hours)</Label>
-                  <Input
-                    id="downtimeHours"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={maintenanceData.downtimeHours}
-                    onChange={(e) => setMaintenanceData(prev => ({ ...prev, downtimeHours: e.target.value }))}
-                    placeholder="0.0"
-                    className={`transition-all duration-200 focus:ring-2 focus:ring-blue-500 ${isMobile ? 'h-10 text-sm' : ''}`}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label className={isMobile ? 'text-sm font-medium' : ''}>Date Repaired</Label>
-                  <Popover open={dateRepairedOpen} onOpenChange={setDateRepairedOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal transition-all duration-200 focus:ring-2 focus:ring-blue-500",
-                          !dateRepaired && "text-muted-foreground",
-                          isMobile ? 'h-10 text-sm' : ''
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
-                        {dateRepaired ? (
-                          <span className="truncate">{format(dateRepaired, isMobile ? "MMM d, yyyy" : "PPP")}</span>
-                        ) : (
-                          <span className="truncate">Pick repair date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={dateRepaired}
-                        onSelect={(date) => {
-                          setDateRepaired(date);
-                          setDateRepairedOpen(false);
-                        }}
-                        initialFocus
-                        captionLayout="dropdown-buttons"
-                        fromYear={1990}
-                        toYear={2030}
-                        classNames={{
-                          caption_dropdowns: "flex gap-2 justify-center",
-                          vhidden: "hidden",
-                          caption_label: "hidden"
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                {/* Show Downtime only for IN_PROGRESS and COMPLETED status */}
+                {(maintenanceData.status === 'IN_PROGRESS' || maintenanceData.status === 'COMPLETED') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="downtimeHours" className={isMobile ? 'text-sm font-medium' : ''}>Downtime (Hours)</Label>
+                    <Input
+                      id="downtimeHours"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={maintenanceData.downtimeHours}
+                      onChange={(e) => setMaintenanceData(prev => ({ ...prev, downtimeHours: e.target.value }))}
+                      placeholder="0.0"
+                      className={`transition-all duration-200 focus:ring-2 focus:ring-blue-500 ${isMobile ? 'h-10 text-sm' : ''}`}
+                    />
+                  </div>
+                )}
               </div>
+              
+              {/* Completion Fields - Only show when status is COMPLETED */}
+              {maintenanceData.status === 'COMPLETED' && (
+                <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  <div className="space-y-2">
+                    <Label className={isMobile ? 'text-sm font-medium' : ''}>Repaired By</Label>
+                    <Select value={maintenanceData.repairedBy} onValueChange={(value) => setMaintenanceData(prev => ({ ...prev, repairedBy: value }))}>
+                      <SelectTrigger className={`w-full transition-all duration-200 focus:ring-2 focus:ring-blue-500 ${isMobile ? 'h-10 text-sm' : ''}`}>
+                        <SelectValue placeholder="Select technician" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {usersData?.data?.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.full_name} ({user.username})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className={isMobile ? 'text-sm font-medium' : ''}>Date Repaired</Label>
+                    <Popover open={dateRepairedOpen} onOpenChange={setDateRepairedOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal transition-all duration-200 focus:ring-2 focus:ring-blue-500",
+                            !dateRepaired && "text-muted-foreground",
+                            isMobile ? 'h-10 text-sm' : ''
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                          {dateRepaired ? (
+                            <span className="truncate">{format(dateRepaired, isMobile ? "MMM d, yyyy" : "PPP")}</span>
+                          ) : (
+                            <span className="truncate">Pick repair date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={dateRepaired}
+                          onSelect={(date) => {
+                            setDateRepaired(date);
+                            setDateRepairedOpen(false);
+                          }}
+                          initialFocus
+                          captionLayout="dropdown-buttons"
+                          fromYear={1990}
+                          toYear={2030}
+                          classNames={{
+                            caption_dropdowns: "flex gap-2 justify-center",
+                            vhidden: "hidden",
+                            caption_label: "hidden"
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
           
