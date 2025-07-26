@@ -52,7 +52,6 @@ export async function GET(
 
     return NextResponse.json(report);
   } catch (error) {
-    console.error('Error fetching equipment maintenance report:', error);
     return NextResponse.json(
       { error: 'Failed to fetch equipment maintenance report' },
       { status: 500 }
@@ -70,8 +69,6 @@ export async function PUT(
     const body = await request.json();
     
     // Debug: Log the incoming data
-    console.log("PUT /api/equipments/maintenance-reports/[id] - Received data:", body);
-    console.log("Update ID:", id);
     
     const {
       equipment_id,
@@ -119,7 +116,6 @@ export async function PUT(
       reported_by,
       repaired_by,
     };
-    console.log("Update data prepared:", updateData);
 
     const updatedReport = await prisma.maintenance_equipment_report.update({
       where: { id },
@@ -158,14 +154,6 @@ export async function PUT(
 
     return NextResponse.json(updatedReport);
   } catch (error) {
-    console.error('Error updating equipment maintenance report:', error);
-    console.error('Full error details:', {
-      message: error?.message,
-      code: error?.code,
-      meta: error?.meta,
-      stack: error?.stack
-    });
-    
     return NextResponse.json(
       { 
         error: 'Failed to update equipment maintenance report',
@@ -206,7 +194,6 @@ export async function DELETE(
       { status: 200 }
     );
   } catch (error) {
-    console.error('Error deleting equipment maintenance report:', error);
     return NextResponse.json(
       { error: 'Failed to delete equipment maintenance report' },
       { status: 500 }

@@ -14,9 +14,16 @@ export async function GET(
   try {
     const { uid } = await context.params
 
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(uid)) {
+      return NextResponse.json({ error: 'Invalid equipment ID format' }, { status: 400 })
+    }
+
     const equipment = await prisma.equipment.findUnique({
       where: { id: uid },
       include: {
+        user: true, // Include created_by user info
         project: {
           include: {
             client: {
@@ -40,6 +47,7 @@ export async function GET(
       model: equipment.model,
       type: equipment.type,
       insuranceExpirationDate: equipment.insurance_expiration_date?.toISOString() || "",
+      registrationExpiry: equipment.registration_expiry?.toISOString() || undefined,
       status: equipment.status,
       remarks: equipment.remarks || undefined,
       owner: equipment.owner,
@@ -71,7 +79,6 @@ export async function GET(
               // Try to parse as JSON (modern format)
               return JSON.parse(rawParts);
             } catch (error) {
-              console.warn('Failed to parse equipment_parts for equipment', equipment.id, ':', error);
               // If parsing fails but we have data, treat as legacy URL format
               if (equipment.equipment_parts.length > 0) {
                 return {
@@ -88,6 +95,8 @@ export async function GET(
           })()
         : undefined,
       before: equipment.before || undefined,
+      created_at: equipment.created_at?.toISOString() || undefined,
+      created_by: equipment.user?.full_name || undefined,
       project: {
         uid: equipment.project.id,
         name: equipment.project.name,
@@ -105,7 +114,6 @@ export async function GET(
     return NextResponse.json(transformedEquipment)
   } catch (err) {
     const { uid } = await context.params
-    console.error(`GET /api/equipments/${uid} error:`, err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -116,6 +124,12 @@ export async function DELETE(
 ) {
   try {
     const { uid } = await context.params
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(uid)) {
+      return NextResponse.json({ error: 'Invalid equipment ID format' }, { status: 400 })
+    }
 
     const equipment = await prisma.equipment.findUnique({
       where: { id: uid }
@@ -140,7 +154,6 @@ export async function DELETE(
     return NextResponse.json({ message: 'Deleted successfully' })
   } catch (err) {
     const { uid } = await context.params
-    console.error(`DELETE /api/equipments/${uid} error:`, err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -153,7 +166,11 @@ export async function PUT(
     const { uid } = await context.params
     const body = await request.json()
     
-    console.log('📝 PUT /api/equipments/' + uid + ' - received data:', body)
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(uid)) {
+      return NextResponse.json({ error: 'Invalid equipment ID format' }, { status: 400 })
+    }
 
     const existing = await prisma.equipment.findUnique({
       where: { id: uid },
@@ -188,14 +205,11 @@ export async function PUT(
     if (body.equipmentParts !== undefined) {
       // Convert parts structure to JSON string for storage in String[] field
       try {
-        console.log('🔧 Processing equipmentParts:', body.equipmentParts);
         const partsData = typeof body.equipmentParts === 'string' 
           ? body.equipmentParts 
           : JSON.stringify(body.equipmentParts);
-        console.log('🔧 Storing partsData as:', partsData);
         updateData.equipment_parts = [partsData]; // Store as array with single JSON string
       } catch (error) {
-        console.error('Failed to stringify equipmentParts:', error);
         updateData.equipment_parts = [JSON.stringify({ rootFiles: [], folders: [] })];
       }
     }
@@ -214,6 +228,10 @@ export async function PUT(
     if (body.insuranceExpirationDate) {
       updateData.insurance_expiration_date = new Date(body.insuranceExpirationDate)
     }
+    if (body.registrationExpiry) {
+      updateData.registration_expiry = new Date(body.registrationExpiry)
+    }
+    
     
     // Handle file URLs (for now just keep existing ones - file upload will be handled later)
     if (body.image_url !== undefined) updateData.image_url = body.image_url
@@ -222,7 +240,6 @@ export async function PUT(
     if (body.originalReceiptUrl !== undefined) updateData.original_receipt_url = body.originalReceiptUrl
     if (body.equipmentRegistrationUrl !== undefined) updateData.equipment_registration_url = body.equipmentRegistrationUrl
 
-    console.log('🔄 Updating equipment with data:', updateData)
 
     // Update the equipment
     const updatedEquipment = await prisma.equipment.update({
@@ -248,6 +265,7 @@ export async function PUT(
       model: updatedEquipment.model,
       type: updatedEquipment.type,
       insuranceExpirationDate: updatedEquipment.insurance_expiration_date?.toISOString() || "",
+      registrationExpiry: updatedEquipment.registration_expiry?.toISOString() || undefined,
       before: updatedEquipment.before || undefined,
       status: updatedEquipment.status,
       remarks: updatedEquipment.remarks || undefined,
@@ -262,7 +280,6 @@ export async function PUT(
       equipmentParts: updatedEquipment.equipment_parts && updatedEquipment.equipment_parts.length > 0 
         ? (() => {
             try {
-              console.log('🔧 Retrieved equipment_parts from DB:', updatedEquipment.equipment_parts);
               const rawParts = updatedEquipment.equipment_parts[0];
               
               // Check if it's a URL (legacy format)
@@ -276,16 +293,13 @@ export async function PUT(
                   })),
                   folders: []
                 };
-                console.log('🔧 Converted legacy equipmentParts:', legacyParts);
                 return legacyParts;
               }
               
               // Try to parse as JSON (modern format)
               const parsed = JSON.parse(rawParts);
-              console.log('🔧 Parsed equipmentParts:', parsed);
               return parsed;
             } catch (error) {
-              console.error('🔧 Failed to parse equipment_parts:', error, updatedEquipment.equipment_parts);
               // If parsing fails but we have data, treat as legacy URL format
               if (updatedEquipment.equipment_parts.length > 0) {
                 const fallbackParts = {
@@ -296,7 +310,6 @@ export async function PUT(
                   })),
                   folders: []
                 };
-                console.log('🔧 Fallback legacy equipmentParts:', fallbackParts);
                 return fallbackParts;
               }
               return { rootFiles: [], folders: [] };
@@ -317,11 +330,9 @@ export async function PUT(
       },
     }
 
-    console.log('✅ Equipment updated successfully:', transformedEquipment)
     return NextResponse.json(transformedEquipment)
   } catch (err) {
     const { uid } = await context.params
-    console.error(`PUT /api/equipments/${uid} error:`, err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -332,6 +343,13 @@ export async function PATCH(
 ) {
   try {
     const { uid } = await context.params
+    
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(uid)) {
+      return NextResponse.json({ error: 'Invalid equipment ID format' }, { status: 400 })
+    }
+    
     const formData = await request.formData()
     const brand = formData.get('brand') as string
     const model = formData.get('model') as string
@@ -400,7 +418,6 @@ export async function PATCH(
         })
 
       if (uploadError) {
-        console.error('Supabase upload error:', uploadError)
         return NextResponse.json({ error: 'Image upload failed' }, { status: 500 })
       }
 
@@ -421,7 +438,6 @@ export async function PATCH(
     return NextResponse.json(updated)
   } catch (err) {
     const { uid } = await context.params
-    console.error(`PATCH /api/equipments/${uid} error:`, err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

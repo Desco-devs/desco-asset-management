@@ -8,7 +8,7 @@ import {
 import { useEquipmentsStore, type EquipmentMaintenanceReport, selectIsEquipmentMaintenanceModalOpen } from "@/stores/equipmentsStore";
 import {
   Calendar,
-  ExternalLink,
+  ChevronRight,
   Loader2,
   MapPin,
   Plus,
@@ -89,13 +89,30 @@ export default function EquipmentMaintenanceReportsEnhanced({
             Add Report
           </Button>
         </div>
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="border rounded-lg p-4 animate-pulse">
-            <div className="h-4 bg-gray-200 rounded mb-2 w-3/4"></div>
-            <div className="h-3 bg-gray-200 rounded mb-1 w-1/2"></div>
-            <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-          </div>
-        ))}
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="border rounded-lg p-4 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="h-4 bg-gray-200 rounded flex-1 max-w-xs"></div>
+                    <div className="flex gap-1">
+                      <div className="h-5 w-16 bg-gray-200 rounded"></div>
+                      <div className="h-5 w-12 bg-gray-200 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="h-3 bg-gray-200 rounded w-20"></div>
+                    <div className="h-3 bg-gray-200 rounded w-24"></div>
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <div className="h-4 w-4 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -155,7 +172,7 @@ export default function EquipmentMaintenanceReportsEnhanced({
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="space-y-2">
             {equipmentReports.map((report) => (
               <div
                 key={report.id}
@@ -165,57 +182,51 @@ export default function EquipmentMaintenanceReportsEnhanced({
                   // Close equipment modal in mobile to prevent navigation conflicts
                   setIsModalOpen(false);
                 }}
-                className="border rounded-lg p-4 hover:shadow-md transition-all cursor-pointer bg-card hover:border-primary/50"
+                className="border rounded-lg p-4 hover:bg-muted/50 transition-all cursor-pointer group"
               >
-                {/* Header */}
-                <div className="mb-3">
-                  <h4 className="font-medium text-base mb-2 line-clamp-2">
-                    {report.issue_description}
-                  </h4>
-                  <div className="flex flex-wrap gap-1">
-                    <Badge className={getStatusColor(report.status)} variant="outline">
-                      {report.status || "REPORTED"}
-                    </Badge>
-                    <Badge className={getPriorityColor(report.priority)} variant="outline">
-                      {report.priority || "MEDIUM"}
-                    </Badge>
+                <div className="flex items-center justify-between">
+                  {/* Left side - Main info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-3 mb-2">
+                      <h4 className="font-medium text-sm flex-1 leading-tight">
+                        {report.issue_description}
+                      </h4>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Badge className={getStatusColor(report.status)} variant="outline">
+                          {report.status || "REPORTED"}
+                        </Badge>
+                        <Badge className={getPriorityColor(report.priority)} variant="outline">
+                          {report.priority || "MEDIUM"}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    {/* Secondary info */}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        <span>{formatDate(report.date_reported)}</span>
+                      </div>
+                      
+                      {report.reported_user && (
+                        <div className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          <span className="truncate max-w-[100px] sm:max-w-[120px]">{report.reported_user.full_name}</span>
+                        </div>
+                      )}
+
+                      {report.parts_replaced && report.parts_replaced.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Wrench className="h-3 w-3" />
+                          <span>{report.parts_replaced.length} part{report.parts_replaced.length !== 1 ? 's' : ''}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Quick Info */}
-                <div className="space-y-1 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    <span>{formatDate(report.date_reported)}</span>
-                  </div>
-                  
-                  {report.reported_user && (
-                    <div className="flex items-center gap-1">
-                      <User className="h-3 w-3" />
-                      <span>{report.reported_user.full_name}</span>
-                    </div>
-                  )}
-
-                  {report.location && (
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      <span className="truncate">{report.location.address}</span>
-                    </div>
-                  )}
-
-                  {report.parts_replaced && report.parts_replaced.length > 0 && (
-                    <div className="flex items-center gap-1">
-                      <Wrench className="h-3 w-3" />
-                      <span>{report.parts_replaced.length} part{report.parts_replaced.length !== 1 ? 's' : ''} replaced</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Action hint */}
-                <div className="mt-3 pt-2 border-t">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Click to view details</span>
-                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                  {/* Right side - Arrow indicator */}
+                  <div className="ml-4 flex-shrink-0">
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                   </div>
                 </div>
               </div>

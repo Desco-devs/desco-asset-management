@@ -83,12 +83,9 @@ export default function EditEquipmentMaintenanceReportDrawer() {
   // Populate form data when selectedReport changes
   useEffect(() => {
     if (selectedReport) {
-      console.log('🔍 Populating form with selectedReport:', selectedReport);
-      console.log('📍 Available locations:', locations);
       
       // Find the location to verify it exists
       const selectedLocation = locations.find(loc => loc.uid === selectedReport.location_id);
-      console.log('🔍 Selected location found:', selectedLocation);
       
       setFormData({
         issue_description: selectedReport.issue_description || "",
@@ -107,12 +104,6 @@ export default function EditEquipmentMaintenanceReportDrawer() {
           : [],
       });
       
-      console.log('📝 Form data populated:', {
-        location_id: selectedReport.location_id,
-        location_exists: !!selectedLocation,
-        parts_replaced: selectedReport.parts_replaced,
-        attachment_urls: selectedReport.attachment_urls
-      });
     }
   }, [selectedReport, locations]);
 
@@ -252,7 +243,6 @@ export default function EditEquipmentMaintenanceReportDrawer() {
             const uploadedUrl = await uploadFileToSupabase(file, `part_${i}`);
             uploadedUrls[i] = uploadedUrl;
           } catch (uploadError) {
-            console.error(`Error uploading part ${i + 1} image:`, uploadError);
             toast.error(`Failed to upload part ${i + 1} image`);
             return; // Stop if upload fails
           }
@@ -269,7 +259,6 @@ export default function EditEquipmentMaintenanceReportDrawer() {
             const attachmentIndex = partsFiles.length + i;
             uploadedUrls[attachmentIndex] = uploadedUrl;
           } catch (uploadError) {
-            console.error(`Error uploading attachment ${i + 1}:`, uploadError);
             toast.error(`Failed to upload attachment ${i + 1}`);
             return; // Stop if upload fails
           }
@@ -307,12 +296,10 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       };
 
       // Debug: Log the data being sent
-      console.log("Sending report data with uploaded URLs:", reportData);
 
       const updatedReport = await updateMaintenanceReportMutation.mutateAsync(reportData);
       handleSaveAndViewDetails(updatedReport);
     } catch (error) {
-      console.error("Error updating maintenance report:", error);
       toast.error("Failed to update maintenance report");
     }
   }, [formData, selectedReport, updateMaintenanceReportMutation, handleSaveAndViewDetails, partsFiles, attachmentFiles, uploadFileToSupabase]);

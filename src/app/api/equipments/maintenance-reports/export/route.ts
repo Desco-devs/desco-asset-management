@@ -108,7 +108,6 @@ export const GET = withResourcePermission('maintenance_reports', 'view', async (
     }
 
   } catch (error) {
-    console.error('Error exporting equipment maintenance reports:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

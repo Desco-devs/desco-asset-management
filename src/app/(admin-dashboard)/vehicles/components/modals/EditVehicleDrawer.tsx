@@ -272,9 +272,10 @@ function EditVehicleDrawer() {
           }
         } else if (rawParts && typeof rawParts === 'object') {
           // Already an object - ensure proper structure
+          const objectParts = rawParts as any;
           parsedParts = {
-            rootFiles: Array.isArray(rawParts.rootFiles) ? rawParts.rootFiles : [],
-            folders: Array.isArray(rawParts.folders) ? rawParts.folders : []
+            rootFiles: Array.isArray(objectParts.rootFiles) ? objectParts.rootFiles : [],
+            folders: Array.isArray(objectParts.folders) ? objectParts.folders : []
           };
         } else {
           parsedParts = { rootFiles: [], folders: [] };

@@ -53,7 +53,10 @@
       "Bash(head:*)",
       "Bash(true)",
       "Bash(node:*)",
-      "Bash(npx prisma db execute:*)"
+      "Bash(npx prisma db execute:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm test:*)",
+      "Bash(npx prisma:*)"
     ],
     "deny": []
   }

@@ -38,7 +38,7 @@ export interface DetailedData {
 export interface ActivityItem {
   id: string;
   type: 'equipment' | 'vehicle' | 'project' | 'client' | 'maintenance' | 'location';
-  action: 'created' | 'updated' | 'reported' | 'deleted';
+  action: 'created' | 'updated' | 'reported' | 'deleted' | 'repaired' | 'breakdown' | 'started' | 'completed';
   title?: string;
   description: string;
   timestamp: string;
@@ -53,6 +53,7 @@ export interface LocationData {
   name?: string;
   address: string;
   created_at: Date;
+  created_by?: string;
   clients?: { id: string; name: string }[];
   user?: { full_name: string } | null;
 }
@@ -62,6 +63,7 @@ export interface ClientData {
   id: string;
   name: string;
   created_at: Date;
+  created_by?: string;
   location?: { id: string; address: string; created_at: Date };
   projects?: { id: string }[];
 }
@@ -70,6 +72,7 @@ export interface ProjectData {
   id: string;
   name: string;
   created_at: Date;
+  created_by?: string;
   client?: {
     name: string;
     location?: { address: string };

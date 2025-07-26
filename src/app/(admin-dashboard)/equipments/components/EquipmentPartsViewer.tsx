@@ -44,9 +44,6 @@ interface ParsedPartData {
 }
 
 export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentPartsViewerProps) {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [selectedImageName, setSelectedImageName] = useState<string>("");
-  
   // Collapsible states - same as PartsFolderManager
   const [isRootCollapsed, setIsRootCollapsed] = useState(false);
   const [isFoldersCollapsed, setIsFoldersCollapsed] = useState(false);
@@ -56,6 +53,21 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
   const parsePartsData = (parts: string[] | { rootFiles: any[]; folders: any[] } | string | undefined): ParsedPartData => {
     if (!parts) {
       return { rootFiles: [], folders: [] };
+    }
+
+    // Handle database format: array with JSON string
+    if (Array.isArray(parts) && parts.length > 0 && typeof parts[0] === 'string') {
+      try {
+        const parsed = JSON.parse(parts[0]);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            rootFiles: Array.isArray(parsed.rootFiles) ? parsed.rootFiles : [],
+            folders: Array.isArray(parsed.folders) ? parsed.folders : []
+          };
+        }
+      } catch {
+        // If JSON parse fails, fall through to legacy handling
+      }
     }
 
     // Handle string (JSON) format
@@ -174,17 +186,18 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
   };
 
   const parsedData = parsePartsData(equipmentParts);
-  
-  // Debug logging to see what we're receiving (can be removed in production)
-  console.log('🔍 EquipmentPartsViewer received equipmentParts:', equipmentParts);
-  console.log('🔍 Parsed data:', parsedData);
+
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [viewerImageUrl, setViewerImageUrl] = useState<string>('');
+  const [viewerImageName, setViewerImageName] = useState<string>('');
 
   const handleImageClick = (url: string, name: string) => {
-    setSelectedImage(url);
-    setSelectedImageName(name);
+    setViewerImageUrl(url);
+    setViewerImageName(name);
+    setShowImageViewer(true);
   };
 
-  // Helper function to toggle individual folder collapse - same as PartsFolderManager
+  // Helper function to toggle individual folder collapse - EXACT COPY from PartsFolderManager
   const toggleFolderCollapse = (folderId: string) => {
     setCollapsedFolders(prev => {
       const newSet = new Set(prev);
@@ -197,10 +210,16 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
     });
   };
 
-  // File preview component - same as PartsFolderManager but read-only
+  // File preview component - enhanced for better preview functionality
   const FilePreview = ({ file }: { file: ParsedFile }) => {
-    const isImage = file.type === 'image';
     const fileUrl = file.preview || file.url;
+    
+    // Better image detection - check file extension and MIME type
+    const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
+    const isImageByExtension = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
+    const isImageByUrl = fileUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+    const isImageByType = file.type === 'image';
+    const isImage = isImageByExtension || isImageByUrl || isImageByType;
     
     // For stored files, try to get file size from name or estimate
     const getFileDisplayInfo = (file: ParsedFile) => {
@@ -210,13 +229,19 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
       }
       
       // If it's an existing stored file, show appropriate label
-      return file.preview || file.url ? 'Stored file' : isImage ? 'Image file' : 'Document';
+      return fileUrl ? 'Stored file' : isImage ? 'Image file' : 'Document';
+    };
+
+    const handleClick = () => {
+      if (fileUrl && (isImage || fileUrl)) {
+        handleImageClick(fileUrl, file.name);
+      }
     };
     
     return (
       <div 
         className="relative group border rounded-lg p-2 bg-card hover:bg-muted/50 transition-colors cursor-pointer"
-        onClick={() => handleImageClick(fileUrl, file.name)}
+        onClick={handleClick}
       >
         <div className="flex items-center gap-2">
           {isImage && fileUrl ? (
@@ -231,11 +256,11 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
                   target.style.display = 'none';
                   const parentDiv = target.parentElement;
                   if (parentDiv) {
-                    parentDiv.innerHTML = `<div class="w-10 h-10 flex items-center justify-center border rounded bg-muted"><svg class="h-6 w-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>`;
+                    parentDiv.innerHTML = `<div class="w-10 h-10 flex items-center justify-center border rounded bg-muted"><svg class="h-6 w-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>`;
                   }
                 }}
               />
-              <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
+              <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-100 transition-opacity bg-black/40 rounded">
                 <Eye className="h-3 w-3 text-white" />
               </div>
             </div>
@@ -252,8 +277,8 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
               {getFileDisplayInfo(file)}
             </p>
           </div>
-          {/* Click to view indicator */}
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Click to view indicator - always visible for better UX */}
+          <div className="opacity-60 group-hover:opacity-100 transition-opacity">
             <Eye className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>
@@ -261,7 +286,7 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
     );
   };
 
-  // Folder component - same as PartsFolderManager but read-only
+  // Folder component - EXACT COPY from PartsFolderManager structure
   const FolderComponent = ({ folder }: { folder: ParsedFolder }) => {
     const isCollapsed = collapsedFolders.has(folder.id);
     
@@ -285,29 +310,36 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
           </CardTitle>
         </CardHeader>
         {!isCollapsed && (
-          <CardContent>
-            <div className="space-y-2">
-              {folder.files.length === 0 ? (
-                <div className="text-center py-4 border-2 border-dashed border-gray-200 rounded-lg">
-                  <Folder className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm text-muted-foreground">No files in this folder</p>
-                  <p className="text-xs text-muted-foreground mt-1">This folder is empty</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {folder.files.map((file) => (
-                    <FilePreview key={file.id} file={file} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </CardContent>
+        <CardContent>
+          <div className="space-y-2">
+            {folder.files.length === 0 ? (
+              <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg bg-muted/20">
+                <Folder className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">"{folder.name}" is empty</p>
+                <p className="text-xs text-muted-foreground mt-1">This folder exists but contains no files yet</p>
+                <p className="text-xs text-muted-foreground/80 mt-2">
+                  Files can be added to this folder using the edit mode
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {folder.files.map((file) => (
+                  <FilePreview key={file.id} file={file} />
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
         )}
       </Card>
     );
   };
 
-  if (parsedData.rootFiles.length === 0 && parsedData.folders.length === 0) {
+  // Check if we have any structure to display (including empty folders)
+  // Show the component if there are any folders (even empty) or any root files
+  const hasAnyStructure = parsedData.folders.length > 0 || parsedData.rootFiles.length > 0;
+  
+  if (!hasAnyStructure) {
     return (
       <Card>
         <CardHeader className="pb-3">
@@ -323,6 +355,7 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
           <div className="text-center">
             <Folder className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
             <p className="text-muted-foreground">No parts data available for this equipment</p>
+            <p className="text-xs text-muted-foreground mt-2">Parts can be added using the edit mode</p>
           </div>
         </CardContent>
       </Card>
@@ -332,7 +365,7 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
   return (
     <>
       <div className="space-y-6">
-        {/* Root Files Section - same as PartsFolderManager */}
+        {/* Root Files Section - Always show when any structure exists */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle 
@@ -354,9 +387,10 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
             <CardContent>
               <div className="space-y-4">
                 {parsedData.rootFiles.length === 0 ? (
-                  <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
-                    <ImageIcon className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-muted-foreground">No files in root folder</p>
+                  <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg bg-muted/20">
+                    <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
+                    <p className="text-sm font-medium text-muted-foreground">Root folder is empty</p>
+                    <p className="text-xs text-muted-foreground mt-1">Files can be added to the root folder using edit mode</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -370,7 +404,7 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
           )}
         </Card>
 
-        {/* Folders Section - same as PartsFolderManager */}
+        {/* Folders Section - Always show if folders exist, even if empty */}
         {parsedData.folders.length > 0 && (
           <div className="space-y-4">
             <div 
@@ -385,7 +419,7 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
               )}
             </div>
             {!isFoldersCollapsed && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                 {parsedData.folders.map((folder) => (
                   <FolderComponent key={folder.id} folder={folder} />
                 ))}
@@ -395,32 +429,21 @@ export default function EquipmentPartsViewer({ equipmentParts = [] }: EquipmentP
         )}
       </div>
 
-      {/* Image Viewer Modal - Same responsive sizing as FileUploadSectionSimple */}
-      {selectedImage && (
-        <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-          <DialogContent 
-            className="!max-w-none p-4 
-              w-[95vw] max-h-[90vh] sm:w-[80vw] sm:max-h-[75vh] lg:w-[60vw] lg:max-h-[65vh] xl:w-[40vw] xl:max-h-[60vh]" 
-            style={{ 
-              maxWidth: 'min(95vw, 800px)', 
-              width: 'min(95vw, 800px)'
-            }}
-          >
+      {/* Image Viewer Modal - EXACT COPY from PartsFolderManager */}
+      {showImageViewer && (
+        <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
             <DialogHeader className="pb-4">
               <DialogTitle className="text-center">
-                {selectedImageName}
+                {viewerImageName}
               </DialogTitle>
             </DialogHeader>
             <div className="flex items-center justify-center">
               <img
-                src={selectedImage}
-                alt={selectedImageName}
-                className="max-w-full max-h-[80vh] sm:max-h-[65vh] lg:max-h-[55vh] xl:max-h-[45vh] object-contain"
+                src={viewerImageUrl}
+                alt={viewerImageName}
+                className="max-w-full max-h-[70vh] object-contain"
                 onClick={(e) => e.stopPropagation()}
-                onError={(e) => {
-                }}
-                onLoad={() => {
-                }}
               />
             </div>
           </DialogContent>

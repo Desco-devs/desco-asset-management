@@ -213,7 +213,6 @@ export default function EditEquipmentMaintenanceReportModal() {
       toast.success("Equipment maintenance report updated successfully");
       handleClose();
     } catch (error) {
-      console.error("Error updating maintenance report:", error);
       toast.error("Failed to update maintenance report");
     }
   }, [formData, selectedReport, updateMaintenanceReportMutation, handleClose, partsFiles, attachmentFiles]);

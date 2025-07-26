@@ -229,7 +229,6 @@ export default function CreateEquipmentMaintenanceReportModal({
       toast.success("Maintenance report created successfully");
       handleClose();
     } catch (error) {
-      console.error("Error creating maintenance report:", error);
       toast.error("Failed to create maintenance report");
     }
   }, [formData, equipmentId, createMaintenanceReportMutation, handleClose, partsFiles, attachmentFiles]);

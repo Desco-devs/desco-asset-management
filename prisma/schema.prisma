@@ -185,6 +185,7 @@ model equipment {
   model                       String
   type                        String
   insurance_expiration_date   DateTime?                      @default(now())
+  registration_expiry         DateTime?
   before                      Int?
   status                      status
   remarks                     String?
@@ -212,6 +213,7 @@ model equipment {
   @@index([brand])
   @@index([inspection_date])
   @@index([insurance_expiration_date])
+  @@index([registration_expiry])
   @@index([created_at])
   @@map("equipment")
 }

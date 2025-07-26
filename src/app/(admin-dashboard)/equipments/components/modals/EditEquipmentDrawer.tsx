@@ -87,8 +87,14 @@ function EditEquipmentDrawer() {
   const { projects, equipments } = useEquipmentsWithReferenceData();
   
   // Client state from Zustand
-  const selectedEquipment = useEquipmentsStore(selectSelectedEquipment);
+  const selectedEquipmentFromStore = useEquipmentsStore(selectSelectedEquipment);
   const isMobile = useEquipmentsStore(selectIsMobile);
+  
+  // CRITICAL FIX: Always use fresh server data to ensure synchronization
+  // This ensures edit form always shows the latest data, same as view modal
+  const selectedEquipment = selectedEquipmentFromStore
+    ? equipments.find((e) => e.uid === selectedEquipmentFromStore.uid) || selectedEquipmentFromStore
+    : null;
   
   // Actions
   const {
@@ -133,6 +139,21 @@ function EditEquipmentDrawer() {
     insuranceExpirationDate: undefined as Date | undefined,
     remarks: ''
   });
+
+  // State to track original data for dirty field detection
+  const [originalData, setOriginalData] = useState({
+    brand: '',
+    model: '',
+    plateNumber: '',
+    owner: '',
+    type: '',
+    projectId: '',
+    status: 'OPERATIONAL' as 'OPERATIONAL' | 'NON_OPERATIONAL',
+    before: '6',
+    inspectionDate: new Date(),
+    insuranceExpirationDate: undefined as Date | undefined,
+    remarks: ''
+  });
   
   // File state for images and documents
   const [files, setFiles] = useState({
@@ -158,7 +179,8 @@ function EditEquipmentDrawer() {
     equipmentRegistration: false,
   });
 
-  // Initialize form data when selectedEquipment changes
+  // CRITICAL FIX: Initialize form data when selectedEquipment changes 
+  // This ensures edit form always shows the latest data from server
   useEffect(() => {
     if (selectedEquipment) {
       
@@ -177,55 +199,74 @@ function EditEquipmentDrawer() {
       };
       
       setFormData(newFormData);
+      setOriginalData(newFormData); // Track original values for dirty detection
 
-      // Initialize parts structure - handle legacy format properly like EquipmentPartsViewer
+      // Initialize parts structure - CRITICAL FIX: Handle database format properly (array with JSON string)
       try {
         const rawParts = selectedEquipment.equipmentParts;
         let parsedParts: PartsStructure;
         
+        
         if (!rawParts) {
           parsedParts = { rootFiles: [], folders: [] };
-        } else if (typeof rawParts === 'string') {
+        } else if (Array.isArray(rawParts) && rawParts.length > 0 && typeof rawParts[0] === 'string') {
+          // CRITICAL FIX: Handle database format - array with JSON string (most common case)
           try {
-            const parsed = JSON.parse(rawParts);
-            if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
-              // Modern format - ensure proper structure
+            const parsed = JSON.parse(rawParts[0]);
+            
+            if (parsed && typeof parsed === 'object' && (parsed.rootFiles !== undefined || parsed.folders !== undefined)) {
+              // Modern format - ensure proper structure with empty folder support
               parsedParts = {
                 rootFiles: Array.isArray(parsed.rootFiles) ? parsed.rootFiles.map((file: any, index: number) => {
-                  // If the file has a preview URL (from existing data), use it
-                  if (file.preview && typeof file.preview === 'string') {
-                    const fileName = file.name || file.preview.split('/').pop() || `image_${index}`;
-                    const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-                    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
-                    const mimeType = isImage ? `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}` : 'application/octet-stream';
-                    
+                  // CRITICAL FIX: Don't create new File objects for existing stored files
+                  if (file.url || file.preview) {
                     return {
                       id: file.id || `existing_${index}`,
-                      name: fileName,
-                      file: new File([''], fileName, { type: mimeType }),
-                      preview: file.preview // Keep existing preview URL
+                      name: file.name || (file.url || file.preview).split('/').pop() || `file_${index}`,
+                      url: file.url,
+                      preview: file.preview,
+                      type: file.type || 'document' // Keep original type
                     };
                   }
                   return file;
                 }) : [],
+                folders: Array.isArray(parsed.folders) ? parsed.folders.map((folder: any) => {
+                  return {
+                    id: folder.id || `folder_${Date.now()}`,
+                    name: folder.name,
+                    files: Array.isArray(folder.files) ? folder.files.map((file: any, index: number) => {
+                      // CRITICAL FIX: Don't create new File objects for existing stored files
+                      if (file.url || file.preview) {
+                        return {
+                          id: file.id || `existing_${index}`,
+                          name: file.name || (file.url || file.preview).split('/').pop() || `file_${index}`,
+                          url: file.url,
+                          preview: file.preview,
+                          type: file.type || 'document' // Keep original type
+                        };
+                      }
+                      return file;
+                    }) : [],
+                    created_at: folder.created_at ? new Date(folder.created_at) : new Date()
+                  };
+                }) : []
+              };
+            } else {
+              parsedParts = { rootFiles: [], folders: [] };
+            }
+          } catch (parseError) {
+            parsedParts = { rootFiles: [], folders: [] };
+          }
+        } else if (typeof rawParts === 'string') {
+          // Handle direct JSON string
+          try {
+            const parsed = JSON.parse(rawParts);
+            if (parsed && typeof parsed === 'object' && (parsed.rootFiles !== undefined || parsed.folders !== undefined)) {
+              parsedParts = {
+                rootFiles: Array.isArray(parsed.rootFiles) ? parsed.rootFiles : [],
                 folders: Array.isArray(parsed.folders) ? parsed.folders.map((folder: any) => ({
                   ...folder,
-                  files: Array.isArray(folder.files) ? folder.files.map((file: any, index: number) => {
-                    if (file.preview && typeof file.preview === 'string') {
-                      const fileName = file.name || file.preview.split('/').pop() || `image_${index}`;
-                      const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-                      const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
-                      const mimeType = isImage ? `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}` : 'application/octet-stream';
-                      
-                      return {
-                        id: file.id || `existing_${index}`,
-                        name: fileName,
-                        file: new File([''], fileName, { type: mimeType }),
-                        preview: file.preview
-                      };
-                    }
-                    return file;
-                  }) : []
+                  created_at: folder.created_at ? new Date(folder.created_at) : new Date()
                 })) : []
               };
             } else {
@@ -234,7 +275,7 @@ function EditEquipmentDrawer() {
           } catch {
             parsedParts = { rootFiles: [], folders: [] };
           }
-        } else if (Array.isArray(rawParts)) {
+        } else if (Array.isArray(rawParts) && rawParts.length > 0 && typeof rawParts[0] !== 'string') {
           // Legacy format: array of URLs - convert to root files
           parsedParts = {
             rootFiles: rawParts.map((url, index) => {
@@ -252,19 +293,13 @@ function EditEquipmentDrawer() {
             }),
             folders: []
           };
-        } else if (rawParts && typeof rawParts === 'object') {
-          // Already an object - ensure proper structure
-          parsedParts = {
-            rootFiles: Array.isArray(rawParts.rootFiles) ? rawParts.rootFiles : [],
-            folders: Array.isArray(rawParts.folders) ? rawParts.folders : []
-          };
         } else {
+          // Fallback for any other case
           parsedParts = { rootFiles: [], folders: [] };
         }
         
         setPartsStructure(parsedParts);
       } catch (error) {
-        console.error('Failed to parse equipment parts:', error);
         setPartsStructure({ rootFiles: [], folders: [] });
       }
 
@@ -289,7 +324,7 @@ function EditEquipmentDrawer() {
       // Reset tab to details when switching equipment
       setActiveTab('details');
     }
-  }, [selectedEquipment?.uid]); // Only depend on the UID to prevent excessive re-runs
+  }, [selectedEquipment]); // CRITICAL FIX: Depend on full object to catch data changes
 
   // Focus restoration effect - restore focus after re-renders
   useEffect(() => {
@@ -391,6 +426,7 @@ function EditEquipmentDrawer() {
     setInsuranceDateOpen(false);
   }, []);
   
+  
   // Stable tab handlers
   const handleDetailsTabClick = useCallback(() => setActiveTab('details'), []);
   const handleImagesTabClick = useCallback(() => setActiveTab('images'), []);
@@ -400,14 +436,16 @@ function EditEquipmentDrawer() {
   // Stable counting functions using useCallback to prevent re-renders
   const getImagesCount = useCallback(() => {
     let count = 0;
+    // Count existing images that aren't removed
     if (selectedEquipment?.image_url && !removedFiles.equipmentImage) count++;
     if (selectedEquipment?.thirdpartyInspectionImage && !removedFiles.thirdpartyInspection) count++;
     if (selectedEquipment?.pgpcInspectionImage && !removedFiles.pgpcInspection) count++;
+    // Count new files
     if (files.equipmentImage) count++;
     if (files.thirdpartyInspection) count++;
     if (files.pgpcInspection) count++;
     return count;
-  }, [selectedEquipment?.image_url, selectedEquipment?.thirdpartyInspectionImage, selectedEquipment?.pgpcInspectionImage, removedFiles.equipmentImage, removedFiles.thirdpartyInspection, removedFiles.pgpcInspection, files.equipmentImage, files.thirdpartyInspection, files.pgpcInspection]);
+  }, [selectedEquipment?.image_url, selectedEquipment?.thirdpartyInspectionImage, selectedEquipment?.pgpcInspectionImage, removedFiles, files]);
 
   const getDocumentsCount = useCallback(() => {
     let count = 0;
@@ -416,11 +454,15 @@ function EditEquipmentDrawer() {
     if (files.originalReceipt) count++;
     if (files.equipmentRegistration) count++;
     return count;
-  }, [selectedEquipment?.originalReceiptUrl, selectedEquipment?.equipmentRegistrationUrl, removedFiles.originalReceipt, removedFiles.equipmentRegistration, files.originalReceipt, files.equipmentRegistration]);
+  }, [selectedEquipment?.originalReceiptUrl, selectedEquipment?.equipmentRegistrationUrl, removedFiles, files]);
 
   const getEquipmentPartsCount = useCallback(() => {
-    const rootCount = partsStructure.rootFiles?.length || 0;
-    const folderCount = partsStructure.folders?.reduce((acc, folder) => acc + (folder.files?.length || 0), 0) || 0;
+    // Only count actual files, not empty folders/structures
+    const rootCount = partsStructure.rootFiles?.filter(file => file.file || file.url || file.preview).length || 0;
+    const folderCount = partsStructure.folders?.reduce((acc, folder) => {
+      const folderFileCount = folder.files?.filter(file => file.file || file.url || file.preview).length || 0;
+      return acc + folderFileCount;
+    }, 0) || 0;
     return rootCount + folderCount;
   }, [partsStructure.rootFiles, partsStructure.folders]);
 
@@ -473,13 +515,6 @@ function EditEquipmentDrawer() {
     const formDataFromForm = new FormData(e.currentTarget);
     
     // Client-side validation before submission
-    console.log("Client-side validation:", {
-      brand: formData.brand || 'MISSING',
-      model: formData.model || 'MISSING',
-      type: formData.type || 'MISSING',
-      owner: formData.owner || 'MISSING',
-      projectId: formData.projectId || 'MISSING'
-    });
 
     if (!formData.brand?.trim()) {
       toast.error("Please enter equipment brand");
@@ -512,6 +547,13 @@ function EditEquipmentDrawer() {
       }
     });
 
+    // CRITICAL FIX: Add removed files information so server knows which images to delete
+    Object.entries(removedFiles).forEach(([key, isRemoved]) => {
+      if (isRemoved) {
+        formDataFromForm.append(`remove_${key}`, 'true');
+      }
+    });
+
     // Add parts structure data
     formDataFromForm.append('partsStructure', JSON.stringify(partsStructure));
     
@@ -533,24 +575,132 @@ function EditEquipmentDrawer() {
       });
     });
     
-    // Add all form field values to formData
-    formDataFromForm.append('brand', formData.brand);
-    formDataFromForm.append('model', formData.model);
-    formDataFromForm.append('plateNumber', formData.plateNumber);
-    formDataFromForm.append('owner', formData.owner);
-    formDataFromForm.append('remarks', formData.remarks);
-    formDataFromForm.append('type', formData.type);
-    formDataFromForm.append('projectId', formData.projectId);
-    formDataFromForm.append('status', formData.status);
-    formDataFromForm.append('before', formData.before);
+    // 🚀 PERFORMANCE OPTIMIZATION: True partial updates - only send changed fields
+    const changedFields: string[] = [];
     
-    // Add date values to formData
-    if (formData.inspectionDate) {
-      formDataFromForm.append('inspectionDate', format(formData.inspectionDate, 'yyyy-MM-dd'));
+    // Only send fields that actually changed - much better performance
+    if (formData.brand !== originalData.brand) {
+      formDataFromForm.append('brand', formData.brand);
+      changedFields.push('brand');
     }
-    if (formData.insuranceExpirationDate) {
-      formDataFromForm.append('insuranceExpirationDate', format(formData.insuranceExpirationDate, 'yyyy-MM-dd'));
+    if (formData.model !== originalData.model) {
+      formDataFromForm.append('model', formData.model);
+      changedFields.push('model');
     }
+    if (formData.plateNumber !== originalData.plateNumber) {
+      formDataFromForm.append('plateNumber', formData.plateNumber);
+      changedFields.push('plateNumber');
+    }
+    if (formData.owner !== originalData.owner) {
+      formDataFromForm.append('owner', formData.owner);
+      changedFields.push('owner');
+    }
+    if (formData.remarks !== originalData.remarks) {
+      formDataFromForm.append('remarks', formData.remarks);
+      changedFields.push('remarks');
+    }
+    if (formData.type !== originalData.type) {
+      formDataFromForm.append('type', formData.type);
+      changedFields.push('type');
+    }
+    if (formData.projectId !== originalData.projectId) {
+      formDataFromForm.append('projectId', formData.projectId);
+      changedFields.push('projectId');
+    }
+    if (formData.status !== originalData.status) {
+      formDataFromForm.append('status', formData.status);
+      changedFields.push('status');
+    }
+    if (formData.before !== originalData.before) {
+      formDataFromForm.append('before', formData.before);
+      changedFields.push('before');
+    }
+    
+    // Date comparisons (convert to strings for comparison)
+    const currentInspectionDate = formData.inspectionDate ? format(formData.inspectionDate, 'yyyy-MM-dd') : '';
+    const originalInspectionDate = originalData.inspectionDate ? format(originalData.inspectionDate, 'yyyy-MM-dd') : '';
+    if (currentInspectionDate !== originalInspectionDate) {
+      if (formData.inspectionDate) {
+        formDataFromForm.append('inspectionDate', currentInspectionDate);
+        changedFields.push('inspectionDate');
+      }
+    }
+    
+    const currentInsuranceDate = formData.insuranceExpirationDate ? format(formData.insuranceExpirationDate, 'yyyy-MM-dd') : '';
+    const originalInsuranceDate = originalData.insuranceExpirationDate ? format(originalData.insuranceExpirationDate, 'yyyy-MM-dd') : '';
+    if (currentInsuranceDate !== originalInsuranceDate) {
+      if (formData.insuranceExpirationDate) {
+        formDataFromForm.append('insuranceExpirationDate', currentInsuranceDate);
+        changedFields.push('insuranceExpirationDate');
+      }
+    }
+    
+    
+    // Check if we have any changes (files, removed files, parts, or field changes)
+    const hasFileChanges = Object.values(files).some(file => file !== null);
+    const hasRemovedFiles = Object.values(removedFiles).some(removed => removed);
+    const hasPartsChanges = partsStructure.rootFiles.some(f => f.file?.size && f.file.size > 0) || 
+                           partsStructure.folders.some(folder => folder.files.some(f => f.file?.size && f.file.size > 0));
+    
+    // CRITICAL FIX: Check for structural changes in parts (folders, file deletions)
+    const hasPartsStructureChanges = (() => {
+      try {
+        // Get original parts structure for comparison
+        const originalParts = selectedEquipment.equipmentParts;
+        let originalStructure = { rootFiles: [], folders: [] };
+        
+        if (originalParts) {
+          if (Array.isArray(originalParts) && originalParts.length > 0) {
+            originalStructure = JSON.parse(originalParts[0]);
+          } else if (typeof originalParts === 'string') {
+            originalStructure = JSON.parse(originalParts);
+          } else {
+            originalStructure = { rootFiles: [], folders: [] };
+          }
+        }
+        
+        // Compare folder structures (including empty folders)
+        const originalFolderNames = originalStructure.folders?.map((f: any) => f.name).sort() || [];
+        const currentFolderNames = partsStructure.folders?.map(f => f.name).sort() || [];
+        
+        const folderStructureChanged = JSON.stringify(originalFolderNames) !== JSON.stringify(currentFolderNames);
+        
+        // CRITICAL FIX: Check for file deletions within existing structure
+        const hasFileDeleteions = (() => {
+          // Count original files (both root and in folders)
+          const originalRootFileCount = originalStructure.rootFiles?.length || 0;
+          const originalFolderFileCount = originalStructure.folders?.reduce((total: number, folder: any) => {
+            return total + (folder.files?.length || 0);
+          }, 0) || 0;
+          const originalTotalFiles = originalRootFileCount + originalFolderFileCount;
+          
+          // Count current stored files (exclude new uploads with file.file)
+          const currentRootFileCount = partsStructure.rootFiles.filter(f => f.url || f.preview).length;
+          const currentFolderFileCount = partsStructure.folders.reduce((total, folder) => {
+            return total + folder.files.filter(f => f.url || f.preview).length;
+          }, 0);
+          const currentTotalFiles = currentRootFileCount + currentFolderFileCount;
+          
+          const filesDeleted = currentTotalFiles < originalTotalFiles;
+          
+          
+          return filesDeleted;
+        })();
+        
+        const structureChanged = folderStructureChanged || hasFileDeleteions;
+        
+        
+        return structureChanged;
+      } catch (error) {
+        return false;
+      }
+    })();
+    
+    if (changedFields.length === 0 && !hasFileChanges && !hasRemovedFiles && !hasPartsChanges && !hasPartsStructureChanges) {
+      toast.info("No changes detected");
+      return;
+    }
+    
     
     // Use fast mutation with optimistic updates
     updateEquipmentMutation.mutate(formDataFromForm, {
@@ -558,42 +708,12 @@ function EditEquipmentDrawer() {
         // Show success toast
         toast.success(`Equipment "${formData.brand} ${formData.model}" updated successfully!`);
         
-        // CRITICAL FIX: Update the selected equipment in Zustand store with fresh data
-        // This ensures that when user reopens edit mode, they see the updated data
-        if (result?.equipment && selectedEquipment) {
-          // Transform the result to match our Equipment interface
-          const updatedEquipment: Equipment = {
-            uid: result.equipment.id || selectedEquipment.uid,
-            brand: result.equipment.brand || selectedEquipment.brand,
-            model: result.equipment.model || selectedEquipment.model,
-            type: result.equipment.type || selectedEquipment.type,
-            insuranceExpirationDate: result.equipment.insurance_expiration_date || selectedEquipment.insuranceExpirationDate,
-            before: result.equipment.before?.toString() || selectedEquipment.before,
-            status: result.equipment.status || selectedEquipment.status,
-            remarks: result.equipment.remarks || selectedEquipment.remarks,
-            owner: result.equipment.owner || selectedEquipment.owner,
-            image_url: result.equipment.image_url || selectedEquipment.image_url,
-            inspectionDate: result.equipment.inspection_date || selectedEquipment.inspectionDate,
-            plateNumber: result.equipment.plate_number || selectedEquipment.plateNumber,
-            originalReceiptUrl: result.equipment.original_receipt_url || selectedEquipment.originalReceiptUrl,
-            equipmentRegistrationUrl: result.equipment.equipment_registration_url || selectedEquipment.equipmentRegistrationUrl,
-            thirdpartyInspectionImage: result.equipment.thirdparty_inspection_image || selectedEquipment.thirdpartyInspectionImage,
-            pgpcInspectionImage: result.equipment.pgpc_inspection_image || selectedEquipment.pgpcInspectionImage,
-            equipmentParts: result.equipment.equipment_parts || selectedEquipment.equipmentParts,
-            project: result.equipment.project || selectedEquipment.project,
-          };
-          
-          // Update the selected equipment in Zustand store
-          setSelectedEquipment(updatedEquipment);
-        }
-        
-        // Return to view mode
+        // Return to view mode immediately - show loading skeleton while data refreshes
         setIsEditMode(false);
         setIsModalOpen(true);
       },
       onError: (error) => {
         // Error toast is already handled by the mutation hook
-        console.error("Equipment update failed:", error);
       }
     });
   };
@@ -706,8 +826,8 @@ function EditEquipmentDrawer() {
         )}
       </div>
 
-      {/* Tab Content Container with Scroll */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      {/* Tab Content Container with Scroll - Enhanced for parts tab footer visibility */}
+      <div className={`flex-1 overflow-y-auto min-h-0 ${activeTab === 'parts' ? 'pb-24' : 'pb-4'}`}>
         
         {/* Details Tab */}
         {activeTab === 'details' && (
@@ -955,6 +1075,7 @@ function EditEquipmentDrawer() {
                   </div>
                 </div>
               </div>
+              
 
               {/* Additional Notes */}
               <div className="space-y-2">
@@ -1116,9 +1237,9 @@ function EditEquipmentDrawer() {
         </div>
       )}
 
-      {/* Parts Tab - EXACTLY like CreateEquipmentForm */}
+      {/* Parts Tab - Enhanced for footer visibility */}
       {activeTab === 'parts' && (
-        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
+        <div className={`space-y-4 ${isMobile ? 'pb-8' : 'border-t pt-4 pb-8'}`}>
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
@@ -1129,12 +1250,20 @@ function EditEquipmentDrawer() {
                 Upload and organize equipment parts documentation in folders. This helps with maintenance planning and parts ordering.
               </p>
             </CardHeader>
-            <CardContent>
-              <PartsFolderManager 
-                key={selectedEquipment?.uid || 'new'} // Force re-mount when equipment changes
-                onChange={setPartsStructure}
-                initialData={partsStructure}
-              />
+            <CardContent className="space-y-4">
+              {/* 🔧 FOOTER VISIBILITY FIX: Constrained container to prevent buttons from being pushed out of view */}
+              <div className={`${isMobile ? 'max-h-[45vh]' : 'max-h-[50vh]'} overflow-y-auto border rounded-lg p-4 bg-muted/20`}>
+                <PartsFolderManager 
+                  key={selectedEquipment?.uid || 'new'} // Force re-mount when equipment changes
+                  onChange={setPartsStructure}
+                  initialData={partsStructure}
+                />
+              </div>
+              
+              {/* Footer visibility helper - shows when content might be cut off */}
+              <div className="text-xs text-muted-foreground text-center py-2 border-t">
+                📁 Scroll within the parts area above to view all folders and files
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1214,7 +1343,7 @@ function EditEquipmentDrawer() {
               </div>
             </DrawerHeader>
             
-            {/* Mobile Content - Scrollable container with proper constraints */}
+            {/* Mobile Content - Enhanced scrollable container with footer visibility */}
             <div className="flex-1 overflow-y-auto min-h-0 overscroll-contain">
               <div className="p-4 pb-6">
 {ModalContent}
@@ -1257,14 +1386,15 @@ function EditEquipmentDrawer() {
             </p>
           </DialogHeader>
           
+          {/* Desktop Content - Enhanced for footer visibility */}
           <div className="flex-1 overflow-y-auto min-h-0">
             <div className="p-0">
 {ModalContent}
             </div>
           </div>
           
-          {/* Desktop Action Buttons in Footer */}
-          <DialogFooter className="pt-4 border-t bg-background">
+          {/* Desktop Action Buttons in Footer - Always visible */}
+          <DialogFooter className="flex-shrink-0 pt-4 border-t bg-background sticky bottom-0 z-10">
             <div className="flex gap-2 w-full justify-end">
               <Button
                 type="button"

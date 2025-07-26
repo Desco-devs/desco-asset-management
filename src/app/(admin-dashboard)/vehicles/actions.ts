@@ -452,7 +452,7 @@ export async function createVehicleAction(formData: FormData) {
     if (finalPartsStructure) {
       // Store structured parts data as JSON string in a single array element for now
       // This maintains compatibility while preserving folder structure
-      updateData.vehicle_parts = [JSON.stringify(finalPartsStructure)];
+      updateData.vehicle_parts = [JSON.stringify(finalPartsStructure)] as any;
     }
     
     if (Object.keys(updateData).length > 0) {
@@ -928,7 +928,7 @@ export async function updateVehicleAction(formData: FormData) {
     const updateData: any = { ...fileUploads };
     if (finalPartsStructure !== null) {
       // Always update parts structure if it was processed (even if empty - indicating deletions)
-      updateData.vehicle_parts = [JSON.stringify(finalPartsStructure)];
+      updateData.vehicle_parts = [JSON.stringify(finalPartsStructure)] as any;
     }
     
     // Update vehicle with new file URLs and/or parts structure if any changes were made

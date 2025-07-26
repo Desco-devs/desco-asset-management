@@ -28,6 +28,7 @@ export async function GET() {
       model: equipment.model,
       type: equipment.type,
       insurance_expiration_date: equipment.insurance_expiration_date,
+      registration_expiry: equipment.registration_expiry,
       before: equipment.before,
       status: equipment.status,
       remarks: equipment.remarks,
@@ -61,7 +62,6 @@ export async function GET() {
               // Try to parse as JSON (modern format)
               return JSON.parse(rawParts);
             } catch (error) {
-              console.warn('Failed to parse equipment_parts for equipment', equipment.id, ':', error);
               // If parsing fails but we have data, treat as legacy URL format
               if (equipment.equipment_parts.length > 0) {
                 return {
@@ -86,7 +86,6 @@ export async function GET() {
 
     return NextResponse.json(transformedEquipments);
   } catch (error) {
-    console.error('Error fetching equipments:', error);
     return NextResponse.json(
       { error: 'Failed to fetch equipments' },
       { status: 500 }

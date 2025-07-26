@@ -46,7 +46,7 @@ function MetricCard({ title, value, icon, trend, subtitle, className }: MetricCa
         </CardTitle>
         <div className="text-muted-foreground flex-shrink-0">
           <div className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">
-            {React.cloneElement(icon as React.ReactElement, { 
+            {React.cloneElement(icon as React.ReactElement<{ className?: string }>, { 
               className: "h-4 w-4 sm:h-5 sm:w-5" 
             })}
           </div>

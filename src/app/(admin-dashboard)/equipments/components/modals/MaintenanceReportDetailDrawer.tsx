@@ -104,7 +104,6 @@ export default function MaintenanceReportDetailDrawer() {
       setSelectedMaintenanceReportForDetail(null);
       setIsModalOpen(true);
     } catch (error) {
-      console.error("Error deleting maintenance report:", error);
     }
   }, [selectedReport, deleteMaintenanceReportMutation, setIsMaintenanceReportDetailOpen, setSelectedMaintenanceReportForDetail, setIsModalOpen]);
 
@@ -207,11 +206,8 @@ export default function MaintenanceReportDetailDrawer() {
             className="max-w-full max-h-[70vh] sm:max-h-[55vh] lg:max-h-[50vh] xl:max-h-[45vh] object-contain"
             onClick={(e) => e.stopPropagation()}
             onError={(e) => {
-              console.error('Image failed to load:', imageViewer.url);
-              console.error('Error details:', e);
             }}
             onLoad={() => {
-              console.log('Image loaded successfully:', imageViewer.url);
             }}
           />
         </div>
@@ -409,14 +405,11 @@ export default function MaintenanceReportDetailDrawer() {
             <div className="space-y-4">
               {selectedReport.parts_replaced.map((part, index) => {
                 // Debug logging
-                console.log('Part:', part, 'Index:', index);
-                console.log('All attachment_urls:', selectedReport.attachment_urls);
                 
                 // Check if there's an associated image for this part
                 const partImageUrl = selectedReport.attachment_urls?.[index];
                 const isImage = partImageUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(partImageUrl);
                 
-                console.log('Part image URL:', partImageUrl, 'Is image:', isImage);
                 
                 return (
                   <div key={`${selectedReport.id}-part-${index}-${part}`} className="border rounded-lg p-4 space-y-3">
@@ -434,7 +427,6 @@ export default function MaintenanceReportDetailDrawer() {
                             <div 
                               className="relative cursor-pointer"
                               onClick={() => {
-                                console.log('Opening image viewer for part:', part, partImageUrl);
                                 setImageViewer({isOpen: true, url: partImageUrl, title: `Part: ${part}`});
                               }}
                             >
@@ -445,7 +437,6 @@ export default function MaintenanceReportDetailDrawer() {
                                 height={200}
                                 className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
                                 onError={(e) => {
-                                  console.error('Part image load error:', e);
                                 }}
                               />
                               <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
@@ -514,7 +505,6 @@ export default function MaintenanceReportDetailDrawer() {
                             <div 
                               className="relative cursor-pointer"
                               onClick={() => {
-                                console.log('Opening image viewer for attachment:', index + 1, url);
                                 setImageViewer({isOpen: true, url: url, title: `Attachment ${index + 1}`});
                               }}
                             >
@@ -525,10 +515,8 @@ export default function MaintenanceReportDetailDrawer() {
                                 height={200}
                                 className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
                                 onError={(e) => {
-                                  console.error('Attachment image load error:', e);
                                 }}
                                 onLoad={() => {
-                                  console.log('Attachment image loaded successfully:', url);
                                 }}
                               />
                               <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">

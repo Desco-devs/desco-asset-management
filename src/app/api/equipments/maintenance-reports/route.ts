@@ -45,7 +45,6 @@ export async function GET() {
       data: reports
     });
   } catch (error) {
-    console.error('Error fetching equipment maintenance reports:', error);
     return NextResponse.json(
       { error: 'Failed to fetch equipment maintenance reports' },
       { status: 500 }
@@ -133,7 +132,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(report, { status: 201 });
   } catch (error) {
-    console.error('Error creating equipment maintenance report:', error);
     return NextResponse.json(
       { error: 'Failed to create equipment maintenance report' },
       { status: 500 }

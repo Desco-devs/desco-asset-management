@@ -294,7 +294,6 @@ const MaintenanceReportModal = ({
       onReportSubmitted();
       onOpenChange(false);
     } catch (error) {
-      console.error("Error submitting maintenance report:", error);
       toast.error(
         `Failed to ${editReport ? "update" : "create"} maintenance report: ${
           error instanceof Error ? error.message : "Unknown error occurred"

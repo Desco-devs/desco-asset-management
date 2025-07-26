@@ -22,9 +22,10 @@ export const equipmentKeys = {
 
 // API functions
 async function fetchEquipments(): Promise<Equipment[]> {
-  const response = await fetch('/api/equipments/getall');
+  const response = await fetch('/api/equipments');
   if (!response.ok) throw new Error('Failed to fetch equipments');
-  const data = await response.json();
+  const result = await response.json();
+  const data = result.data || result; // Handle both formats
   
   // Transform the data to match our Equipment interface
   return data.map((item: any) => ({
@@ -33,6 +34,7 @@ async function fetchEquipments(): Promise<Equipment[]> {
     model: item.model,
     type: item.type,
     insuranceExpirationDate: item.insurance_expiration_date || '',
+    registrationExpiry: item.registration_expiry || undefined,
     before: item.before || undefined,
     status: item.status as "OPERATIONAL" | "NON_OPERATIONAL",
     remarks: item.remarks || undefined,
@@ -146,6 +148,11 @@ async function updateEquipment({ uid, ...equipmentData }: Partial<Equipment> & {
 }
 
 async function deleteEquipment(uid: string): Promise<void> {
+  // Prevent deletion of temporary IDs from optimistic updates
+  if (uid.startsWith('temp_')) {
+    throw new Error('Cannot delete equipment that is still being created');
+  }
+  
   const response = await fetch(`/api/equipments/${uid}`, {
     method: 'DELETE',
   });
@@ -173,7 +180,6 @@ async function updateMaintenanceReport({ id, ...reportData }: Partial<Maintenanc
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    console.error('Update maintenance report error:', errorData);
     throw new Error(errorData.error || `Failed to update maintenance report (${response.status})`);
   }
   return response.json();
@@ -185,13 +191,11 @@ async function deleteMaintenanceReport(id: string): Promise<void> {
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    console.error('Delete maintenance report error response:', errorData);
     throw new Error(errorData.error || errorData.details || `Failed to delete maintenance report (${response.status})`);
   }
 }
 
 async function createEquipmentMaintenanceReport(reportData: Partial<EquipmentMaintenanceReport>): Promise<EquipmentMaintenanceReport> {
-  console.log('Creating equipment maintenance report with data:', reportData);
   const response = await fetch('/api/equipments/maintenance-reports', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -199,7 +203,6 @@ async function createEquipmentMaintenanceReport(reportData: Partial<EquipmentMai
   });
   if (!response.ok) {
     const errorData = await response.text();
-    console.error('Equipment maintenance report creation failed:', response.status, errorData);
     throw new Error(`Failed to create equipment maintenance report: ${response.status} ${errorData}`);
   }
   return response.json();
@@ -213,7 +216,6 @@ async function updateEquipmentMaintenanceReport({ id, ...reportData }: Partial<E
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    console.error('Update equipment maintenance report error:', errorData);
     throw new Error(errorData.error || `Failed to update equipment maintenance report (${response.status})`);
   }
   return response.json();
@@ -225,7 +227,6 @@ async function deleteEquipmentMaintenanceReport(id: string): Promise<void> {
   });
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    console.error('Delete equipment maintenance report error response:', errorData);
     throw new Error(errorData.error || errorData.details || `Failed to delete equipment maintenance report (${response.status})`);
   }
 }
@@ -235,7 +236,6 @@ function deduplicateEquipments(equipments: Equipment[]): Equipment[] {
   const seen = new Set();
   return equipments.filter(equipment => {
     if (seen.has(equipment.uid)) {
-      console.warn('🚨 Duplicate equipment found and removed:', equipment.uid);
       return false;
     }
     seen.add(equipment.uid);
@@ -251,8 +251,8 @@ export function useEquipments() {
     queryKey: equipmentKeys.equipments(),
     queryFn: fetchEquipments,
     select: (data) => deduplicateEquipments(data), // Always deduplicate
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes - reduce refetch frequency
+    gcTime: 15 * 60 * 1000, // 15 minutes
   });
 }
 
@@ -341,9 +341,14 @@ export function useCreateEquipmentAction() {
   
   return useMutation({
     mutationFn: async (formData: FormData) => {
-      // Import server action dynamically for edge compatibility
-      const { createEquipmentAction } = await import('../app/(admin-dashboard)/equipments/actions');
-      return await createEquipmentAction(formData);
+      try {
+        // Import server action dynamically for edge compatibility
+        const { createEquipmentAction } = await import('../app/(admin-dashboard)/equipments/actions');
+        return await createEquipmentAction(formData);
+      } catch (error) {
+        console.error('Equipment creation mutation failed:', error);
+        throw error;
+      }
     },
     onMutate: async (formData: FormData) => {
       // Cancel outgoing refetches (so they don't overwrite our optimistic update)
@@ -358,8 +363,13 @@ export function useCreateEquipmentAction() {
       const type = formData.get("type") as string;
       const owner = formData.get("owner") as string;
       const status = formData.get("status") as string;
+      const projectId = formData.get("projectId") as string;
       
       if (brand && model && type && owner) {
+        // Get project data for optimistic update
+        const projectsData = queryClient.getQueryData<any[]>(equipmentKeys.projects());
+        const matchingProject = projectsData?.find(p => p.uid === projectId);
+        
         const optimisticEquipment: Equipment = {
           uid: `temp_${Date.now()}`, // Temporary ID for optimistic update
           brand,
@@ -378,7 +388,7 @@ export function useCreateEquipmentAction() {
           thirdpartyInspectionImage: undefined,
           pgpcInspectionImage: undefined,
           equipmentParts: undefined,
-          project: { uid: '', name: 'Loading...', client: { uid: '', name: 'Loading...', location: { uid: '', address: 'Loading...' }}},
+          project: matchingProject || { uid: projectId || '', name: 'Loading...', client: { uid: '', name: 'Loading...', location: { uid: '', address: 'Loading...' }}},
         };
 
         // Optimistically update cache for instant feedback
@@ -390,24 +400,38 @@ export function useCreateEquipmentAction() {
       return { previousEquipments };
     },
     onSuccess: (result, formData, context) => {
-      // Server action completed successfully - realtime will handle the real data
-      console.log('✅ Equipment creation server action completed:', result);
-      
-      // Invalidate to get fresh data with proper relationships
-      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
+      // Server action completed successfully
+      // Don't invalidate - let optimistic update and real-time handle it
     },
     onError: (error, formData, context) => {
+      console.error('Equipment creation failed:', error);
+      
       // Rollback optimistic update on error
       if (context?.previousEquipments) {
         queryClient.setQueryData(equipmentKeys.equipments(), context.previousEquipments);
       }
       
-      console.error('❌ Equipment creation failed:', error);
-      toast.error('Failed to create equipment: ' + error.message);
+      // Enhanced error messages for different error types
+      let errorMessage = 'Failed to create equipment';
+      if (error instanceof Error) {
+        if (error.message.includes('Missing required fields')) {
+          errorMessage = error.message;
+        } else if (error.message.includes('File upload failed')) {
+          errorMessage = 'File upload failed. Please check your files and try again.';
+        } else if (error.message.includes('Project not found')) {
+          errorMessage = 'Selected project is invalid. Please refresh the page and try again.';
+        } else if (error.message.includes('Unauthorized')) {
+          errorMessage = 'You are not authorized to create equipment. Please log in again.';
+        } else {
+          errorMessage = `Failed to create equipment: ${error.message}`;
+        }
+      }
+      
+      toast.error(errorMessage);
     },
     onSettled: () => {
-      // Always refetch after error or success to ensure cache consistency
-      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
+      // Don't invalidate on success - optimistic update + real-time handles it
+      // Only for debugging - remove this invalidation
     },
   });
 }
@@ -429,34 +453,85 @@ export function useUpdateEquipmentAction() {
       // Snapshot the previous value for rollback
       const previousEquipments = queryClient.getQueryData<Equipment[]>(equipmentKeys.equipments());
 
-      // Create optimistic equipment update for instant UI feedback
+      // 🚀 INSTANT UPDATES: Optimistic update for partial changes
       const equipmentId = formData.get("equipmentId") as string;
-      const brand = formData.get("brand") as string;
-      const model = formData.get("model") as string;
-      const type = formData.get("type") as string;
-      const owner = formData.get("owner") as string;
-      const status = formData.get("status") as string;
       
-      if (equipmentId && brand && model && type && owner) {
+      if (equipmentId) {
+        // Get all possible field updates (only what was sent)
+        const brand = formData.get("brand") as string;
+        const model = formData.get("model") as string;
+        const type = formData.get("type") as string;
+        const owner = formData.get("owner") as string;
+        const status = formData.get("status") as string;
+        const plateNumber = formData.get("plateNumber") as string;
+        const remarks = formData.get("remarks") as string;
+        const insuranceExpirationDate = formData.get("insuranceExpirationDate") as string;
+        const inspectionDate = formData.get("inspectionDate") as string;
+        const before = formData.get("before") as string;
+        const projectId = formData.get("projectId") as string;
+        
         // Optimistically update cache for instant feedback
         queryClient.setQueryData<Equipment[]>(equipmentKeys.equipments(), (oldData) => {
           if (!oldData) return oldData;
           
           return oldData.map((equipment) => {
             if (equipment.uid === equipmentId) {
-              return {
+              
+              // Create updated equipment object
+              const updatedEquipment = {
                 ...equipment,
-                brand,
-                model,
-                type,
-                owner,
-                status: (status as "OPERATIONAL" | "NON_OPERATIONAL") || equipment.status,
-                plateNumber: formData.get("plateNumber") as string || equipment.plateNumber,
-                remarks: formData.get("remarks") as string || equipment.remarks,
-                insuranceExpirationDate: formData.get("insuranceExpirationDate") as string || equipment.insuranceExpirationDate,
-                before: formData.get("before") ? parseInt(formData.get("before") as string) : equipment.before,
-                inspectionDate: formData.get("inspectionDate") as string || equipment.inspectionDate,
+                // Only update fields that were actually sent (partial updates)
+                ...(brand && { brand }),
+                ...(model && { model }),
+                ...(type && { type }),
+                ...(owner && { owner }),
+                ...(status && { status: status as "OPERATIONAL" | "NON_OPERATIONAL" }),
+                ...(plateNumber !== null && { plateNumber }),
+                ...(remarks !== null && { remarks }),
+                ...(insuranceExpirationDate && { insuranceExpirationDate }),
+                ...(inspectionDate && { inspectionDate }),
+                ...(before && { before: parseInt(before) }),
               };
+
+              // Handle project update ONLY if projectId was actually sent in the form
+              if (projectId && projectId !== equipment.project.uid) {
+                const projectsData = queryClient.getQueryData<any[]>(equipmentKeys.projects());
+                const matchingProject = projectsData?.find(p => p.uid === projectId);
+                if (matchingProject) {
+                  updatedEquipment.project = matchingProject;
+                }
+              }
+              // If no projectId or same project, keep existing project data unchanged
+
+              // Handle file removals optimistically
+              if (formData.get("remove_equipmentImage") === "true") {
+                updatedEquipment.image_url = undefined;
+              }
+              if (formData.get("remove_thirdpartyInspection") === "true") {
+                updatedEquipment.thirdpartyInspectionImage = undefined;
+              }
+              if (formData.get("remove_pgpcInspection") === "true") {
+                updatedEquipment.pgpcInspectionImage = undefined;
+              }
+              if (formData.get("remove_originalReceipt") === "true") {
+                updatedEquipment.originalReceiptUrl = undefined;
+              }
+              if (formData.get("remove_equipmentRegistration") === "true") {
+                updatedEquipment.equipmentRegistrationUrl = undefined;
+              }
+              
+              // 🔧 CRITICAL FIX: Handle parts structure updates optimistically
+              const partsStructureData = formData.get("partsStructure") as string;
+              if (partsStructureData) {
+                try {
+                  const partsStructure = JSON.parse(partsStructureData);
+                  // Store as array with JSON string (matching database format)
+                  updatedEquipment.equipmentParts = [JSON.stringify(partsStructure)];
+                } catch (error) {
+                }
+              }
+
+              return updatedEquipment;
             }
             return equipment;
           });
@@ -467,23 +542,32 @@ export function useUpdateEquipmentAction() {
     },
     onSuccess: (result, formData, context) => {
       // Server action completed successfully - realtime will handle the real data
-      console.log('✅ Equipment update server action completed:', result);
       
-      // Invalidate to get fresh data with proper relationships
-      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
+      // 🚀 INSTANT UPDATES: Don't invalidate immediately, let real-time handle it
+      // The optimistic update already shows the changes instantly
+      // Real-time subscription will update with server data when DB changes
     },
     onError: (error, formData, context) => {
+      console.error('Equipment update failed:', error);
+      
       // Rollback optimistic update on error
       if (context?.previousEquipments) {
         queryClient.setQueryData(equipmentKeys.equipments(), context.previousEquipments);
       }
       
-      console.error('❌ Equipment update failed:', error);
-      toast.error('Failed to update equipment: ' + error.message);
-    },
-    onSettled: () => {
-      // Always refetch after error or success to ensure cache consistency
-      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
+      // Enhanced error messages for different error types
+      let errorMessage = 'Failed to update equipment';
+      if (error instanceof Error) {
+        if (error.message.includes('Equipment not found')) {
+          errorMessage = 'Equipment not found. It may have been deleted.';
+        } else if (error.message.includes('Unauthorized')) {
+          errorMessage = 'You are not authorized to update this equipment. Please log in again.';
+        } else {
+          errorMessage = `Failed to update equipment: ${error.message}`;
+        }
+      }
+      
+      toast.error(errorMessage);
     },
   });
 }
@@ -502,17 +586,15 @@ export function useCreateEquipment() {
         // Check if equipment already exists to prevent duplicates
         const existingEquipment = oldData.find(equipment => equipment.uid === newEquipment.uid);
         if (existingEquipment) {
-          console.log('🔄 Equipment already exists in cache during create, skipping duplicate');
           return oldData;
         }
-        
-        console.log('✅ Adding new equipment to cache:', newEquipment.uid);
         return deduplicateEquipments([newEquipment, ...oldData]);
       });
       // Toast moved to realtime listener to show for all equipment creations
     },
     onError: (error) => {
-      toast.error('Failed to create equipment: ' + error.message);
+      console.error('Legacy equipment creation failed:', error);
+      toast.error('Failed to create equipment: ' + (error instanceof Error ? error.message : 'Unknown error'));
     },
   });
 }
@@ -534,7 +616,8 @@ export function useUpdateEquipment() {
       // Toast moved to realtime listener for unified notification system
     },
     onError: (error) => {
-      toast.error('Failed to update equipment: ' + error.message);
+      console.error('Legacy equipment update failed:', error);
+      toast.error('Failed to update equipment: ' + (error instanceof Error ? error.message : 'Unknown error'));
     },
   });
 }
@@ -553,7 +636,8 @@ export function useDeleteEquipment() {
       // Toast moved to realtime listener for unified notification system
     },
     onError: (error) => {
-      toast.error('Failed to delete equipment: ' + error.message);
+      console.error('Equipment deletion failed:', error);
+      toast.error('Failed to delete equipment: ' + (error instanceof Error ? error.message : 'Unknown error'));
     },
   });
 }
@@ -563,7 +647,6 @@ function deduplicateMaintenanceReports(reports: MaintenanceReport[]): Maintenanc
   const seen = new Set();
   return reports.filter(report => {
     if (seen.has(report.id)) {
-      console.warn('🚨 Duplicate maintenance report found and removed:', report.id);
       return false;
     }
     seen.add(report.id);
@@ -576,7 +659,6 @@ function deduplicateEquipmentMaintenanceReports(reports: EquipmentMaintenanceRep
   const seen = new Set();
   return reports.filter(report => {
     if (seen.has(report.id)) {
-      console.warn('🚨 Duplicate equipment maintenance report found and removed:', report.id);
       return false;
     }
     seen.add(report.id);
@@ -598,11 +680,8 @@ export function useCreateMaintenanceReport() {
         // Check if report already exists to prevent duplicates
         const existingReport = oldData.find(report => report.id === newReport.id);
         if (existingReport) {
-          console.log('🔄 Maintenance report already exists in cache during create, skipping duplicate');
           return oldData;
         }
-        
-        console.log('✅ Adding new maintenance report to cache:', newReport.id);
         return deduplicateMaintenanceReports([newReport, ...oldData]);
       });
       toast.success('Maintenance report created successfully!');
@@ -668,11 +747,8 @@ export function useCreateEquipmentMaintenanceReport() {
         // Check if report already exists to prevent duplicates
         const existingReport = oldData.find(report => report.id === newReport.id);
         if (existingReport) {
-          console.log('🔄 Equipment maintenance report already exists in cache during create, skipping duplicate');
           return oldData;
         }
-        
-        console.log('✅ Adding new equipment maintenance report to cache:', newReport.id);
         return deduplicateEquipmentMaintenanceReports([newReport, ...oldData]);
       });
       toast.success('Equipment maintenance report created successfully!');
@@ -735,7 +811,8 @@ export function useSupabaseRealtime() {
   useEffect(() => {
     const supabase = createClient();
     
-    console.log('🔌 Setting up Supabase realtime subscriptions for equipments...');
+    // Generate unique channel name to avoid conflicts
+    const channelId = `equipments-realtime-${Math.random().toString(36).substring(2, 11)}`;
 
     // Comprehensive error handler to catch transformers.js and realtime errors
     const originalConsoleError = console.error;
@@ -748,7 +825,6 @@ export function useSupabaseRealtime() {
     const safeObjectKeys = function(obj: any) {
       // If obj is null or undefined, return empty array to prevent crash
       if (obj == null) {
-        console.debug('🔧 Prevented Object.keys() crash on null/undefined value');
         return [];
       }
       // Otherwise use original Object.keys
@@ -759,36 +835,47 @@ export function useSupabaseRealtime() {
     Object.keys = safeObjectKeys;
     
     const errorSuppression = (message: any, ...args: any[]) => {
-      // Convert message to string for analysis
-      const messageStr = String(message || '');
-      const fullMessage = [messageStr, ...args.map(arg => String(arg || ''))].join(' ');
-      
-      // Comprehensive pattern matching for Supabase/transformers errors
-      const isTransformersError = (
-        messageStr.includes('transformers.js') ||
-        messageStr.includes('Cannot convert undefined or null to object') ||
-        messageStr.includes('TypeError: Cannot read properties of null') ||
-        messageStr.includes('RealtimeChannel.js') ||
-        messageStr.includes('RealtimeClient.js') ||
-        messageStr.includes('convertChangeData') ||
-        messageStr.includes('_getPayloadRecords') ||
-        messageStr.includes('serializer.js') ||
-        (messageStr.includes('Supabase') && messageStr.includes('transformers')) ||
-        // Object.keys errors from transformers
-        (messageStr.includes('Object.keys') && fullMessage.includes('transformers')) ||
-        // Specific error patterns
-        fullMessage.includes('at Object.keys (<anonymous>)') ||
-        fullMessage.includes('at Module.convertChangeData (transformers.js:61:19)')
-      );
-      
-      if (isTransformersError) {
-        // Use debug level to completely hide these errors
-        console.debug('🔇 Suppressed Supabase transformers error');
+      // Prevent recursive calls by checking if we're already in error suppression
+      if ((errorSuppression as any)._processing) {
+        originalConsoleError.call(console, message, ...args);
         return;
       }
       
-      // Allow all other errors to pass through normally
-      originalConsoleError.call(console, message, ...args);
+      (errorSuppression as any)._processing = true;
+      
+      try {
+        // Convert message to string for analysis
+        const messageStr = String(message || '');
+        const fullMessage = [messageStr, ...args.map(arg => String(arg || ''))].join(' ');
+        
+        // Comprehensive pattern matching for Supabase/transformers errors
+        const isTransformersError = (
+          messageStr.includes('transformers.js') ||
+          messageStr.includes('Cannot convert undefined or null to object') ||
+          messageStr.includes('TypeError: Cannot read properties of null') ||
+          messageStr.includes('RealtimeChannel.js') ||
+          messageStr.includes('RealtimeClient.js') ||
+          messageStr.includes('convertChangeData') ||
+          messageStr.includes('_getPayloadRecords') ||
+          messageStr.includes('serializer.js') ||
+          (messageStr.includes('Supabase') && messageStr.includes('transformers')) ||
+          // Object.keys errors from transformers
+          (messageStr.includes('Object.keys') && fullMessage.includes('transformers')) ||
+          // Specific error patterns
+          fullMessage.includes('at Object.keys (<anonymous>)') ||
+          fullMessage.includes('at Module.convertChangeData (transformers.js:61:19)')
+        );
+        
+        if (isTransformersError) {
+          // Use debug level to completely hide these errors
+          return;
+        }
+        
+        // Allow all other errors to pass through normally
+        originalConsoleError.call(console, message, ...args);
+      } finally {
+        (errorSuppression as any)._processing = false;
+      }
     };
     
     // Handle uncaught TypeError from transformers.js
@@ -812,7 +899,6 @@ export function useSupabaseRealtime() {
       );
       
       if (isTransformersUncaughtError) {
-        console.debug('🔇 Suppressed uncaught Supabase transformers error');
         return true; // Prevent the error from being logged
       }
       
@@ -823,9 +909,6 @@ export function useSupabaseRealtime() {
     console.error = errorSuppression;
     window.onerror = windowErrorHandler;
 
-    // Generate unique channel name to avoid conflicts
-    const channelId = `equipments-realtime-${Math.random().toString(36).substring(2, 11)}`;
-    
     // Equipments realtime subscription
     const equipmentsChannel = supabase
       .channel(channelId)
@@ -834,33 +917,30 @@ export function useSupabaseRealtime() {
         {
           event: '*',
           schema: 'public',
-          table: 'equipments'
+          table: 'equipment'
         },
         (payload) => {
+          
           try {
             // Comprehensive payload validation to prevent transformers.js errors
             if (!payload || typeof payload !== 'object') {
-              console.warn('Invalid payload received for equipment event (null or not object):', payload);
               return;
             }
 
             // Check if payload has required properties
             if (!(payload as any).eventType && !(payload as any).event) {
-              console.warn('Invalid equipment payload received (no event type):', payload);
               return;
             }
 
             // Normalize eventType (some versions use 'event' instead of 'eventType')
             const eventType = (payload as any).eventType || (payload as any).event;
             if (!eventType || typeof eventType !== 'string') {
-              console.warn('Invalid event type in equipment payload:', payload);
               return;
             }
 
             // Enhanced validation for DELETE events to prevent Object.keys() errors
             if (eventType === 'DELETE') {
               if (!payload.old || typeof payload.old !== 'object' || payload.old === null) {
-                console.warn('Invalid DELETE payload structure for equipment, skipping:', payload);
                 // Still try to invalidate cache as fallback
                 queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
                 return;
@@ -868,7 +948,6 @@ export function useSupabaseRealtime() {
 
               // Ensure payload.old has at least an id property
               if (!(payload as any).old?.id || typeof (payload as any).old?.id !== 'string') {
-                console.warn('DELETE payload.old missing valid id for equipment, skipping:', payload);
                 queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
                 return;
               }
@@ -877,24 +956,26 @@ export function useSupabaseRealtime() {
             // Enhanced validation for INSERT/UPDATE events
             if ((eventType === 'INSERT' || eventType === 'UPDATE')) {
               if (!payload.new || typeof payload.new !== 'object' || payload.new === null) {
-                console.warn(`Invalid ${eventType} payload structure for equipment, skipping:`, payload);
                 queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
                 return;
               }
 
               // Ensure payload.new has at least an id property
               if (!(payload as any).new?.id || typeof (payload as any).new?.id !== 'string') {
-                console.warn(`${eventType} payload.new missing valid id for equipment, skipping:`, payload);
                 queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
                 return;
               }
             }
             
-            console.log('🔧 Equipment realtime event:', eventType, payload);
-            
             if (eventType === 'INSERT' && payload.new) {
-              console.log('✅ New equipment inserted:', payload.new);
               const equipmentData = payload.new as any;
+              
+              // Check if we have complete project data in the payload
+              if (!equipmentData.project || !equipmentData.project.client) {
+                // If project data is incomplete, just invalidate queries to refetch with complete data
+                queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
+                return;
+              }
               
               // Transform the data to match our Equipment interface
               const transformedEquipment: Equipment = {
@@ -915,18 +996,43 @@ export function useSupabaseRealtime() {
                 thirdpartyInspectionImage: equipmentData.thirdparty_inspection_image || undefined,
                 pgpcInspectionImage: equipmentData.pgpc_inspection_image || undefined,
                 equipmentParts: equipmentData.equipment_parts || undefined,
-                project: equipmentData.project || { uid: '', name: 'Unknown', client: { uid: '', name: 'Unknown', location: { uid: '', address: 'Unknown' }}},
+                project: {
+                  uid: equipmentData.project.id,
+                  name: equipmentData.project.name,
+                  client: {
+                    uid: equipmentData.project.client.id,
+                    name: equipmentData.project.client.name,
+                    location: {
+                      uid: equipmentData.project.client.location.id,
+                      address: equipmentData.project.client.location.address,
+                    },
+                  },
+                },
               };
               
-              // Only add if equipment doesn't already exist in cache (prevent duplicates)
+              // Update existing equipment or add new one (handle optimistic updates)
               queryClient.setQueryData<Equipment[]>(equipmentKeys.equipments(), (oldData) => {
                 if (!oldData) return [transformedEquipment];
                 
-                // Check if equipment already exists in cache
-                const existingEquipment = oldData.find(equipment => equipment.uid === transformedEquipment.uid);
-                if (existingEquipment) {
-                  console.log('🔄 Equipment already exists in cache, skipping insert');
-                  return oldData; // Don't add duplicate
+                // First check exact UID match
+                const exactMatch = oldData.findIndex(equipment => equipment.uid === transformedEquipment.uid);
+                if (exactMatch !== -1) {
+                  return oldData;
+                }
+                
+                // Then check for optimistic update to replace (recent temp_ with matching data)
+                const optimisticMatch = oldData.findIndex(equipment => 
+                  equipment.uid.startsWith('temp_') &&
+                  equipment.brand === transformedEquipment.brand &&
+                  equipment.model === transformedEquipment.model &&
+                  equipment.type === transformedEquipment.type &&
+                  equipment.owner === transformedEquipment.owner
+                );
+                
+                if (optimisticMatch !== -1) {
+                  const updated = [...oldData];
+                  updated[optimisticMatch] = transformedEquipment;
+                  return deduplicateEquipments(updated);
                 }
                 
                 return deduplicateEquipments([transformedEquipment, ...oldData]);
@@ -944,55 +1050,59 @@ export function useSupabaseRealtime() {
                 }
               }
             } else if (eventType === 'UPDATE' && payload.new) {
-              console.log('🔄 Equipment updated:', payload.new);
               const equipmentData = payload.new as any;
               
-              // Transform the data to match our Equipment interface
-              const transformedEquipment: Equipment = {
-                uid: equipmentData.id,
-                brand: equipmentData.brand,
-                model: equipmentData.model,
-                type: equipmentData.type,
-                insuranceExpirationDate: equipmentData.insurance_expiration_date || '',
-                before: equipmentData.before || undefined,
-                status: equipmentData.status as "OPERATIONAL" | "NON_OPERATIONAL",
-                remarks: equipmentData.remarks || undefined,
-                owner: equipmentData.owner,
-                image_url: equipmentData.image_url || undefined,
-                inspectionDate: equipmentData.inspection_date || undefined,
-                plateNumber: equipmentData.plate_number || undefined,
-                originalReceiptUrl: equipmentData.original_receipt_url || undefined,
-                equipmentRegistrationUrl: equipmentData.equipment_registration_url || undefined,
-                thirdpartyInspectionImage: equipmentData.thirdparty_inspection_image || undefined,
-                pgpcInspectionImage: equipmentData.pgpc_inspection_image || undefined,
-                equipmentParts: equipmentData.equipment_parts || undefined,
-                project: equipmentData.project || { uid: '', name: 'Unknown', client: { uid: '', name: 'Unknown', location: { uid: '', address: 'Unknown' }}},
-              };
-              
-              // Update in cache only if equipment exists
+              // Update equipment in cache, preserving existing project data if real-time data is incomplete
               queryClient.setQueryData<Equipment[]>(equipmentKeys.equipments(), (oldData) => {
                 if (!oldData) return [];
                 
-                const existingIndex = oldData.findIndex(equipment => equipment.uid === transformedEquipment.uid);
+                const existingIndex = oldData.findIndex(equipment => equipment.uid === equipmentData.id);
                 if (existingIndex === -1) {
-                  console.log('🔄 Equipment not found in cache for update, skipping');
                   return oldData;
                 }
                 
-                const updated = oldData.map(equipment => 
-                  equipment.uid === transformedEquipment.uid ? transformedEquipment : equipment
-                );
+                const existingEquipment = oldData[existingIndex];
+                
+                // ALWAYS preserve existing project data - project updates are handled separately
+                // Real-time equipment updates should not affect project relationships
+                const projectData = existingEquipment.project;
+                
+                // Transform the data to match our Equipment interface
+                const transformedEquipment: Equipment = {
+                  ...existingEquipment, // Start with existing data
+                  // Update only the fields that changed
+                  uid: equipmentData.id,
+                  brand: equipmentData.brand,
+                  model: equipmentData.model,
+                  type: equipmentData.type,
+                  insuranceExpirationDate: equipmentData.insurance_expiration_date || '',
+                  before: equipmentData.before || undefined,
+                  status: equipmentData.status as "OPERATIONAL" | "NON_OPERATIONAL",
+                  remarks: equipmentData.remarks || undefined,
+                  owner: equipmentData.owner,
+                  image_url: equipmentData.image_url || undefined,
+                  inspectionDate: equipmentData.inspection_date || undefined,
+                  plateNumber: equipmentData.plate_number || undefined,
+                  originalReceiptUrl: equipmentData.original_receipt_url || undefined,
+                  equipmentRegistrationUrl: equipmentData.equipment_registration_url || undefined,
+                  thirdpartyInspectionImage: equipmentData.thirdparty_inspection_image || undefined,
+                  pgpcInspectionImage: equipmentData.pgpc_inspection_image || undefined,
+                  equipmentParts: equipmentData.equipment_parts || undefined,
+                  project: projectData, // Use preserved or updated project data
+                };
+                
+                const updated = [...oldData];
+                updated[existingIndex] = transformedEquipment;
                 return deduplicateEquipments(updated);
               });
               
               // Simple individual toast with duplicate prevention
-              const eventKey = `update-${transformedEquipment.uid}`;
+              const eventKey = `update-${equipmentData.id}`;
               if (!processedEvents.current.has(eventKey)) {
                 processedEvents.current.add(eventKey);
-                toast.success(`Equipment "${transformedEquipment.brand} ${transformedEquipment.model}" updated successfully!`);
+                toast.success(`Equipment "${equipmentData.brand} ${equipmentData.model}" updated successfully!`);
               }
             } else if (eventType === 'DELETE') {
-              console.log('🗑️ Equipment deleted:', payload.old || 'Unknown equipment');
               
               // We already validated payload.old above, so it's safe to use
               const deletedEquipment = payload.old as any;
@@ -1004,7 +1114,6 @@ export function useSupabaseRealtime() {
                   
                   const existingEquipment = oldData.find(equipment => equipment.uid === deletedEquipment.id);
                   if (!existingEquipment) {
-                    console.log('🗑️ Equipment not found in cache for deletion, skipping');
                     return oldData;
                   }
                   
@@ -1021,14 +1130,12 @@ export function useSupabaseRealtime() {
               }
             }
           } catch (error) {
-            console.error('Error handling realtime equipment event:', error);
             // Still invalidate cache even if toast fails
             queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
           }
         }
       )
       .subscribe((status) => {
-        console.log('🔧 Equipments subscription status:', status);
         setIsConnected(status === 'SUBSCRIBED');
       });
 
@@ -1046,20 +1153,17 @@ export function useSupabaseRealtime() {
           try {
             // Comprehensive payload validation to prevent transformers.js errors
             if (!payload || typeof payload !== 'object') {
-              console.warn('Invalid payload received (null or not object):', payload);
               return;
             }
 
             // Check if payload has required properties
             if (!(payload as any).eventType && !(payload as any).event) {
-              console.warn('Invalid payload received (no event type):', payload);
               return;
             }
 
             // Normalize eventType (some versions use 'event' instead of 'eventType')
             const eventType = (payload as any).eventType || (payload as any).event;
             if (!eventType || typeof eventType !== 'string') {
-              console.warn('Invalid event type in payload:', payload);
               return;
             }
 
@@ -1067,7 +1171,6 @@ export function useSupabaseRealtime() {
             if (eventType === 'DELETE') {
               // Validate payload.old exists and has valid structure
               if (!payload.old || typeof payload.old !== 'object' || payload.old === null) {
-                console.warn('Invalid DELETE payload structure for equipment maintenance report, skipping:', payload);
                 // Still try to invalidate cache as fallback
                 queryClient.invalidateQueries({ queryKey: equipmentKeys.maintenanceReports() });
                 return;
@@ -1075,7 +1178,6 @@ export function useSupabaseRealtime() {
 
               // Ensure payload.old has at least an id property
               if (!(payload as any).old?.id || typeof (payload as any).old?.id !== 'string') {
-                console.warn('DELETE payload.old missing valid id, skipping:', payload);
                 queryClient.invalidateQueries({ queryKey: equipmentKeys.maintenanceReports() });
                 return;
               }
@@ -1084,23 +1186,18 @@ export function useSupabaseRealtime() {
             // Enhanced validation for INSERT/UPDATE events
             if ((eventType === 'INSERT' || eventType === 'UPDATE')) {
               if (!payload.new || typeof payload.new !== 'object' || payload.new === null) {
-                console.warn(`Invalid ${eventType} payload structure for equipment maintenance report, skipping:`, payload);
                 queryClient.invalidateQueries({ queryKey: equipmentKeys.maintenanceReports() });
                 return;
               }
 
               // Ensure payload.new has at least an id property
               if (!(payload as any).new?.id || typeof (payload as any).new?.id !== 'string') {
-                console.warn(`${eventType} payload.new missing valid id, skipping:`, payload);
                 queryClient.invalidateQueries({ queryKey: equipmentKeys.maintenanceReports() });
                 return;
               }
             }
             
-            console.log('🔧 Equipment maintenance report realtime event:', eventType, payload);
-            
             if (eventType === 'INSERT' && payload.new) {
-              console.log('✅ New equipment maintenance report inserted:', payload.new);
               const reportData = payload.new as any;
               // Only add if report doesn't already exist in cache (prevent duplicates)
               queryClient.setQueryData<MaintenanceReport[]>(equipmentKeys.maintenanceReports(), (oldData) => {
@@ -1109,7 +1206,6 @@ export function useSupabaseRealtime() {
                 // Check if report already exists in cache
                 const existingReport = oldData.find(report => report.id === reportData.id);
                 if (existingReport) {
-                  console.log('🔄 Equipment maintenance report already exists in cache, skipping insert');
                   return oldData; // Don't add duplicate
                 }
                 
@@ -1118,7 +1214,6 @@ export function useSupabaseRealtime() {
               // No toast here - mutation handles user-initiated creates
               // This is for realtime updates from other users
             } else if (eventType === 'UPDATE' && payload.new) {
-              console.log('🔄 Equipment maintenance report updated:', payload.new);
               const reportData = payload.new as any;
               // Update in cache only if report exists
               queryClient.setQueryData<MaintenanceReport[]>(equipmentKeys.maintenanceReports(), (oldData) => {
@@ -1126,7 +1221,6 @@ export function useSupabaseRealtime() {
                 
                 const existingIndex = oldData.findIndex(report => report.id === reportData.id);
                 if (existingIndex === -1) {
-                  console.log('🔄 Equipment maintenance report not found in cache for update, skipping');
                   return oldData;
                 }
                 
@@ -1137,7 +1231,6 @@ export function useSupabaseRealtime() {
               });
               // No toast for updates - user initiated the action
             } else if (eventType === 'DELETE') {
-              console.log('🗑️ Equipment maintenance report deleted:', payload.old || 'Unknown report');
               
               // We already validated payload.old above, so it's safe to use
               const deletedReport = payload.old as any;
@@ -1149,7 +1242,6 @@ export function useSupabaseRealtime() {
                   
                   const existingReport = oldData.find(report => report.id === deletedReport.id);
                   if (!existingReport) {
-                    console.log('🗑️ Equipment maintenance report not found in cache for deletion, skipping');
                     return oldData;
                   }
                   
@@ -1161,7 +1253,6 @@ export function useSupabaseRealtime() {
               // This is for realtime updates from other users
             }
           } catch (error) {
-            console.error('Error handling realtime equipment maintenance report event:', error);
             // Still invalidate cache even if toast fails
             queryClient.invalidateQueries({ queryKey: equipmentKeys.maintenanceReports() });
           }

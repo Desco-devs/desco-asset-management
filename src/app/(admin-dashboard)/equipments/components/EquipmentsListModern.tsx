@@ -115,6 +115,10 @@ export default function EquipmentsListModern() {
             aValue = a.insuranceExpirationDate ? new Date(a.insuranceExpirationDate).getTime() : 0;
             bValue = b.insuranceExpirationDate ? new Date(b.insuranceExpirationDate).getTime() : 0;
             break;
+          case "registrationExpiry":
+            aValue = a.registrationExpiry ? new Date(a.registrationExpiry).getTime() : 0;
+            bValue = b.registrationExpiry ? new Date(b.registrationExpiry).getTime() : 0;
+            break;
           case "owner":
             aValue = a.owner.toLowerCase();
             bValue = b.owner.toLowerCase();
@@ -398,6 +402,9 @@ export default function EquipmentsListModern() {
               if (sortBy === "insuranceExpirationDate") {
                 return sortOrder === "asc" ? "insuranceExpirationDate" : "insuranceExpirationDate_late";
               }
+              if (sortBy === "registrationExpiry") {
+                return sortOrder === "asc" ? "registrationExpiry" : "registrationExpiry_late";
+              }
               if (sortBy === "status") {
                 return sortOrder === "asc" ? "status" : "status_issues";
               }
@@ -426,6 +433,14 @@ export default function EquipmentsListModern() {
                 // Expiring later (desc)
                 setSortBy("insuranceExpirationDate");
                 setSortOrder("desc");
+              } else if (value === "registrationExpiry") {
+                // Registration expiring soon (asc)
+                setSortBy("registrationExpiry");
+                setSortOrder("asc");
+              } else if (value === "registrationExpiry_late") {
+                // Registration expiring later (desc)
+                setSortBy("registrationExpiry");
+                setSortOrder("desc");
               } else if (value === "status") {
                 // Operational first (asc)
                 setSortBy("status");
@@ -437,11 +452,11 @@ export default function EquipmentsListModern() {
               } else if (value.includes("_desc")) {
                 // Generic desc handling
                 const field = value.replace("_desc", "");
-                setSortBy(field as "brand" | "status" | "insuranceExpirationDate" | "model" | "type" | "owner" | "");
+                setSortBy(field as "brand" | "status" | "insuranceExpirationDate" | "registrationExpiry" | "model" | "type" | "owner" | "");
                 setSortOrder("desc");
               } else {
                 // Default asc handling
-                setSortBy(value as "brand" | "status" | "insuranceExpirationDate" | "model" | "type" | "owner" | "");
+                setSortBy(value as "brand" | "status" | "insuranceExpirationDate" | "registrationExpiry" | "model" | "type" | "owner" | "");
                 setSortOrder("asc");
               }
             }}
@@ -455,8 +470,10 @@ export default function EquipmentsListModern() {
                 <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 px-2">
                   By Priority
                 </div>
-                <SelectItem value="insuranceExpirationDate">Expiring Soon</SelectItem>
-                <SelectItem value="insuranceExpirationDate_late">Expiring Later</SelectItem>
+                <SelectItem value="insuranceExpirationDate">Insurance Expiring Soon</SelectItem>
+                <SelectItem value="insuranceExpirationDate_late">Insurance Expiring Later</SelectItem>
+                <SelectItem value="registrationExpiry">Registration Expiring Soon</SelectItem>
+                <SelectItem value="registrationExpiry_late">Registration Expiring Later</SelectItem>
                 <SelectItem value="status">Operational First</SelectItem>
                 <SelectItem value="status_issues">Issues First</SelectItem>
 
@@ -498,8 +515,12 @@ export default function EquipmentsListModern() {
                 {(() => {
                   if (sortBy === "insuranceExpirationDate")
                     return sortOrder === "asc"
-                      ? "Expiring Soon"
-                      : "Expiring Later";
+                      ? "Insurance Expiring Soon"
+                      : "Insurance Expiring Later";
+                  if (sortBy === "registrationExpiry")
+                    return sortOrder === "asc"
+                      ? "Registration Expiring Soon"
+                      : "Registration Expiring Later";
                   if (sortBy === "status")
                     return sortOrder === "asc"
                       ? "Operational First"
@@ -645,7 +666,9 @@ export default function EquipmentsListModern() {
               : sortBy === "status"
               ? "status"
               : sortBy === "insuranceExpirationDate"
-              ? "expiry"
+              ? "insurance expiry"
+              : sortBy === "registrationExpiry"
+              ? "registration expiry"
               : sortBy === "owner"
               ? "owner"
               : "default"}{" "}
@@ -679,7 +702,8 @@ export default function EquipmentsListModern() {
           </div>
         ) : (
           paginatedEquipments.map((equipment, index) => {
-            const daysUntilExpiry = getDaysUntilExpiry(equipment.insuranceExpirationDate);
+            const daysUntilInsuranceExpiry = getDaysUntilExpiry(equipment.insuranceExpirationDate);
+            const daysUntilRegistrationExpiry = getDaysUntilExpiry(equipment.registrationExpiry);
             
             return (
               <Card
@@ -726,17 +750,21 @@ export default function EquipmentsListModern() {
                         )}
 
                         {/* Expiry Badge */}
-                        {daysUntilExpiry !== null && daysUntilExpiry <= 30 && (
+                        {(daysUntilInsuranceExpiry !== null && daysUntilInsuranceExpiry <= 30) || 
+                         (daysUntilRegistrationExpiry !== null && daysUntilRegistrationExpiry <= 30) ? (
                           <Badge
                             className={
-                              daysUntilExpiry <= 7
+                              (daysUntilInsuranceExpiry !== null && daysUntilInsuranceExpiry <= 7) ||
+                              (daysUntilRegistrationExpiry !== null && daysUntilRegistrationExpiry <= 7)
                                 ? "bg-red-500 text-white hover:bg-red-600"
                                 : "bg-orange-500 text-white hover:bg-orange-600"
                             }
                           >
-                            {daysUntilExpiry <= 0 ? "Expired" : "Expiring Soon"}
+                            {((daysUntilInsuranceExpiry !== null && daysUntilInsuranceExpiry <= 0) ||
+                              (daysUntilRegistrationExpiry !== null && daysUntilRegistrationExpiry <= 0))
+                              ? "Expired" : "Expiring Soon"}
                           </Badge>
-                        )}
+                        ) : null}
 
                         {/* Maintenance Issue Badge */}
                         {hasMaintenanceIssues(equipment) && (
@@ -810,14 +838,30 @@ export default function EquipmentsListModern() {
                         )[0] || "No location"}
                       </span>
                     </div>
+                    {equipment.registrationExpiry && (
+                      <div className="flex justify-between">
+                        <span>Registration Expires:</span>
+                        <span
+                          className={`font-medium ${
+                            daysUntilRegistrationExpiry !== null && daysUntilRegistrationExpiry <= 7
+                              ? "text-red-600"
+                              : daysUntilRegistrationExpiry !== null && daysUntilRegistrationExpiry <= 30
+                              ? "text-orange-600"
+                              : ""
+                          }`}
+                        >
+                          {new Date(equipment.registrationExpiry).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
                     {equipment.insuranceExpirationDate && (
                       <div className="flex justify-between">
                         <span>Insurance Expires:</span>
                         <span
                           className={`font-medium ${
-                            daysUntilExpiry !== null && daysUntilExpiry <= 7
+                            daysUntilInsuranceExpiry !== null && daysUntilInsuranceExpiry <= 7
                               ? "text-red-600"
-                              : daysUntilExpiry !== null && daysUntilExpiry <= 30
+                              : daysUntilInsuranceExpiry !== null && daysUntilInsuranceExpiry <= 30
                               ? "text-orange-600"
                               : ""
                           }`}

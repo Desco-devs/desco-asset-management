@@ -107,8 +107,6 @@ export default function PartsFolderManager({
   // Helper function to generate unique IDs
   const generateId = () => Math.random().toString(36).substring(2, 15);
 
-  // Debug logging for parts structure (can be removed in production)
-  console.log('🔧 PartsFolderManager current structure:', partsStructure);
 
   // Helper function to create file preview
   const createFilePreview = (file: File): Promise<string> => {
@@ -121,6 +119,18 @@ export default function PartsFolderManager({
         resolve('');
       }
     });
+  };
+
+  // Helper functions to trigger file uploads
+  const handleAddRootFiles = () => {
+    rootFileInputRef.current?.click();
+  };
+
+  const handleAddFilesToFolder = (folderId: string) => {
+    const folderInput = folderFileInputRefs.current[folderId];
+    if (folderInput) {
+      folderInput.click();
+    }
   };
 
   // Update parent component when structure changes
@@ -203,8 +213,9 @@ export default function PartsFolderManager({
       setFolderToDelete(folder);
       setIsDeleteConfirmOpen(true);
     } else {
-      // Delete empty folders immediately
-      confirmDeleteFolder(folder);
+      // Show confirmation dialog for empty folders too (organizational structure)
+      setFolderToDelete(folder);
+      setIsDeleteConfirmOpen(true);
     }
   };
 
@@ -469,10 +480,10 @@ export default function PartsFolderManager({
           <CardContent>
             <div className="space-y-2">
               {folder.files.length === 0 ? (
-                <div className="text-center py-4 border-2 border-dashed border-gray-200 rounded-lg">
-                  <Folder className="h-6 w-6 mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm text-muted-foreground">No files in this folder</p>
-                  <p className="text-xs text-muted-foreground mt-1">Click "Add Files" below to add files to this folder</p>
+                <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg bg-muted/20">
+                  <Folder className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
+                  <p className="text-sm font-medium text-muted-foreground">"{folder.name}" is empty</p>
+                  <p className="text-xs text-muted-foreground mt-1">This folder exists but contains no files yet</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-32 overflow-y-auto">
@@ -573,9 +584,10 @@ export default function PartsFolderManager({
           <CardContent>
           <div className="space-y-4">
             {partsStructure.rootFiles.length === 0 ? (
-              <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
-                <Image className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                <p className="text-sm text-muted-foreground">No files in root folder</p>
+              <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg bg-muted/20">
+                <Image className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">Root folder is empty</p>
+                <p className="text-xs text-muted-foreground mt-1">Upload files directly here or organize them in folders</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -612,7 +624,7 @@ export default function PartsFolderManager({
         )}
       </Card>
 
-      {/* Folders Section */}
+      {/* Folders Section - Always show if folders exist, even if empty */}
       {partsStructure.folders.length > 0 && (
         <div className="space-y-4">
           <div 

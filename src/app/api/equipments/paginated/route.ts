@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     const [equipmentData, totalCount] = await Promise.all([
       prisma.equipment.findMany({
         include: {
+          user: true, // Include created_by user info
           project: {
             include: {
               client: {
@@ -39,6 +40,8 @@ export async function GET(request: Request) {
       type: item.type,
       insuranceExpirationDate:
         item.insurance_expiration_date?.toISOString() || "",
+      registrationExpiry:
+        item.registration_expiry?.toISOString() || undefined,
       before: item.before || undefined,
       status: item.status as "OPERATIONAL" | "NON_OPERATIONAL",
       remarks: item.remarks || undefined,
@@ -71,7 +74,6 @@ export async function GET(request: Request) {
               // Try to parse as JSON (modern format)
               return JSON.parse(rawParts);
             } catch (error) {
-              console.warn('Failed to parse equipment_parts for equipment', item.id, ':', error);
               // If parsing fails but we have data, treat as legacy URL format
               if (item.equipment_parts.length > 0) {
                 return {
@@ -87,6 +89,8 @@ export async function GET(request: Request) {
             }
           })()
         : undefined,
+      created_at: item.created_at?.toISOString() || undefined,
+      created_by: item.user?.full_name || undefined,
       project: {
         uid: item.project.id,
         name: item.project.name,
@@ -113,7 +117,6 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    console.error('Error fetching paginated equipments:', error);
     return NextResponse.json(
       { error: 'Failed to fetch equipments' },
       { status: 500 }

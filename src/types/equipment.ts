@@ -71,6 +71,7 @@ export interface Equipment {
   model: string;
   type: string;
   insuranceExpirationDate?: string;
+  registrationExpiry?: string;
   before?: number;
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks?: string;
@@ -83,6 +84,8 @@ export interface Equipment {
   thirdpartyInspectionImage?: string;
   pgpcInspectionImage?: string;
   equipmentParts?: string[];
+  created_at?: string;
+  created_by?: string;
   project: {
     uid: string;
     name: string;
@@ -102,6 +105,7 @@ export interface EquipmentFormData {
   model: string;
   type: string;
   insuranceExpirationDate: Date | undefined;
+  registrationExpiry: Date | undefined;
   before: string;
   status: "OPERATIONAL" | "NON_OPERATIONAL";
   remarks: string;

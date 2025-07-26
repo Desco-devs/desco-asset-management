@@ -82,15 +82,12 @@ export default function EquipmentsPageModern() {
   // Delete confirmation functions
   const handleDeleteConfirm = async () => {
     if (!deleteConfirmation.equipment) return;
-    console.log("Delete confirmed for equipment:", deleteConfirmation.equipment.uid);
 
     try {
       await deleteEquipmentMutation.mutateAsync(deleteConfirmation.equipment.uid);
-      console.log("Equipment deleted successfully");
       setDeleteConfirmation({ isOpen: false, equipment: null });
       closeAllModals(); // Clean slate - everything closed
     } catch (error) {
-      console.error("Error deleting equipment:", error);
       const equipmentToRestore = deleteConfirmation.equipment;
       setDeleteConfirmation({ isOpen: false, equipment: null });
 
@@ -104,7 +101,6 @@ export default function EquipmentsPageModern() {
   };
 
   const handleDeleteCancel = () => {
-    console.log("Delete cancelled");
     const equipmentToRestore = deleteConfirmation.equipment;
     setDeleteConfirmation({ isOpen: false, equipment: null });
 
@@ -120,10 +116,6 @@ export default function EquipmentsPageModern() {
   const ImageViewerModal = () => {
     if (!viewerImage) return null;
 
-    console.log(
-      "Rendering global image viewer in parent component:",
-      viewerImage
-    );
 
     return (
       <Dialog open={true} onOpenChange={closeImageViewer}>

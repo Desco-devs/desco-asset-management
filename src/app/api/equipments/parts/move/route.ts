@@ -58,7 +58,7 @@ const moveFileInSupabase = async (
       .remove([oldFilePath])
 
     if (deleteError) {
-      console.warn(`Warning: Failed to delete old file: ${deleteError.message}`)
+      // Failed to delete old file
     }
 
     // Get new public URL
@@ -69,7 +69,6 @@ const moveFileInSupabase = async (
 
     return urlData.publicUrl
   } catch (error) {
-    console.error('Error moving file:', error)
     throw error
   }
 }
@@ -114,7 +113,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, newUrl })
   } catch (error) {
-    console.error('Move file error:', error)
     return NextResponse.json({ error: 'Failed to move file' }, { status: 500 })
   }
 }

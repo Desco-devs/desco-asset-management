@@ -7,7 +7,7 @@ export interface Equipment {
   model: string;
   type: string;
   insuranceExpirationDate: string;
-  before?: string;
+  before?: string | number;
   status: 'OPERATIONAL' | 'NON_OPERATIONAL';
   remarks?: string;
   owner: string;
@@ -18,7 +18,7 @@ export interface Equipment {
   equipmentRegistrationUrl?: string;
   thirdpartyInspectionImage?: string;
   pgpcInspectionImage?: string;
-  equipmentParts?: string;
+  equipmentParts?: string[];
   project: {
     uid: string;
     name: string;

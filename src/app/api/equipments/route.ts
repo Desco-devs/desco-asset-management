@@ -18,7 +18,6 @@ const extractFilePathFromUrl = (fileUrl: string): string | null => {
     }
     return null;
   } catch (err) {
-    console.error("extractFilePath error:", err);
     return null;
   }
 };
@@ -190,9 +189,7 @@ const moveFileInSupabase = async (
       .remove([oldFilePath]);
 
     if (deleteError) {
-      console.warn(
-        `Warning: Failed to delete old file: ${deleteError.message}`
-      );
+      // Failed to delete old file
     }
 
     // Get new public URL
@@ -202,7 +199,6 @@ const moveFileInSupabase = async (
 
     return urlData.publicUrl;
   } catch (error) {
-    console.error("Error moving file:", error);
     throw error;
   }
 };
@@ -245,6 +241,7 @@ export const GET = withResourcePermission(
       // Apply pagination if provided
       const queryOptions: Prisma.equipmentFindManyArgs = {
         where,
+        orderBy: { updated_at: 'desc' }, // Fast sorting by indexed field
         include: {
           project: {
             include: {
@@ -290,7 +287,6 @@ export const GET = withResourcePermission(
         },
       });
     } catch (error) {
-      console.error("GET /api/equipments error:", error);
       return NextResponse.json(
         { error: "Failed to fetch equipment" },
         { status: 500 }
@@ -318,6 +314,8 @@ export const POST = withResourcePermission(
       // Dates & plate:
       const inspDateStr = formData.get("inspectionDate") as string | null;
       const plateNum = (formData.get("plateNumber") as string) || null;
+      
+      // New inspection & compliance fields
 
       // BEFORE field as string
       const rawBefore = formData.get("before");
@@ -373,6 +371,8 @@ export const POST = withResourcePermission(
       if (inspDateStr) {
         createData.inspection_date = new Date(inspDateStr);
       }
+      
+      // Add new inspection & compliance fields
 
       const equipment = await prisma.equipment.create({ data: createData });
 
@@ -412,16 +412,22 @@ export const POST = withResourcePermission(
           )
         );
 
-      // 3) handle equipment parts with new standardized structure (matching server actions)
+      // 3) handle equipment parts with new standardized structure (matching server actions) - CRITICAL FIX: Support empty folders
       const partsStructureData = formData.get('partsStructure') as string;
       let partsStructureWithUrls = null;
       
       if (partsStructureData) {
         try {
           const partsStructure = JSON.parse(partsStructureData);
+          
+          // CRITICAL FIX: Initialize with existing structure to preserve empty folders
           partsStructureWithUrls = {
             rootFiles: [],
-            folders: []
+            folders: partsStructure.folders ? partsStructure.folders.map((folder: any) => ({
+              id: folder.id,
+              name: folder.name,
+              files: [] // Start with empty files array, will be populated with actual uploaded files
+            })) : []
           };
           
           // Upload root files and build structure
@@ -454,6 +460,11 @@ export const POST = withResourcePermission(
           
           // Upload folder files and build structure
           const folderMap: { [key: string]: any } = {};
+          
+          // CRITICAL FIX: Initialize folderMap with existing folders to preserve empty ones
+          partsStructureWithUrls.folders.forEach((folder: any) => {
+            folderMap[folder.name] = folder;
+          });
           
           for (let folderIndex = 0; formData.get(`partsFile_folder_${folderIndex}_0`); folderIndex++) {
             for (let fileIndex = 0; formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`); fileIndex++) {
@@ -496,8 +507,9 @@ export const POST = withResourcePermission(
           
           // Convert folderMap to array
           partsStructureWithUrls.folders = Object.values(folderMap);
+          
         } catch (error) {
-          console.error('Failed to parse parts structure:', error);
+          // Failed to parse parts structure
           // Fall back to legacy handling if JSON parsing fails
         }
       }
@@ -529,7 +541,6 @@ export const POST = withResourcePermission(
             updateData[u.field] = u.url;
           });
         } catch (e) {
-          console.error("Upload error:", e);
           await prisma.equipment.delete({ where: { id: equipment.id } });
           return NextResponse.json(
             { error: "File upload failed" },
@@ -563,7 +574,6 @@ export const POST = withResourcePermission(
           }
           updateData.equipment_parts = partUrls;
         } catch (e) {
-          console.error("Part upload error:", e);
           await prisma.equipment.delete({ where: { id: equipment.id } });
           return NextResponse.json(
             { error: "Equipment parts upload failed" },
@@ -590,7 +600,6 @@ export const POST = withResourcePermission(
       });
       return NextResponse.json(result);
     } catch (err) {
-      console.error("POST error:", err);
       return NextResponse.json(
         {
           error: "Internal server error",
@@ -623,6 +632,8 @@ export const PUT = withResourcePermission(
 
       const inspDateStr = formData.get("inspectionDate") as string | null;
       const plateNum = (formData.get("plateNumber") as string) || null;
+      
+      // New inspection & compliance fields
 
       // BEFORE field
       const rawBefore = formData.get("before");
@@ -646,28 +657,46 @@ export const PUT = withResourcePermission(
         );
       }
 
-      // build update data
-      const updateData: Record<string, unknown> = {
-        brand,
-        model,
-        type,
-        status,
-        remarks,
-        owner,
-        plate_number: plateNum,
-        before: beforeStr !== "" ? parseInt(beforeStr, 10) : null,
-        project_id: projectId,
-        // Handle insurance date conditionally
-        ...(insExp
-          ? { insurance_expiration_date: new Date(insExp) }
-          : { insurance_expiration_date: null }),
-      };
+      // 🚀 PERFORMANCE OPTIMIZATION: Build update data only with changed fields
+      const updateData: Record<string, unknown> = {};
 
-      if (inspDateStr) {
-        updateData.inspection_date = new Date(inspDateStr);
-      } else {
-        updateData.inspection_date = null;
+      // Required fields - always sent by frontend, but only update if different from existing
+      if (brand !== null && brand !== existing.brand) updateData.brand = brand;
+      if (model !== null && model !== existing.model) updateData.model = model;
+      if (type !== null && type !== existing.type) updateData.type = type;
+      if (owner !== null && owner !== existing.owner) updateData.owner = owner;
+      if (projectId !== null && projectId !== existing.project_id) updateData.project_id = projectId;
+
+      // Optional fields - only update if provided and different
+      if (status !== null && status !== existing.status) updateData.status = status;
+      if (remarks !== null && remarks !== existing.remarks) updateData.remarks = remarks;
+      if (plateNum !== null && plateNum !== existing.plate_number) updateData.plate_number = plateNum;
+      if (beforeStr !== null) {
+        const newBefore = beforeStr !== "" ? parseInt(beforeStr, 10) : null;
+        if (newBefore !== existing.before) updateData.before = newBefore;
       }
+
+      // Handle dates only if provided and different
+      if (insExp !== null) {
+        const newInsuranceDate = insExp ? new Date(insExp) : null;
+        const existingInsuranceDate = existing.insurance_expiration_date;
+        // Compare dates properly
+        const datesAreDifferent = newInsuranceDate?.getTime() !== existingInsuranceDate?.getTime();
+        if (datesAreDifferent) {
+          updateData.insurance_expiration_date = newInsuranceDate;
+        }
+      }
+      if (inspDateStr !== null) {
+        const newInspectionDate = inspDateStr ? new Date(inspDateStr) : null;
+        const existingInspectionDate = existing.inspection_date;
+        // Compare dates properly
+        const datesAreDifferent = newInspectionDate?.getTime() !== existingInspectionDate?.getTime();
+        if (datesAreDifferent) {
+          updateData.inspection_date = newInspectionDate;
+        }
+      }
+      
+
 
       // Rest of the PUT function remains the same...
       // Handle regular files
@@ -739,7 +768,7 @@ export const PUT = withResourcePermission(
         }
       }
 
-      // Handle equipment parts updates - support both new and legacy formats
+      // Handle equipment parts updates - support both new and legacy formats - CRITICAL FIX: Support empty folders
       const partsStructureData = formData.get('partsStructure') as string;
       let partsStructureWithUrls = null;
       
@@ -747,9 +776,15 @@ export const PUT = withResourcePermission(
         // Handle new parts structure (matching server actions)
         try {
           const partsStructure = JSON.parse(partsStructureData);
+          
+          // CRITICAL FIX: Initialize with existing structure to preserve empty folders
           partsStructureWithUrls = {
             rootFiles: [],
-            folders: []
+            folders: partsStructure.folders ? partsStructure.folders.map((folder: any) => ({
+              id: folder.id,
+              name: folder.name,
+              files: [] // Start with empty files array, will be populated with actual uploaded files
+            })) : []
           };
           
           // Upload root files and build structure
@@ -775,8 +810,28 @@ export const PUT = withResourcePermission(
             }
           }
           
+          // CRITICAL FIX: Process existing root files (for existing data preservation)
+          if (partsStructure.rootFiles && Array.isArray(partsStructure.rootFiles)) {
+            partsStructure.rootFiles.forEach((existingFile: any) => {
+              // Only add if it has a valid URL (existing stored file)
+              if (existingFile.url || existingFile.preview) {
+                partsStructureWithUrls.rootFiles.push({
+                  id: existingFile.id,
+                  name: existingFile.name,
+                  url: existingFile.url || existingFile.preview,
+                  type: existingFile.type || 'document'
+                });
+              }
+            });
+          }
+          
           // Upload folder files and build structure
           const folderMap: { [key: string]: any } = {};
+          
+          // CRITICAL FIX: Initialize folderMap with existing folders to preserve empty ones
+          partsStructureWithUrls.folders.forEach((folder: any) => {
+            folderMap[folder.name] = folder;
+          });
           
           for (let folderIndex = 0; formData.get(`partsFile_folder_${folderIndex}_0`); folderIndex++) {
             for (let fileIndex = 0; formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`); fileIndex++) {
@@ -812,13 +867,42 @@ export const PUT = withResourcePermission(
             }
           }
           
+          // CRITICAL FIX: Preserve existing files in folders
+          if (partsStructure.folders && Array.isArray(partsStructure.folders)) {
+            partsStructure.folders.forEach((existingFolder: any) => {
+              if (existingFolder.files && Array.isArray(existingFolder.files)) {
+                // Ensure folder exists in folderMap
+                if (!folderMap[existingFolder.name]) {
+                  folderMap[existingFolder.name] = {
+                    id: existingFolder.id,
+                    name: existingFolder.name,
+                    files: []
+                  };
+                }
+                
+                // Add existing files that have valid URLs
+                existingFolder.files.forEach((existingFile: any) => {
+                  if (existingFile.url || existingFile.preview) {
+                    folderMap[existingFolder.name].files.push({
+                      id: existingFile.id,
+                      name: existingFile.name,
+                      url: existingFile.url || existingFile.preview,
+                      type: existingFile.type || 'document'
+                    });
+                  }
+                });
+              }
+            });
+          }
+          
           // Convert folderMap to array
           partsStructureWithUrls.folders = Object.values(folderMap);
+          
           
           // Store as array with single JSON string element
           updateData.equipment_parts = [JSON.stringify(partsStructureWithUrls)];
         } catch (error) {
-          console.error('Failed to parse parts structure during update:', error);
+          // Failed to parse parts structure during update
         }
       } else {
         // Legacy handling: Handle equipment parts updates with folder structure
@@ -890,8 +974,7 @@ export const PUT = withResourcePermission(
               );
               newParts[partIndex] = movedUrl;
             } catch (error) {
-              console.error(`Failed to move file at index ${partIndex}:`, error);
-              // Keep the original URL if move fails
+              // Failed to move file - keep the original URL if move fails
             }
           } else if (keepExisting !== "true" && partIndex < currentParts.length) {
             // Remove existing part
@@ -919,7 +1002,6 @@ export const PUT = withResourcePermission(
             updateData[u.field] = u.url;
           });
         } catch (e) {
-          console.error("PUT upload error:", e);
           return NextResponse.json(
             { error: "File upload failed" },
             { status: 500 }
@@ -927,10 +1009,14 @@ export const PUT = withResourcePermission(
         }
       }
 
-      const updated = await prisma.equipment.update({
-        where: { id: equipmentId },
-        data: updateData,
-      });
+      // Only update if we have changes to make
+      let updated = existing;
+      if (Object.keys(updateData).length > 0) {
+        updated = await prisma.equipment.update({
+          where: { id: equipmentId },
+          data: updateData,
+        });
+      }
 
       const result = await prisma.equipment.findUnique({
         where: { id: updated.id },
@@ -943,7 +1029,6 @@ export const PUT = withResourcePermission(
 
       return NextResponse.json(result);
     } catch (err) {
-      console.error("PUT error:", err);
       return NextResponse.json(
         {
           error: "Internal server error",
@@ -996,7 +1081,6 @@ export const DELETE = withResourcePermission(
 
       return NextResponse.json({ message: "Deleted" });
     } catch (err) {
-      console.error("DELETE error:", err);
       return NextResponse.json(
         { error: "Internal server error" },
         { status: 500 }

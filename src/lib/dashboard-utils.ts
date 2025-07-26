@@ -166,7 +166,7 @@ export function generateRecentActivity(
         description: `Equipment status changed to ${item.status.toLowerCase().replace('_', ' ')}`,
         timestamp: item.created_at.toISOString(), // In real scenario, this would be updated_at
         status: item.status,
-        user: getUserName(item.project?.created_by),
+        user: getUserName(),
       });
     }
   });
@@ -196,7 +196,7 @@ export function generateRecentActivity(
         description: `Vehicle ${item.plate_number} status changed to ${item.status.toLowerCase().replace('_', ' ')}`,
         timestamp: item.created_at.toISOString(),
         status: item.status,
-        user: getUserName(item.project?.created_by),
+        user: getUserName(),
       });
     }
   });
@@ -259,7 +259,7 @@ export function generateRecentActivity(
       title: item.name,
       description: `New project "${item.name}" created for ${item.client?.name || 'Unknown Client'}`,
       timestamp: item.created_at.toISOString(),
-      user: getUserName(item.created_by),
+      user: getUserName(),
     });
   });
 
@@ -272,7 +272,7 @@ export function generateRecentActivity(
       title: item.name,
       description: `New client "${item.name}" registered`,
       timestamp: item.created_at.toISOString(),
-      user: getUserName(item.created_by),
+      user: getUserName(),
     });
   });
 
@@ -285,7 +285,7 @@ export function generateRecentActivity(
       title: item.address,
       description: `New service location added: ${item.address}`,
       timestamp: item.created_at.toISOString(),
-      user: getUserName(item.created_by),
+      user: getUserName(),
     });
   });
 

@@ -2,7 +2,6 @@
 
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -55,15 +54,29 @@ import {
   X,
   ZoomIn,
   Trash2,
+  CalendarIcon,
+  Save,
+  CheckCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import EditEquipmentModalModern from "./EditEquipmentModalModern";
 import EquipmentMaintenanceReportsEnhanced from "../EquipmentMaintenanceReportsEnhanced";
 import EquipmentPartsViewer from "../EquipmentPartsViewer";
+import { ImageDisplayWithRemove } from "@/components/equipment/ImageDisplayWithRemove";
+import PartsFolderManager, { type PartsStructure } from "../forms/PartsFolderManager";
+import { useUpdateEquipmentAction } from "@/hooks/useEquipmentsQuery";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { format } from "date-fns";
 
 export default function EquipmentModalModern() {
   // Server state from TanStack Query
-  const { equipments, maintenanceReports } = useEquipmentsWithReferenceData();
+  const { equipments, maintenanceReports, projects } = useEquipmentsWithReferenceData();
 
   // Client state from Zustand
   const selectedEquipmentFromStore = useEquipmentsStore(selectSelectedEquipment);
@@ -75,6 +88,38 @@ export default function EquipmentModalModern() {
 
   // Custom tab state - EXACTLY like CreateEquipmentForm with Images and Documents tabs
   const [activeTab, setActiveTab] = useState<'details' | 'images' | 'documents' | 'parts' | 'maintenance'>('details');
+
+  // Individual edit states for each tab
+  const [overviewEdit, setOverviewEdit] = useState(false);
+  const [imagesEdit, setImagesEdit] = useState(false);
+  const [documentsEdit, setDocumentsEdit] = useState(false);
+  const [partsEdit, setPartsEdit] = useState(false);
+  const [maintenanceEdit, setMaintenanceEdit] = useState(false);
+  const [inspectionEdit, setInspectionEdit] = useState(false);
+
+  // Date picker states for auto-close functionality
+  const [registrationExpiryDateOpen, setRegistrationExpiryDateOpen] = useState(false);
+  const [insuranceExpiryDateOpen, setInsuranceExpiryDateOpen] = useState(false);
+  const [lastInspectionDateOpen, setLastInspectionDateOpen] = useState(false);
+
+  // Form state for inspection dates - initialized with default values
+  const [inspectionFormData, setInspectionFormData] = useState({
+    registrationExpiry: undefined as Date | undefined,
+    insuranceExpirationDate: undefined as Date | undefined,
+    inspectionDate: undefined as Date | undefined,
+    before: '6',
+    remarks: ''
+  });
+
+  // Form refs and state for each tab
+  const overviewFormRef = useRef<HTMLFormElement>(null);
+  const imagesFormRef = useRef<HTMLFormElement>(null);
+  const documentsFormRef = useRef<HTMLFormElement>(null);
+  const partsFormRef = useRef<HTMLFormElement>(null);
+  const inspectionFormRef = useRef<HTMLFormElement>(null);
+
+  // Update mutation
+  const updateEquipmentMutation = useUpdateEquipmentAction();
 
   // Actions
   const {
@@ -90,17 +135,41 @@ export default function EquipmentModalModern() {
   // Mutations
   const deleteEquipmentMutation = useDeleteEquipment();
 
-  // Get the latest equipment data from the server
+  // CRITICAL FIX: Always prioritize fresh server data over store data
+  // This ensures view and edit always show the same, most up-to-date information
   const selectedEquipment = selectedEquipmentFromStore
-    ? equipments.find((e) => e.uid === selectedEquipmentFromStore.uid) ||
-      selectedEquipmentFromStore
+    ? equipments.find((e) => e.uid === selectedEquipmentFromStore.uid) || selectedEquipmentFromStore
     : null;
 
   useEffect(() => {
     if (!isModalOpen) {
       setActiveTab("details");
+      // Reset all edit states when modal closes
+      setOverviewEdit(false);
+      setImagesEdit(false);
+      setDocumentsEdit(false);
+      setPartsEdit(false);
+      setMaintenanceEdit(false);
+      setInspectionEdit(false);
+      // Reset date picker states
+      setRegistrationExpiryDateOpen(false);
+      setLastInspectionDateOpen(false);
     }
   }, [isModalOpen]);
+
+  // Update inspection form data when selectedEquipment changes
+  useEffect(() => {
+    if (selectedEquipment) {
+      setInspectionFormData({
+        registrationExpiry: selectedEquipment.registrationExpiry ? new Date(selectedEquipment.registrationExpiry) : undefined,
+        insuranceExpirationDate: selectedEquipment.insuranceExpirationDate ? new Date(selectedEquipment.insuranceExpirationDate) : undefined,
+        inspectionDate: selectedEquipment.inspectionDate ? new Date(selectedEquipment.inspectionDate) : undefined,
+        before: selectedEquipment.before?.toString() || '6',
+        remarks: selectedEquipment.remarks || ''
+      });
+    }
+  }, [selectedEquipment]);
+
 
   const handleClose = () => {
     setIsModalOpen(false);
@@ -108,6 +177,13 @@ export default function EquipmentModalModern() {
     setIsEditMode(false);
     // Close any open maintenance modals
     setIsEquipmentMaintenanceModalOpen(false);
+    // Reset all edit states
+    setOverviewEdit(false);
+    setImagesEdit(false);
+    setDocumentsEdit(false);
+    setPartsEdit(false);
+    setMaintenanceEdit(false);
+    setInspectionEdit(false);
   };
 
   const handleEdit = () => {
@@ -115,9 +191,122 @@ export default function EquipmentModalModern() {
   };
 
   const handleDelete = () => {
-    if (selectedEquipment) {
+    if (selectedEquipment && !selectedEquipment.uid.startsWith('temp_')) {
       setDeleteConfirmation({ isOpen: true, equipment: selectedEquipment });
       setIsModalOpen(false); // Close main modal to show delete confirmation
+    }
+  };
+
+  // Individual tab edit handlers
+  const handleTabEditToggle = (tab: 'overview' | 'images' | 'documents' | 'parts' | 'maintenance' | 'inspection', editState: boolean) => {
+    switch (tab) {
+      case 'overview':
+        setOverviewEdit(editState);
+        break;
+      case 'images':
+        setImagesEdit(editState);
+        break;
+      case 'documents':
+        setDocumentsEdit(editState);
+        break;
+      case 'parts':
+        setPartsEdit(editState);
+        break;
+      case 'maintenance':
+        setMaintenanceEdit(editState);
+        break;
+      case 'inspection':
+        setInspectionEdit(editState);
+        break;
+    }
+  };
+
+  const handleTabCancel = (tab: 'overview' | 'images' | 'documents' | 'parts' | 'maintenance' | 'inspection') => {
+    handleTabEditToggle(tab, false);
+    
+    // Reset form data when canceling inspection edit
+    if (tab === 'inspection' && selectedEquipment) {
+      setInspectionFormData({
+        registrationExpiry: selectedEquipment.registrationExpiry ? new Date(selectedEquipment.registrationExpiry) : undefined,
+        insuranceExpirationDate: selectedEquipment.insuranceExpirationDate ? new Date(selectedEquipment.insuranceExpirationDate) : undefined,
+        inspectionDate: selectedEquipment.inspectionDate ? new Date(selectedEquipment.inspectionDate) : undefined,
+        before: selectedEquipment.before?.toString() || '6',
+        remarks: selectedEquipment.remarks || ''
+      });
+      // Close any open date pickers
+      setRegistrationExpiryDateOpen(false);
+      setInsuranceExpiryDateOpen(false);
+      setLastInspectionDateOpen(false);
+    }
+  };
+
+  const handleTabSave = async (tab: 'overview' | 'images' | 'documents' | 'parts' | 'maintenance' | 'inspection') => {
+    if (!selectedEquipment) return;
+
+    let formRef: React.RefObject<HTMLFormElement | null>;
+    switch (tab) {
+      case 'overview':
+        formRef = overviewFormRef;
+        break;
+      case 'images':
+        formRef = imagesFormRef;
+        break;
+      case 'documents':
+        formRef = documentsFormRef;
+        break;
+      case 'parts':
+        formRef = partsFormRef;
+        break;
+      case 'inspection':
+        formRef = inspectionFormRef;
+        break;
+      default:
+        return;
+    }
+
+    if (!formRef.current) return;
+
+    const formData = new FormData(formRef.current);
+    formData.append('equipmentId', selectedEquipment.uid);
+
+    // Special handling for inspection tab - use state data instead of form data
+    if (tab === 'inspection') {
+      if (inspectionFormData.registrationExpiry) {
+        formData.append('registrationExpiry', format(inspectionFormData.registrationExpiry, 'yyyy-MM-dd'));
+      }
+      if (inspectionFormData.insuranceExpirationDate) {
+        formData.append('insuranceExpirationDate', format(inspectionFormData.insuranceExpirationDate, 'yyyy-MM-dd'));
+      }
+      if (inspectionFormData.inspectionDate) {
+        formData.append('inspectionDate', format(inspectionFormData.inspectionDate, 'yyyy-MM-dd'));
+      }
+      formData.append('before', inspectionFormData.before);
+      formData.append('remarks', inspectionFormData.remarks);
+    }
+
+    // Special handling for parts tab - get data from PartsFolderManager
+    if (tab === 'parts') {
+      // Note: PartsFolderManager handles its own state internally
+      // The parts data will be handled by the component's internal logic
+      // For now, we'll use the existing structure
+      const currentPartsStructure = selectedEquipment.equipmentParts 
+        ? (Array.isArray(selectedEquipment.equipmentParts) && selectedEquipment.equipmentParts.length > 0
+            ? JSON.parse(selectedEquipment.equipmentParts[0])
+            : typeof selectedEquipment.equipmentParts === 'string'
+            ? JSON.parse(selectedEquipment.equipmentParts)
+            : selectedEquipment.equipmentParts)
+        : { rootFiles: [], folders: [] };
+      
+      formData.append('partsStructure', JSON.stringify(currentPartsStructure));
+    }
+
+    try {
+      await updateEquipmentMutation.mutateAsync(formData);
+      handleTabEditToggle(tab, false);
+      toast.success(`${tab.charAt(0).toUpperCase() + tab.slice(1)} updated successfully`);
+    } catch (error) {
+      console.error(`Error updating ${tab}:`, error);
+      toast.error(`Failed to update ${tab}`);
     }
   };
 
@@ -185,7 +374,6 @@ export default function EquipmentModalModern() {
               <div 
                 className="relative cursor-pointer"
                 onClick={() => {
-                  console.log('Opening image viewer for:', label, url);
                   setShowImageViewer(true);
                 }}
               >
@@ -230,11 +418,8 @@ export default function EquipmentModalModern() {
                   className="max-w-full max-h-[70vh] sm:max-h-[55vh] lg:max-h-[50vh] xl:max-h-[45vh] object-contain"
                   onClick={(e) => e.stopPropagation()}
                   onError={(e) => {
-                    console.error('Image failed to load:', url);
-                    console.error('Error details:', e);
                   }}
                   onLoad={() => {
-                    console.log('Image loaded successfully:', url);
                   }}
                 />
               </div>
@@ -292,24 +477,65 @@ export default function EquipmentModalModern() {
   const getEquipmentPartsCount = () => {
     if (!selectedEquipment || !selectedEquipment.equipmentParts) return 0;
     
-    // Count files in rootFiles array and recursively in folders
-    const countFiles = (partsData: any): number => {
-      if (!partsData) return 0;
+    try {
+      let partsData;
       
-      let count = 0;
-      if (partsData.rootFiles && Array.isArray(partsData.rootFiles)) {
-        count += partsData.rootFiles.length;
+      // Handle different storage formats
+      if (typeof selectedEquipment.equipmentParts === 'string') {
+        partsData = JSON.parse(selectedEquipment.equipmentParts);
+      } else if (Array.isArray(selectedEquipment.equipmentParts)) {
+        if (selectedEquipment.equipmentParts.length === 0) return 0;
+        // Parse the first element which contains the JSON string - with safety check
+        try {
+          const rawData = selectedEquipment.equipmentParts[0];
+          
+          // Safety check - ensure it's a valid JSON string
+          if (typeof rawData !== 'string') {
+            return 0;
+          }
+          
+          // Additional safety - check if it starts with bucket (corrupted data)
+          if (rawData.startsWith('bucket') || rawData.includes('"bucket"')) {
+            return 0;
+          }
+          
+          partsData = JSON.parse(rawData);
+        } catch (error) {
+          return 0;
+        }
+      } else if (typeof selectedEquipment.equipmentParts === 'object') {
+        partsData = selectedEquipment.equipmentParts;
+      } else {
+        return 0;
       }
+      
+      if (!partsData) return 0;
+    
+      // Count only actual files with content (url, preview, or file), not empty structures
+      let count = 0;
+      
+      // Count root files that have actual content
+      if (partsData.rootFiles && Array.isArray(partsData.rootFiles)) {
+        count += partsData.rootFiles.filter((file: any) => 
+          file && (file.url || file.preview || file.file)
+        ).length;
+      }
+      
+      // Count files in folders that have actual content
       if (partsData.folders && Array.isArray(partsData.folders)) {
         partsData.folders.forEach((folder: any) => {
-          count += countFiles(folder);
+          if (folder && folder.files && Array.isArray(folder.files)) {
+            count += folder.files.filter((file: any) => 
+              file && (file.url || file.preview || file.file)
+            ).length;
+          }
         });
       }
       
       return count;
-    };
-    
-    return countFiles(selectedEquipment.equipmentParts);
+    } catch (error) {
+      return 0;
+    }
   };
 
   // Tab content components - EXACTLY like CreateEquipmentForm
@@ -332,6 +558,52 @@ export default function EquipmentModalModern() {
       <span className="hidden sm:inline">{label}</span>
     </Button>
   );
+
+  // Helper function to render edit button for each tab
+  const renderTabEditButton = (tab: 'overview' | 'images' | 'documents' | 'parts' | 'maintenance' | 'inspection', editState: boolean) => {
+    if (editState) {
+      return (
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => handleTabCancel(tab)}
+            disabled={updateEquipmentMutation.isPending}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => handleTabSave(tab)}
+            disabled={updateEquipmentMutation.isPending}
+            className="flex items-center gap-2"
+          >
+            {updateEquipmentMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Save Changes
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => handleTabEditToggle(tab, true)}
+        className="flex items-center gap-2"
+      >
+        <Edit className="h-4 w-4" />
+        Edit
+      </Button>
+    );
+  };
 
   const ModalContent = () => (
     <div className="space-y-4">
@@ -438,194 +710,575 @@ export default function EquipmentModalModern() {
           {/* Equipment Details */}
           <Card>
             <CardHeader className="pb-6">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Equipment Information
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                View detailed information about this equipment
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Equipment Information
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {overviewEdit ? 'Edit equipment details' : 'View detailed information about this equipment'}
+                  </p>
+                </div>
+                {renderTabEditButton('overview', overviewEdit)}
+              </div>
             </CardHeader>
             <CardContent className="space-y-8">
-              {/* Equipment Identity Section */}
-              <div className="space-y-4">
-                <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Wrench className="h-4 w-4" />
-                      Brand
-                    </Label>
-                    <div className="font-medium text-foreground">{selectedEquipment.brand}</div>
+              {overviewEdit ? (
+                // Edit Mode Form
+                <form ref={overviewFormRef} className="space-y-8">
+                  {/* Equipment Identity Section */}
+                  <div className="space-y-4">
+                    <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Wrench className="h-4 w-4" />
+                          Brand
+                        </Label>
+                        <Input
+                          name="brand"
+                          defaultValue={selectedEquipment.brand}
+                          placeholder="Enter equipment brand"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          Model
+                        </Label>
+                        <Input
+                          name="model"
+                          defaultValue={selectedEquipment.model}
+                          placeholder="Enter equipment model"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Equipment Type</Label>
+                        <Input
+                          name="type"
+                          defaultValue={selectedEquipment.type}
+                          placeholder="Enter equipment type"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Hash className="h-4 w-4" />
+                          Plate/Serial Number
+                        </Label>
+                        <Input
+                          name="plateNumber"
+                          defaultValue={selectedEquipment.plateNumber || ''}
+                          placeholder="Enter plate/serial number"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
-                      Model
-                    </Label>
-                    <div className="font-medium text-foreground">{selectedEquipment.model}</div>
+                  {/* Ownership & Project Section */}
+                  <div className="space-y-4">
+                    <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          Owner
+                        </Label>
+                        <Input
+                          name="owner"
+                          defaultValue={selectedEquipment.owner}
+                          placeholder="Enter equipment owner"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Assigned Project</Label>
+                        <Select name="projectId" defaultValue={selectedEquipment.project?.uid}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a project" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {projects.map((project) => (
+                              <SelectItem key={project.uid} value={project.uid}>
+                                {project.name} - {project.client.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Equipment Type</Label>
-                    <div className="font-medium text-foreground">{selectedEquipment.type}</div>
+                  {/* Status & Additional Fields Section */}
+                  <div className="space-y-4">
+                    <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Shield className="h-4 w-4" />
+                          Operational Status
+                        </Label>
+                        <Select name="status" defaultValue={selectedEquipment.status}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="OPERATIONAL">Operational</SelectItem>
+                            <SelectItem value="NON_OPERATIONAL">Non-Operational</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Insurance Expiration Date</Label>
+                        <Input
+                          name="insuranceExpirationDate"
+                          type="date"
+                          defaultValue={selectedEquipment.insuranceExpirationDate ? new Date(selectedEquipment.insuranceExpirationDate).toISOString().split('T')[0] : ''}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Inspection Date</Label>
+                        <Input
+                          name="inspectionDate"
+                          type="date"
+                          defaultValue={selectedEquipment.inspectionDate ? new Date(selectedEquipment.inspectionDate).toISOString().split('T')[0] : ''}
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  {selectedEquipment.plateNumber && (
+                  {/* Remarks Section */}
+                  <div className="space-y-2">
+                    <Label>Remarks</Label>
+                    <Textarea
+                      name="remarks"
+                      defaultValue={selectedEquipment.remarks || ''}
+                      placeholder="Enter any additional notes or remarks"
+                      rows={3}
+                    />
+                  </div>
+                </form>
+              ) : (
+                // View Mode
+                <>
+                  {/* Equipment Identity Section */}
+                  <div className="space-y-4">
+                    <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Wrench className="h-4 w-4" />
+                          Brand
+                        </Label>
+                        <div className="font-medium text-foreground">{selectedEquipment.brand}</div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4" />
+                          Model
+                        </Label>
+                        <div className="font-medium text-foreground">{selectedEquipment.model}</div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Equipment Type</Label>
+                        <div className="font-medium text-foreground">{selectedEquipment.type}</div>
+                      </div>
+
+                      {selectedEquipment.plateNumber && (
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            <Hash className="h-4 w-4" />
+                            Plate/Serial Number
+                          </Label>
+                          <div className="font-medium text-foreground font-mono">{selectedEquipment.plateNumber}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Ownership & Project Section */}
+                  <div className="space-y-4">
+                    <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          Owner
+                        </Label>
+                        <div className="font-medium text-foreground">{selectedEquipment.owner}</div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Assigned Project</Label>
+                        <div className="font-medium text-foreground">{selectedEquipment.project?.name || "Unassigned"}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status Section */}
+                  <div className="space-y-4">
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2">
-                        <Hash className="h-4 w-4" />
-                        Plate/Serial Number
+                        <Shield className="h-4 w-4" />
+                        Operational Status
                       </Label>
-                      <div className="font-medium text-foreground font-mono">{selectedEquipment.plateNumber}</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          className={
+                            selectedEquipment.status === "OPERATIONAL"
+                              ? "bg-green-100 text-green-800 hover:bg-green-200"
+                              : "bg-red-100 text-red-800 hover:bg-red-200"
+                          }
+                        >
+                          {selectedEquipment.status}
+                        </Badge>
+
+                        {selectedEquipment.plateNumber && (
+                          <Badge variant="outline" className="flex items-center gap-1">
+                            <Hash className="h-3 w-3" />
+                            {selectedEquipment.plateNumber}
+                          </Badge>
+                        )}
+
+                        {daysUntilExpiry !== null && daysUntilExpiry <= 30 && (
+                          <Badge
+                            className={
+                              daysUntilExpiry <= 7
+                                ? "bg-red-500 text-white hover:bg-red-600"
+                                : "bg-orange-500 text-white hover:bg-orange-600"
+                            }
+                          >
+                            {daysUntilExpiry <= 0 ? "Insurance Expired" : "Insurance Expiring Soon"}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Ownership & Project Section */}
-              <div className="space-y-4">
-                <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      Owner
-                    </Label>
-                    <div className="font-medium text-foreground">{selectedEquipment.owner}</div>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label>Assigned Project</Label>
-                    <div className="font-medium text-foreground">{selectedEquipment.project?.name || "Unassigned"}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Section */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    Operational Status
-                  </Label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge
-                      className={
-                        selectedEquipment.status === "OPERATIONAL"
-                          ? "bg-green-100 text-green-800 hover:bg-green-200"
-                          : "bg-red-100 text-red-800 hover:bg-red-200"
-                      }
-                    >
-                      {selectedEquipment.status}
-                    </Badge>
-
-                    {selectedEquipment.plateNumber && (
-                      <Badge variant="outline" className="flex items-center gap-1">
-                        <Hash className="h-3 w-3" />
-                        {selectedEquipment.plateNumber}
-                      </Badge>
-                    )}
-
-                    {daysUntilExpiry !== null && daysUntilExpiry <= 30 && (
-                      <Badge
-                        className={
-                          daysUntilExpiry <= 7
-                            ? "bg-red-500 text-white hover:bg-red-600"
-                            : "bg-orange-500 text-white hover:bg-orange-600"
-                        }
-                      >
-                        {daysUntilExpiry <= 0 ? "Insurance Expired" : "Insurance Expiring Soon"}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
-          {/* Inspection & Compliance Card */}
+          {/* Dates & Inspection Card */}
           <Card>
             <CardHeader className="pb-4">
-              <CardTitle className="text-base flex items-center gap-2">
-                <CalendarDays className="h-4 w-4" />
-                Inspection & Compliance
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Inspection schedules and compliance information
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4" />
+                    Dates & Inspection
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {inspectionEdit ? 'Edit equipment dates and inspection schedule' : 'Equipment registration, inspection dates and scheduling information'}
+                  </p>
+                </div>
+                {renderTabEditButton('inspection', inspectionEdit)}
+              </div>
             </CardHeader>
             <CardContent>
-              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
-                {selectedEquipment.inspectionDate && (
-                  <div className="space-y-2">
-                    <Label>Last Inspection Date</Label>
-                    <div className="font-medium text-foreground">
-                      {format(new Date(selectedEquipment.inspectionDate), "PPP")}
+              {inspectionEdit ? (
+                // Edit Mode Form
+                <form ref={inspectionFormRef} className="space-y-6">
+                  <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
+                    {/* Registration Expires */}
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        Registration Expires
+                      </Label>
+                      <Popover open={registrationExpiryDateOpen} onOpenChange={setRegistrationExpiryDateOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !inspectionFormData.registrationExpiry && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {inspectionFormData.registrationExpiry ? (
+                              format(inspectionFormData.registrationExpiry, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={inspectionFormData.registrationExpiry}
+                            onSelect={(date) => {
+                              setInspectionFormData(prev => ({ ...prev, registrationExpiry: date }));
+                              setRegistrationExpiryDateOpen(false); // Auto-close after selection
+                            }}
+                            initialFocus
+                            captionLayout="dropdown-buttons"
+                            fromYear={1990}
+                            toYear={2050}
+                            classNames={{
+                              caption_dropdowns: "flex gap-2 justify-center",
+                              vhidden: "hidden",
+                              caption_label: "hidden"
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {/* Insurance Expiration */}
+                    <div className="space-y-2">
+                      <Label>Insurance Expires</Label>
+                      <Popover open={insuranceExpiryDateOpen} onOpenChange={setInsuranceExpiryDateOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !inspectionFormData.insuranceExpirationDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {inspectionFormData.insuranceExpirationDate ? (
+                              format(inspectionFormData.insuranceExpirationDate, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={inspectionFormData.insuranceExpirationDate}
+                            onSelect={(date) => {
+                              setInspectionFormData(prev => ({ ...prev, insuranceExpirationDate: date }));
+                              setInsuranceExpiryDateOpen(false); // Auto-close after selection
+                            }}
+                            initialFocus
+                            captionLayout="dropdown-buttons"
+                            fromYear={1990}
+                            toYear={2050}
+                            classNames={{
+                              caption_dropdowns: "flex gap-2 justify-center",
+                              vhidden: "hidden",
+                              caption_label: "hidden"
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {/* Last Inspection */}
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4" />
+                        Last Inspection
+                      </Label>
+                      <Popover open={lastInspectionDateOpen} onOpenChange={setLastInspectionDateOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !inspectionFormData.inspectionDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {inspectionFormData.inspectionDate ? (
+                              format(inspectionFormData.inspectionDate, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={inspectionFormData.inspectionDate}
+                            onSelect={(date) => {
+                              setInspectionFormData(prev => ({ ...prev, inspectionDate: date }));
+                              setLastInspectionDateOpen(false); // Auto-close after selection
+                            }}
+                            initialFocus
+                            captionLayout="dropdown-buttons"
+                            fromYear={1990}
+                            toYear={2030}
+                            classNames={{
+                              caption_dropdowns: "flex gap-2 justify-center",
+                              vhidden: "hidden",
+                              caption_label: "hidden"
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {/* Inspection Frequency */}
+                    <div className="space-y-2">
+                      <Label>Inspection Frequency</Label>
+                      <Select 
+                        value={inspectionFormData.before} 
+                        onValueChange={(value) => setInspectionFormData(prev => ({ ...prev, before: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select frequency" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Every 1 month</SelectItem>
+                          <SelectItem value="2">Every 2 months</SelectItem>
+                          <SelectItem value="3">Every 3 months</SelectItem>
+                          <SelectItem value="6">Every 6 months</SelectItem>
+                          <SelectItem value="12">Every 12 months</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                )}
 
-                {selectedEquipment.insuranceExpirationDate && (
-                  <div className="space-y-2">
-                    <Label>Insurance Expiration Date</Label>
-                    <div className={`font-medium ${
-                      daysUntilExpiry !== null && daysUntilExpiry <= 7
-                        ? "text-red-600"
-                        : daysUntilExpiry !== null && daysUntilExpiry <= 30
-                        ? "text-orange-600"
-                        : "text-foreground"
-                    }`}>
-                      {format(new Date(selectedEquipment.insuranceExpirationDate), "PPP")}
-                    </div>
+                  {/* Additional Notes */}
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label>Additional Notes</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Add any additional information or special notes about this equipment
+                    </p>
+                    <Textarea
+                      value={inspectionFormData.remarks}
+                      onChange={(e) => setInspectionFormData(prev => ({ ...prev, remarks: e.target.value }))}
+                      placeholder="Enter any special notes, conditions, or important information about this equipment..."
+                      rows={3}
+                      className="min-h-[80px]"
+                    />
                   </div>
-                )}
+                </form>
+              ) : (
+                // View Mode
+                <div className="space-y-4">
+                  <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
+                    {/* Registration Expires */}
+                    {selectedEquipment.registrationExpiry && (
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-muted-foreground">Registration Expires:</Label>
+                        <div className={`font-medium ${
+                          (() => {
+                            if (!selectedEquipment.registrationExpiry) return "text-foreground";
+                            const now = new Date();
+                            const expiry = new Date(selectedEquipment.registrationExpiry);
+                            const diffTime = expiry.getTime() - now.getTime();
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            return diffDays <= 0 ? "text-red-600" : diffDays <= 30 ? "text-orange-600" : "text-foreground";
+                          })()
+                        }`}>
+                          {format(new Date(selectedEquipment.registrationExpiry), "M/d/yyyy")}
+                          {(() => {
+                            if (!selectedEquipment.registrationExpiry) return null;
+                            const now = new Date();
+                            const expiry = new Date(selectedEquipment.registrationExpiry);
+                            const diffTime = expiry.getTime() - now.getTime();
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            return diffDays <= 0 ? <span className="text-red-600 ml-2">(Expired)</span> : null;
+                          })()}
+                        </div>
+                      </div>
+                    )}
 
-                {selectedEquipment.before && (
-                  <div className="space-y-2">
-                    <Label>Inspection Frequency</Label>
-                    <div className="font-medium text-foreground">
-                      {(() => {
-                        const frequency = selectedEquipment.before?.toString();
-                        switch (frequency) {
-                          case '1': return 'Monthly';
-                          case '2': return 'Every 2 months';
-                          case '3': return 'Quarterly';
-                          case '6': return 'Every 6 months';
-                          case '12': return 'Annually';
-                          default: return `Every ${frequency} months`;
-                        }
-                      })()}
-                    </div>
+                    {/* Insurance Expires */}
+                    {selectedEquipment.insuranceExpirationDate && (
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-muted-foreground">Insurance Expires:</Label>
+                        <div className={`font-medium ${
+                          daysUntilExpiry !== null && daysUntilExpiry <= 0
+                            ? "text-red-600"
+                            : daysUntilExpiry !== null && daysUntilExpiry <= 30
+                            ? "text-orange-600"
+                            : "text-foreground"
+                        }`}>
+                          {format(new Date(selectedEquipment.insuranceExpirationDate), "M/d/yyyy")}
+                          {daysUntilExpiry !== null && daysUntilExpiry <= 0 && (
+                            <span className="text-red-600 ml-2">(Expired)</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Last Inspection */}
+                    {selectedEquipment.inspectionDate && (
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-muted-foreground">Last Inspection:</Label>
+                        <div className="font-medium text-foreground">
+                          {format(new Date(selectedEquipment.inspectionDate), "M/d/yyyy")}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Next Inspection Due */}
+                    {selectedEquipment.inspectionDate && selectedEquipment.before && (
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-muted-foreground">Next Inspection Due:</Label>
+                        <div className="font-medium text-foreground">
+                          {(() => {
+                            const lastInspection = new Date(selectedEquipment.inspectionDate);
+                            const frequency = parseInt(selectedEquipment.before.toString());
+                            const nextInspection = new Date(lastInspection);
+                            nextInspection.setMonth(nextInspection.getMonth() + frequency);
+                            return format(nextInspection, "M/d/yyyy");
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Inspection Frequency */}
+                    {selectedEquipment.before && (
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-muted-foreground">Inspection Frequency:</Label>
+                        <div className="font-medium text-foreground">
+                          Every {selectedEquipment.before} month{parseInt(selectedEquipment.before.toString()) > 1 ? 's' : ''}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Date Added */}
+                    {selectedEquipment.created_at && (
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-muted-foreground">Date Added:</Label>
+                        <div className="font-medium text-foreground">
+                          {format(new Date(selectedEquipment.created_at), "M/d/yyyy")}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Added by */}
+                    {selectedEquipment.created_by && (
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium text-muted-foreground">Added by:</Label>
+                        <div className="font-medium text-foreground">
+                          {selectedEquipment.created_by}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
 
-                <div className="space-y-2">
-                  <Label>Client</Label>
-                  <div className="font-medium text-foreground">{selectedEquipment.project?.client?.name || "No client"}</div>
+                  {/* Additional Notes */}
+                  <div className="space-y-2 pt-4 border-t">
+                    <Label className="text-sm font-medium text-muted-foreground">Additional Notes:</Label>
+                    {selectedEquipment.remarks ? (
+                      <div className="p-3 bg-muted/50 rounded-lg text-sm text-foreground">
+                        {selectedEquipment.remarks}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground italic">
+                        No additional notes
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
-          {/* Additional Information */}
-          {selectedEquipment.remarks && (
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base">Additional Notes</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Special notes and remarks about this equipment
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Label>Remarks</Label>
-                  <div className="p-3 bg-muted/50 rounded-lg text-sm text-foreground">
-                    {selectedEquipment.remarks}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       )}
 
@@ -634,51 +1287,120 @@ export default function EquipmentModalModern() {
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Camera className="h-4 w-4" />
-                Equipment Images {isMobile ? '' : ''}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-2">
-                Photos and inspection images for this equipment. These images help with identification, insurance claims, and maintenance records.
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Camera className="h-4 w-4" />
+                    Equipment Images {isMobile ? '' : ''}
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {imagesEdit ? 'Upload or replace equipment images' : 'Photos and inspection images for this equipment. These images help with identification, insurance claims, and maintenance records.'}
+                  </p>
+                </div>
+                {renderTabEditButton('images', imagesEdit)}
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                  {/* Equipment Image */}
-                  {selectedEquipment.image_url && (
-                    <ImageViewerSection 
-                      url={selectedEquipment.image_url}
-                      label="Equipment Image" 
-                      description="Equipment Image"
-                    />
-                  )}
-                  
-                  {/* Third-party Inspection */}
-                  {selectedEquipment.thirdpartyInspectionImage && (
-                    <ImageViewerSection 
-                      url={selectedEquipment.thirdpartyInspectionImage}
-                      label="Third-party Inspection" 
-                      description="Third-party Inspection"
-                    />
-                  )}
-                  
-                  {/* PGPC Inspection */}
-                  {selectedEquipment.pgpcInspectionImage && (
-                    <ImageViewerSection 
-                      url={selectedEquipment.pgpcInspectionImage}
-                      label="PGPC Inspection" 
-                      description="PGPC Inspection"
-                    />
+              {imagesEdit ? (
+                // Edit Mode Form
+                <form ref={imagesFormRef} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                      {/* Equipment Image */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Equipment Image</Label>
+                        {selectedEquipment.image_url ? (
+                          <ImageDisplayWithRemove
+                            url={selectedEquipment.image_url}
+                            onRemove={() => {}}
+                            label="Equipment Image"
+                            description="Equipment image for identification"
+                          />
+                        ) : (
+                          <div className="text-center py-8">
+                            <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                            <p className="text-muted-foreground">No equipment image available</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Third-party Inspection */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Third-party Inspection</Label>
+                        {selectedEquipment.thirdpartyInspectionImage ? (
+                          <ImageDisplayWithRemove
+                            url={selectedEquipment.thirdpartyInspectionImage}
+                            onRemove={() => {}}
+                            label="Third-party Inspection"
+                            description="Third-party inspection certificate"
+                          />
+                        ) : (
+                          <div className="text-center py-8">
+                            <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                            <p className="text-muted-foreground">No third-party inspection available</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* PGPC Inspection */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">PGPC Inspection</Label>
+                        {selectedEquipment.pgpcInspectionImage ? (
+                          <ImageDisplayWithRemove
+                            url={selectedEquipment.pgpcInspectionImage}
+                            onRemove={() => {}}
+                            label="PGPC Inspection"
+                            description="PGPC inspection certificate"
+                          />
+                        ) : (
+                          <div className="text-center py-8">
+                            <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                            <p className="text-muted-foreground">No PGPC inspection available</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                // View Mode
+                <div className="space-y-4">
+                  <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {/* Equipment Image */}
+                    {selectedEquipment.image_url && (
+                      <ImageViewerSection 
+                        url={selectedEquipment.image_url}
+                        label="Equipment Image" 
+                        description="Equipment Image"
+                      />
+                    )}
+                    
+                    {/* Third-party Inspection */}
+                    {selectedEquipment.thirdpartyInspectionImage && (
+                      <ImageViewerSection 
+                        url={selectedEquipment.thirdpartyInspectionImage}
+                        label="Third-party Inspection" 
+                        description="Third-party Inspection"
+                      />
+                    )}
+                    
+                    {/* PGPC Inspection */}
+                    {selectedEquipment.pgpcInspectionImage && (
+                      <ImageViewerSection 
+                        url={selectedEquipment.pgpcInspectionImage}
+                        label="PGPC Inspection" 
+                        description="PGPC Inspection"
+                      />
+                    )}
+                  </div>
+                  {!selectedEquipment.image_url && !selectedEquipment.thirdpartyInspectionImage && !selectedEquipment.pgpcInspectionImage && (
+                    <div className="text-center py-8">
+                      <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <p className="text-muted-foreground">No images available for this equipment</p>
+                    </div>
                   )}
                 </div>
-                {!selectedEquipment.image_url && !selectedEquipment.thirdpartyInspectionImage && !selectedEquipment.pgpcInspectionImage && (
-                  <div className="text-center py-8">
-                    <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <p className="text-muted-foreground">No images available for this equipment</p>
-                  </div>
-                )}
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -689,42 +1411,93 @@ export default function EquipmentModalModern() {
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Documents {isMobile ? '' : ''}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-2">
-                Important equipment documents for compliance and record-keeping. Accepted formats: PDF and image files.
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Documents {isMobile ? '' : ''}
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {documentsEdit ? 'Upload or replace equipment documents' : 'Important equipment documents for compliance and record-keeping. Accepted formats: PDF and image files.'}
+                  </p>
+                </div>
+                {renderTabEditButton('documents', documentsEdit)}
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                  {/* Original Receipt (OR) */}
-                  {selectedEquipment.originalReceiptUrl && (
-                    <ImageViewerSection 
-                      url={selectedEquipment.originalReceiptUrl}
-                      label="Original Receipt (OR)" 
-                      description="Proof of purchase document"
-                    />
-                  )}
-                  
-                  {/* Equipment Registration */}
-                  {selectedEquipment.equipmentRegistrationUrl && (
-                    <ImageViewerSection 
-                      url={selectedEquipment.equipmentRegistrationUrl}
-                      label="Equipment Registration" 
-                      description="Official equipment registration certificate"
-                    />
+              {documentsEdit ? (
+                // Edit Mode Form
+                <form ref={documentsFormRef} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                      {/* Original Receipt (OR) */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Original Receipt (OR)</Label>
+                        {selectedEquipment.originalReceiptUrl ? (
+                          <ImageDisplayWithRemove
+                            url={selectedEquipment.originalReceiptUrl}
+                            onRemove={() => {}}
+                            label="Original Receipt"
+                            description="Proof of purchase document"
+                          />
+                        ) : (
+                          <div className="text-center py-8">
+                            <Receipt className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                            <p className="text-muted-foreground">No original receipt available</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Equipment Registration */}
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Equipment Registration</Label>
+                        {selectedEquipment.equipmentRegistrationUrl ? (
+                          <ImageDisplayWithRemove
+                            url={selectedEquipment.equipmentRegistrationUrl}
+                            onRemove={() => {}}
+                            label="Equipment Registration"
+                            description="Official equipment registration certificate"
+                          />
+                        ) : (
+                          <div className="text-center py-8">
+                            <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                            <p className="text-muted-foreground">No equipment registration available</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                // View Mode
+                <div className="space-y-4">
+                  <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {/* Original Receipt (OR) */}
+                    {selectedEquipment.originalReceiptUrl && (
+                      <ImageViewerSection 
+                        url={selectedEquipment.originalReceiptUrl}
+                        label="Original Receipt (OR)" 
+                        description="Proof of purchase document"
+                      />
+                    )}
+                    
+                    {/* Equipment Registration */}
+                    {selectedEquipment.equipmentRegistrationUrl && (
+                      <ImageViewerSection 
+                        url={selectedEquipment.equipmentRegistrationUrl}
+                        label="Equipment Registration" 
+                        description="Official equipment registration certificate"
+                      />
+                    )}
+                  </div>
+                  {!selectedEquipment.originalReceiptUrl && !selectedEquipment.equipmentRegistrationUrl && (
+                    <div className="text-center py-8">
+                      <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <p className="text-muted-foreground">No documents available for this equipment</p>
+                    </div>
                   )}
                 </div>
-                {!selectedEquipment.originalReceiptUrl && !selectedEquipment.equipmentRegistrationUrl && (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                    <p className="text-muted-foreground">No documents available for this equipment</p>
-                  </div>
-                )}
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -733,21 +1506,54 @@ export default function EquipmentModalModern() {
       {/* Parts Tab */}
       {activeTab === 'parts' && (
         <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold">Equipment Parts</h3>
-            <p className="text-sm text-muted-foreground">
-              View and browse parts documentation organized in folders.
-            </p>
-          </div>
-          <EquipmentPartsViewer 
-            equipmentParts={
-              selectedEquipment.equipmentParts 
-                ? typeof selectedEquipment.equipmentParts === 'string'
-                  ? JSON.parse(selectedEquipment.equipmentParts)
-                  : selectedEquipment.equipmentParts
-                : { rootFiles: [], folders: [] }
-            } 
-          />
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Wrench className="h-4 w-4" />
+                    Equipment Parts
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {partsEdit ? 'Manage parts documentation with folders and files' : 'View and browse parts documentation organized in folders.'}
+                  </p>
+                </div>
+                {renderTabEditButton('parts', partsEdit)}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {partsEdit ? (
+                // Edit Mode Form
+                <form ref={partsFormRef} className="space-y-6">
+                  <PartsFolderManager
+                    initialData={
+                      selectedEquipment.equipmentParts 
+                        ? (Array.isArray(selectedEquipment.equipmentParts) && selectedEquipment.equipmentParts.length > 0
+                            ? JSON.parse(selectedEquipment.equipmentParts[0])
+                            : typeof selectedEquipment.equipmentParts === 'string'
+                            ? JSON.parse(selectedEquipment.equipmentParts)
+                            : selectedEquipment.equipmentParts)
+                        : { rootFiles: [], folders: [] }
+                    }
+                    onChange={() => {}} // Parts manager handles its own state
+                  />
+                </form>
+              ) : (
+                // View Mode
+                <EquipmentPartsViewer 
+                  equipmentParts={
+                    selectedEquipment.equipmentParts 
+                      ? (Array.isArray(selectedEquipment.equipmentParts) && selectedEquipment.equipmentParts.length > 0
+                          ? JSON.parse(selectedEquipment.equipmentParts[0])
+                          : typeof selectedEquipment.equipmentParts === 'string'
+                          ? JSON.parse(selectedEquipment.equipmentParts)
+                          : selectedEquipment.equipmentParts)
+                      : { rootFiles: [], folders: [] }
+                  } 
+                />
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -793,29 +1599,19 @@ export default function EquipmentModalModern() {
               </div>
             </DrawerHeader>
             
-            {/* Mobile Content - Exact copy from CreateEquipmentModalModern */}
-            <div className="flex-1 overflow-y-auto p-4">
+            {/* Mobile Content - Enhanced to ensure footer visibility */}
+            <div className="flex-1 overflow-y-auto p-4 pb-6">
               <ModalContent />
             </div>
             
             {/* Mobile Action Buttons in Footer */}
-            <DrawerFooter className="p-4 pt-2 border-t bg-background">
+            <DrawerFooter className="flex-shrink-0 p-4 pt-2 border-t bg-background">
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleEdit}
-                  className="flex-1"
-                  size="lg"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Equipment
-                </Button>
                 <Button
                   type="button"
                   variant="destructive"
                   onClick={handleDelete}
-                  disabled={deleteEquipmentMutation.isPending}
+                  disabled={deleteEquipmentMutation.isPending || selectedEquipment?.uid.startsWith('temp_')}
                   className="flex-1"
                   size="lg"
                 >
@@ -825,6 +1621,16 @@ export default function EquipmentModalModern() {
                     <Trash2 className="h-4 w-4 mr-2" />
                   )}
                   Delete Equipment
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleEdit}
+                  className="flex-1"
+                  size="lg"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Equipment
                 </Button>
               </div>
             </DrawerFooter>
@@ -849,28 +1655,18 @@ export default function EquipmentModalModern() {
             </p>
           </DialogHeader>
           
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto pb-4">
             <ModalContent />
           </div>
           
           {/* Desktop Action Buttons in Footer */}
-          <DialogFooter className="pt-4 border-t bg-background">
+          <DialogFooter className="flex-shrink-0 pt-4 border-t bg-background">
             <div className="flex gap-2 w-full">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleEdit}
-                className="flex-1"
-                size="lg"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Equipment
-              </Button>
               <Button
                 type="button"
                 variant="destructive"
                 onClick={handleDelete}
-                disabled={deleteEquipmentMutation.isPending}
+                disabled={deleteEquipmentMutation.isPending || selectedEquipment?.uid.startsWith('temp_')}
                 className="flex-1"
                 size="lg"
               >
@@ -880,6 +1676,16 @@ export default function EquipmentModalModern() {
                   <Trash2 className="h-4 w-4 mr-2" />
                 )}
                 Delete Equipment
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleEdit}
+                className="flex-1"
+                size="lg"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Equipment
               </Button>
             </div>
           </DialogFooter>

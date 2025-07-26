@@ -317,7 +317,6 @@ const EquipmentCards = ({
       setEquipmentReports((prev) => ({ ...prev, [equipmentId]: reports }));
       return reports;
     } catch (error) {
-      console.error("Error fetching maintenance reports:", error);
       toast.error("Failed to fetch maintenance reports");
       return [];
     } finally {
@@ -429,7 +428,6 @@ const EquipmentCards = ({
         setShowViewReportsModal(false);
       }
     } catch (error) {
-      console.error("Error deleting maintenance report:", error);
       toast.error(
         `Failed to delete maintenance report: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -489,7 +487,6 @@ const EquipmentCards = ({
 
       onEquipmentAdded(); // Refresh the equipment list
     } catch (error) {
-      console.error("Error deleting equipment:", error);
       toast.error(
         `Failed to delete equipment: ${
           error instanceof Error ? error.message : "Unknown error occurred"
@@ -542,7 +539,6 @@ const EquipmentCards = ({
         return reports.length;
       }
     } catch (error) {
-      console.error("Error fetching report count:", error);
     }
     return 0;
   };
@@ -780,14 +776,6 @@ const EquipmentCards = ({
                     </Button>
                     <Button
                       size="sm"
-                      variant="outline"
-                      onClick={(e) => handleEditIssue(e, equipment)}
-                      disabled={deletingEquipmentId === equipment.uid}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
                       variant="destructive"
                       onClick={(e) => handleDeleteIssue(e, equipment)}
                       disabled={deletingEquipmentId === equipment.uid}
@@ -797,6 +785,14 @@ const EquipmentCards = ({
                       ) : (
                         <Trash2 className="h-4 w-4" />
                       )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => handleEditIssue(e, equipment)}
+                      disabled={deletingEquipmentId === equipment.uid}
+                    >
+                      <Edit className="h-4 w-4" />
                     </Button>
                   </div>
                 )}
@@ -814,7 +810,11 @@ const EquipmentCards = ({
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={(e) => handleDeleteIssue(e, equipment)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEquipmentToDelete(equipment);
+                        setShowDeleteDialog(true);
+                      }}
                       disabled={deletingEquipmentId === equipment.uid}
                     >
                       {deletingEquipmentId === equipment.uid ? (

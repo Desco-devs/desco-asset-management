@@ -255,7 +255,6 @@ export default function EquipmentClientViewer({
         setEquipment(serializedEquipment);
       }
     } catch (error) {
-      console.error("Error refreshing equipment data:", error);
     }
   }, []);
 
@@ -383,7 +382,6 @@ export default function EquipmentClientViewer({
         );
       }
     } catch (error) {
-      console.error("Error exporting maintenance reports:", error);
       toast.error("Failed to export maintenance reports. Please try again.");
     } finally {
       setExportingReports(false);
