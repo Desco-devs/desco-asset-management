@@ -54,11 +54,20 @@ export interface Location {
 export interface MaintenanceReport {
   id: string;
   equipment_id: string;
+  location_id: string;
   issue_description: string;
-  status: string | null;
+  remarks: string | null;
+  inspection_details: string | null;
+  action_taken: string | null;
+  parts_replaced: string[];
   priority: string | null;
+  status: string | null;
+  downtime_hours: string | null;
   date_reported: string;
   date_repaired: string | null;
+  attachment_urls: string[];
+  reported_by: string | null;
+  repaired_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -75,41 +84,6 @@ export interface EquipmentResponse {
   };
 }
 
-// Legacy Equipment Interface for backward compatibility
-export interface LegacyEquipment {
-  uid: string;
-  brand: string;
-  model: string;
-  type: string;
-  insuranceExpirationDate?: string;
-  registrationExpiry?: string;
-  before?: number;
-  status: Status;
-  remarks?: string;
-  owner: string;
-  image_url?: string;
-  inspectionDate?: string;
-  plateNumber?: string;
-  originalReceiptUrl?: string;
-  equipmentRegistrationUrl?: string;
-  thirdpartyInspectionImage?: string;
-  pgpcInspectionImage?: string;
-  equipmentParts?: string[];
-  created_at?: string;
-  created_by?: string;
-  project: {
-    uid: string;
-    name: string;
-    client: {
-      uid: string;
-      name: string;
-      location: {
-        uid: string;
-        address: string;
-      };
-    };
-  };
-}
 
 // Vehicle interface (keeping existing for compatibility)
 export interface Vehicle {
@@ -183,11 +157,4 @@ export interface FilesState {
   registration: FileState;
   thirdpartyInspection: FileState;
   pgpcInspection: FileState;
-}
-
-export interface AddEquipmentModalProps {
-  onEquipmentAdded: () => void;
-  editEquipment?: Equipment | null;
-  isOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
 }

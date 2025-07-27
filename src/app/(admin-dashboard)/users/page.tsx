@@ -1,161 +1,106 @@
 'use client'
 
-import { Card, CardContent } from '@/components/ui/card'
 import { UserModal } from '@/components/modals/UserModal'
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/api/use-users'
+import { useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/useUsersQuery'
 import { useUsersStore } from '@/stores/users-store'
 import { CreateUserSchema, UpdateUserSchema } from '@/types/users'
-import { parseUserRole, parseUserStatus } from '@/lib/constants/users'
 import { useAuth } from '@/app/context/AuthContext'
 
-// Page-specific components
+// Components
 import { UserHeader } from './components/UserHeader'
 import { UserStats } from './components/UserStats'
 import { UserSearchAndActions } from './components/UserSearchAndActions'
-import { UserTableSection } from './components/UserTableSection'
+import { UsersList } from './components/UsersList'
 
 export default function UsersPage() {
-  // Get current authenticated user
-  const { user: currentUser } = useAuth()
-  
-  // Zustand store for client state management
-  const {
-    modalState,
-    filters,
-    hasActiveFilters,
-    openCreateModal,
-    openEditModal,
-    openViewModal,
-    closeModal,
-    setFilters,
-    clearFilters,
-  } = useUsersStore()
-
-  // TanStack Query with Supabase realtime - filter out current user
-  const { data: usersData, isLoading, error } = useUsers(filters, currentUser?.id)
+  // Data layer
   const createUserMutation = useCreateUser()
   const updateUserMutation = useUpdateUser()
   const deleteUserMutation = useDeleteUser()
 
+  // UI layer
+  const { user: currentUser } = useAuth()
+  const {
+    isModalOpen,
+    selectedUser,
+    modalMode,
+    searchQuery,
+    filterRole,
+    filterStatus,
+    openCreateModal,
+    openEditModal,
+    openViewModal,
+    closeModal,
+    setSearchQuery,
+    setFilterRole,
+    setFilterStatus,
+    resetFilters,
+    getFilteredUsers,
+  } = useUsersStore()
+
   // Handlers
   const handleCreateUser = async (data: CreateUserSchema) => {
-    try {
-      await createUserMutation.mutateAsync(data)
-      // Only close modal on success
-      closeModal()
-    } catch (error) {
-      // Error occurred - don't close modal, let user fix and retry
-      console.error('Error creating user:', error)
-    }
+    await createUserMutation.mutateAsync(data)
+    closeModal()
   }
 
   const handleUpdateUser = async (data: UpdateUserSchema) => {
-    if (!modalState.user) return
-    try {
-      const updatedUser = await updateUserMutation.mutateAsync({ id: modalState.user.id, data })
-      // Close modal on success
-      closeModal()
-      // Note: The UsersCards component will handle reopening the drawer with updated data
-      // via the userBeingEdited state and modal close detection
-    } catch (error) {
-      // Error occurred - don't close modal, let user fix and retry
-      console.error('Error updating user:', error)
-    }
+    if (!selectedUser) return
+    await updateUserMutation.mutateAsync({ id: selectedUser.id, data })
+    closeModal()
   }
 
   const handleDeleteUser = async (userId: string) => {
-    // Use mutateAsync which will throw on error, allowing the modal to stay open on failure
     return deleteUserMutation.mutateAsync(userId)
   }
 
   const handleModalSubmit = async (data: CreateUserSchema | UpdateUserSchema) => {
-    if (modalState.mode === 'create') {
+    if (modalMode === 'create') {
       await handleCreateUser(data as CreateUserSchema)
-    } else if (modalState.mode === 'edit') {
+    } else if (modalMode === 'edit') {
       await handleUpdateUser(data as UpdateUserSchema)
     }
   }
 
-  // Filter handlers
-  const handleSearchChange = (search: string) => {
-    setFilters({ search: search || undefined })
-  }
-
-  const handleRoleFilter = (role: string) => {
-    setFilters({ role: parseUserRole(role) })
-  }
-
-  const handleStatusFilter = (status: string) => {
-    setFilters({ status: parseUserStatus(status) })
-  }
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center text-red-600">
-              <h3 className="text-lg font-semibold mb-2">Error Loading Users</h3>
-              <p>{error.message}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  const hasActiveFilters = !!(searchQuery || filterRole || filterStatus)
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
-      <UserHeader 
-        total={usersData?.originalTotal || usersData?.total}
-      />
+      <UserHeader />
 
-      {/* Stats Cards */}
-      {usersData && (
-        <UserStats 
-          usersData={usersData}
-          currentUserId={currentUser?.id}
-        />
-      )}
-
+      {/* Stats - TODO: Implement if needed */}
+      
       {/* Search and Actions */}
       <UserSearchAndActions
-        filters={filters}
+        searchQuery={searchQuery}
+        filterRole={filterRole}
+        filterStatus={filterStatus}
         hasActiveFilters={hasActiveFilters}
-        onSearchChange={handleSearchChange}
-        onRoleFilter={handleRoleFilter}
-        onStatusFilter={handleStatusFilter}
-        onClearFilters={clearFilters}
+        onSearchChange={setSearchQuery}
+        onRoleFilter={setFilterRole}
+        onStatusFilter={setFilterStatus}
+        onClearFilters={resetFilters}
         onCreateNew={openCreateModal}
-        canCreate={usersData?.permissions.can_create}
       />
 
-      {/* Users Table */}
-      <UserTableSection
-        usersData={usersData}
-        isLoading={isLoading}
+      {/* Users List */}
+      <UsersList
         onEdit={openEditModal}
         onDelete={handleDeleteUser}
         onView={openViewModal}
         onCreateNew={openCreateModal}
         deleteLoading={deleteUserMutation.isPending}
-        currentUserRole={currentUser?.role}
-        currentUserId={currentUser?.id}
-        isModalOpen={modalState.isOpen}
       />
 
       {/* User Modal */}
       <UserModal
-        isOpen={modalState.isOpen}
+        isOpen={isModalOpen}
         onClose={closeModal}
         onSubmit={handleModalSubmit}
-        user={modalState.user}
-        mode={modalState.mode}
-        loading={
-          createUserMutation.isPending || 
-          updateUserMutation.isPending
-        }
+        user={selectedUser}
+        mode={modalMode}
+        loading={createUserMutation.isPending || updateUserMutation.isPending}
       />
     </div>
   )

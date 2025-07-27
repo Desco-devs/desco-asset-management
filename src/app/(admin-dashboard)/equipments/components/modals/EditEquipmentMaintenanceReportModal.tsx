@@ -149,7 +149,7 @@ export default function EditEquipmentMaintenanceReportModal() {
         if (file) {
           const formDataUpload = new FormData();
           formDataUpload.append('file', file);
-          formDataUpload.append('folder', 'maintenance-parts');
+          formDataUpload.append('folder', `equipment-${selectedReport.equipment_id}/maintenance-reports/${selectedReport.id}/parts`);
           
           const uploadResponse = await fetch('/api/upload', {
             method: 'POST',
@@ -169,7 +169,7 @@ export default function EditEquipmentMaintenanceReportModal() {
         if (file) {
           const formDataUpload = new FormData();
           formDataUpload.append('file', file);
-          formDataUpload.append('folder', 'maintenance-attachments');
+          formDataUpload.append('folder', `equipment-${selectedReport.equipment_id}/maintenance-reports/${selectedReport.id}/attachments`);
           
           const uploadResponse = await fetch('/api/upload', {
             method: 'POST',

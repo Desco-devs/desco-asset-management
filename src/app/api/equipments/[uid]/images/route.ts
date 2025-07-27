@@ -47,20 +47,8 @@ const uploadFileToSupabase = async (
   const ext = file.name.split(".").pop();
   const filename = `${prefix}_${timestamp}.${ext}`;
 
-  // Create human-readable folder structure
-  const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
-
-  let humanReadablePath = "";
-  if (projectName && clientName && brand && model && type) {
-    const readableProject = sanitizeForPath(`${projectName}_${clientName}`);
-    const readableEquipment = sanitizeForPath(`${brand}_${model}_${type}`);
-    humanReadablePath = `${readableProject}/${readableEquipment}`;
-  } else {
-    // Fallback to UUID structure
-    humanReadablePath = `${projectId}/${equipmentId}`;
-  }
-
-  const filepath = `${humanReadablePath}/${filename}`;
+  // NEW STRUCTURE: equipment-{equipmentId}/equipment-images/
+  const filepath = `equipment-${equipmentId}/equipment-images/${filename}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { data: uploadData, error: uploadErr } = await supabase.storage

@@ -12,28 +12,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { UserFiltersSchema } from '@/lib/validations/users'
-
 interface UserSearchAndActionsProps {
-  filters: UserFiltersSchema
+  searchQuery: string
+  filterRole: string
+  filterStatus: string
   hasActiveFilters: boolean
   onSearchChange: (search: string) => void
   onRoleFilter: (role: string) => void
   onStatusFilter: (status: string) => void
   onClearFilters: () => void
   onCreateNew: () => void
-  canCreate?: boolean
 }
 
 export function UserSearchAndActions({
-  filters,
+  searchQuery,
+  filterRole,
+  filterStatus,
   hasActiveFilters,
   onSearchChange,
   onRoleFilter,
   onStatusFilter,
   onClearFilters,
   onCreateNew,
-  canCreate = false,
 }: UserSearchAndActionsProps) {
   
   const handleSearch = (value: string) => {
@@ -42,28 +42,28 @@ export function UserSearchAndActions({
 
   // Helper to get the current grouped filter value
   const getFilterValue = () => {
-    if (filters.role && filters.role !== ('all' as any)) return `role-${filters.role}`
-    if (filters.status && filters.status !== ('all' as any)) return `status-${filters.status}`
+    if (filterRole && filterRole !== 'all') return `role-${filterRole}`
+    if (filterStatus && filterStatus !== 'all') return `status-${filterStatus}`
     return ""
   }
 
   // Helper to handle filter changes
   const handleFilterChange = (value: string) => {
     if (value === "clear-all") {
-      onRoleFilter('all')
-      onStatusFilter('all')
+      onRoleFilter('')
+      onStatusFilter('')
     }
     // Role filters
     else if (value.startsWith("role-")) {
       const role = value.replace("role-", "")
       onRoleFilter(role)
-      onStatusFilter('all') // Reset status filter
+      onStatusFilter('') // Reset status filter
     }
     // Status filters
     else if (value.startsWith("status-")) {
       const status = value.replace("status-", "")
       onStatusFilter(status)
-      onRoleFilter('all') // Reset role filter
+      onRoleFilter('') // Reset role filter
     }
   }
 
@@ -81,17 +81,15 @@ export function UserSearchAndActions({
   return (
     <div className="space-y-4">
       {/* Add Button - Mobile: above search, Desktop: side by side */}
-      {canCreate && (
-        <div className="sm:hidden">
-          <Button 
-            onClick={onCreateNew}
-            className="gap-2 font-semibold w-full"
-          >
-            <Plus className="h-4 w-4" />
-            Add User
-          </Button>
-        </div>
-      )}
+      <div className="sm:hidden">
+        <Button 
+          onClick={onCreateNew}
+          className="gap-2 font-semibold w-full"
+        >
+          <Plus className="h-4 w-4" />
+          Add User
+        </Button>
+      </div>
 
       {/* Search and Add Button */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
@@ -99,22 +97,20 @@ export function UserSearchAndActions({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search users by name, username, email..."
-            value={filters.search || ''}
+            value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
             className="pl-9 h-11"
           />
         </div>
-        {canCreate && (
-          <div className="hidden sm:block">
-            <Button 
-              onClick={onCreateNew}
-              className="gap-2 font-semibold"
-            >
-              <Plus className="h-4 w-4" />
-              Add User
-            </Button>
-          </div>
-        )}
+        <div className="hidden sm:block">
+          <Button 
+            onClick={onCreateNew}
+            className="gap-2 font-semibold"
+          >
+            <Plus className="h-4 w-4" />
+            Add User
+          </Button>
+        </div>
       </div>
 
       {/* Filter and Sort Buttons - side by side on mobile like projects */}
@@ -130,7 +126,7 @@ export function UserSearchAndActions({
           <SelectContent className="w-80">
             <div className="p-3 max-h-96 overflow-y-auto">
               {/* Clear Filters */}
-              {(filters.role !== ('all' as any) || filters.status !== ('all' as any)) && (
+              {(filterRole || filterStatus) && (
                 <div className="mb-4">
                   <SelectItem value="clear-all" className="text-red-600 font-medium">
                     Clear All Filters
@@ -200,12 +196,12 @@ export function UserSearchAndActions({
       </div>
 
       {/* Active Filter Badges */}
-      {(filters.role !== ('all' as any) || filters.status !== ('all' as any) || filters.search) && (
+      {(filterRole || filterStatus || searchQuery) && (
         <div className="flex flex-wrap gap-2">
           {/* Search Badge */}
-          {filters.search && (
+          {searchQuery && (
             <Badge variant="secondary" className="gap-1 pr-1">
-              Search: "{filters.search}"
+              Search: "{searchQuery}"
               <Button
                 variant="ghost"
                 size="sm"
@@ -218,7 +214,7 @@ export function UserSearchAndActions({
           )}
 
           {/* Role Filter Badge */}
-          {filters.role && filters.role !== ('all' as any) && (
+          {filterRole && (
             <Badge variant="secondary" className="gap-1 pr-1">
               Role: {(() => {
                 const roleMap = {
@@ -226,13 +222,13 @@ export function UserSearchAndActions({
                   'ADMIN': 'Admin', 
                   'VIEWER': 'Viewer'
                 }
-                return roleMap[filters.role as keyof typeof roleMap] || filters.role
+                return roleMap[filterRole as keyof typeof roleMap] || filterRole
               })()}
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
-                onClick={() => onRoleFilter('all')}
+                onClick={() => onRoleFilter('')}
               >
                 <X className="h-3 w-3" />
               </Button>
@@ -240,14 +236,14 @@ export function UserSearchAndActions({
           )}
 
           {/* Status Filter Badge */}
-          {filters.status && filters.status !== ('all' as any) && (
+          {filterStatus && (
             <Badge variant="secondary" className="gap-1 pr-1">
-              Status: {filters.status === 'ACTIVE' ? 'Active' : 'Inactive'}
+              Status: {filterStatus === 'ACTIVE' ? 'Active' : 'Inactive'}
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-auto p-0 text-muted-foreground hover:text-destructive ml-1"
-                onClick={() => onStatusFilter('all')}
+                onClick={() => onStatusFilter('')}
               >
                 <X className="h-3 w-3" />
               </Button>
@@ -259,8 +255,8 @@ export function UserSearchAndActions({
             variant="outline"
             size="sm"
             onClick={() => {
-              onRoleFilter('all')
-              onStatusFilter('all')
+              onRoleFilter('')
+              onStatusFilter('')
               handleSearch('')
             }}
             className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"

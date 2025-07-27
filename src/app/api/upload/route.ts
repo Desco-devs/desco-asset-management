@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     let allowedTypes: string[] = [];
     let maxSize = 10 * 1024 * 1024; // 10MB default
 
-    if (folder === "maintenance-parts" || folder === "maintenance-attachments") {
+    if (folder.includes("maintenance-parts") || folder.includes("maintenance-attachments") || folder.includes("/parts") || folder.includes("/attachments")) {
       // Allow images and documents for maintenance
       allowedTypes = [
         "image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif",
@@ -68,11 +68,13 @@ export async function POST(request: NextRequest) {
     const serviceRoleClient = createServiceRoleClient();
 
     // Determine storage bucket based on folder
-    let bucket = "maintenance"; // Default bucket for maintenance files
+    let bucket = "equipments"; // Default to equipments bucket (maintenance bucket doesn't exist)
     if (folder.includes("profile")) {
       bucket = "avatars";
-    } else if (folder.includes("vehicle") || folder.includes("equipment")) {
-      bucket = "assets";
+    } else if (folder.includes("vehicle")) {
+      bucket = "vehicles";
+    } else if (folder.includes("equipment") || folder.includes("maintenance")) {
+      bucket = "equipments"; // Use equipments bucket for equipment and maintenance files
     }
 
     // Upload to Supabase Storage

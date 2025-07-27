@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient, report_status, report_priority } from '@prisma/client'
 
-import { deleteFileFromSupabase, uploadFileToSupabase } from '@/types/MaintenanceHelper'
+import { deleteFileFromSupabase, uploadFileToSupabase } from '@/utils/maintenance-helpers'
 
 const prisma = new PrismaClient()
 

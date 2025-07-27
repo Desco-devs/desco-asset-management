@@ -657,14 +657,6 @@ export default function MaintenanceReportDetailDrawer() {
             <DrawerFooter className="p-4 pt-2 border-t bg-background">
               <div className="flex gap-3">
                 <Button 
-                  variant="outline" 
-                  onClick={handleEdit}
-                  className="flex-1 gap-2"
-                >
-                  <Edit className="h-4 w-4" />
-                  Edit
-                </Button>
-                <Button 
                   variant="destructive" 
                   onClick={handleDeleteClick}
                   disabled={deleteMaintenanceReportMutation.isPending}
@@ -701,10 +693,6 @@ export default function MaintenanceReportDetailDrawer() {
               <div className="flex gap-2 w-full justify-end">
                 <Button variant="outline" onClick={handleClose} size="lg">
                   Close
-                </Button>
-                <Button variant="outline" onClick={handleEdit} className="gap-2" size="lg">
-                  <Edit className="h-4 w-4" />
-                  Edit Report
                 </Button>
                 <Button 
                   variant="destructive" 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { createClient } from '@/lib/supabase';
 
 // GET - Fetch specific equipment maintenance report
 export async function GET(
@@ -173,9 +174,16 @@ export async function DELETE(
   try {
     const { id } = await context.params;
 
-    // Check if report exists
+    // Check if report exists and get attachment URLs for cleanup
     const existingReport = await prisma.maintenance_equipment_report.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        equipment: {
+          select: {
+            id: true
+          }
+        }
+      }
     });
 
     if (!existingReport) {
@@ -185,12 +193,56 @@ export async function DELETE(
       );
     }
 
+    // Extract equipment ID for file path matching
+    const equipmentId = existingReport.equipment.id;
+
+    // Delete associated files from Supabase storage
+    if (existingReport.attachment_urls && existingReport.attachment_urls.length > 0) {
+      const supabase = createClient();
+      
+      // Extract file paths from URLs that belong to our storage structure
+      const filesToDelete: string[] = [];
+      
+      for (const url of existingReport.attachment_urls) {
+        if (typeof url === 'string' && url.includes('supabase')) {
+          // Extract file path from Supabase URL
+          // Expected URL format: https://[project].supabase.co/storage/v1/object/public/[bucket]/[path]
+          const urlParts = url.split('/storage/v1/object/public/');
+          if (urlParts.length === 2) {
+            const [bucketAndPath] = urlParts[1].split('/', 1);
+            const filePath = urlParts[1].substring(bucketAndPath.length + 1);
+            
+            // Only delete files that belong to this equipment and report
+            if (filePath.includes(`equipment-${equipmentId}/maintenance-reports/${id}/`)) {
+              filesToDelete.push(filePath);
+            }
+          }
+        }
+      }
+
+      // Delete files in batches
+      if (filesToDelete.length > 0) {
+        try {
+          const { error: deleteError } = await supabase.storage
+            .from('equipments')
+            .remove(filesToDelete);
+          
+          if (deleteError) {
+            // Continue with report deletion even if file cleanup fails
+          }
+        } catch (storageError) {
+          // Continue with report deletion even if file cleanup fails
+        }
+      }
+    }
+
+    // Delete the maintenance report from database
     await prisma.maintenance_equipment_report.delete({
       where: { id }
     });
 
     return NextResponse.json(
-      { message: 'Equipment maintenance report deleted successfully' },
+      { message: 'Equipment maintenance report and associated files deleted successfully' },
       { status: 200 }
     );
   } catch (error) {

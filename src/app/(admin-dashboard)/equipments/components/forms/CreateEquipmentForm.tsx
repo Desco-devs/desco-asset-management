@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { format } from "date-fns";
 import { useCreateEquipment } from "@/hooks/useEquipmentQuery";
-import { useUsers } from "@/hooks/api/use-users";
+import { useUsers } from "@/hooks/useUsersQuery";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";

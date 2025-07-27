@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
       repaired_by,
     } = body;
 
+
     // Validate required fields
     if (!equipment_id || !issue_description) {
       return NextResponse.json(

@@ -33,7 +33,32 @@ const deleteFileFromSupabase = async (
   if (error) throw error;
 };
 
-// Upload a file to Supabase storage with human-readable paths
+// Ensure directory exists in Supabase storage by creating a placeholder file
+const ensureDirectoryExists = async (directoryPath: string): Promise<void> => {
+  try {
+    // Check if directory exists by trying to list it
+    const { data: files, error } = await supabase.storage
+      .from("equipments")
+      .list(directoryPath);
+    
+    if (error && error.message.includes('not found')) {
+      // Directory doesn't exist, create it by uploading a placeholder file
+      const placeholderPath = `${directoryPath}/.placeholder`;
+      const { error: uploadError } = await supabase.storage
+        .from("equipments")
+        .upload(placeholderPath, new Blob([''], { type: 'text/plain' }), {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      }
+    }
+  } catch (error) {
+    // Ignore errors - directory creation is best effort
+  }
+};
+
+// Upload a file to Supabase storage with equipment-{equipmentId} structure
 const uploadFileToSupabase = async (
   file: File,
   projectId: string,
@@ -49,20 +74,28 @@ const uploadFileToSupabase = async (
   const ext = file.name.split(".").pop();
   const filename = `${prefix}_${timestamp}.${ext}`;
 
-  // Create human-readable folder structure
-  const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
+  // NEW STRUCTURE: equipment-{equipmentId}/equipment-images/ or equipment-documents/
+  const getSubfolder = (prefix: string) => {
+    switch (prefix) {
+      case 'equipment_image':
+        return 'equipment-images';
+      case 'thirdparty_inspection':
+      case 'pgpc_inspection':
+      case 'original_receipt':
+      case 'equipment_registration':
+        return 'equipment-documents';
+      default:
+        return 'equipment-files';
+    }
+  };
 
-  let humanReadablePath = "";
-  if (projectName && clientName && brand && model && type) {
-    const readableProject = sanitizeForPath(`${projectName}_${clientName}`);
-    const readableEquipment = sanitizeForPath(`${brand}_${model}_${type}`);
-    humanReadablePath = `${readableProject}/${readableEquipment}`;
-  } else {
-    // Fallback to UUID structure
-    humanReadablePath = `${projectId}/${equipmentId}`;
-  }
-
-  const filepath = `${humanReadablePath}/${filename}`;
+  const subfolder = getSubfolder(prefix);
+  const equipmentDir = `equipment-${equipmentId}/${subfolder}`;
+  
+  // Ensure directory exists before uploading
+  await ensureDirectoryExists(equipmentDir);
+  
+  const filepath = `${equipmentDir}/${filename}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { data: uploadData, error: uploadErr } = await supabase.storage
@@ -100,22 +133,15 @@ const uploadEquipmentPart = async (
     ""
   )}_${timestamp}.${ext}`;
 
-  // Create human-readable folder structure
+  // NEW STRUCTURE: equipment-{equipmentId}/parts-management/{folderPath}/
   const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
-
-  let humanReadablePath = "";
-  if (projectName && clientName && brand && model && type) {
-    const readableProject = sanitizeForPath(`${projectName}_${clientName}`);
-    const readableEquipment = sanitizeForPath(`${brand}_${model}_${type}`);
-    humanReadablePath = `${readableProject}/${readableEquipment}`;
-  } else {
-    // Fallback to UUID structure
-    humanReadablePath = `${projectId}/${equipmentId}`;
-  }
-
-  const sanitizedFolderPath = folderPath.replace(/[^a-zA-Z0-9_\-\/]/g, "_");
-  const filepath = `${humanReadablePath}/${sanitizedFolderPath}/${filename}`;
-
+  const sanitizedFolderPath = sanitizeForPath(folderPath);
+  const partsDir = `equipment-${equipmentId}/parts-management/${sanitizedFolderPath}`;
+  
+  // Ensure directory exists before uploading
+  await ensureDirectoryExists(partsDir);
+  
+  const filepath = `${partsDir}/${filename}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { data: uploadData, error: uploadErr } = await supabase.storage
@@ -133,75 +159,6 @@ const uploadEquipmentPart = async (
   return urlData.publicUrl;
 };
 
-// Function to move file in Supabase storage
-const moveFileInSupabase = async (
-  oldUrl: string,
-  projectId: string,
-  equipmentId: string,
-  newFolderPath: string,
-  partNumber: number,
-  originalFilename: string
-): Promise<string> => {
-  try {
-    // Extract the old file path from URL
-    const urlParts = oldUrl.split("/storage/v1/object/public/equipments/");
-    if (urlParts.length !== 2) {
-      throw new Error("Invalid file URL format");
-    }
-    const oldFilePath = urlParts[1];
-
-    // Download the file
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from("equipments")
-      .download(oldFilePath);
-
-    if (downloadError || !fileData) {
-      throw new Error(`Failed to download file: ${downloadError?.message}`);
-    }
-
-    // Create new file path
-    const timestamp = Date.now();
-    const ext = originalFilename.split(".").pop();
-    const filename = `${partNumber}_${originalFilename.replace(
-      /\.[^/.]+$/,
-      ""
-    )}_${timestamp}.${ext}`;
-    const sanitizedFolderPath = newFolderPath.replace(
-      /[^a-zA-Z0-9_\-\/]/g,
-      "_"
-    );
-    const newFilePath = `${projectId}/${equipmentId}/${sanitizedFolderPath}/${filename}`;
-
-    // Upload to new location
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("equipments")
-      .upload(newFilePath, fileData, { cacheControl: "3600", upsert: false });
-
-    if (uploadError || !uploadData) {
-      throw new Error(
-        `Failed to upload to new location: ${uploadError?.message}`
-      );
-    }
-
-    // Delete old file
-    const { error: deleteError } = await supabase.storage
-      .from("equipments")
-      .remove([oldFilePath]);
-
-    if (deleteError) {
-      // Failed to delete old file
-    }
-
-    // Get new public URL
-    const { data: urlData } = supabase.storage
-      .from("equipments")
-      .getPublicUrl(uploadData.path);
-
-    return urlData.publicUrl;
-  } catch (error) {
-    throw error;
-  }
-};
 
 // Map file-prefix to Prisma field name
 const getFieldName = (prefix: string): string => {
@@ -524,23 +481,6 @@ export const POST = withResourcePermission(
         }
       }
 
-      // Legacy fallback: handle old-style equipment parts
-      const partFiles: File[] = [];
-      const partFolders: string[] = [];
-      let partIndex = 0;
-      while (true) {
-        const partFile = formData.get(
-          `equipmentPart_${partIndex}`
-        ) as File | null;
-        if (!partFile || partFile.size === 0) break;
-
-        const folderPath =
-          (formData.get(`equipmentPartFolder_${partIndex}`) as string) ||
-          "main";
-        partFiles.push(partFile);
-        partFolders.push(folderPath);
-        partIndex++;
-      }
 
       const updateData: Record<string, unknown> = {};
 
@@ -559,37 +499,10 @@ export const POST = withResourcePermission(
         }
       }
 
-      // Handle parts upload - prioritize new structure, fall back to legacy
+      // Handle parts upload using new structure
       if (partsStructureWithUrls) {
         // Store as array with single JSON string element (to match existing API expectations)
         updateData.equipment_parts = [JSON.stringify(partsStructureWithUrls)];
-      } else if (partFiles.length > 0) {
-        // Legacy fallback: Upload equipment parts with folder structure
-        try {
-          const partUrls: string[] = [];
-          for (let i = 0; i < partFiles.length; i++) {
-            const partUrl = await uploadEquipmentPart(
-              partFiles[i],
-              projectId,
-              equipment.id,
-              i + 1,
-              partFolders[i],
-              projectName,
-              clientName,
-              brand,
-              model,
-              type
-            );
-            partUrls.push(partUrl);
-          }
-          updateData.equipment_parts = partUrls;
-        } catch (e) {
-          await prisma.equipment.delete({ where: { id: equipment.id } });
-          return NextResponse.json(
-            { error: "Equipment parts upload failed" },
-            { status: 500 }
-          );
-        }
       }
 
       // Update if we have any files
@@ -615,66 +528,11 @@ export const POST = withResourcePermission(
           if (projectInfo) {
             // Validate required fields for maintenance report
             if (!maintenanceData.issueDescription || maintenanceData.issueDescription.trim() === '') {
-              console.log('Skipping maintenance report creation: issue_description is required but empty');
               return; // Skip maintenance report creation if issue description is empty
             }
             
-            // Upload part images and collect attachment URLs
-            const attachmentUrls: string[] = [];
-            
-            // Handle part images
-            for (let i = 0; formData.get(`partImage_${i}`); i++) {
-              const partImage = formData.get(`partImage_${i}`) as File;
-              const partName = formData.get(`partImageName_${i}`) as string;
-              
-              if (partImage && partImage.size > 0) {
-                try {
-                  const url = await uploadEquipmentPart(
-                    partImage,
-                    projectId,
-                    equipment.id,
-                    i + 1,
-                    'maintenance/parts',
-                    projectName,
-                    clientName,
-                    brand,
-                    model,
-                    type
-                  );
-                  attachmentUrls.push(url);
-                } catch (error) {
-                  // Continue if individual part image upload fails
-                }
-              }
-            }
-            
-            // Handle maintenance attachments
-            for (let i = 0; formData.get(`maintenanceAttachment_${i}`); i++) {
-              const attachment = formData.get(`maintenanceAttachment_${i}`) as File;
-              
-              if (attachment && attachment.size > 0) {
-                try {
-                  const url = await uploadEquipmentPart(
-                    attachment,
-                    projectId,
-                    equipment.id,
-                    i + 1,
-                    'maintenance/attachments',
-                    projectName,
-                    clientName,
-                    brand,
-                    model,
-                    type
-                  );
-                  attachmentUrls.push(url);
-                } catch (error) {
-                  // Continue if individual attachment upload fails
-                }
-              }
-            }
-            
-            // Create maintenance report
-            await prisma.maintenance_equipment_report.create({
+            // FIRST: Create the maintenance report to get the ID
+            const maintenanceReport = await prisma.maintenance_equipment_report.create({
               data: {
                 equipment_id: equipment.id,
                 location_id: projectInfo.client.location.id,
@@ -690,14 +548,100 @@ export const POST = withResourcePermission(
                 date_repaired: maintenanceData.dateRepaired ? new Date(maintenanceData.dateRepaired) : null,
                 reported_by: user.id,
                 repaired_by: maintenanceData.status === 'COMPLETED' && maintenanceData.repairedBy ? maintenanceData.repairedBy : null,
-                attachment_urls: attachmentUrls,
+                attachment_urls: [], // Will be updated after file uploads
               },
             });
+            
+            // THEN: Upload part images and collect attachment URLs
+            const attachmentUrls: string[] = [];
+            
+            // Handle part images
+            for (let i = 0; formData.get(`partImage_${i}`); i++) {
+              const partImage = formData.get(`partImage_${i}`) as File;
+              const partName = formData.get(`partImageName_${i}`) as string;
+              
+              if (partImage && partImage.size > 0) {
+                try {
+                  // Ensure the parts directory exists
+                  const partsDir = `equipment-${equipment.id}/maintenance-reports/${maintenanceReport.id}/parts`;
+                  await ensureDirectoryExists(partsDir);
+                  
+                  // Use dedicated maintenance parts upload with correct report ID
+                  const timestamp = Date.now();
+                  const ext = partImage.name.split(".").pop();
+                  const sanitizedPartName = (partName || `part_${i + 1}`).replace(/[^a-zA-Z0-9_\-]/g, '_');
+                  const filename = `${sanitizedPartName}_${timestamp}.${ext}`;
+                  const filepath = `${partsDir}/${filename}`;
+                  const buffer = Buffer.from(await partImage.arrayBuffer());
+
+                  const { data: uploadData, error: uploadErr } = await supabase.storage
+                    .from("equipments")
+                    .upload(filepath, buffer, { cacheControl: "3600", upsert: false });
+
+                  if (uploadErr || !uploadData) {
+                    throw new Error(`Upload maintenance part image ${i + 1} failed: ${uploadErr?.message}`);
+                  }
+
+                  const { data: urlData } = supabase.storage
+                    .from("equipments")
+                    .getPublicUrl(uploadData.path);
+
+                  const url = urlData.publicUrl;
+                  attachmentUrls.push(url);
+                } catch (error) {
+                  // Continue if individual part image upload fails
+                }
+              }
+            }
+            
+            // Handle maintenance attachments
+            for (let i = 0; formData.get(`maintenanceAttachment_${i}`); i++) {
+              const attachment = formData.get(`maintenanceAttachment_${i}`) as File;
+              
+              if (attachment && attachment.size > 0) {
+                try {
+                  // Ensure the attachments directory exists
+                  const attachmentsDir = `equipment-${equipment.id}/maintenance-reports/${maintenanceReport.id}/attachments`;
+                  await ensureDirectoryExists(attachmentsDir);
+                  
+                  // Use dedicated maintenance attachment upload with correct report ID
+                  const timestamp = Date.now();
+                  const ext = attachment.name.split(".").pop();
+                  const filename = `maintenance_attachment_${i + 1}_${timestamp}.${ext}`;
+                  const filepath = `${attachmentsDir}/${filename}`;
+                  const buffer = Buffer.from(await attachment.arrayBuffer());
+
+                  const { data: uploadData, error: uploadErr } = await supabase.storage
+                    .from("equipments")
+                    .upload(filepath, buffer, { cacheControl: "3600", upsert: false });
+
+                  if (uploadErr || !uploadData) {
+                    throw new Error(`Upload maintenance attachment ${i + 1} failed: ${uploadErr?.message}`);
+                  }
+
+                  const { data: urlData } = supabase.storage
+                    .from("equipments")
+                    .getPublicUrl(uploadData.path);
+
+                  const url = urlData.publicUrl;
+                  attachmentUrls.push(url);
+                } catch (error) {
+                  // Continue if individual attachment upload fails
+                }
+              }
+            }
+            
+            // Update maintenance report with attachment URLs if any files were uploaded
+            if (attachmentUrls.length > 0) {
+              await prisma.maintenance_equipment_report.update({
+                where: { id: maintenanceReport.id },
+                data: { attachment_urls: attachmentUrls },
+              });
+            }
           }
         } catch (error) {
           // Failed to create maintenance report, but equipment was created successfully
-          // Log error but don't fail the whole request
-          console.error('Failed to create maintenance report:', error);
+          // Don't fail the whole request
         }
       }
 
@@ -1018,95 +962,6 @@ export const PUT = withResourcePermission(
           updateData.equipment_parts = [JSON.stringify(partsStructureWithUrls)];
         } catch (error) {
           // Failed to parse parts structure during update
-        }
-      } else {
-        // Legacy handling: Handle equipment parts updates with folder structure
-        const currentParts = existing.equipment_parts || [];
-        const newParts: string[] = [...currentParts]; // Start with existing parts
-
-        // Check for new parts or replacements
-        let partIndex = 0;
-        while (true) {
-          const newPartFile = formData.get(
-            `equipmentPart_${partIndex}`
-          ) as File | null;
-          const keepExisting = formData.get(
-            `keepExistingPart_${partIndex}`
-          ) as string;
-          const folderPath =
-            (formData.get(`equipmentPartFolder_${partIndex}`) as string) ||
-            "main";
-          const moveFile = formData.get(
-            `moveExistingPart_${partIndex}`
-          ) as string;
-
-          if (
-            !newPartFile &&
-            keepExisting !== "true" &&
-            moveFile !== "true" &&
-            partIndex >= currentParts.length
-          ) {
-            // No more parts to process
-            break;
-          }
-
-          if (newPartFile && newPartFile.size > 0) {
-            // Replace or add new part
-            if (partIndex < currentParts.length) {
-              // Replace existing part - delete old one first
-              await deleteFileFromSupabase(
-                currentParts[partIndex],
-                `part ${partIndex + 1}`
-              );
-            }
-
-            // Upload new part with folder structure
-            const newPartUrl = await uploadEquipmentPart(
-              newPartFile,
-              projectId,
-              equipmentId,
-              partIndex + 1,
-              folderPath
-            );
-            newParts[partIndex] = newPartUrl;
-          } else if (moveFile === "true" && partIndex < currentParts.length) {
-            // Move existing file to different folder
-            try {
-              const originalFilename =
-                currentParts[partIndex]
-                  .split("/")
-                  .pop()
-                  ?.split("_")
-                  .slice(1, -1)
-                  .join("_") || "file";
-              const movedUrl = await moveFileInSupabase(
-                currentParts[partIndex],
-                projectId,
-                equipmentId,
-                folderPath,
-                partIndex + 1,
-                originalFilename
-              );
-              newParts[partIndex] = movedUrl;
-            } catch (error) {
-              // Failed to move file - keep the original URL if move fails
-            }
-          } else if (keepExisting !== "true" && partIndex < currentParts.length) {
-            // Remove existing part
-            await deleteFileFromSupabase(
-              currentParts[partIndex],
-              `part ${partIndex + 1}`
-            );
-            newParts.splice(partIndex, 1);
-            partIndex--; // Adjust index since we removed an item
-          }
-
-          partIndex++;
-        }
-
-        // Update parts array only if not using new structure
-        if (!partsStructureWithUrls) {
-          updateData.equipment_parts = newParts;
         }
       }
 

@@ -27,7 +27,7 @@ import {
 } from "@/hooks/useEquipmentQuery";
 import { useEquipmentMaintenanceReports } from "@/hooks/useEquipmentsQuery";
 import { useProjects } from "@/hooks/api/use-projects";
-import { useUsers } from "@/hooks/api/use-users";
+import { useUsers } from "@/hooks/useUsersQuery";
 import {
   selectIsEditMode,
   selectIsMobile,
@@ -82,7 +82,8 @@ import { format } from "date-fns";
 
 export default function EquipmentModalModern() {
   // Server state from TanStack Query
-  const { data: equipments = [] } = useEquipments();
+  const { data: equipmentsResponse } = useEquipments();
+  const equipments = equipmentsResponse || [];
   const { data: projectsData } = useProjects();
   const { data: maintenanceReports = [] } = useEquipmentMaintenanceReports();
   const { data: usersData } = useUsers();
@@ -390,10 +391,10 @@ export default function EquipmentModalModern() {
 
 
   // Helper function to calculate days until expiry
-  const getDaysUntilExpiry = (expiryDate: string | null | undefined) => {
+  const getDaysUntilExpiry = (expiryDate: string | Date | null | undefined) => {
     if (!expiryDate) return null;
     const now = new Date();
-    const expiry = new Date(expiryDate);
+    const expiry = expiryDate instanceof Date ? expiryDate : new Date(expiryDate);
     const diffTime = expiry.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
@@ -712,12 +713,12 @@ export default function EquipmentModalModern() {
       {activeTab === 'details' && (
         <div>
           {/* Tab Title and Description */}
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
-              <Settings className="h-5 w-5" />
+          <div className={`mb-6 ${isMobile ? 'mb-4' : ''}`}>
+            <h2 className={`font-semibold flex items-center gap-2 mb-2 ${isMobile ? 'text-lg' : 'text-xl'}`}>
+              <Settings className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
               Equipment Details
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
               Complete equipment information including specifications, project assignment, and inspection schedules
             </p>
           </div>
@@ -734,7 +735,7 @@ export default function EquipmentModalModern() {
                   <div className="space-y-4">
                     <div className={gridClassName}>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                           <Wrench className="h-4 w-4" />
                           Brand
                         </Label>
@@ -743,11 +744,12 @@ export default function EquipmentModalModern() {
                           placeholder="Enter equipment brand"
                           onChange={(e) => handleFieldChange('brand', e.target.value)}
                           defaultValue={editFormDataRef.current.brand}
+                          className={`${isMobile ? 'text-xs' : ''}`}
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                           <Building2 className="h-4 w-4" />
                           Model
                         </Label>
@@ -756,30 +758,31 @@ export default function EquipmentModalModern() {
                           placeholder="Enter equipment model"
                           onChange={(e) => handleFieldChange('model', e.target.value)}
                           defaultValue={editFormDataRef.current.model}
+                          className={`${isMobile ? 'text-xs' : ''}`}
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Equipment Type</Label>
+                        <Label className={`${isMobile ? 'text-xs' : ''}`}>Equipment Type</Label>
                         <Select 
                           defaultValue={editFormDataRef.current.type} 
                           onValueChange={(value) => handleFieldChange('type', value)}
                         >
-                          <SelectTrigger className="w-full">
+                          <SelectTrigger className={`w-full ${isMobile ? 'text-xs' : ''}`}>
                             <SelectValue placeholder="Select equipment type" />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Excavator">Excavator</SelectItem>
-                            <SelectItem value="Bulldozer">Bulldozer</SelectItem>
-                            <SelectItem value="Crane">Crane</SelectItem>
-                            <SelectItem value="Loader">Loader</SelectItem>
-                            <SelectItem value="Grader">Grader</SelectItem>
-                            <SelectItem value="Compactor">Compactor</SelectItem>
-                            <SelectItem value="Dump Truck">Dump Truck</SelectItem>
-                            <SelectItem value="Mixer">Mixer</SelectItem>
-                            <SelectItem value="Generator">Generator</SelectItem>
-                            <SelectItem value="Pump">Pump</SelectItem>
-                            <SelectItem value="Other">Other</SelectItem>
+                          <SelectContent className={`${isMobile ? 'max-w-[90vw]' : ''}`}>
+                            <SelectItem value="Excavator" className={`${isMobile ? 'text-xs' : ''}`}>Excavator</SelectItem>
+                            <SelectItem value="Bulldozer" className={`${isMobile ? 'text-xs' : ''}`}>Bulldozer</SelectItem>
+                            <SelectItem value="Crane" className={`${isMobile ? 'text-xs' : ''}`}>Crane</SelectItem>
+                            <SelectItem value="Loader" className={`${isMobile ? 'text-xs' : ''}`}>Loader</SelectItem>
+                            <SelectItem value="Grader" className={`${isMobile ? 'text-xs' : ''}`}>Grader</SelectItem>
+                            <SelectItem value="Compactor" className={`${isMobile ? 'text-xs' : ''}`}>Compactor</SelectItem>
+                            <SelectItem value="Dump Truck" className={`${isMobile ? 'text-xs' : ''}`}>Dump Truck</SelectItem>
+                            <SelectItem value="Mixer" className={`${isMobile ? 'text-xs' : ''}`}>Mixer</SelectItem>
+                            <SelectItem value="Generator" className={`${isMobile ? 'text-xs' : ''}`}>Generator</SelectItem>
+                            <SelectItem value="Pump" className={`${isMobile ? 'text-xs' : ''}`}>Pump</SelectItem>
+                            <SelectItem value="Other" className={`${isMobile ? 'text-xs' : ''}`}>Other</SelectItem>
                           </SelectContent>
                         </Select>
                         
@@ -795,7 +798,7 @@ export default function EquipmentModalModern() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                           <Hash className="h-4 w-4" />
                           Plate/Serial Number
                         </Label>
@@ -804,6 +807,7 @@ export default function EquipmentModalModern() {
                           placeholder="Enter plate/serial number"
                           onChange={(e) => handleFieldChange('plate_number', e.target.value)}
                           defaultValue={editFormDataRef.current.plate_number}
+                          className={`${isMobile ? 'text-xs' : ''}`}
                         />
                       </div>
                     </div>
@@ -822,23 +826,26 @@ export default function EquipmentModalModern() {
                           placeholder="Enter equipment owner"
                           onChange={(e) => handleFieldChange('owner', e.target.value)}
                           defaultValue={editFormDataRef.current.owner}
+                          className={`${isMobile ? 'text-xs' : ''}`}
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Assigned Project</Label>
+                        <Label className={`${isMobile ? 'text-xs' : ''}`}>Assigned Project</Label>
                         <Select 
                           name="projectId" 
                           defaultValue={editFormDataRef.current.project_id}
                           onValueChange={(value) => handleFieldChange('project_id', value)}
                         >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a project" />
+                          <SelectTrigger className={`${isMobile ? 'text-xs' : ''}`}>
+                            <SelectValue placeholder="Select a project" className="truncate" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className={`${isMobile ? 'max-w-[90vw]' : ''}`}>
                             {projects.map((project) => (
-                              <SelectItem key={project.id} value={project.id}>
-                                {project.name} - {project.client?.name || 'No Client'}
+                              <SelectItem key={project.id} value={project.id} className={`${isMobile ? 'text-xs' : ''}`}>
+                                <div className="truncate max-w-full">
+                                  {project.name} - {project.client?.name || 'No Client'}
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -851,7 +858,7 @@ export default function EquipmentModalModern() {
                   <div className="space-y-4">
                     <div className={gridClassName3}>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                           <Shield className="h-4 w-4" />
                           Operational Status
                         </Label>
@@ -860,18 +867,18 @@ export default function EquipmentModalModern() {
                           defaultValue={editFormDataRef.current.status}
                           onValueChange={(value) => handleFieldChange('status', value)}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className={`${isMobile ? 'text-xs' : ''}`}>
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="OPERATIONAL">Operational</SelectItem>
-                            <SelectItem value="NON_OPERATIONAL">Non-Operational</SelectItem>
+                          <SelectContent className={`${isMobile ? 'max-w-[90vw]' : ''}`}>
+                            <SelectItem value="OPERATIONAL" className={`${isMobile ? 'text-xs' : ''}`}>Operational</SelectItem>
+                            <SelectItem value="NON_OPERATIONAL" className={`${isMobile ? 'text-xs' : ''}`}>Non-Operational</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                           <CalendarDays className="h-4 w-4" />
                           Before (months)
                         </Label>
@@ -883,6 +890,7 @@ export default function EquipmentModalModern() {
                           defaultValue={editFormDataRef.current.before}
                           onChange={(e) => handleFieldChange('before', parseInt(e.target.value) || 6)}
                           placeholder="Months before inspection"
+                          className={`${isMobile ? 'text-xs' : ''}`}
                         />
                       </div>
 
@@ -893,7 +901,7 @@ export default function EquipmentModalModern() {
                   <div className="space-y-4">
                     <div className={gridClassName4}>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                           <CalendarIcon className="h-4 w-4" />
                           Inspection Date
                         </Label>
@@ -922,7 +930,7 @@ export default function EquipmentModalModern() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                           <CalendarIcon className="h-4 w-4" />
                           Registration Expiry
                         </Label>
@@ -951,7 +959,7 @@ export default function EquipmentModalModern() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                           <Shield className="h-4 w-4" />
                           Insurance Expiration
                         </Label>
@@ -985,7 +993,7 @@ export default function EquipmentModalModern() {
                   {/* Additional Fields Section */}
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
+                      <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                         <User className="h-4 w-4" />
                         Added by
                       </Label>
@@ -994,13 +1002,15 @@ export default function EquipmentModalModern() {
                         defaultValue={editFormDataRef.current.created_by}
                         onValueChange={(value) => handleFieldChange('created_by', value)}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select who added this equipment" />
+                        <SelectTrigger className={`${isMobile ? 'text-xs' : ''}`}>
+                          <SelectValue placeholder="Select who added this equipment" className="truncate" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className={`${isMobile ? 'max-w-[90vw]' : ''}`}>
                           {users.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.full_name} ({user.username})
+                            <SelectItem key={user.id} value={user.id} className={`${isMobile ? 'text-xs' : ''}`}>
+                              <div className="truncate max-w-full">
+                                {user.full_name} ({user.username})
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1010,13 +1020,14 @@ export default function EquipmentModalModern() {
 
                   {/* Remarks Section */}
                   <div className="space-y-2">
-                    <Label>Remarks</Label>
+                    <Label className={`${isMobile ? 'text-xs' : ''}`}>Remarks</Label>
                     <Textarea
                       name="remarks"
                       placeholder="Enter any additional notes or remarks"
                       defaultValue={editFormDataRef.current.remarks}
                       onChange={(e) => handleFieldChange('remarks', e.target.value)}
                       rows={3}
+                      className={`${isMobile ? 'text-xs' : ''}`}
                     />
                   </div>
                 </form>
@@ -1027,33 +1038,33 @@ export default function EquipmentModalModern() {
                   <div className="space-y-4">
                     <div className={gridClassName}>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                           <Wrench className="h-4 w-4" />
                           Brand
                         </Label>
-                        <div className="font-medium text-foreground">{selectedEquipment.brand}</div>
+                        <div className={`font-medium text-foreground ${isMobile ? 'text-sm' : ''}`}>{selectedEquipment.brand}</div>
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                           <Building2 className="h-4 w-4" />
                           Model
                         </Label>
-                        <div className="font-medium text-foreground">{selectedEquipment.model}</div>
+                        <div className={`font-medium text-foreground ${isMobile ? 'text-sm' : ''}`}>{selectedEquipment.model}</div>
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Equipment Type</Label>
-                        <div className="font-medium text-foreground">{selectedEquipment.type}</div>
+                        <Label className={`${isMobile ? 'text-xs' : ''}`}>Equipment Type</Label>
+                        <div className={`font-medium text-foreground ${isMobile ? 'text-sm' : ''}`}>{selectedEquipment.type}</div>
                       </div>
 
                       {selectedEquipment.plate_number && (
                         <div className="space-y-2">
-                          <Label className="flex items-center gap-2">
+                          <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                             <Hash className="h-4 w-4" />
                             Plate/Serial Number
                           </Label>
-                          <div className="font-medium text-foreground font-mono">{selectedEquipment.plate_number}</div>
+                          <div className={`font-medium text-foreground font-mono ${isMobile ? 'text-sm' : ''}`}>{selectedEquipment.plate_number}</div>
                         </div>
                       )}
                     </div>
@@ -1063,11 +1074,11 @@ export default function EquipmentModalModern() {
                   <div className="space-y-4">
                     <div className={gridClassName2}>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
+                        <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                           <User className="h-4 w-4" />
                           Owner
                         </Label>
-                        <div className="font-medium text-foreground">{selectedEquipment.owner}</div>
+                        <div className={`font-medium text-foreground ${isMobile ? 'text-sm' : ''}`}>{selectedEquipment.owner}</div>
                       </div>
 
                       <div className="space-y-2">
@@ -1266,12 +1277,12 @@ export default function EquipmentModalModern() {
       {activeTab === 'images' && (
         <div>
           {/* Tab Title and Description */}
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
-              <Camera className="h-5 w-5" />
+          <div className={`mb-6 ${isMobile ? 'mb-4' : ''}`}>
+            <h2 className={`font-semibold flex items-center gap-2 mb-2 ${isMobile ? 'text-lg' : 'text-xl'}`}>
+              <Camera className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
               Equipment Images
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
               Visual documentation of the equipment including main photo and inspection images
             </p>
           </div>
@@ -1516,12 +1527,12 @@ export default function EquipmentModalModern() {
       {activeTab === 'documents' && (
         <div>
           {/* Tab Title and Description */}
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
-              <FileText className="h-5 w-5" />
+          <div className={`mb-6 ${isMobile ? 'mb-4' : ''}`}>
+            <h2 className={`font-semibold flex items-center gap-2 mb-2 ${isMobile ? 'text-lg' : 'text-xl'}`}>
+              <FileText className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
               Equipment Documents
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
               Official documents and certificates related to equipment purchase and registration
             </p>
           </div>
@@ -1690,12 +1701,12 @@ export default function EquipmentModalModern() {
       {activeTab === 'parts' && (
         <div className="space-y-6">
           {/* Tab Title and Description */}
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
-              <Wrench className="h-5 w-5" />
+          <div className={`mb-6 ${isMobile ? 'mb-4' : ''}`}>
+            <h2 className={`font-semibold flex items-center gap-2 mb-2 ${isMobile ? 'text-lg' : 'text-xl'}`}>
+              <Wrench className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
               Equipment Parts
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
               Components and parts associated with this equipment for inventory tracking
             </p>
           </div>
@@ -1725,12 +1736,12 @@ export default function EquipmentModalModern() {
       {activeTab === 'maintenance' && (
         <div className="space-y-6">
           {/* Tab Title and Description */}
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold flex items-center gap-2 mb-2">
-              <ClipboardList className="h-5 w-5" />
+          <div className={`mb-6 ${isMobile ? 'mb-4' : ''}`}>
+            <h2 className={`font-semibold flex items-center gap-2 mb-2 ${isMobile ? 'text-lg' : 'text-xl'}`}>
+              <ClipboardList className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
               Maintenance Reports
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
               Maintenance history, service reports, and repair records for this equipment
             </p>
           </div>
@@ -1771,55 +1782,16 @@ export default function EquipmentModalModern() {
                   <X className="h-4 w-4" />
                 </Button>
               </DrawerClose>
-              <div className="text-center space-y-3">
+              <div className="text-center space-y-2">
                 <div>
-                  <DrawerTitle className="text-xl font-bold">
+                  <DrawerTitle className="text-lg font-bold">
                     {selectedEquipment.brand} {selectedEquipment.model}
                   </DrawerTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {isGlobalEditMode ? 'Edit equipment information across all tabs' : getTabDescription()}
                   </p>
                 </div>
                 
-                {/* Mobile Edit Controls */}
-                <div className="pt-2">
-                  {!isGlobalEditMode ? (
-                    <Button
-                      type="button"
-                      onClick={() => setIsGlobalEditMode(true)}
-                      size="sm"
-                      className="flex items-center gap-2"
-                    >
-                      <Edit className="h-4 w-4" />
-                      Edit Equipment
-                    </Button>
-                  ) : (
-                    <div className="flex items-center justify-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsGlobalEditMode(false)}
-                        size="sm"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={handleSaveChanges}
-                        disabled={updateEquipmentMutation.isPending}
-                        size="sm"
-                        className="flex items-center gap-2"
-                      >
-                        {updateEquipmentMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                        Save Changes
-                      </Button>
-                    </div>
-                  )}
-                </div>
               </div>
             </DrawerHeader>
 
@@ -1842,31 +1814,60 @@ export default function EquipmentModalModern() {
             {/* Mobile Action Buttons in Footer */}
             <DrawerFooter className="flex-shrink-0 p-4 pt-2 border-t bg-background">
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={deleteEquipmentMutation.isPending || selectedEquipment?.id.startsWith('temp_')}
-                  className="flex-1"
-                  size="lg"
-                >
-                  {deleteEquipmentMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4 mr-2" />
-                  )}
-                  Delete Equipment
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleEdit}
-                  className="flex-1"
-                  size="lg"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Equipment
-                </Button>
+                {!isGlobalEditMode ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={handleDelete}
+                      disabled={deleteEquipmentMutation.isPending || selectedEquipment?.id?.startsWith('temp_')}
+                      className="flex-1"
+                      size="lg"
+                    >
+                      {deleteEquipmentMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-2" />
+                      )}
+                      Delete Equipment
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => setIsGlobalEditMode(true)}
+                      className="flex-1"
+                      size="lg"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Equipment
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsGlobalEditMode(false)}
+                      className="flex-1"
+                      size="lg"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleSaveChanges}
+                      disabled={updateEquipmentMutation.isPending}
+                      className="flex-1"
+                      size="lg"
+                    >
+                      {updateEquipmentMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      Save Changes
+                    </Button>
+                  </>
+                )}
               </div>
             </DrawerFooter>
           </DrawerContent>
@@ -2031,7 +2032,7 @@ export default function EquipmentModalModern() {
                 type="button"
                 variant="destructive"
                 onClick={handleDelete}
-                disabled={deleteEquipmentMutation.isPending || selectedEquipment?.id.startsWith('temp_')}
+                disabled={deleteEquipmentMutation.isPending || selectedEquipment?.id?.startsWith('temp_')}
                 className="flex-1"
                 size="lg"
               >

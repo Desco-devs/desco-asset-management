@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { User, UserFiltersSchema } from '@/types/users'
+import { User } from '@/types/users'
 
 interface UserModalState {
   isOpen: boolean
@@ -10,148 +10,108 @@ interface UserModalState {
   user: User | null
 }
 
-interface UsersStore {
-  // UI State
-  modalState: UserModalState
-  selectedUsers: string[]
-  tableView: 'table' | 'grid'
-  
-  // Filters & Preferences (persisted)
-  filters: UserFiltersSchema
-  sortBy: 'created_at' | 'full_name' | 'username' | 'role'
-  sortOrder: 'asc' | 'desc'
-  
-  // Computed values
-  hasActiveFilters: boolean
-  
+interface UsersUIState {
+  // Modal state
+  isModalOpen: boolean
+  isCreateModalOpen: boolean
+  selectedUser: User | null
+  modalMode: 'create' | 'edit' | 'view'
+
+  // Filters (not persisted - start fresh)
+  searchQuery: string
+  filterRole: string
+  filterStatus: string
+
   // Actions
-  setModalState: (state: Partial<UserModalState>) => void
+  setIsModalOpen: (open: boolean) => void
+  setSelectedUser: (user: User | null) => void
+  setModalMode: (mode: 'create' | 'edit' | 'view') => void
+  setSearchQuery: (query: string) => void
+  setFilterRole: (role: string) => void
+  setFilterStatus: (status: string) => void
+
+  // Utility functions
+  getFilteredUsers: (users: User[]) => User[]
+  resetFilters: () => void
+
+  // Combined modal actions for convenience
   openCreateModal: () => void
   openEditModal: (user: User) => void
   openViewModal: (user: User) => void
   closeModal: () => void
-  
-  setSelectedUsers: (userIds: string[]) => void
-  toggleUserSelection: (userId: string) => void
-  clearSelection: () => void
-  
-  setTableView: (view: 'table' | 'grid') => void
-  
-  setFilters: (filters: Partial<UserFiltersSchema>) => void
-  clearFilters: () => void
-  setSortBy: (sortBy: 'created_at' | 'full_name' | 'username' | 'role') => void
-  setSortOrder: (order: 'asc' | 'desc') => void
-  
-  // Batch actions
-  resetUIState: () => void
 }
 
-const initialFilters: UserFiltersSchema = {
-  limit: 50,
-  offset: 0,
-}
-
-const initialModalState: UserModalState = {
-  isOpen: false,
-  mode: 'create',
-  user: null,
-}
-
-export const useUsersStore = create<UsersStore>()(
+export const useUsersStore = create<UsersUIState>()(
   persist(
     (set, get) => ({
-      // Initial state
-      modalState: initialModalState,
-      selectedUsers: [],
-      tableView: 'table',
-      filters: initialFilters,
-      sortBy: 'created_at',
-      sortOrder: 'desc',
-      
-      // Computed values
-      get hasActiveFilters() {
-        const { filters } = get()
-        return !!(filters.search || filters.role || filters.status)
+      // State
+      isModalOpen: false,
+      isCreateModalOpen: false,
+      selectedUser: null,
+      modalMode: 'create',
+      searchQuery: '',
+      filterRole: '',
+      filterStatus: '',
+
+      // Actions
+      setIsModalOpen: (open) => set({ isModalOpen: open }),
+      setSelectedUser: (user) => set({ selectedUser: user }),
+      setModalMode: (mode) => set({ modalMode: mode }),
+      setSearchQuery: (query) => set({ searchQuery: query }),
+      setFilterRole: (role) => set({ filterRole: role }),
+      setFilterStatus: (status) => set({ filterStatus: status }),
+
+      // Utility
+      getFilteredUsers: (users) => {
+        const { searchQuery, filterRole, filterStatus } = get()
+        return users.filter(user => {
+          const matchesSearch = !searchQuery || 
+            user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
+          
+          const matchesRole = !filterRole || user.role === filterRole
+          const matchesStatus = !filterStatus || user.user_status === filterStatus
+          
+          return matchesSearch && matchesRole && matchesStatus
+        })
       },
-      
-      // Modal actions
-      setModalState: (state) => set((prev) => ({
-        modalState: { ...prev.modalState, ...state }
-      })),
-      
-      openCreateModal: () => set({
-        modalState: { isOpen: true, mode: 'create', user: null }
+
+      resetFilters: () => set({ 
+        searchQuery: '', 
+        filterRole: '', 
+        filterStatus: '' 
+      }),
+
+      // Combined actions
+      openCreateModal: () => set({ 
+        isModalOpen: true, 
+        modalMode: 'create', 
+        selectedUser: null 
       }),
       
-      openEditModal: (user) => set({
-        modalState: { isOpen: true, mode: 'edit', user }
+      openEditModal: (user) => set({ 
+        isModalOpen: true, 
+        modalMode: 'edit', 
+        selectedUser: user 
       }),
       
-      openViewModal: (user) => set({
-        modalState: { isOpen: true, mode: 'view', user }
+      openViewModal: (user) => set({ 
+        isModalOpen: true, 
+        modalMode: 'view', 
+        selectedUser: user 
       }),
       
-      closeModal: () => set({
-        modalState: initialModalState
-      }),
-      
-      // Selection actions
-      setSelectedUsers: (userIds) => set({ selectedUsers: userIds }),
-      
-      toggleUserSelection: (userId) => set((state) => ({
-        selectedUsers: state.selectedUsers.includes(userId)
-          ? state.selectedUsers.filter(id => id !== userId)
-          : [...state.selectedUsers, userId]
-      })),
-      
-      clearSelection: () => set({ selectedUsers: [] }),
-      
-      // View actions
-      setTableView: (view) => set({ tableView: view }),
-      
-      // Filter actions
-      setFilters: (newFilters) => set((state) => ({
-        filters: { ...state.filters, ...newFilters, offset: 0 }
-      })),
-      
-      clearFilters: () => set({ filters: initialFilters }),
-      
-      setSortBy: (sortBy) => set({ sortBy }),
-      setSortOrder: (sortOrder) => set({ sortOrder }),
-      
-      // Reset actions
-      resetUIState: () => set({
-        modalState: initialModalState,
-        selectedUsers: [],
-        tableView: 'table',
+      closeModal: () => set({ 
+        isModalOpen: false, 
+        selectedUser: null 
       }),
     }),
     {
-      name: 'users-store',
-      // Only persist user preferences, not UI state
+      name: 'users-ui-settings',
       partialize: (state) => ({
-        filters: state.filters,
-        sortBy: state.sortBy,
-        sortOrder: state.sortOrder,
-        tableView: state.tableView,
+        // Only persist UI preferences, not temporary state
       }),
     }
   )
 )
-
-// Selectors for specific state slices
-export const useUserModalState = () => useUsersStore(state => state.modalState)
-export const useUserFilters = () => useUsersStore(state => state.filters)
-export const useUserSelection = () => useUsersStore(state => ({
-  selectedUsers: state.selectedUsers,
-  toggleUserSelection: state.toggleUserSelection,
-  clearSelection: state.clearSelection,
-}))
-export const useUserPreferences = () => useUsersStore(state => ({
-  tableView: state.tableView,
-  sortBy: state.sortBy,
-  sortOrder: state.sortOrder,
-  setTableView: state.setTableView,
-  setSortBy: state.setSortBy,
-  setSortOrder: state.setSortOrder,
-}))

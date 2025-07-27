@@ -123,14 +123,6 @@ export function UserForm({ user, onSubmit, onCancel, loading = false, mode }: Us
 
   return (
     <div className="relative">
-      {loading && (
-        <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 flex items-center justify-center z-10 rounded-lg">
-          <div className="flex items-center gap-2 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-lg">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm font-medium">{isEdit ? 'Updating user...' : 'Creating user...'}</span>
-          </div>
-        </div>
-      )}
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6 dark:!bg-gray-900 dark:!text-white">
       {!isEdit && (
         <div className="space-y-4">

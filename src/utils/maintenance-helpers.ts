@@ -12,13 +12,12 @@ export const extractFilePathFromUrl = (fileUrl: string): string | null => {
     try {
         const url = new URL(fileUrl)
         const parts = url.pathname.split('/').filter(Boolean)
-        const idx = parts.findIndex(p => p === 'maintenance-reports')
+        const idx = parts.findIndex(p => p === 'equipments')
         if (idx !== -1 && idx < parts.length - 1) {
             return parts.slice(idx + 1).join('/')
         }
         return null
     } catch (err) {
-        console.error('extractFilePath error:', err)
         return null
     }
 }
@@ -27,7 +26,7 @@ export const extractFilePathFromUrl = (fileUrl: string): string | null => {
 export const deleteFileFromSupabase = async (fileUrl: string, tag: string): Promise<void> => {
     const path = extractFilePathFromUrl(fileUrl)
     if (!path) throw new Error(`Cannot parse path for ${tag}`)
-    const { error } = await supabase.storage.from('maintenance-reports').remove([path])
+    const { error } = await supabase.storage.from('equipments').remove([path])
     if (error) throw error
 }
 
@@ -46,7 +45,7 @@ export const uploadFileToSupabase = async (
 
     const { data: uploadData, error: uploadErr } = await supabase
         .storage
-        .from('maintenance-reports')
+        .from('equipments')
         .upload(filepath, buffer, { cacheControl: '3600', upsert: false })
 
     if (uploadErr || !uploadData) {
@@ -55,7 +54,7 @@ export const uploadFileToSupabase = async (
 
     const { data: urlData } = supabase
         .storage
-        .from('maintenance-reports')
+        .from('equipments')
         .getPublicUrl(uploadData.path)
 
     return urlData.publicUrl

@@ -18,6 +18,7 @@ interface EquipmentUIState {
   isCreateModalOpen: boolean;
   isEditMode: boolean;
   isExportModalOpen: boolean;
+  isMaintenanceModalOpen: boolean;
   
   // Image Viewer
   viewerImage: { url: string; title: string } | null;
@@ -49,6 +50,7 @@ interface EquipmentUIState {
   setIsCreateModalOpen: (open: boolean) => void;
   setIsEditMode: (isEdit: boolean) => void;
   setIsExportModalOpen: (open: boolean) => void;
+  setIsMaintenanceModalOpen: (open: boolean) => void;
   setViewerImage: (image: { url: string; title: string } | null) => void;
   setDeleteConfirmation: (state: { isOpen: boolean; equipment: Equipment | null }) => void;
   setCurrentPage: (page: number) => void;
@@ -79,6 +81,7 @@ export const useEquipmentStore = create<EquipmentUIState>()(
       isCreateModalOpen: false,
       isEditMode: false,
       isExportModalOpen: false,
+      isMaintenanceModalOpen: false,
       viewerImage: null,
       deleteConfirmation: {
         isOpen: false,
@@ -106,6 +109,7 @@ export const useEquipmentStore = create<EquipmentUIState>()(
       setIsCreateModalOpen: (open) => set({ isCreateModalOpen: open }),
       setIsEditMode: (isEdit) => set({ isEditMode: isEdit }),
       setIsExportModalOpen: (open) => set({ isExportModalOpen: open }),
+      setIsMaintenanceModalOpen: (open) => set({ isMaintenanceModalOpen: open }),
       setViewerImage: (image) => set({ viewerImage: image }),
       setDeleteConfirmation: (state) => set({ deleteConfirmation: state }),
       setCurrentPage: (page) => set({ currentPage: page }),
@@ -137,6 +141,7 @@ export const useEquipmentStore = create<EquipmentUIState>()(
         isModalOpen: false,
         isCreateModalOpen: false,
         isExportModalOpen: false,
+        isMaintenanceModalOpen: false,
         selectedEquipment: null,
         isEditMode: false,
         viewerImage: null,

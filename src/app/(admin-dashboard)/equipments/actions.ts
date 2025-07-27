@@ -22,20 +22,8 @@ const uploadMaintenanceFileToSupabase = async (
   const ext = file.name.split('.').pop();
   const filename = `maintenance_${index}_${timestamp}.${ext}`;
   
-  // Create human-readable folder structure
-  const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_');
-  
-  let humanReadablePath = '';
-  if (projectName && clientName && brand && model) {
-    const readableProject = sanitizeForPath(`${projectName}_${clientName}`);
-    const readableEquipment = sanitizeForPath(`${brand}_${model}_${plateNumber || 'Equipment'}`);
-    humanReadablePath = `${readableProject}/${readableEquipment}`;
-  } else {
-    // Fallback to UUID structure
-    humanReadablePath = `${projectId}/${equipmentId}`;
-  }
-  
-  const filepath = `equipments/${humanReadablePath}/maintenance/${reportId}/${filename}`;
+  // NEW STRUCTURE: equipment-{equipmentId}/maintenance-reports/{reportId}/attachments/
+  const filepath = `equipment-${equipmentId}/maintenance-reports/${reportId}/attachments/${filename}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { data: uploadData, error: uploadErr } = await supabase
@@ -76,20 +64,8 @@ const uploadPartImageToSupabase = async (
   const sanitizedPartName = partName.replace(/[^a-zA-Z0-9_\-]/g, '_');
   const filename = `${sanitizedPartName}_${timestamp}.${ext}`;
   
-  // Create human-readable folder structure
-  const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_');
-  
-  let humanReadablePath = '';
-  if (projectName && clientName && brand && model) {
-    const readableProject = sanitizeForPath(`${projectName}_${clientName}`);
-    const readableEquipment = sanitizeForPath(`${brand}_${model}_${plateNumber || 'Equipment'}`);
-    humanReadablePath = `${readableProject}/${readableEquipment}`;
-  } else {
-    // Fallback to UUID structure
-    humanReadablePath = `${projectId}/${equipmentId}`;
-  }
-  
-  const filepath = `equipments/${humanReadablePath}/maintenance/${reportId}/parts/${filename}`;
+  // NEW STRUCTURE: equipment-{equipmentId}/maintenance-reports/{reportId}/parts/
+  const filepath = `equipment-${equipmentId}/maintenance-reports/${reportId}/parts/${filename}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { data: uploadData, error: uploadErr } = await supabase
@@ -126,20 +102,23 @@ const uploadFileToSupabase = async (
   const ext = file.name.split('.').pop();
   const filename = `${prefix}_${timestamp}.${ext}`;
   
-  // Create human-readable folder structure
-  const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_');
+  // NEW STRUCTURE: equipment-{equipmentId}/equipment-images/ or equipment-documents/
+  const getSubfolder = (prefix: string) => {
+    switch (prefix) {
+      case 'equipment_image':
+        return 'equipment-images';
+      case 'thirdparty_inspection':
+      case 'pgpc_inspection':
+      case 'original_receipt':
+      case 'equipment_registration':
+        return 'equipment-documents';
+      default:
+        return 'equipment-files';
+    }
+  };
   
-  let humanReadablePath = '';
-  if (projectName && clientName && brand && model) {
-    const readableProject = sanitizeForPath(`${projectName}_${clientName}`);
-    const readableEquipment = sanitizeForPath(`${brand}_${model}_${plateNumber || 'Equipment'}`);
-    humanReadablePath = `${readableProject}/${readableEquipment}`;
-  } else {
-    // Fallback to UUID structure
-    humanReadablePath = `${projectId}/${equipmentId}`;
-  }
-  
-  const filepath = `equipments/${humanReadablePath}/${filename}`;
+  const subfolder = getSubfolder(prefix);
+  const filepath = `equipment-${equipmentId}/${subfolder}/${filename}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { data: uploadData, error: uploadErr } = await supabase
@@ -178,22 +157,11 @@ const uploadPartFileToSupabase = async (
   const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
   const uniqueFileName = `${sanitizedFileName}_${timestamp}.${ext}`;
   
-  // Create human-readable folder structure for parts
+  // NEW STRUCTURE: equipment-{equipmentId}/parts-management/{folderName}/
   const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_');
-  
-  let humanReadablePath = '';
-  if (projectName && clientName && brand && model) {
-    const readableProject = sanitizeForPath(`${projectName}_${clientName}`);
-    const readableEquipment = sanitizeForPath(`${brand}_${model}_${plateNumber || 'Equipment'}`);
-    humanReadablePath = `${readableProject}/${readableEquipment}`;
-  } else {
-    // Fallback to UUID structure
-    humanReadablePath = `${projectId}/${equipmentId}`;
-  }
-  
-  // Create the parts folder structure
   const sanitizedFolderName = sanitizeForPath(folderName);
-  const filepath = `equipments/${humanReadablePath}/parts/${sanitizedFolderName}/${uniqueFileName}`;
+  
+  const filepath = `equipment-${equipmentId}/parts-management/${sanitizedFolderName}/${uniqueFileName}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { data: uploadData, error: uploadErr } = await supabase

@@ -45,7 +45,8 @@ import ExportDialog from "./ExportDialog";
 
 export default function EquipmentsListModern() {
   // TanStack Query - Server state
-  const { data: equipments = [], isLoading, isError, error } = useEquipments();
+  const { data: equipmentsResponse, isLoading, isError, error } = useEquipments();
+  const equipments = equipmentsResponse || [];
 
   // Supabase Realtime - Live updates
   useEquipmentRealtime();
@@ -129,10 +130,10 @@ export default function EquipmentsListModern() {
   };
 
   // Helper function to calculate days until expiry
-  const getDaysUntilExpiry = (expiryDate: string | undefined) => {
+  const getDaysUntilExpiry = (expiryDate: string | Date | undefined) => {
     if (!expiryDate) return null;
     const now = new Date();
-    const expiry = new Date(expiryDate);
+    const expiry = expiryDate instanceof Date ? expiryDate : new Date(expiryDate);
     const diffTime = expiry.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;

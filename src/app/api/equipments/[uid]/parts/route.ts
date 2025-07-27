@@ -51,21 +51,10 @@ const uploadEquipmentPart = async (
     ""
   )}_${timestamp}.${ext}`;
 
-  // Create human-readable folder structure
+  // NEW STRUCTURE: equipment-{equipmentId}/parts-management/{folderPath}/
   const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
-
-  let humanReadablePath = "";
-  if (projectName && clientName && brand && model && type) {
-    const readableProject = sanitizeForPath(`${projectName}_${clientName}`);
-    const readableEquipment = sanitizeForPath(`${brand}_${model}_${type}`);
-    humanReadablePath = `${readableProject}/${readableEquipment}`;
-  } else {
-    // Fallback to UUID structure
-    humanReadablePath = `${projectId}/${equipmentId}`;
-  }
-
-  const sanitizedFolderPath = folderPath.replace(/[^a-zA-Z0-9_\-\/]/g, "_");
-  const filepath = `${humanReadablePath}/${sanitizedFolderPath}/${filename}`;
+  const sanitizedFolderPath = sanitizeForPath(folderPath);
+  const filepath = `equipment-${equipmentId}/parts-management/${sanitizedFolderPath}/${filename}`;
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
