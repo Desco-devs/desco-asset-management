@@ -196,44 +196,86 @@ export async function DELETE(
     // Extract equipment ID for file path matching
     const equipmentId = existingReport.equipment.id;
 
-    // Delete associated files from Supabase storage
-    if (existingReport.attachment_urls && existingReport.attachment_urls.length > 0) {
-      const supabase = createClient();
+    // Delete the entire report folder from Supabase storage
+    const supabase = createClient();
+    
+    try {
+      // Target the specific report folder: equipment-{equipmentId}/maintenance-reports/{reportId}/
+      const reportFolderPrefix = `equipment-${equipmentId}/maintenance-reports/${id}`;
       
-      // Extract file paths from URLs that belong to our storage structure
-      const filesToDelete: string[] = [];
+      // List all files that start with this report folder path
+      const { data: allFiles, error: listError } = await supabase.storage
+        .from('equipments')
+        .list('', {
+          limit: 1000,
+          search: reportFolderPrefix
+        });
       
-      for (const url of existingReport.attachment_urls) {
-        if (typeof url === 'string' && url.includes('supabase')) {
-          // Extract file path from Supabase URL
-          // Expected URL format: https://[project].supabase.co/storage/v1/object/public/[bucket]/[path]
-          const urlParts = url.split('/storage/v1/object/public/');
-          if (urlParts.length === 2) {
-            const [bucketAndPath] = urlParts[1].split('/', 1);
-            const filePath = urlParts[1].substring(bucketAndPath.length + 1);
-            
-            // Only delete files that belong to this equipment and report
-            if (filePath.includes(`equipment-${equipmentId}/maintenance-reports/${id}/`)) {
-              filesToDelete.push(filePath);
-            }
-          }
-        }
-      }
-
-      // Delete files in batches
-      if (filesToDelete.length > 0) {
-        try {
+      if (!listError && allFiles && allFiles.length > 0) {
+        // Filter files that belong to this specific report folder
+        const filesToDelete = allFiles
+          .map(file => file.name)
+          .filter(fileName => fileName.startsWith(reportFolderPrefix + '/'));
+        
+        if (filesToDelete.length > 0) {
           const { error: deleteError } = await supabase.storage
             .from('equipments')
             .remove(filesToDelete);
           
           if (deleteError) {
-            // Continue with report deletion even if file cleanup fails
+            console.warn('Failed to delete report folder from storage:', deleteError);
           }
-        } catch (storageError) {
-          // Continue with report deletion even if file cleanup fails
         }
       }
+      
+      // Alternative approach: Use the recursive list to get all files in the folder
+      const { data: folderContents, error: folderError } = await supabase.storage
+        .from('equipments')
+        .list(reportFolderPrefix, {
+          limit: 1000,
+          offset: 0
+        });
+      
+      if (!folderError && folderContents && folderContents.length > 0) {
+        // Get all files recursively in the report folder
+        const getAllFilesInFolder = async (folderPath: string): Promise<string[]> => {
+          const files: string[] = [];
+          
+          const { data, error } = await supabase.storage
+            .from('equipments')
+            .list(folderPath, { limit: 1000 });
+          
+          if (!error && data) {
+            for (const item of data) {
+              const fullPath = `${folderPath}/${item.name}`;
+              if (item.metadata?.mimetype) {
+                // It's a file
+                files.push(fullPath);
+              } else {
+                // It's a folder, recurse
+                const subFiles = await getAllFilesInFolder(fullPath);
+                files.push(...subFiles);
+              }
+            }
+          }
+          return files;
+        };
+        
+        const allFilesInFolder = await getAllFilesInFolder(reportFolderPrefix);
+        
+        if (allFilesInFolder.length > 0) {
+          const { error: deleteError } = await supabase.storage
+            .from('equipments')
+            .remove(allFilesInFolder);
+          
+          if (deleteError) {
+            console.warn('Failed to delete all files in report folder:', deleteError);
+          }
+        }
+      }
+    } catch (storageError) {
+      console.warn('Storage cleanup failed:', storageError);
+      // Continue with report deletion even if file cleanup fails
     }
 
     // Delete the maintenance report from database

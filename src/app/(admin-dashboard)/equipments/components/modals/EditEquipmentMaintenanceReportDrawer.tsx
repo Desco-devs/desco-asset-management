@@ -32,8 +32,11 @@ import {
   useUpdateEquipmentMaintenanceReport,
   useEquipmentsWithReferenceData,
 } from "@/hooks/useEquipmentsQuery";
-import { useEquipmentsStore, selectIsMobile } from "@/stores/equipmentsStore";
-import { Plus, Trash2, X, Settings, Camera, FileText, Upload, MapPin, Calendar, Clock, Wrench, Loader2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { equipmentKeys } from "@/hooks/useEquipmentsQuery";
+import { useEquipmentsStore } from "@/stores/equipmentsStore";
+import { useEquipmentStore, selectIsMobile } from "@/stores/equipmentStore";
+import { Plus, Trash2, X, ClipboardCheck, Package, ImageIcon, Upload, MapPin, Calendar, Clock, Wrench, Loader2 } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
@@ -41,7 +44,7 @@ import { createClient } from "@/lib/supabase";
 export default function EditEquipmentMaintenanceReportDrawer() {
   // State from Zustand
   const isOpen = useEquipmentsStore((state) => state.isEditMaintenanceReportDrawerOpen);
-  const isMobile = useEquipmentsStore(selectIsMobile);
+  const isMobile = useEquipmentStore(selectIsMobile);
   const selectedReport = useEquipmentsStore((state) => state.selectedMaintenanceReportForEdit);
   const { 
     setIsEditMaintenanceReportDrawerOpen, 
@@ -54,6 +57,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
   // Server state from TanStack Query
   const { locations } = useEquipmentsWithReferenceData();
   const updateMaintenanceReportMutation = useUpdateEquipmentMaintenanceReport();
+  const queryClient = useQueryClient();
 
   // Local form state
   const [activeTab, setActiveTab] = useState<'details' | 'parts' | 'attachments'>('details');
@@ -62,6 +66,15 @@ export default function EditEquipmentMaintenanceReportDrawer() {
   const handleTabChange = useCallback((tab: 'details' | 'parts' | 'attachments') => {
     setActiveTab(tab);
   }, []);
+
+  // Helper functions for counts
+  const getPartsCount = () => {
+    return formData.parts_replaced.filter(part => part && part.trim() !== "").length;
+  };
+
+  const getAttachmentsCount = () => {
+    return formData.attachment_urls.filter(url => url && url.trim() !== "").length;
+  };
 
   const [formData, setFormData] = useState({
     issue_description: "",
@@ -79,6 +92,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [removedPartImages, setRemovedPartImages] = useState<number[]>([]);
   const [removedAttachments, setRemovedAttachments] = useState<number[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Populate form data when selectedReport changes
   useEffect(() => {
@@ -98,10 +112,10 @@ export default function EditEquipmentMaintenanceReportDrawer() {
         location_id: selectedReport.location_id || "",
         parts_replaced: selectedReport.parts_replaced && selectedReport.parts_replaced.length > 0 
           ? selectedReport.parts_replaced.filter(part => part && part.trim() !== "")
-          : [],
-        attachment_urls: selectedReport.attachment_urls && selectedReport.attachment_urls.length > 0 
-          ? selectedReport.attachment_urls.filter(url => url && url.trim() !== "")
-          : [],
+          : [""], // Always have at least one empty part
+        attachment_urls: selectedReport.attachment_urls && selectedReport.attachment_urls.length > 0 && selectedReport.parts_replaced
+          ? selectedReport.attachment_urls.slice(selectedReport.parts_replaced.length).filter(url => url && url.trim() !== "")
+          : [""], // Only attachment URLs after part images
       });
       
     }
@@ -144,9 +158,14 @@ export default function EditEquipmentMaintenanceReportDrawer() {
     // Use the updated report if provided, otherwise use selected report
     const reportToShow = updatedReport || selectedReport;
     if (reportToShow) {
-      // Set the updated report for detail view
-      setSelectedMaintenanceReportForDetail(reportToShow);
+      // Set the updated report for detail view - ensure it's a fresh object
+      setSelectedMaintenanceReportForDetail({...reportToShow});
       setIsMaintenanceReportDetailOpen(true);
+      
+      // Invalidate queries to ensure fresh data everywhere
+      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipmentMaintenanceReports() });
+      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
+      
       // Close edit drawer (this will also close equipment modal via handleClose)
       setIsEditMaintenanceReportDrawerOpen(false);
       setSelectedMaintenanceReportForEdit(null);
@@ -171,7 +190,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       // Equipment modal stays closed since we're opening detail drawer
       // (Detail drawer will handle reopening equipment modal when it closes)
     }
-  }, [selectedReport, setSelectedMaintenanceReportForDetail, setIsMaintenanceReportDetailOpen, setIsEditMaintenanceReportDrawerOpen, setSelectedMaintenanceReportForEdit, setPartsFiles, setAttachmentFiles, setFormData, setActiveTab]);
+  }, [selectedReport, setSelectedMaintenanceReportForDetail, setIsMaintenanceReportDetailOpen, setIsEditMaintenanceReportDrawerOpen, setSelectedMaintenanceReportForEdit, setPartsFiles, setAttachmentFiles, setFormData, setActiveTab, queryClient]);
 
   const handleInputChange = useCallback((field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -188,18 +207,55 @@ export default function EditEquipmentMaintenanceReportDrawer() {
     }));
   }, []);
 
+  // Add/remove handlers for parts and attachments
+  const addPartReplaced = useCallback(() => {
+    setFormData((prev) => ({
+      ...prev,
+      parts_replaced: [...prev.parts_replaced, ""],
+    }));
+  }, []);
+
+  const removePartReplaced = useCallback((index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      parts_replaced: prev.parts_replaced.filter((_, i) => i !== index),
+    }));
+    // Also remove corresponding files
+    setPartsFiles((prev) => prev.filter((_, i) => i !== index));
+    setRemovedPartImages((prev) => prev.filter(i => i !== index).map(i => i > index ? i - 1 : i));
+  }, []);
+
+  const addAttachment = useCallback(() => {
+    setFormData((prev) => ({
+      ...prev,
+      attachment_urls: [...prev.attachment_urls, ""],
+    }));
+  }, []);
+
+  const removeAttachment = useCallback((index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      attachment_urls: prev.attachment_urls.filter((_, i) => i !== index),
+    }));
+    // Also remove corresponding files
+    setAttachmentFiles((prev) => prev.filter((_, i) => i !== index));
+    setRemovedAttachments((prev) => prev.filter(i => i !== index).map(i => i > index ? i - 1 : i));
+  }, []);
+
 
 
   // File upload helper function  
-  const uploadFileToSupabase = useCallback(async (file: File, prefix: string): Promise<string> => {
+  const uploadFileToSupabase = useCallback(async (file: File, prefix: string, isAttachment: boolean = false): Promise<string> => {
     const supabase = createClient();
     const timestamp = Date.now();
     const ext = file.name.split('.').pop();
-    const filename = `${prefix}_${timestamp}.${ext}`;
+    const filename = `${timestamp}_${selectedReport?.id || 'unknown'}_${file.name}`;
     
-    // Create a simple folder structure for maintenance reports
+    // Match the create functionality path structure
     const equipmentId = selectedReport?.equipment_id || 'unknown';
-    const filepath = `equipments/maintenance-reports/${equipmentId}/${filename}`;
+    const reportId = selectedReport?.id || 'unknown';
+    const folder = isAttachment ? 'attachments' : 'parts';
+    const filepath = `equipment-${equipmentId}/maintenance-reports/${reportId}/${folder}/${filename}`;
     
     const buffer = await file.arrayBuffer();
     const { data: uploadData, error: uploadErr } = await supabase.storage
@@ -215,67 +271,179 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       .getPublicUrl(uploadData.path);
 
     return urlData.publicUrl;
-  }, [selectedReport?.equipment_id]);
+  }, [selectedReport?.equipment_id, selectedReport?.id]);
+
+  // Function to delete old files from Supabase storage
+  const deleteFileFromSupabase = useCallback(async (fileUrl: string): Promise<void> => {
+    if (!fileUrl || !fileUrl.includes('supabase.co/storage/v1/object/public/equipments/')) {
+      return; // Not a Supabase storage URL, skip deletion
+    }
+    
+    const supabase = createClient();
+    
+    // Extract the file path from the URL
+    // URL format: https://domain.supabase.co/storage/v1/object/public/equipments/path/to/file
+    const urlParts = fileUrl.split('/storage/v1/object/public/equipments/');
+    if (urlParts.length !== 2) {
+      console.warn('Invalid storage URL format:', fileUrl);
+      return;
+    }
+    
+    const filePath = urlParts[1];
+    
+    const { error } = await supabase.storage
+      .from('equipments')
+      .remove([filePath]);
+      
+    if (error) {
+      console.warn('Failed to delete file from storage:', filePath, error);
+      // Don't throw error - continue with update even if file deletion fails
+    }
+  }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Set loading state immediately
+    setIsSubmitting(true);
 
     if (!selectedReport) {
       toast.error("No report selected for editing");
+      setIsSubmitting(false);
       return;
     }
 
     if (!formData.issue_description.trim()) {
       toast.error("Issue description is required");
+      setIsSubmitting(false);
       return;
     }
 
-
     try {
-      // Step 1: Upload new files first
-      const uploadedUrls: string[] = [...formData.attachment_urls];
+      // Step 0: Delete removed part images from storage
+      for (const removedIndex of removedPartImages) {
+        const existingUrl = selectedReport?.attachment_urls?.[removedIndex];
+        if (existingUrl) {
+          await deleteFileFromSupabase(existingUrl);
+        }
+      }
+
+      // Step 1: Process parts and their images
+      const partUrls: string[] = [];
+      const filteredPartsReplaced: string[] = [];
       
-      // Upload parts files and replace URLs
-      for (let i = 0; i < partsFiles.length; i++) {
+      for (let i = 0; i < formData.parts_replaced.length; i++) {
+        const part = formData.parts_replaced[i];
+        
+        // Skip empty parts or removed parts
+        if (!part.trim() || removedPartImages.includes(i)) {
+          continue;
+        }
+        
+        // Add the part name to filtered list
+        filteredPartsReplaced.push(part);
+        
+        // Handle part image
         const file = partsFiles[i];
         if (file) {
+          // Delete old file if replacing
+          const existingUrl = selectedReport?.attachment_urls?.[i];
+          if (existingUrl) {
+            await deleteFileFromSupabase(existingUrl);
+          }
+          
+          // Upload new file
           try {
-            const uploadedUrl = await uploadFileToSupabase(file, `part_${i}`);
-            uploadedUrls[i] = uploadedUrl;
+            const uploadedUrl = await uploadFileToSupabase(file, `part_${filteredPartsReplaced.length - 1}`, false);
+            partUrls.push(uploadedUrl);
           } catch (uploadError) {
-            toast.error(`Failed to upload part ${i + 1} image`);
-            return; // Stop if upload fails
+            toast.error(`Failed to upload part ${filteredPartsReplaced.length} image`);
+            setIsSubmitting(false);
+            return;
+          }
+        } else {
+          // Keep existing URL if available
+          const existingUrl = selectedReport?.attachment_urls?.[i];
+          if (existingUrl) {
+            partUrls.push(existingUrl);
+          } else {
+            // No image for this part
+            partUrls.push("");
           }
         }
       }
 
-      // Upload attachment files
-      for (let i = 0; i < attachmentFiles.length; i++) {
+      // Step 1.5: Delete removed attachment files from storage  
+      for (const removedIndex of removedAttachments) {
+        // Calculate the actual index in attachment_urls array (after parts)
+        const attachmentIndex = filteredPartsReplaced.length + removedIndex;
+        const existingUrl = selectedReport?.attachment_urls?.[attachmentIndex];
+        if (existingUrl) {
+          await deleteFileFromSupabase(existingUrl);
+        }
+      }
+
+      // Step 2: Process attachment files
+      const attachmentUrls: string[] = [];
+      
+      for (let i = 0; i < formData.attachment_urls.length; i++) {
+        // Skip removed attachments
+        if (removedAttachments.includes(i)) {
+          continue;
+        }
+        
         const file = attachmentFiles[i];
         if (file) {
-          try {
-            const uploadedUrl = await uploadFileToSupabase(file, `attachment_${i}`);
-            // Find the next available slot or append
-            const attachmentIndex = partsFiles.length + i;
-            uploadedUrls[attachmentIndex] = uploadedUrl;
-          } catch (uploadError) {
-            toast.error(`Failed to upload attachment ${i + 1}`);
-            return; // Stop if upload fails
+          // Delete old attachment file if replacing
+          const attachmentIndex = filteredPartsReplaced.length + attachmentUrls.length;
+          const existingUrl = selectedReport?.attachment_urls?.[attachmentIndex];
+          if (existingUrl) {
+            await deleteFileFromSupabase(existingUrl);
           }
+          
+          // Upload new attachment file
+          try {
+            const uploadedUrl = await uploadFileToSupabase(file, `attachment_${attachmentUrls.length}`, true);
+            attachmentUrls.push(uploadedUrl);
+          } catch (uploadError) {
+            toast.error(`Failed to upload attachment ${attachmentUrls.length + 1}`);
+            setIsSubmitting(false);
+            return;
+          }
+        } else if (formData.attachment_urls[i] && formData.attachment_urls[i].trim()) {
+          // Keep manual URL if provided
+          attachmentUrls.push(formData.attachment_urls[i]);
         }
       }
 
-      // Step 2: Filter out empty parts, removed images, and attachment URLs
-      const filteredPartsReplaced = formData.parts_replaced.filter(
-        (part, index) => part.trim() !== "" && !removedPartImages.includes(index)
-      );
+      // Step 3: Build final attachment URLs array with proper indexing
+      // Parts images go at the same indices as their corresponding parts
+      // Standalone attachments go after all parts
+      const finalAttachmentUrls: string[] = [];
       
-      // Filter attachment URLs, excluding removed ones
-      const filteredAttachmentUrls = uploadedUrls.filter(
-        (url, index) => url && url.trim() !== "" && !removedAttachments.includes(index)
-      );
+      // First, add part images at their corresponding indices
+      for (let i = 0; i < filteredPartsReplaced.length; i++) {
+        if (partUrls[i] && partUrls[i].trim() !== "") {
+          finalAttachmentUrls[i] = partUrls[i];
+        } else {
+          finalAttachmentUrls[i] = ""; // Empty string to maintain index alignment
+        }
+      }
+      
+      // Then, add standalone attachments after the parts
+      attachmentUrls.forEach(url => {
+        if (url && url.trim() !== "") {
+          finalAttachmentUrls.push(url);
+        }
+      });
+      
+      // Clean up empty strings at the end but keep them in part positions
+      while (finalAttachmentUrls.length > filteredPartsReplaced.length && 
+             finalAttachmentUrls[finalAttachmentUrls.length - 1] === "") {
+        finalAttachmentUrls.pop();
+      }
 
-      // Step 3: Update the maintenance report with new data
+      // Step 4: Update the maintenance report with new data
       const reportData = {
         id: selectedReport.id,
         equipment_id: selectedReport.equipment_id,
@@ -289,7 +457,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
         // location_id is required in schema, fallback to existing value if empty
         location_id: formData.location_id || selectedReport.location_id,
         parts_replaced: filteredPartsReplaced,
-        attachment_urls: filteredAttachmentUrls,
+        attachment_urls: finalAttachmentUrls,
         date_repaired: formData.status === "COMPLETED" && !selectedReport.date_repaired 
           ? new Date().toISOString() 
           : selectedReport.date_repaired,
@@ -298,15 +466,17 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       // Debug: Log the data being sent
 
       const updatedReport = await updateMaintenanceReportMutation.mutateAsync(reportData);
+      setIsSubmitting(false);
       handleSaveAndViewDetails(updatedReport);
     } catch (error) {
+      setIsSubmitting(false);
       toast.error("Failed to update maintenance report");
     }
-  }, [formData, selectedReport, updateMaintenanceReportMutation, handleSaveAndViewDetails, partsFiles, attachmentFiles, uploadFileToSupabase]);
+  }, [formData, selectedReport, updateMaintenanceReportMutation, handleSaveAndViewDetails, partsFiles, attachmentFiles, uploadFileToSupabase, removedPartImages, removedAttachments]);
 
 
   // Stable tab button renderer
-  const renderTabButton = useCallback((tab: 'details' | 'parts' | 'attachments', label: string, icon: React.ReactNode) => (
+  const renderTabButton = useCallback((tab: 'details' | 'parts' | 'attachments', label: string, icon: React.ReactNode, count?: number) => (
     <Button
       type="button"
       variant={activeTab === tab ? 'default' : 'ghost'}
@@ -314,7 +484,14 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       onClick={() => handleTabChange(tab)}
       className="flex-1 flex items-center gap-2"
     >
-      {icon}
+      <div className="relative">
+        {icon}
+        {count !== undefined && count > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1 py-0.5 min-w-[16px] h-[16px] flex items-center justify-center text-[10px] leading-none">
+            {count}
+          </span>
+        )}
+      </div>
       <span className="hidden sm:inline">{label}</span>
     </Button>
   ), [activeTab, handleTabChange]);
@@ -335,14 +512,17 @@ export default function EditEquipmentMaintenanceReportDrawer() {
             <DrawerTitle className="text-xl font-bold">
               Edit Maintenance Report
             </DrawerTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Update maintenance report details, parts replacement, and attachments
+            </p>
           </DrawerHeader>
           <div className="flex-1 overflow-y-auto p-4">
             <div className="space-y-6">
               {/* Tab Navigation */}
               <div className="grid grid-cols-3 bg-muted rounded-md p-1">
-                {renderTabButton('details', 'Details', <Settings className="h-4 w-4" />)}
-                {renderTabButton('parts', 'Parts', <Wrench className="h-4 w-4" />)}
-                {renderTabButton('attachments', 'Images', <Camera className="h-4 w-4" />)}
+                {renderTabButton('details', 'Details', <ClipboardCheck className="h-4 w-4" />)}
+                {renderTabButton('parts', 'Parts', <Package className="h-4 w-4" />, getPartsCount() > 0 ? getPartsCount() : undefined)}
+                {renderTabButton('attachments', 'Files', <ImageIcon className="h-4 w-4" />, getAttachmentsCount() > 0 ? getAttachmentsCount() : undefined)}
               </div>
 
               {/* Details Tab */}
@@ -352,7 +532,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                   <Card>
                     <CardHeader className="pb-6">
                       <CardTitle className="text-lg flex items-center gap-2">
-                        <Settings className="h-5 w-5" />
+                        <ClipboardCheck className="h-5 w-5" />
                         Issue Information
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
@@ -388,14 +568,13 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                               <SelectItem value="LOW">Low</SelectItem>
                               <SelectItem value="MEDIUM">Medium</SelectItem>
                               <SelectItem value="HIGH">High</SelectItem>
-                              <SelectItem value="CRITICAL">Critical</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
 
                         <div className="space-y-2">
                           <Label htmlFor="status" className="flex items-center gap-2">
-                            <Settings className="h-4 w-4" />
+                            <ClipboardCheck className="h-4 w-4" />
                             Status
                           </Label>
                           <Select
@@ -458,7 +637,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                   <Card>
                     <CardHeader className="pb-4">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <Wrench className="h-4 w-4" />
+                        <ClipboardCheck className="h-4 w-4" />
                         Technical Details
                       </CardTitle>
                     </CardHeader>
@@ -505,7 +684,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                 <Card>
                   <CardHeader className="pb-4">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Wrench className="h-4 w-4" />
+                      <Package className="h-4 w-4" />
                       Parts Replaced
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-2">
@@ -515,10 +694,25 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                   <CardContent className="space-y-6">
                     {formData.parts_replaced.map((part, index) => (
                       <div key={index} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Part {index + 1}</span>
+                          {formData.parts_replaced.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removePartReplaced(index)}
+                              className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                         <FileUploadSectionSimple
                           label={`Part ${index + 1} Image`}
                           accept="image/*"
                           currentFileUrl={removedPartImages.includes(index) ? null : (selectedReport?.attachment_urls?.[index] || null)}
+                          selectedFile={partsFiles[index] || null}
                           onFileChange={(file) => {
                             const newFiles = [...partsFiles];
                             if (file) {
@@ -546,6 +740,17 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                         </div>
                       </div>
                     ))}
+                    <div className="flex justify-center pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addPartReplaced}
+                        className="flex items-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Another Part
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -555,7 +760,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                 <Card>
                   <CardHeader className="pb-4">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Camera className="h-4 w-4" />
+                      <ImageIcon className="h-4 w-4" />
                       Attachments & Images
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-2">
@@ -565,10 +770,25 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                   <CardContent className="space-y-6">
                     {formData.attachment_urls.map((url, index) => (
                       <div key={index} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Attachment {index + 1}</span>
+                          {formData.attachment_urls.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeAttachment(index)}
+                              className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                         <FileUploadSectionSimple
                           label={`Attachment ${index + 1}`}
                           accept="image/*,application/pdf,.doc,.docx"
-                          currentFileUrl={removedAttachments.includes(index) ? null : (url || null)}
+                          currentFileUrl={removedAttachments.includes(index) ? null : (formData.attachment_urls[index] || null)}
+                          selectedFile={attachmentFiles[index] || null}
                           onFileChange={(file) => {
                             const newFiles = [...attachmentFiles];
                             if (file) {
@@ -597,6 +817,17 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                         </div>
                       </div>
                     ))}
+                    <div className="flex justify-center pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addAttachment}
+                        className="flex items-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Another Attachment
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -610,10 +841,10 @@ export default function EditEquipmentMaintenanceReportDrawer() {
               <Button
                 type="button"
                 onClick={handleSubmit}
-                disabled={updateMaintenanceReportMutation.isPending}
+                disabled={isSubmitting}
                 className="flex-1"
               >
-                {updateMaintenanceReportMutation.isPending ? (
+                {isSubmitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Updating...
@@ -657,7 +888,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
               }`}
             >
-              <Settings className="h-4 w-4" />
+              <ClipboardCheck className="h-4 w-4" />
               Report Details
             </button>
             <button
@@ -669,8 +900,13 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
               }`}
             >
-              <Wrench className="h-4 w-4" />
+              <Package className="h-4 w-4" />
               Parts Replaced
+              {getPartsCount() > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getPartsCount()}
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -678,11 +914,16 @@ export default function EditEquipmentMaintenanceReportDrawer() {
               className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
                 activeTab === 'attachments'
                   ? 'border-primary text-primary bg-primary/5'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                  : 'border-transparent text-muted-foreground hover:border-muted-foreground'
               }`}
             >
-              <Camera className="h-4 w-4" />
+              <ImageIcon className="h-4 w-4" />
               Attachments & Images
+              {getAttachmentsCount() > 0 && (
+                <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                  {getAttachmentsCount()}
+                </span>
+              )}
             </button>
           </div>
 
@@ -716,7 +957,6 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                         <SelectItem value="LOW">Low</SelectItem>
                         <SelectItem value="MEDIUM">Medium</SelectItem>
                         <SelectItem value="HIGH">High</SelectItem>
-                        <SelectItem value="CRITICAL">Critical</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -813,7 +1053,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-medium flex items-center gap-2">
-                  <Wrench className="h-4 w-4" />
+                  <Package className="h-4 w-4" />
                   Parts Replaced
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
@@ -822,10 +1062,25 @@ export default function EditEquipmentMaintenanceReportDrawer() {
               </div>
               {formData.parts_replaced.map((part, index) => (
                 <div key={index} className="space-y-3 p-4 border rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Part {index + 1}</span>
+                    {formData.parts_replaced.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removePartReplaced(index)}
+                        className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
                   <FileUploadSectionSimple
                     label={`Part ${index + 1} Image`}
                     accept="image/*"
                     currentFileUrl={removedPartImages.includes(index) ? null : (selectedReport?.attachment_urls?.[index] || null)}
+                    selectedFile={partsFiles[index] || null}
                     onFileChange={(file) => {
                       const newFiles = [...partsFiles];
                       if (file) {
@@ -853,6 +1108,17 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                   </div>
                 </div>
               ))}
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addPartReplaced}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Another Part
+                </Button>
+              </div>
             </div>
           )}
 
@@ -861,7 +1127,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-medium flex items-center gap-2">
-                  <Camera className="h-4 w-4" />
+                  <ImageIcon className="h-4 w-4" />
                   Attachments & Images
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
@@ -870,10 +1136,25 @@ export default function EditEquipmentMaintenanceReportDrawer() {
               </div>
               {formData.attachment_urls.map((url, index) => (
                 <div key={index} className="space-y-3 p-4 border rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Attachment {index + 1}</span>
+                    {formData.attachment_urls.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeAttachment(index)}
+                        className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
                   <FileUploadSectionSimple
                     label={`Attachment ${index + 1}`}
                     accept="image/*,application/pdf,.doc,.docx"
-                    currentFileUrl={removedAttachments.includes(index) ? null : (url || null)}
+                    currentFileUrl={removedAttachments.includes(index) ? null : (formData.attachment_urls[index] || null)}
+                    selectedFile={attachmentFiles[index] || null}
                     onFileChange={(file) => {
                       const newFiles = [...attachmentFiles];
                       if (file) {
@@ -902,6 +1183,17 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                   </div>
                 </div>
               ))}
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addAttachment}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Another Attachment
+                </Button>
+              </div>
             </div>
           )}
 
@@ -918,10 +1210,10 @@ export default function EditEquipmentMaintenanceReportDrawer() {
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={updateMaintenanceReportMutation.isPending}
+              disabled={isSubmitting}
               size="lg"
             >
-              {updateMaintenanceReportMutation.isPending ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Updating...

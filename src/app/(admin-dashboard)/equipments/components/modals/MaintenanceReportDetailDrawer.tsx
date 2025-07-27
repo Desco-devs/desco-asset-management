@@ -18,7 +18,8 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { useEquipmentsStore, selectIsMobile } from "@/stores/equipmentsStore";
+import { useEquipmentsStore } from "@/stores/equipmentsStore";
+import { useEquipmentStore, selectIsMobile } from "@/stores/equipmentStore";
 import { useDeleteEquipmentMaintenanceReport } from "@/hooks/useEquipmentsQuery";
 import {
   Calendar,
@@ -39,7 +40,7 @@ import Image from "next/image";
 
 export default function MaintenanceReportDetailDrawer() {
   // State from Zustand
-  const isMobile = useEquipmentsStore(selectIsMobile);
+  const isMobile = useEquipmentStore(selectIsMobile);
   const selectedReport = useEquipmentsStore((state) => state.selectedMaintenanceReportForDetail);
   const isOpen = useEquipmentsStore((state) => state.isMaintenanceReportDetailOpen);
   const { 
@@ -139,10 +140,9 @@ export default function MaintenanceReportDetailDrawer() {
 
   const getPriorityColor = useCallback((priority?: string) => {
     switch (priority) {
-      case "CRITICAL":
-        return "bg-red-100 text-red-800 border-red-200";
+      case "CRITICAL": // Legacy data - map to HIGH color
       case "HIGH":
-        return "bg-orange-100 text-orange-800 border-orange-200";
+        return "bg-red-100 text-red-800 border-red-200";
       case "MEDIUM":
         return "bg-blue-100 text-blue-800 border-blue-200";
       case "LOW":
@@ -178,7 +178,11 @@ export default function MaintenanceReportDetailDrawer() {
   };
 
   const getAttachmentsCount = () => {
-    return selectedReport?.attachment_urls?.length || 0;
+    if (!selectedReport?.attachment_urls) return 0;
+    const partsCount = selectedReport.parts_replaced?.length || 0;
+    // Only count standalone attachments (after parts images)
+    const standaloneAttachments = selectedReport.attachment_urls.slice(partsCount);
+    return standaloneAttachments.filter(url => url && url.trim() !== "").length;
   };
 
   // Image Viewer Component - EXACTLY like equipment modal
@@ -491,13 +495,23 @@ export default function MaintenanceReportDetailDrawer() {
             </p>
           </div>
           
-          {selectedReport.attachment_urls && selectedReport.attachment_urls.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {selectedReport.attachment_urls.map((url, index) => {
-                const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
-                
-                return (
-                  <div key={`${selectedReport.id}-attachment-${index}-${url.split('/').pop()}`} className="border rounded-lg p-3">
+          {(() => {
+            if (!selectedReport.attachment_urls) return null;
+            
+            const partsCount = selectedReport.parts_replaced?.length || 0;
+            // Only show standalone attachments (after parts images)
+            const standaloneAttachments = selectedReport.attachment_urls
+              .slice(partsCount)
+              .filter(url => url && url.trim() !== "");
+            
+            return standaloneAttachments.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {standaloneAttachments.map((url, attachmentIndex) => {
+                  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+                  const actualIndex = partsCount + attachmentIndex; // Original index in attachment_urls array
+                  
+                  return (
+                    <div key={`${selectedReport.id}-attachment-${actualIndex}-${url.split('/').pop()}`} className="border rounded-lg p-3">
                     {isImage ? (
                       <div className="space-y-2">
                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
@@ -505,12 +519,12 @@ export default function MaintenanceReportDetailDrawer() {
                             <div 
                               className="relative cursor-pointer"
                               onClick={() => {
-                                setImageViewer({isOpen: true, url: url, title: `Attachment ${index + 1}`});
+                                setImageViewer({isOpen: true, url: url, title: `Attachment ${attachmentIndex + 1}`});
                               }}
                             >
                               <Image
                                 src={url}
-                                alt={`Attachment ${index + 1}`}
+                                alt={`Attachment ${attachmentIndex + 1}`}
                                 width={200}
                                 height={200}
                                 className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
@@ -536,7 +550,7 @@ export default function MaintenanceReportDetailDrawer() {
                       >
                         <ExternalLink className="h-4 w-4" />
                         <span className="text-left">
-                          <div className="font-medium">Attachment {index + 1}</div>
+                          <div className="font-medium">Attachment {attachmentIndex + 1}</div>
                           <div className="text-xs text-muted-foreground truncate">
                             {url.split('/').pop()}
                           </div>
@@ -546,13 +560,14 @@ export default function MaintenanceReportDetailDrawer() {
                   </div>
                 );
               })}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <p className="text-muted-foreground">No attachments available for this report</p>
-            </div>
-          )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-muted-foreground">No attachments available for this report</p>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -650,6 +665,9 @@ export default function MaintenanceReportDetailDrawer() {
               <DrawerTitle className="text-xl font-bold">
                 Maintenance Report Details
               </DrawerTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                View maintenance report details, parts replaced, and attachments
+              </p>
             </DrawerHeader>
             <div className="flex-1 overflow-y-auto p-4">
               <ReportContent />
@@ -664,6 +682,14 @@ export default function MaintenanceReportDetailDrawer() {
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleEdit}
+                  className="flex-1 gap-2"
+                >
+                  <Edit className="h-4 w-4" />
+                  Edit
                 </Button>
               </div>
             </DrawerFooter>

@@ -140,10 +140,9 @@ export default function MaintenanceReportDetailDrawer() {
 
   const getPriorityColor = useCallback((priority?: string) => {
     switch (priority) {
-      case "CRITICAL":
-        return "bg-red-100 text-red-800 border-red-200";
+      case "CRITICAL": // Legacy data - map to HIGH color
       case "HIGH":
-        return "bg-orange-100 text-orange-800 border-orange-200";
+        return "bg-red-100 text-red-800 border-red-200";
       case "MEDIUM":
         return "bg-blue-100 text-blue-800 border-blue-200";
       case "LOW":

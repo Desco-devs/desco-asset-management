@@ -397,7 +397,6 @@ export default function EditVehicleMaintenanceReportDrawer() {
                               <SelectItem value="LOW">Low</SelectItem>
                               <SelectItem value="MEDIUM">Medium</SelectItem>
                               <SelectItem value="HIGH">High</SelectItem>
-                              <SelectItem value="CRITICAL">Critical</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -725,7 +724,6 @@ export default function EditVehicleMaintenanceReportDrawer() {
                         <SelectItem value="LOW">Low</SelectItem>
                         <SelectItem value="MEDIUM">Medium</SelectItem>
                         <SelectItem value="HIGH">High</SelectItem>
-                        <SelectItem value="CRITICAL">Critical</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

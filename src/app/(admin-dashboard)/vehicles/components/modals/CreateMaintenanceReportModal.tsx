@@ -197,7 +197,6 @@ export default function CreateMaintenanceReportModal({
                   <SelectItem value="LOW">Low</SelectItem>
                   <SelectItem value="MEDIUM">Medium</SelectItem>
                   <SelectItem value="HIGH">High</SelectItem>
-                  <SelectItem value="CRITICAL">Critical</SelectItem>
                 </SelectContent>
               </Select>
             </div>

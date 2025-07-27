@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import type { Equipment, MaintenanceReport, EquipmentMaintenanceReport, Project, Client, Location, User, ExportFilters } from "@/stores/equipmentsStore";
 
 // Query keys for consistent cache management
-const equipmentKeys = {
+export const equipmentKeys = {
   all: ['equipments'] as const,
   equipments: () => [...equipmentKeys.all, 'list'] as const,
   equipment: (id: string) => [...equipmentKeys.all, 'item', id] as const,
@@ -747,6 +747,9 @@ export function useUpdateEquipmentMaintenanceReport() {
         );
         return deduplicateEquipmentMaintenanceReports(updated);
       });
+      
+      // Note: Query invalidation is handled by the component after store state update
+      
       toast.success('Equipment maintenance report updated successfully!');
     },
     onError: (error) => {

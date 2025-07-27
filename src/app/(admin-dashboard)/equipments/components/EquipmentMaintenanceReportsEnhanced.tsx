@@ -100,8 +100,7 @@ export default function EquipmentMaintenanceReportsEnhanced({
 
   const getPriorityColor = (priority?: string) => {
     switch (priority) {
-      case "CRITICAL":
-        return "bg-red-100 text-red-800 border-red-200";
+      case "CRITICAL": // Legacy data - map to HIGH styling
       case "HIGH":
         return "bg-orange-100 text-orange-800 border-orange-200";
       case "MEDIUM":
@@ -487,9 +486,11 @@ export default function EquipmentMaintenanceReportsEnhanced({
         ) : (
           <div className="space-y-2">
             {equipmentReports.map((report) => {
-              const isExpanded = expandedReports.has(report.id);
+              const isExpanded = isEditMode ? true : expandedReports.has(report.id);
               
               const toggleExpanded = () => {
+                if (isEditMode) return; // Disable collapsible in edit mode
+                
                 const newExpanded = new Set(expandedReports);
                 if (isExpanded) {
                   newExpanded.delete(report.id);
@@ -501,13 +502,19 @@ export default function EquipmentMaintenanceReportsEnhanced({
                 setExpandedReports(newExpanded);
               };
 
+              // Initialize form data for edit mode
+              if (isEditMode && !reportFormData[report.id]) {
+                initializeFormData(report);
+              }
+
               return (
                 <Card key={report.id} className="overflow-hidden">
                   <CardHeader 
-                    className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                    className={`pb-3 ${!isEditMode ? 'cursor-pointer hover:bg-muted/50' : ''} transition-colors`}
                     onClick={() => {
                       if (isEditMode) {
-                        toggleExpanded();
+                        // Do nothing in edit mode - no collapsible behavior
+                        return;
                       } else {
                         setSelectedMaintenanceReportForDetail(report);
                         setIsMaintenanceReportDetailOpen(true);
@@ -555,17 +562,11 @@ export default function EquipmentMaintenanceReportsEnhanced({
                       </div>
 
                       {/* Right side - Expand/collapse indicator */}
-                      <div className="ml-4 flex-shrink-0">
-                        {isEditMode ? (
-                          isExpanded ? (
-                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )
-                        ) : (
+                      {!isEditMode && (
+                        <div className="ml-4 flex-shrink-0">
                           <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                   
@@ -650,7 +651,6 @@ export default function EquipmentMaintenanceReportsEnhanced({
                                       <SelectItem value="LOW">Low</SelectItem>
                                       <SelectItem value="MEDIUM">Medium</SelectItem>
                                       <SelectItem value="HIGH">High</SelectItem>
-                                      <SelectItem value="CRITICAL">Critical</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>

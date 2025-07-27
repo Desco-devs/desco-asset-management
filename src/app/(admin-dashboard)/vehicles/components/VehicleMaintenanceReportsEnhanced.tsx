@@ -56,8 +56,7 @@ export default function VehicleMaintenanceReportsEnhanced({
 
   const getPriorityColor = (priority?: string) => {
     switch (priority) {
-      case "CRITICAL":
-        return "bg-red-100 text-red-800 border-red-200";
+      case "CRITICAL": // Legacy data - map to HIGH styling
       case "HIGH":
         return "bg-orange-100 text-orange-800 border-orange-200";
       case "MEDIUM":

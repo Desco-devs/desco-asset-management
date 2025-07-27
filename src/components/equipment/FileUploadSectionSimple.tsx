@@ -66,15 +66,16 @@ export function FileUploadSectionSimple({
     }
   }, [selectedFile, currentFileUrl, keepExisting]);
 
-  // Update preview when currentFileUrl changes - DISABLED FOR DEBUGGING
-  /*
+  // Update preview when currentFileUrl changes
   useEffect(() => {
     if (currentFileUrl && !selectedFile) {
       setPreview(currentFileUrl);
       if (propKeepExisting === undefined) setLocalKeepExisting(true);
+    } else if (!currentFileUrl && !selectedFile) {
+      setPreview(null);
+      if (propKeepExisting === undefined) setLocalKeepExisting(false);
     }
   }, [currentFileUrl, selectedFile, propKeepExisting]);
-  */
 
   // Clean up preview URL on component unmount - DISABLED FOR DEBUGGING
   /*
