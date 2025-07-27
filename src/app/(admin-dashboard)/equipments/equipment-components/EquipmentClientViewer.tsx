@@ -727,23 +727,8 @@ export default function EquipmentClientViewer({
                     </div>
                   </div>
 
-                  {/* Beautiful Action Buttons - Appear on Hover on Desktop, Always Visible on Mobile */}
+                  {/* Action Buttons - Only Issue Report for Viewer Role */}
                   <div className="absolute top-2 right-2 flex gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-300 transform sm:translate-y-1 sm:group-hover:translate-y-0">
-                    {/* Edit Button - Blue Theme */}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingEquipment(item);
-                        setIsEditEquipmentOpen(true);
-                      }}
-                      className="h-9 w-9 p-0 bg-blue-500/90 hover:bg-blue-600 shadow-lg border border-blue-400/30 backdrop-blur-sm rounded-full transition-all duration-200 hover:scale-110 hover:shadow-xl"
-                      title="Edit Equipment"
-                    >
-                      <Wrench className="h-4 w-4 text-white" />
-                    </Button>
-
                     {/* Issue Report Button - Red Theme */}
                     <Button
                       size="sm"
@@ -949,20 +934,7 @@ export default function EquipmentClientViewer({
         />
       )}
 
-      {/* Edit Equipment Modal */}
-      {editingEquipment && (
-        <EquipmentAddModal
-          editEquipment={editingEquipment}
-          isOpen={isEditEquipmentOpen}
-          onOpenChange={(open) => {
-            setIsEditEquipmentOpen(open);
-            if (!open) {
-              setEditingEquipment(null);
-            }
-          }}
-          onEquipmentAdded={handleEquipmentAdded}
-        />
-      )}
+      {/* Edit Equipment Modal - Disabled for viewer role */}
 
       {/* Maintenance Report Modal */}
       {selectedEquipment && isMaintenanceReportOpen && (

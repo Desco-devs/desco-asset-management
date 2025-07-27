@@ -63,7 +63,7 @@ export const useEquipmentSubmit = ({
 
       // Add equipment ID for edit mode
       if (isEditMode && editEquipment) {
-        submitFormData.append("equipmentId", editEquipment.uid);
+        submitFormData.append("equipmentId", editEquipment.id);
       }
 
       // Add file uploads

@@ -51,6 +51,8 @@ const ensureDirectoryExists = async (directoryPath: string): Promise<void> => {
           upsert: false
         });
       
+      if (uploadError && !uploadError.message.includes('already exists')) {
+        // Ignore upload errors - directory creation is best effort
       }
     }
   } catch (error) {
@@ -528,8 +530,8 @@ export const POST = withResourcePermission(
           if (projectInfo) {
             // Validate required fields for maintenance report
             if (!maintenanceData.issueDescription || maintenanceData.issueDescription.trim() === '') {
-              return; // Skip maintenance report creation if issue description is empty
-            }
+              // Skip maintenance report creation if issue description is empty
+            } else {
             
             // FIRST: Create the maintenance report to get the ID
             const maintenanceReport = await prisma.maintenance_equipment_report.create({
@@ -637,6 +639,7 @@ export const POST = withResourcePermission(
                 where: { id: maintenanceReport.id },
                 data: { attachment_urls: attachmentUrls },
               });
+            }
             }
           }
         } catch (error) {

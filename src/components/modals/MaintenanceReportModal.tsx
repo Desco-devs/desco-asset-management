@@ -7,18 +7,16 @@ import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
 import { MaintenanceReportForm } from '@/components/forms/MaintenanceReportForm'
 import { 
-  EquipmentMaintenanceReport, 
-  CreateMaintenanceReportData, 
-  UpdateMaintenanceReportData 
-} from '@/types/equipment-clean'
+  MaintenanceReport
+} from '@/types/equipment'
 
 interface MaintenanceReportModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: CreateMaintenanceReportData | UpdateMaintenanceReportData) => Promise<void>
+  onSubmit: (data: any) => Promise<void>
   equipmentId?: string
   locationId?: string
-  report?: EquipmentMaintenanceReport | null
+  report?: MaintenanceReport | null
   loading?: boolean
   mode: 'create' | 'edit' | 'view'
 }
@@ -42,7 +40,7 @@ export function MaintenanceReportModal({
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  const handleSubmit = async (data: CreateMaintenanceReportData | UpdateMaintenanceReportData) => {
+  const handleSubmit = async (data: any) => {
     await onSubmit(data)
   }
 

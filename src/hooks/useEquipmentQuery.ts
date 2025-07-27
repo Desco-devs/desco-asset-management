@@ -95,21 +95,47 @@ export function useCreateEquipment() {
       const type = formData.get('type') as string;
       
       if (brand && model && type) {
-        const optimisticEquipment: Partial<Equipment> = {
+        const optimisticEquipment: Equipment = {
           id: `temp_${Date.now()}`,
           brand,
           model,
           type,
+          insurance_expiration_date: null,
+          registration_expiry: null,
+          before: null,
           status: 'OPERATIONAL',
+          remarks: null,
           owner: formData.get('owner') as string || '',
+          image_url: null,
+          inspection_date: null,
+          project_id: formData.get('projectId') as string || '',
+          plate_number: null,
+          original_receipt_url: null,
+          equipment_registration_url: null,
+          thirdparty_inspection_image: null,
+          pgpc_inspection_image: null,
           equipment_parts: [],
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        } as Equipment;
+          created_by: null,
+          project: {
+            id: formData.get('projectId') as string || '',
+            name: 'Loading...',
+            client: {
+              id: '',
+              name: 'Loading...',
+              location: {
+                id: '',
+                address: 'Loading...'
+              }
+            }
+          },
+          maintenance_reports: []
+        };
         
         queryClient.setQueryData<Equipment[]>(
           equipmentKeys.list(),
-          (old) => old ? [optimisticEquipment as Equipment, ...old] : [optimisticEquipment as Equipment]
+          (old) => old ? [optimisticEquipment, ...old] : [optimisticEquipment]
         );
       }
       

@@ -35,15 +35,15 @@ export const useEquipmentForm = (editEquipment?: Equipment | null) => {
         brand: editEquipment.brand,
         model: editEquipment.model,
         type: editEquipment.type,
-        insuranceExpirationDate: safeParseDate(editEquipment.insuranceExpirationDate || ""),
-        registrationExpiry: safeParseDate(editEquipment.registrationExpiry || ""),
+        insuranceExpirationDate: safeParseDate(editEquipment.insurance_expiration_date || ""),
+        registrationExpiry: safeParseDate(editEquipment.registration_expiry || ""),
         before: editEquipment.before ? editEquipment.before.toString() : "",
         status: editEquipment.status,
         remarks: editEquipment.remarks || "",
         owner: editEquipment.owner,
-        plateNumber: editEquipment.plateNumber || "",
-        inspectionDate: safeParseDate(editEquipment.inspectionDate || ""),
-        projectId: editEquipment.project.uid,
+        plateNumber: editEquipment.plate_number || "",
+        inspectionDate: safeParseDate(editEquipment.inspection_date || ""),
+        projectId: editEquipment.project.id,
       });
     }
   }, [editEquipment]);
@@ -67,14 +67,13 @@ export const useEquipmentForm = (editEquipment?: Equipment | null) => {
       
       // Transform Prisma data to match frontend types
       const transformedProjects: Project[] = Array.isArray(data) ? data.map((project: any) => ({
-        uid: project.id,
+        id: project.id,
         name: project.name,
-        clientId: project.client_id,
         client: {
-          uid: project.client.id,
+          id: project.client.id,
           name: project.client.name,
           location: {
-            uid: project.client.location.id,
+            id: project.client.location.id,
             address: project.client.location.address,
           },
         },

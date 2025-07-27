@@ -25,11 +25,11 @@ export function ProjectSelectionFields({
     setFormData(prev => ({ ...prev, projectId: value }));
   };
 
-  // Ensure unique projects by uid and filter out any invalid entries
+  // Ensure unique projects by id and filter out any invalid entries
   const uniqueProjects = filteredProjects?.filter((project, index, self) => 
-    project?.uid && 
+    project?.id && 
     project.name && 
-    self.findIndex(p => p.uid === project.uid) === index
+    self.findIndex(p => p.id === project.id) === index
   ) || [];
 
   return (
@@ -56,8 +56,8 @@ export function ProjectSelectionFields({
             ) : (
               uniqueProjects.map((project, index) => (
                 <SelectItem 
-                  key={`${project.uid}-${index}`} 
-                  value={project.uid}
+                  key={`${project.id}-${index}`} 
+                  value={project.id}
                 >
                   <div className="flex flex-col items-start">
                     <span className="font-medium">{project.name}</span>

@@ -26,6 +26,8 @@ export function useUsersRealtime() {
       )
       .subscribe()
 
-    return () => channel.unsubscribe()
+    return () => {
+      channel.unsubscribe()
+    }
   }, [queryClient])
 }

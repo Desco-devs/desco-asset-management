@@ -56,7 +56,7 @@ export function DocumentUploadSection({
         <FileUploadSectionSimple
           label="Original Receipt"
           accept=".pdf,image/*"
-          currentFileUrl={editEquipment?.originalReceiptUrl}
+          currentFileUrl={editEquipment?.original_receipt_url}
           onFileChange={handleReceiptFileChange}
           onKeepExistingChange={handleReceiptKeepChange}
           icon={<FileText className="h-4 w-4" />}
@@ -65,7 +65,7 @@ export function DocumentUploadSection({
         <FileUploadSectionSimple
           label="Equipment Registration"
           accept=".pdf,image/*"
-          currentFileUrl={editEquipment?.equipmentRegistrationUrl}
+          currentFileUrl={editEquipment?.equipment_registration_url}
           onFileChange={handleRegistrationFileChange}
           onKeepExistingChange={handleRegistrationKeepChange}
           icon={<FileText className="h-4 w-4" />}
@@ -74,7 +74,7 @@ export function DocumentUploadSection({
         <FileUploadSectionSimple
           label="3rd Party Inspection"
           accept="image/*"
-          currentFileUrl={editEquipment?.thirdpartyInspectionImage}
+          currentFileUrl={editEquipment?.thirdparty_inspection_image}
           onFileChange={handleThirdpartyFileChange}
           onKeepExistingChange={handleThirdpartyKeepChange}
           icon={<Shield className="h-4 w-4" />}
@@ -83,7 +83,7 @@ export function DocumentUploadSection({
         <FileUploadSectionSimple
           label="PGPC Inspection"
           accept="image/*"
-          currentFileUrl={editEquipment?.pgpcInspectionImage}
+          currentFileUrl={editEquipment?.pgpc_inspection_image}
           onFileChange={handlePgpcFileChange}
           onKeepExistingChange={handlePgpcKeepChange}
           icon={<Shield className="h-4 w-4" />}

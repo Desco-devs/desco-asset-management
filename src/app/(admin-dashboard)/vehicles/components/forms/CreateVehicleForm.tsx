@@ -171,7 +171,14 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
       
       // Add all the files to formData
       Object.entries(files).forEach(([key, file]) => {
-        if (file) {
+        if (key === 'maintenanceAttachments' && Array.isArray(file)) {
+          // Handle maintenance attachments array
+          file.forEach((attachment, index) => {
+            if (attachment) {
+              formDataFromForm.append(`maintenanceAttachment_${index}`, attachment);
+            }
+          });
+        } else if (file && !Array.isArray(file)) {
           formDataFromForm.append(key, file);
         }
       });

@@ -26,7 +26,9 @@ export function useEquipmentRealtime() {
       )
       .subscribe()
 
-    return () => channel.unsubscribe()
+    return () => {
+      channel.unsubscribe()
+    }
   }, [queryClient])
 }
 
@@ -53,6 +55,8 @@ export function useMaintenanceReportsRealtime() {
       )
       .subscribe()
 
-    return () => channel.unsubscribe()
+    return () => {
+      channel.unsubscribe()
+    }
   }, [queryClient])
 }

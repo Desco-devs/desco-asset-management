@@ -8,19 +8,15 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
-  CreateMaintenanceReportData, 
-  UpdateMaintenanceReportData,
-  EquipmentMaintenanceReport,
-  ReportPriority,
-  ReportStatus
-} from '@/types/equipment-clean'
+  MaintenanceReport
+} from '@/types/equipment'
 import { Loader2 } from 'lucide-react'
 
 interface MaintenanceReportFormProps {
   equipmentId?: string
   locationId?: string
-  report?: EquipmentMaintenanceReport
-  onSubmit: (data: CreateMaintenanceReportData | UpdateMaintenanceReportData) => Promise<void>
+  report?: MaintenanceReport
+  onSubmit: (data: any) => Promise<void>
   onCancel: () => void
   loading?: boolean
   mode: 'create' | 'edit' | 'view'
@@ -62,8 +58,8 @@ export function MaintenanceReportForm({
       inspection_details: '',
       action_taken: '',
       parts_replaced: '',
-      priority: 'MEDIUM' as ReportPriority,
-      status: 'PENDING' as ReportStatus,
+      priority: 'MEDIUM',
+      status: 'PENDING',
       downtime_hours: '',
     }
   })
@@ -157,7 +153,7 @@ export function MaintenanceReportForm({
           <Label htmlFor="priority">Priority</Label>
           <Select
             value={selectedPriority || 'MEDIUM'}
-            onValueChange={(value) => setValue('priority', value as ReportPriority)}
+            onValueChange={(value) => setValue('priority', value)}
             disabled={loading}
           >
             <SelectTrigger>
@@ -176,7 +172,7 @@ export function MaintenanceReportForm({
           <Label htmlFor="status">Status</Label>
           <Select
             value={selectedStatus || 'PENDING'}
-            onValueChange={(value) => setValue('status', value as ReportStatus)}
+            onValueChange={(value) => setValue('status', value)}
             disabled={loading}
           >
             <SelectTrigger>

@@ -507,7 +507,6 @@ export default function EquipmentMaintenanceReportsEnhanced({
                       } else {
                         setSelectedMaintenanceReportForDetail(report);
                         setIsMaintenanceReportDetailOpen(true);
-                        setIsModalOpen(false);
                       }
                     }}
                   >
