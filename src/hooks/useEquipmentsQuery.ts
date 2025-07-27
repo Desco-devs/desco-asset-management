@@ -153,7 +153,7 @@ async function deleteEquipment(uid: string): Promise<void> {
     throw new Error('Cannot delete equipment that is still being created');
   }
   
-  const response = await fetch(`/api/equipments/${uid}`, {
+  const response = await fetch(`/api/equipments?equipmentId=${uid}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -346,7 +346,6 @@ export function useCreateEquipmentAction() {
         const { createEquipmentAction } = await import('../app/(admin-dashboard)/equipments/actions');
         return await createEquipmentAction(formData);
       } catch (error) {
-        console.error('Equipment creation mutation failed:', error);
         throw error;
       }
     },
@@ -404,8 +403,6 @@ export function useCreateEquipmentAction() {
       // Don't invalidate - let optimistic update and real-time handle it
     },
     onError: (error, formData, context) => {
-      console.error('Equipment creation failed:', error);
-      
       // Rollback optimistic update on error
       if (context?.previousEquipments) {
         queryClient.setQueryData(equipmentKeys.equipments(), context.previousEquipments);
@@ -548,8 +545,6 @@ export function useUpdateEquipmentAction() {
       // Real-time subscription will update with server data when DB changes
     },
     onError: (error, formData, context) => {
-      console.error('Equipment update failed:', error);
-      
       // Rollback optimistic update on error
       if (context?.previousEquipments) {
         queryClient.setQueryData(equipmentKeys.equipments(), context.previousEquipments);
@@ -593,7 +588,6 @@ export function useCreateEquipmentLegacy() {
       // Toast moved to realtime listener to show for all equipment creations
     },
     onError: (error) => {
-      console.error('Legacy equipment creation failed:', error);
       toast.error('Failed to create equipment: ' + (error instanceof Error ? error.message : 'Unknown error'));
     },
   });
@@ -616,31 +610,11 @@ export function useUpdateEquipmentLegacy() {
       // Toast moved to realtime listener for unified notification system
     },
     onError: (error) => {
-      console.error('Legacy equipment update failed:', error);
       toast.error('Failed to update equipment: ' + (error instanceof Error ? error.message : 'Unknown error'));
     },
   });
 }
 
-export function useDeleteEquipmentLegacy() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: deleteEquipment,
-    onSuccess: (_, equipmentUid) => {
-      // Optimistic update - remove equipment from cache immediately
-      queryClient.setQueryData<Equipment[]>(equipmentKeys.equipments(), (oldData) => {
-        const filtered = oldData ? oldData.filter(equipment => equipment.uid !== equipmentUid) : [];
-        return deduplicateEquipments(filtered);
-      });
-      // Toast moved to realtime listener for unified notification system
-    },
-    onError: (error) => {
-      console.error('Equipment deletion failed:', error);
-      toast.error('Failed to delete equipment: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    },
-  });
-}
 
 // Helper function to deduplicate maintenance reports array
 function deduplicateMaintenanceReports(reports: MaintenanceReport[]): MaintenanceReport[] {

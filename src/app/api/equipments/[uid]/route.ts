@@ -131,29 +131,180 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid equipment ID format' }, { status: 400 })
     }
 
+    // Get equipment with maintenance reports
     const equipment = await prisma.equipment.findUnique({
-      where: { id: uid }
+      where: { id: uid },
+      include: {
+        maintenance_reports: true
+      }
     })
     if (!equipment) {
       return NextResponse.json({ error: 'Equipment not found' }, { status: 404 })
     }
 
-    if (equipment.image_url) {
-      const match = equipment.image_url.match(/\/public\/equipments\/(.+)$/)
-      if (match) {
-        const fullPath = match[1]
-        await supabase
-          .storage
-          .from('equipments')
-          .remove([fullPath])
+    // Collect all files to delete from storage
+    const filesToDelete: string[] = []
+
+    // Helper function to extract file path from URL
+    const extractFilePath = (url: string | null) => {
+      if (!url) return null
+      const match = url.match(/\/storage\/v1\/object\/public\/equipments\/(.+)$/) || 
+                   url.match(/\/public\/equipments\/(.+)$/)
+      return match ? match[1] : null
+    }
+
+    // Add equipment files
+    const equipmentFiles = [
+      equipment.image_url,
+      equipment.original_receipt_url,
+      equipment.equipment_registration_url,
+      equipment.thirdparty_inspection_image,
+      equipment.pgpc_inspection_image
+    ]
+
+    equipmentFiles.forEach(url => {
+      const filePath = extractFilePath(url)
+      if (filePath) filesToDelete.push(filePath)
+    })
+
+    // Add equipment parts files (if they contain URLs)
+    if (equipment.equipment_parts && equipment.equipment_parts.length > 0) {
+      equipment.equipment_parts.forEach(part => {
+        try {
+          // Try to parse as JSON first (modern format)
+          if (typeof part === 'string' && part.startsWith('{')) {
+            const parsedParts = JSON.parse(part)
+            if (parsedParts.rootFiles) {
+              parsedParts.rootFiles.forEach((file: any) => {
+                if (file.preview) {
+                  const filePath = extractFilePath(file.preview)
+                  if (filePath) filesToDelete.push(filePath)
+                }
+              })
+            }
+            // Handle nested folders
+            if (parsedParts.folders) {
+              const extractFromFolders = (folders: any[]) => {
+                folders.forEach(folder => {
+                  if (folder.files) {
+                    folder.files.forEach((file: any) => {
+                      if (file.preview) {
+                        const filePath = extractFilePath(file.preview)
+                        if (filePath) filesToDelete.push(filePath)
+                      }
+                    })
+                  }
+                  if (folder.folders) {
+                    extractFromFolders(folder.folders)
+                  }
+                })
+              }
+              extractFromFolders(parsedParts.folders)
+            }
+          } else if (typeof part === 'string' && part.startsWith('http')) {
+            // Legacy URL format
+            const filePath = extractFilePath(part)
+            if (filePath) filesToDelete.push(filePath)
+          }
+        } catch (error) {
+          // If parsing fails, treat as legacy URL
+          if (typeof part === 'string' && part.startsWith('http')) {
+            const filePath = extractFilePath(part)
+            if (filePath) filesToDelete.push(filePath)
+          }
+        }
+      })
+    }
+
+    // Add maintenance report files
+    equipment.maintenance_reports.forEach(report => {
+      if (report.attachment_urls && report.attachment_urls.length > 0) {
+        report.attachment_urls.forEach(url => {
+          const filePath = extractFilePath(url)
+          if (filePath) filesToDelete.push(filePath)
+        })
+      }
+    })
+
+    // Delete all files from Supabase storage
+    if (filesToDelete.length > 0) {
+      const { error: deleteError } = await supabase
+        .storage
+        .from('equipments')
+        .remove(filesToDelete)
+      
+      if (deleteError) {
+        // Continue with database deletion even if file deletion fails
       }
     }
 
+    // Delete the entire equipment folder structure  
+    try {
+      const equipmentFolderPrefix = `equipment-${uid}`
+      
+      // Get ALL files recursively
+      const getAllFilesRecursively = async (prefix: string): Promise<string[]> => {
+        const allFiles: string[] = []
+        
+        const listAllInPrefix = async (path: string = '') => {
+          const fullPath = path ? `${prefix}/${path}` : prefix
+          
+          const { data: items, error } = await supabase
+            .storage
+            .from('equipments')
+            .list(fullPath, {
+              limit: 1000,
+              sortBy: { column: 'name', order: 'asc' }
+            })
+
+          if (error || !items) return
+
+          for (const item of items) {
+            const itemPath = path ? `${path}/${item.name}` : item.name
+            const fullItemPath = `${prefix}/${itemPath}`
+            
+            if (item.metadata) {
+              // It's a file
+              allFiles.push(fullItemPath)
+            } else {
+              // It's a folder, recurse into it
+              await listAllInPrefix(itemPath)
+            }
+          }
+        }
+
+        await listAllInPrefix()
+        return allFiles
+      }
+
+      // Get and delete all files
+      const allFiles = await getAllFilesRecursively(equipmentFolderPrefix)
+
+      if (allFiles.length > 0) {
+        // Delete files in batches
+        const batchSize = 100
+        for (let i = 0; i < allFiles.length; i += batchSize) {
+          const batch = allFiles.slice(i, i + batchSize)
+          const { error: deleteError } = await supabase
+            .storage
+            .from('equipments')
+            .remove(batch)
+          
+          if (deleteError) {
+            // Continue with other batches even if some fail
+          }
+        }
+      }
+
+    } catch (folderError) {
+      // Continue with database deletion even if folder deletion fails
+    }
+
+    // Delete the equipment (this will cascade delete maintenance reports due to foreign key constraints)
     await prisma.equipment.delete({ where: { id: uid } })
 
-    return NextResponse.json({ message: 'Deleted successfully' })
+    return NextResponse.json({ message: 'Equipment and associated files deleted successfully' })
   } catch (err) {
-    const { uid } = await context.params
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

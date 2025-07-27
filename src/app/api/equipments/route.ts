@@ -1013,6 +1013,61 @@ export const PUT = withResourcePermission(
   }
 );
 
+// Helper function to recursively delete all files and folders in a directory
+const deleteDirectoryRecursively = async (directoryPath: string): Promise<void> => {
+  try {
+    // List all items in the directory
+    const { data: items, error: listError } = await supabase.storage
+      .from("equipments")
+      .list(directoryPath);
+
+    if (listError) {
+      // If directory doesn't exist, that's fine - nothing to delete
+      if (listError.message.includes('not found')) {
+        return;
+      }
+      throw listError;
+    }
+
+    if (!items || items.length === 0) {
+      return;
+    }
+
+    // Separate files and folders
+    const files = items.filter(item => !item.metadata?.isDirectory && item.name !== '.emptyFolderPlaceholder');
+    const folders = items.filter(item => item.metadata?.isDirectory || (item.name && item.name.indexOf('.') === -1));
+
+    // Delete all files in current directory
+    if (files.length > 0) {
+      const filePaths = files.map(file => `${directoryPath}/${file.name}`);
+      const { error: deleteFilesError } = await supabase.storage
+        .from("equipments")
+        .remove(filePaths);
+      
+      if (deleteFilesError) {
+        // Ignore individual file deletion errors - some files may already be gone
+      }
+    }
+
+    // Recursively delete subdirectories
+    for (const folder of folders) {
+      await deleteDirectoryRecursively(`${directoryPath}/${folder.name}`);
+    }
+
+    // Try to remove any remaining placeholder files
+    try {
+      await supabase.storage
+        .from("equipments")
+        .remove([`${directoryPath}/.placeholder`]);
+    } catch (error) {
+      // Ignore placeholder removal errors
+    }
+
+  } catch (error) {
+    // Directory deletion errors are handled gracefully
+  }
+};
+
 export const DELETE = withResourcePermission(
   "equipment",
   "delete",
@@ -1029,33 +1084,48 @@ export const DELETE = withResourcePermission(
 
       const existing = await prisma.equipment.findUnique({
         where: { id: equipmentId },
-        include: { project: true },
+        include: { 
+          project: true,
+          maintenance_reports: true 
+        },
       });
       if (!existing) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
 
-      const projectId = existing.project_id;
-
-      // Delete equipment record first
-      await prisma.equipment.delete({ where: { id: equipmentId } });
-
-      // Delete all files in folder (including all parts)
-      const folder = `${projectId}/${equipmentId}`;
-      const { data: files } = await supabase.storage
-        .from("equipments")
-        .list(folder);
-      if (files?.length) {
-        const paths = files
-          .filter((f) => f.name !== ".emptyFolderPlaceholder")
-          .map((f) => `${folder}/${f.name}`);
-        await supabase.storage.from("equipments").remove(paths);
+      // Delete all maintenance reports first (for proper foreign key cleanup)
+      if (existing.maintenance_reports && existing.maintenance_reports.length > 0) {
+        await prisma.maintenance_equipment_report.deleteMany({
+          where: { equipment_id: equipmentId }
+        });
       }
 
-      return NextResponse.json({ message: "Deleted" });
+      // Delete equipment record
+      await prisma.equipment.delete({ where: { id: equipmentId } });
+
+      // Clean up storage using the NEW structure: equipment-{equipmentId}/
+      const equipmentFolder = `equipment-${equipmentId}`;
+      
+      try {
+        await deleteDirectoryRecursively(equipmentFolder);
+      } catch (storageError) {
+        // Don't fail the request if storage cleanup fails - the equipment record is already deleted
+      }
+
+      return NextResponse.json({ 
+        message: "Equipment deleted successfully",
+        cleanedUp: {
+          equipmentRecord: true,
+          maintenanceReports: existing.maintenance_reports?.length || 0,
+          storageFolder: equipmentFolder
+        }
+      });
     } catch (err) {
       return NextResponse.json(
-        { error: "Internal server error" },
+        { 
+          error: "Internal server error",
+          details: err instanceof Error ? err.message : "Unknown error"
+        },
         { status: 500 }
       );
     }

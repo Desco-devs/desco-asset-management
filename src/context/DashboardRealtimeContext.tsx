@@ -498,13 +498,51 @@ export function DashboardRealtimeProvider({
               user: "System",
             });
           }
+        } else if (payload.eventType === "DELETE" && payload.old) {
+          // Handle equipment deletion
+          const deletedRecord = payload.old;
+          console.log("🗑️ Equipment deleted:", deletedRecord);
+
+          const currentStats = useDashboardStore.getState().overviewStats;
+          if (currentStats && deletedRecord.status) {
+            const updatedStats = {
+              ...currentStats,
+              equipment: {
+                ...currentStats.equipment,
+                total: Math.max(0, currentStats.equipment.total - 1),
+                operational:
+                  deletedRecord.status === "OPERATIONAL"
+                    ? Math.max(0, currentStats.equipment.operational - 1)
+                    : currentStats.equipment.operational,
+                nonOperational:
+                  deletedRecord.status === "NON_OPERATIONAL"
+                    ? Math.max(0, currentStats.equipment.nonOperational - 1)
+                    : currentStats.equipment.nonOperational,
+              },
+            };
+            setOverviewStats(updatedStats);
+          }
+
+          addRecentActivity({
+            id: `equipment-deleted-${deletedRecord.id || Date.now()}-${Date.now()}`,
+            type: "equipment",
+            action: "deleted",
+            description: `Equipment "${
+              deletedRecord.brand || deletedRecord.model || "Unknown"
+            }" was deleted`,
+            timestamp: new Date().toISOString(),
+            user: "System",
+          });
         }
 
+        // Always invalidate queries to ensure data consistency
         queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
+        queryClient.invalidateQueries({ queryKey: ["equipments"] });
       } catch (error) {
         console.error("🌐 Error handling equipment change:", error);
         // Fallback: invalidate queries to ensure data consistency
         queryClient.invalidateQueries({ queryKey: ["dashboard-data"] });
+        queryClient.invalidateQueries({ queryKey: ["equipments"] });
       }
     }
 
@@ -630,7 +668,41 @@ export function DashboardRealtimeProvider({
           return;
         }
 
-        if (payload.eventType === "INSERT" && payload.new) {
+        if (payload.eventType === "DELETE" && payload.old) {
+          // Handle maintenance report deletion (cascade from equipment deletion)
+          const deletedReport = payload.old;
+          console.log("🗑️ Equipment maintenance report deleted:", deletedReport.id);
+
+          const currentStats = useDashboardStore.getState().overviewStats;
+          if (currentStats && deletedReport.status) {
+            let pendingDelta = 0;
+            let inProgressDelta = 0;
+
+            // Remove from the appropriate status
+            if (deletedReport.status === "PENDING") pendingDelta = -1;
+            if (deletedReport.status === "IN_PROGRESS") inProgressDelta = -1;
+
+            const updatedStats = {
+              ...currentStats,
+              maintenanceReports: {
+                ...currentStats.maintenanceReports,
+                total: Math.max(0, currentStats.maintenanceReports.total - 1),
+                pending: Math.max(0, currentStats.maintenanceReports.pending + pendingDelta),
+                inProgress: Math.max(0, currentStats.maintenanceReports.inProgress + inProgressDelta),
+              },
+            };
+            setOverviewStats(updatedStats);
+          }
+
+          addRecentActivity({
+            id: `maintenance-deleted-${deletedReport.id || Date.now()}-${Date.now()}`,
+            type: "maintenance",
+            action: "deleted",
+            description: `Equipment maintenance report deleted (cascade)`,
+            timestamp: new Date().toISOString(),
+            user: "System",
+          });
+        } else if (payload.eventType === "INSERT" && payload.new) {
           const newRecord = payload.new;
 
           const currentStats = useDashboardStore.getState().overviewStats;
