@@ -79,6 +79,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { useImagePreview } from "@/hooks/useImagePreview";
+import ImagePreviewSection from "./ImagePreviewSection";
 
 export default function EquipmentModalModern() {
   // Server state from TanStack Query
@@ -102,8 +104,16 @@ export default function EquipmentModalModern() {
   // Global edit mode state
   const [isGlobalEditMode, setIsGlobalEditMode] = useState(false);
   
-  // State to track removed images/documents so they don't show in preview
-  const [removedItems, setRemovedItems] = useState<Set<string>>(new Set());
+  // Image preview management (following REALTIME_PATTERN.md)
+  const {
+    newFileUploads,
+    newFilePreviewUrls,
+    removedItems,
+    handleFileSelect,
+    handleFileRemove,
+    resetPreviewState,
+    cleanupPreviewUrls,
+  } = useImagePreview();
   
   // CRITICAL FIX: Use ref for form data to prevent re-renders entirely
   const editFormDataRef = useRef({
@@ -268,36 +278,54 @@ export default function EquipmentModalModern() {
       
       const formData = new FormData();
       
-      // Map form data to API expected field names
-      const fieldMapping: Record<string, string> = {
-        'insurance_expiration_date': 'insuranceExpirationDate',
-        'registration_expiry': 'registrationExpiry',
-        'project_id': 'projectId',
-        'plate_number': 'plateNumber',
-        'inspection_date': 'inspectionDate'
-      };
-
-      // Add all form fields with proper field name mapping
+      // Add all form fields with correct API field names (no mapping needed)
       Object.entries(currentFormData).forEach(([key, value]) => {
-        // Get the correct API field name
-        const apiFieldName = fieldMapping[key] || key;
-        
-        // Handle removed items
-        if (removedItems.has(key)) {
-          formData.append(apiFieldName, ''); // Send empty string for removed items
-        } else if (value !== undefined && value !== null) {
+        if (value !== undefined && value !== null) {
           if (value instanceof Date) {
-            formData.append(apiFieldName, value.toISOString().split('T')[0]);
+            formData.append(key, value.toISOString().split('T')[0]);
           } else {
-            formData.append(apiFieldName, value.toString());
+            formData.append(key, value.toString());
           }
-        } else {
-          // For null/undefined values, send empty string to avoid missing field errors
-          formData.append(apiFieldName, '');
         }
       });
       
-      // Convert equipment parts back to database format
+      // Handle file uploads
+      Object.entries(newFileUploads).forEach(([fieldName, file]) => {
+        if (file && file.size > 0) {
+          // Map field names to expected API field names
+          const apiFieldMap: Record<string, string> = {
+            'image_url': 'equipmentImage',
+            'original_receipt_url': 'originalReceipt',
+            'equipment_registration_url': 'equipmentRegistration',
+            'thirdparty_inspection_image': 'thirdpartyInspection',
+            'pgpc_inspection_image': 'pgpcInspection'
+          };
+          
+          const apiFieldName = apiFieldMap[fieldName] || fieldName;
+          formData.append(apiFieldName, file);
+        }
+      });
+      
+      // Handle file removals by setting keep flags
+      const fileFields = ['image_url', 'original_receipt_url', 'equipment_registration_url', 'thirdparty_inspection_image', 'pgpc_inspection_image'];
+      fileFields.forEach(field => {
+        const keepFlagMap: Record<string, string> = {
+          'image_url': 'keepExistingImage',
+          'original_receipt_url': 'keepExistingReceipt',
+          'equipment_registration_url': 'keepExistingRegistration',
+          'thirdparty_inspection_image': 'keepExistingThirdpartyInspection',
+          'pgpc_inspection_image': 'keepExistingPgpcInspection'
+        };
+        
+        const flagName = keepFlagMap[field];
+        if (flagName) {
+          // If the item is removed or has a new upload, don't keep existing
+          const shouldKeep = !removedItems.has(field) && !newFileUploads[field];
+          formData.append(flagName, shouldKeep ? 'true' : 'false');
+        }
+      });
+      
+      // Convert equipment parts back to database format using correct field name
       if (isGlobalEditMode) {
         const equipmentPartsData = {
           rootFiles: partsStructure.rootFiles.map((file) => ({
@@ -321,14 +349,15 @@ export default function EquipmentModalModern() {
           }))
         };
         
-        formData.append('equipment_parts', JSON.stringify(equipmentPartsData));
+        // Use the correct field name that API expects
+        formData.append('partsStructure', JSON.stringify(equipmentPartsData));
       }
       
       formData.append('equipmentId', selectedEquipment.id);
       
       await updateEquipmentMutation.mutateAsync(formData);
       setIsGlobalEditMode(false);
-      setRemovedItems(new Set()); // Clear removed items after successful save
+      resetPreviewState(); // Clear all preview state after successful save
       toast.success('Equipment updated successfully!');
     } catch (error) {
       console.error('Failed to update equipment:', error);
@@ -354,8 +383,8 @@ export default function EquipmentModalModern() {
       setActiveTab("details");
       // Reset global edit mode when modal closes
       setIsGlobalEditMode(false);
-      // Reset removed items when modal closes
-      setRemovedItems(new Set());
+      // Reset image preview state
+      resetPreviewState();
     }
   }, [isModalOpen]);
 
@@ -368,8 +397,8 @@ export default function EquipmentModalModern() {
     setIsEditMode(false);
     // Reset global edit state
     setIsGlobalEditMode(false);
-    // Reset removed items when closing
-    setRemovedItems(new Set());
+    // Reset image preview state
+    resetPreviewState();
   };
 
   const handleEdit = () => {
@@ -466,203 +495,8 @@ export default function EquipmentModalModern() {
     },
   ].filter(doc => doc.url);
 
-  // Image/Document Viewer Component - EXACTLY like FileUploadSectionSimple
-  const ImageViewerSection = ({ url, label, description, onRemove }: { 
-    url: string; 
-    label: string; 
-    description: string; 
-    onRemove?: () => void 
-  }) => {
-    const [showImageViewer, setShowImageViewer] = useState(false);
-    
-    return (
-      <div className="space-y-2">
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-          <div className="space-y-2">
-            <div className="relative w-full max-w-[200px] mx-auto group">
-              <div 
-                className="relative cursor-pointer"
-                onClick={() => {
-                  setShowImageViewer(true);
-                }}
-              >
-                <Image
-                  src={url}
-                  alt={label}
-                  width={200}
-                  height={200}
-                  className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
-                />
-                <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
-                  <Eye className="h-6 w-6 text-white" />
-                </div>
-              </div>
-              
-              {/* Remove button - only show in edit mode */}
-              {isGlobalEditMode && onRemove && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove();
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground text-center">{description}</p>
 
-        {/* Image Viewer Modal - Responsive sizing for mobile and desktop like FileUploadSectionSimple */}
-        {showImageViewer && (
-          <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
-            <DialogContent 
-              className="!max-w-none p-4 
-                w-[95vw] max-h-[85vh] sm:w-[80vw] sm:max-h-[70vh] lg:w-[60vw] lg:max-h-[65vh] xl:w-[40vw] xl:max-h-[60vh]" 
-              style={{ 
-                maxWidth: 'min(95vw, 800px)', 
-                width: 'min(95vw, 800px)'
-              }}
-            >
-              <DialogHeader className="pb-4">
-                <DialogTitle className="text-center">
-                  {label}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="flex items-center justify-center">
-                <Image
-                  src={url}
-                  alt={label}
-                  width={800}
-                  height={600}
-                  className="max-w-full max-h-[70vh] sm:max-h-[55vh] lg:max-h-[50vh] xl:max-h-[45vh] object-contain"
-                  onClick={(e) => e.stopPropagation()}
-                  onError={(e) => {
-                  }}
-                  onLoad={() => {
-                  }}
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
-    );
-  };
-
-  // Document Viewer Component - EXACTLY like ImageViewerSection
-  const DocumentViewerSection = ({ url, label, description, onRemove }: { 
-    url: string; 
-    label: string; 
-    description: string; 
-    onRemove?: () => void 
-  }) => {
-    const [showDocumentViewer, setShowDocumentViewer] = useState(false);
-    
-    return (
-      <div className="space-y-2">
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-          <div className="space-y-2">
-            <div className="relative w-full max-w-[200px] mx-auto group">
-              <div 
-                className="relative cursor-pointer"
-                onClick={() => {
-                  setShowDocumentViewer(true);
-                }}
-              >
-                <Image
-                  src={url}
-                  alt={label}
-                  width={200}
-                  height={200}
-                  className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
-                />
-                <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
-                  <Eye className="h-6 w-6 text-white" />
-                </div>
-              </div>
-              
-              {/* Remove button - only show in edit mode */}
-              {isGlobalEditMode && onRemove && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove();
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground text-center">{description}</p>
-
-        {/* Document Viewer Modal - EXACTLY like ImageViewerSection */}
-        {showDocumentViewer && (
-          <Dialog open={showDocumentViewer} onOpenChange={setShowDocumentViewer}>
-            <DialogContent 
-              className="!max-w-none p-4 
-                w-[95vw] max-h-[85vh] sm:w-[80vw] sm:max-h-[70vh] lg:w-[60vw] lg:max-h-[65vh] xl:w-[40vw] xl:max-h-[60vh]" 
-              style={{ 
-                maxWidth: 'min(95vw, 800px)', 
-                width: 'min(95vw, 800px)'
-              }}
-            >
-              <DialogHeader className="pb-4">
-                <DialogTitle className="text-center">
-                  {label}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="flex items-center justify-center">
-                <Image
-                  src={url}
-                  alt={label}
-                  width={800}
-                  height={600}
-                  className="max-w-full max-h-[70vh] sm:max-h-[55vh] lg:max-h-[50vh] xl:max-h-[45vh] object-contain"
-                  onClick={(e) => e.stopPropagation()}
-                  onError={(e) => {
-                  }}
-                  onLoad={() => {
-                  }}
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
-    );
-  };
-
-  // Empty Document Placeholder Component
-  const EmptyDocumentPlaceholder = ({ icon: Icon, label, description }: { icon: any; label: string; description: string }) => {
-    return (
-      <div className="space-y-2">
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-          <div className="space-y-2">
-            <div className="relative w-full max-w-[200px] mx-auto">
-              <div className="w-full h-[200px] bg-gray-50 rounded border-2 border-dashed border-gray-300 flex flex-col items-center justify-center">
-                <Icon className="h-12 w-12 text-gray-400 mb-3" />
-                <p className="text-sm font-medium text-gray-500 text-center px-2">{label}</p>
-                <p className="text-xs text-gray-400 text-center px-2 mt-1">Click edit to upload</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground text-center">{description}</p>
-      </div>
-    );
-  };
+  // Document Viewer Component - Enhanced with preview support
 
   // Simple helper functions for tab counts
   const getImagesCount = () => {
@@ -678,7 +512,40 @@ export default function EquipmentModalModern() {
     if (selectedEquipment?.equipment_registration_url) count++;
     return count;
   };
-  const getEquipmentPartsCount = () => selectedEquipment?.equipment_parts?.length || 0;  
+  const getEquipmentPartsCount = () => {
+    if (!selectedEquipment?.equipment_parts || selectedEquipment.equipment_parts.length === 0) return 0;
+    
+    try {
+      // Parse the equipment_parts from the database format
+      let parsedParts: any = selectedEquipment.equipment_parts;
+      
+      // Handle array with JSON string format
+      if (Array.isArray(parsedParts) && parsedParts.length > 0 && typeof parsedParts[0] === 'string') {
+        parsedParts = JSON.parse(parsedParts[0]);
+      }
+      
+      // Handle string format
+      if (typeof parsedParts === 'string') {
+        parsedParts = JSON.parse(parsedParts);
+      }
+      
+      // Count actual files in the structure
+      if (parsedParts && typeof parsedParts === 'object') {
+        const rootFilesCount = Array.isArray(parsedParts.rootFiles) ? parsedParts.rootFiles.length : 0;
+        const folderFilesCount = Array.isArray(parsedParts.folders) 
+          ? parsedParts.folders.reduce((sum: number, folder: any) => {
+              return sum + (Array.isArray(folder.files) ? folder.files.length : 0);
+            }, 0)
+          : 0;
+        return rootFilesCount + folderFilesCount;
+      }
+    } catch (error) {
+      // If parsing fails, return 0
+      return 0;
+    }
+    
+    return 0;
+  };  
   const getMaintenanceReportsCount = () => {
     if (!selectedEquipment?.id || !Array.isArray(maintenanceReports)) return 0;
     return maintenanceReports.filter(report => report.equipment_id === selectedEquipment.id).length;
@@ -1296,74 +1163,23 @@ export default function EquipmentModalModern() {
                     <Camera className="h-4 w-4" />
                     Equipment Image
                   </h3>
-                  {selectedEquipment.image_url && !removedItems.has('image_url') ? (
-                    <div>
-                      <ImageViewerSection 
-                        url={selectedEquipment.image_url}
-                        label="Equipment Image"
-                        description="Main equipment photo"
-                        onRemove={undefined}
-                      />
-                      {/* Single toggle button - Remove if image exists */}
-                      {isGlobalEditMode && (
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              setRemovedItems(prev => new Set([...prev, 'image_url']));
-                              handleFieldChange('image_url', null);
-                              toast.success('Equipment image will be removed when you save changes');
-                            }}
-                          >
-                            <X className="h-4 w-4 mr-2" />
-                            Remove Image
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <EmptyDocumentPlaceholder 
-                        icon={Camera}
-                        label="Equipment Image"
-                        description="Click upload to add new image"
-                      />
-                      {/* Single toggle button - Upload if no image */}
-                      {isGlobalEditMode && (
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = 'image/*';
-                              input.onchange = (e) => {
-                                const file = (e.target as HTMLInputElement).files?.[0];
-                                if (file) {
-                                  setRemovedItems(prev => {
-                                    const newSet = new Set(prev);
-                                    newSet.delete('image_url');
-                                    return newSet;
-                                  });
-                                  toast.success('New image will be uploaded when you save changes');
-                                }
-                              };
-                              input.click();
-                            }}
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload New Image
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <ImagePreviewSection
+                    fieldName="image_url"
+                    url={selectedEquipment.image_url}
+                    label="Equipment Image"
+                    description="Main equipment photo"
+                    accept="image/*"
+                    isEditMode={isGlobalEditMode}
+                    previewUrl={newFilePreviewUrls['image_url']}
+                    onFileSelect={(fieldName, file) => {
+                      handleFileSelect(fieldName, file);
+                      handleFieldChange('image_url', file);
+                    }}
+                    onRemove={(fieldName) => {
+                      handleFileRemove(fieldName);
+                      handleFieldChange('image_url', null);
+                    }}
+                  />
                 </div>
 
                 {/* Third-party Inspection */}
@@ -1372,150 +1188,42 @@ export default function EquipmentModalModern() {
                     <Shield className="h-4 w-4" />
                     Third-party Inspection
                   </h3>
-                  {selectedEquipment.thirdparty_inspection_image && !removedItems.has('thirdparty_inspection_image') ? (
-                    <div>
-                      <ImageViewerSection 
-                        url={selectedEquipment.thirdparty_inspection_image}
-                        label="Third-party Inspection"
-                        description="Third-party inspection documentation"
-                        onRemove={undefined}
-                      />
-                      {/* Single toggle button - Remove if image exists */}
-                      {isGlobalEditMode && (
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              setRemovedItems(prev => new Set([...prev, 'thirdparty_inspection_image']));
-                              handleFieldChange('thirdparty_inspection_image', null);
-                              toast.success('Third-party inspection image will be removed when you save changes');
-                            }}
-                          >
-                            <X className="h-4 w-4 mr-2" />
-                            Remove Image
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <EmptyDocumentPlaceholder 
-                        icon={Shield}
-                        label="Third-party Inspection"
-                        description="Click upload to add new image"
-                      />
-                      {/* Single toggle button - Upload if no image */}
-                      {isGlobalEditMode && (
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = 'image/*';
-                              input.onchange = (e) => {
-                                const file = (e.target as HTMLInputElement).files?.[0];
-                                if (file) {
-                                  setRemovedItems(prev => {
-                                    const newSet = new Set(prev);
-                                    newSet.delete('thirdparty_inspection_image');
-                                    return newSet;
-                                  });
-                                  toast.success('New third-party inspection image will be uploaded when you save changes');
-                                }
-                              };
-                              input.click();
-                            }}
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload New Image
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <ImagePreviewSection
+                    fieldName="thirdparty_inspection_image"
+                    url={selectedEquipment.thirdparty_inspection_image}
+                    label="Third-party Inspection"
+                    description="Third-party inspection documentation"
+                    accept="image/*"
+                    isEditMode={isGlobalEditMode}
+                    previewUrl={newFilePreviewUrls['thirdparty_inspection_image']}
+                    onFileSelect={(fieldName, file) => {
+                      handleFileSelect(fieldName, file);
+                      handleFieldChange('thirdparty_inspection_image', file);
+                    }}
+                    onRemove={(fieldName) => {
+                      handleFileRemove(fieldName);
+                      handleFieldChange('thirdparty_inspection_image', null);
+                    }}
+                  />
                 </div>
 
                 {/* PGPC Inspection */}
-                <div className="space-y-2">
-                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
+                <div>
+                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2 mb-2">
                     <Shield className="h-4 w-4" />
                     PGPC Inspection
                   </h3>
-                  {selectedEquipment.pgpc_inspection_image && !removedItems.has('pgpc_inspection_image') ? (
-                    <div>
-                      <ImageViewerSection 
-                        url={selectedEquipment.pgpc_inspection_image}
-                        label="PGPC Inspection"
-                        description="PGPC inspection documentation"
-                        onRemove={undefined}
-                      />
-                      {/* Single toggle button - Remove if image exists */}
-                      {isGlobalEditMode && (
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              setRemovedItems(prev => new Set([...prev, 'pgpc_inspection_image']));
-                              handleFieldChange('pgpc_inspection_image', null);
-                              toast.success('PGPC inspection image will be removed when you save changes');
-                            }}
-                          >
-                            <X className="h-4 w-4 mr-2" />
-                            Remove Image
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <EmptyDocumentPlaceholder 
-                        icon={Shield}
-                        label="PGPC Inspection"
-                        description="Click upload to add new image"
-                      />
-                      {/* Single toggle button - Upload if no image */}
-                      {isGlobalEditMode && (
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = 'image/*';
-                              input.onchange = (e) => {
-                                const file = (e.target as HTMLInputElement).files?.[0];
-                                if (file) {
-                                  setRemovedItems(prev => {
-                                    const newSet = new Set(prev);
-                                    newSet.delete('pgpc_inspection_image');
-                                    return newSet;
-                                  });
-                                  toast.success('New PGPC inspection image will be uploaded when you save changes');
-                                }
-                              };
-                              input.click();
-                            }}
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload New Image
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <ImagePreviewSection
+                    fieldName="pgpc_inspection_image"
+                    url={!removedItems.has('pgpc_inspection_image') ? selectedEquipment.pgpc_inspection_image : null}
+                    label="PGPC Inspection"
+                    description="PGPC inspection documentation"
+                    accept="image/*"
+                    isEditMode={isGlobalEditMode}
+                    previewUrl={newFilePreviewUrls['pgpc_inspection_image']}
+                    onFileSelect={handleFileSelect}
+                    onRemove={handleFileRemove}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -1541,155 +1249,41 @@ export default function EquipmentModalModern() {
             <CardContent className="p-6">
               <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 {/* Purchase Receipt */}
-                <div className="space-y-2">
-                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
+                <div>
+                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2 mb-2">
                     <Receipt className="h-4 w-4" />
                     Purchase Receipt
                   </h3>
-                  {selectedEquipment.original_receipt_url && !removedItems.has('original_receipt_url') ? (
-                    <div>
-                      <DocumentViewerSection 
-                        url={selectedEquipment.original_receipt_url}
-                        label="Purchase Receipt"
-                        description="Equipment purchase documentation"
-                        onRemove={undefined}
-                      />
-                      {/* Single toggle button - Remove if document exists */}
-                      {isGlobalEditMode && (
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              setRemovedItems(prev => new Set([...prev, 'original_receipt_url']));
-                              handleFieldChange('original_receipt_url', null);
-                              toast.success('Purchase receipt will be removed when you save changes');
-                            }}
-                          >
-                            <X className="h-4 w-4 mr-2" />
-                            Remove Document
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <EmptyDocumentPlaceholder 
-                        icon={Receipt}
-                        label="Purchase Receipt"
-                        description="Click upload to add new document"
-                      />
-                      {/* Single toggle button - Upload if no document */}
-                      {isGlobalEditMode && (
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = '.pdf,.doc,.docx,.jpg,.jpeg,.png';
-                              input.onchange = (e) => {
-                                const file = (e.target as HTMLInputElement).files?.[0];
-                                if (file) {
-                                  setRemovedItems(prev => {
-                                    const newSet = new Set(prev);
-                                    newSet.delete('original_receipt_url');
-                                    return newSet;
-                                  });
-                                  toast.success('New purchase receipt will be uploaded when you save changes');
-                                }
-                              };
-                              input.click();
-                            }}
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload New Document
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <ImagePreviewSection
+                    fieldName="original_receipt_url"
+                    url={!removedItems.has('original_receipt_url') ? selectedEquipment.original_receipt_url : null}
+                    label="Purchase Receipt"
+                    description="Equipment purchase documentation"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    isEditMode={isGlobalEditMode}
+                    previewUrl={newFilePreviewUrls['original_receipt_url']}
+                    onFileSelect={handleFileSelect}
+                    onRemove={handleFileRemove}
+                  />
                 </div>
 
                 {/* Registration Document */}
-                <div className="space-y-2">
-                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
+                <div>
+                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2 mb-2">
                     <FileText className="h-4 w-4" />
                     Registration Document
                   </h3>
-                  {selectedEquipment.equipment_registration_url && !removedItems.has('equipment_registration_url') ? (
-                    <div>
-                      <DocumentViewerSection 
-                        url={selectedEquipment.equipment_registration_url}
-                        label="Registration Document"
-                        description="Official equipment registration certificate"
-                        onRemove={undefined}
-                      />
-                      {/* Single toggle button - Remove if document exists */}
-                      {isGlobalEditMode && (
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              setRemovedItems(prev => new Set([...prev, 'equipment_registration_url']));
-                              handleFieldChange('equipment_registration_url', null);
-                              toast.success('Registration document will be removed when you save changes');
-                            }}
-                          >
-                            <X className="h-4 w-4 mr-2" />
-                            Remove Document
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <EmptyDocumentPlaceholder 
-                        icon={FileText}
-                        label="Registration Document"
-                        description="Click upload to add new document"
-                      />
-                      {/* Single toggle button - Upload if no document */}
-                      {isGlobalEditMode && (
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = '.pdf,.doc,.docx,.jpg,.jpeg,.png';
-                              input.onchange = (e) => {
-                                const file = (e.target as HTMLInputElement).files?.[0];
-                                if (file) {
-                                  setRemovedItems(prev => {
-                                    const newSet = new Set(prev);
-                                    newSet.delete('equipment_registration_url');
-                                    return newSet;
-                                  });
-                                  toast.success('New registration document will be uploaded when you save changes');
-                                }
-                              };
-                              input.click();
-                            }}
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload New Document
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <ImagePreviewSection
+                    fieldName="equipment_registration_url"
+                    url={!removedItems.has('equipment_registration_url') ? selectedEquipment.equipment_registration_url : null}
+                    label="Registration Document"
+                    description="Official equipment registration certificate"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    isEditMode={isGlobalEditMode}
+                    previewUrl={newFilePreviewUrls['equipment_registration_url']}
+                    onFileSelect={handleFileSelect}
+                    onRemove={handleFileRemove}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -1846,7 +1440,11 @@ export default function EquipmentModalModern() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setIsGlobalEditMode(false)}
+                      onClick={() => {
+                        // Clean up preview state on cancel
+                        resetPreviewState();
+                        setIsGlobalEditMode(false);
+                      }}
                       className="flex-1"
                       size="lg"
                     >
@@ -1910,7 +1508,11 @@ export default function EquipmentModalModern() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setIsGlobalEditMode(false)}
+                      onClick={() => {
+                        // Clean up preview state on cancel
+                        resetPreviewState();
+                        setIsGlobalEditMode(false);
+                      }}
                       size="sm"
                     >
                       Cancel
@@ -2027,13 +1629,12 @@ export default function EquipmentModalModern() {
           
           {/* Desktop Action Buttons in Footer */}
           <DialogFooter className="flex-shrink-0 pt-4 border-t bg-background px-6 pb-6">
-            <div className="flex gap-2 w-full">
+            <div className="flex justify-center w-full">
               <Button
                 type="button"
                 variant="destructive"
                 onClick={handleDelete}
                 disabled={deleteEquipmentMutation.isPending || selectedEquipment?.id?.startsWith('temp_')}
-                className="flex-1"
                 size="lg"
               >
                 {deleteEquipmentMutation.isPending ? (
@@ -2042,16 +1643,6 @@ export default function EquipmentModalModern() {
                   <Trash2 className="h-4 w-4 mr-2" />
                 )}
                 Delete Equipment
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleEdit}
-                className="flex-1"
-                size="lg"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Equipment
               </Button>
             </div>
           </DialogFooter>

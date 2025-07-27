@@ -686,14 +686,16 @@ export const PUT = withResourcePermission(
       const brand = formData.get("brand") as string;
       const model = formData.get("model") as string;
       const type = formData.get("type") as string;
-      const insExp = formData.get("insuranceExpirationDate") as string | null; // Changed to allow null
+      const insExp = formData.get("insurance_expiration_date") as string | null; // Match frontend field name
       const status = formData.get("status") as keyof typeof EquipmentStatus;
       const remarks = (formData.get("remarks") as string) || null;
       const owner = formData.get("owner") as string;
-      const projectId = formData.get("projectId") as string;
+      const projectId = formData.get("project_id") as string;
 
-      const inspDateStr = formData.get("inspectionDate") as string | null;
-      const plateNum = (formData.get("plateNumber") as string) || null;
+      const inspDateStr = formData.get("inspection_date") as string | null;
+      const plateNum = (formData.get("plate_number") as string) || null;
+      const regExpiryStr = formData.get("registration_expiry") as string | null;
+      const createdBy = formData.get("created_by") as string | null;
       
       // New inspection & compliance fields
 
@@ -733,6 +735,7 @@ export const PUT = withResourcePermission(
       if (status !== null && status !== existing.status) updateData.status = status;
       if (remarks !== null && remarks !== existing.remarks) updateData.remarks = remarks;
       if (plateNum !== null && plateNum !== existing.plate_number) updateData.plate_number = plateNum;
+      if (createdBy !== null && createdBy !== existing.created_by) updateData.created_by = createdBy;
       if (beforeStr !== null) {
         const newBefore = beforeStr !== "" ? parseInt(beforeStr, 10) : null;
         if (newBefore !== existing.before) updateData.before = newBefore;
@@ -755,6 +758,15 @@ export const PUT = withResourcePermission(
         const datesAreDifferent = newInspectionDate?.getTime() !== existingInspectionDate?.getTime();
         if (datesAreDifferent) {
           updateData.inspection_date = newInspectionDate;
+        }
+      }
+      if (regExpiryStr !== null) {
+        const newRegistrationExpiry = regExpiryStr ? new Date(regExpiryStr) : null;
+        const existingRegistrationExpiry = existing.registration_expiry;
+        // Compare dates properly
+        const datesAreDifferent = newRegistrationExpiry?.getTime() !== existingRegistrationExpiry?.getTime();
+        if (datesAreDifferent) {
+          updateData.registration_expiry = newRegistrationExpiry;
         }
       }
       
