@@ -135,6 +135,11 @@ export default function EquipmentModalModern() {
   // Force re-render trigger for controlled inputs
   const [, forceUpdate] = useState({});
   
+  // Date picker open states
+  const [inspectionDateOpen, setInspectionDateOpen] = useState(false);
+  const [registrationExpiryOpen, setRegistrationExpiryOpen] = useState(false);
+  const [insuranceExpiryOpen, setInsuranceExpiryOpen] = useState(false);
+  
   // Equipment parts state for PartsFolderManager
   const [partsStructure, setPartsStructure] = useState<PartsStructure>({
     rootFiles: [],
@@ -249,7 +254,10 @@ export default function EquipmentModalModern() {
   // CRITICAL FIX: Update form data via ref without causing re-renders
   const handleFieldChange = useCallback((field: string, value: any) => {
     editFormDataRef.current = { ...editFormDataRef.current, [field]: value };
-    // Don't trigger re-render - just update the ref
+    // Trigger re-render for date fields to update UI immediately
+    if (field === 'inspection_date' || field === 'registration_expiry' || field === 'insurance_expiration_date') {
+      forceUpdate({});
+    }
   }, []); // No dependencies - function is stable
   
   // Handle form submission - using ref to avoid editFormData dependency and prevent re-renders
@@ -358,7 +366,7 @@ export default function EquipmentModalModern() {
       await updateEquipmentMutation.mutateAsync(formData);
       setIsGlobalEditMode(false);
       resetPreviewState(); // Clear all preview state after successful save
-      toast.success('Equipment updated successfully!');
+      // Note: Success toast is handled by useUpdateEquipment hook
     } catch (error) {
       console.error('Failed to update equipment:', error);
       toast.error('Failed to update equipment. Please try again.');
@@ -772,12 +780,13 @@ export default function EquipmentModalModern() {
                           <CalendarIcon className="h-4 w-4" />
                           Inspection Date
                         </Label>
-                        <Popover>
+                        <Popover open={inspectionDateOpen} onOpenChange={setInspectionDateOpen}>
                           <PopoverTrigger asChild>
                             <Button
+                              type="button"
                               variant="outline"
                               className={cn(
-                                "w-full justify-start text-left font-normal",
+                                "w-full justify-start text-left font-normal transition-all duration-200 focus:ring-2 focus:ring-blue-500",
                                 !editFormDataRef.current.inspection_date && "text-muted-foreground"
                               )}
                             >
@@ -789,8 +798,19 @@ export default function EquipmentModalModern() {
                             <Calendar
                               mode="single"
                               selected={editFormDataRef.current.inspection_date}
-                              onSelect={(date) => handleFieldChange('inspection_date', date)}
+                              onSelect={(date) => {
+                                handleFieldChange('inspection_date', date);
+                                setInspectionDateOpen(false); // Auto-close after selection
+                              }}
                               initialFocus
+                              captionLayout="dropdown-buttons"
+                              fromYear={1990}
+                              toYear={2030}
+                              classNames={{
+                                caption_dropdowns: "flex gap-2 justify-center",
+                                vhidden: "hidden",
+                                caption_label: "hidden"
+                              }}
                             />
                           </PopoverContent>
                         </Popover>
@@ -801,12 +821,13 @@ export default function EquipmentModalModern() {
                           <CalendarIcon className="h-4 w-4" />
                           Registration Expiry
                         </Label>
-                        <Popover>
+                        <Popover open={registrationExpiryOpen} onOpenChange={setRegistrationExpiryOpen}>
                           <PopoverTrigger asChild>
                             <Button
+                              type="button"
                               variant="outline"
                               className={cn(
-                                "w-full justify-start text-left font-normal",
+                                "w-full justify-start text-left font-normal transition-all duration-200 focus:ring-2 focus:ring-blue-500",
                                 !editFormDataRef.current.registration_expiry && "text-muted-foreground"
                               )}
                             >
@@ -818,8 +839,19 @@ export default function EquipmentModalModern() {
                             <Calendar
                               mode="single"
                               selected={editFormDataRef.current.registration_expiry}
-                              onSelect={(date) => handleFieldChange('registration_expiry', date)}
+                              onSelect={(date) => {
+                                handleFieldChange('registration_expiry', date);
+                                setRegistrationExpiryOpen(false); // Auto-close after selection
+                              }}
                               initialFocus
+                              captionLayout="dropdown-buttons"
+                              fromYear={1990}
+                              toYear={2050}
+                              classNames={{
+                                caption_dropdowns: "flex gap-2 justify-center",
+                                vhidden: "hidden",
+                                caption_label: "hidden"
+                              }}
                             />
                           </PopoverContent>
                         </Popover>
@@ -830,12 +862,13 @@ export default function EquipmentModalModern() {
                           <Shield className="h-4 w-4" />
                           Insurance Expiration
                         </Label>
-                        <Popover>
+                        <Popover open={insuranceExpiryOpen} onOpenChange={setInsuranceExpiryOpen}>
                           <PopoverTrigger asChild>
                             <Button
+                              type="button"
                               variant="outline"
                               className={cn(
-                                "w-full justify-start text-left font-normal",
+                                "w-full justify-start text-left font-normal transition-all duration-200 focus:ring-2 focus:ring-blue-500",
                                 !editFormDataRef.current.insurance_expiration_date && "text-muted-foreground"
                               )}
                             >
@@ -847,8 +880,19 @@ export default function EquipmentModalModern() {
                             <Calendar
                               mode="single"
                               selected={editFormDataRef.current.insurance_expiration_date}
-                              onSelect={(date) => handleFieldChange('insurance_expiration_date', date)}
+                              onSelect={(date) => {
+                                handleFieldChange('insurance_expiration_date', date);
+                                setInsuranceExpiryOpen(false); // Auto-close after selection
+                              }}
                               initialFocus
+                              captionLayout="dropdown-buttons"
+                              fromYear={1990}
+                              toYear={2050}
+                              classNames={{
+                                caption_dropdowns: "flex gap-2 justify-center",
+                                vhidden: "hidden",
+                                caption_label: "hidden"
+                              }}
                             />
                           </PopoverContent>
                         </Popover>
@@ -1165,7 +1209,7 @@ export default function EquipmentModalModern() {
                   </h3>
                   <ImagePreviewSection
                     fieldName="image_url"
-                    url={selectedEquipment.image_url}
+                    url={!removedItems.has('image_url') ? selectedEquipment.image_url : null}
                     label="Equipment Image"
                     description="Main equipment photo"
                     accept="image/*"
@@ -1190,7 +1234,7 @@ export default function EquipmentModalModern() {
                   </h3>
                   <ImagePreviewSection
                     fieldName="thirdparty_inspection_image"
-                    url={selectedEquipment.thirdparty_inspection_image}
+                    url={!removedItems.has('thirdparty_inspection_image') ? selectedEquipment.thirdparty_inspection_image : null}
                     label="Third-party Inspection"
                     description="Third-party inspection documentation"
                     accept="image/*"

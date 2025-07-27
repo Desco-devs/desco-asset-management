@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,10 +31,20 @@ export default function ImagePreviewSection({
   onRemove,
 }: ImagePreviewSectionProps) {
   const [showViewer, setShowViewer] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
   
   const displayUrl = previewUrl || url;
   const isNewUpload = !!previewUrl;
   const hasImage = !!displayUrl;
+
+  // Reset error state when URL changes
+  useEffect(() => {
+    if (displayUrl) {
+      setImageError(false);
+      setImageLoading(true);
+    }
+  }, [displayUrl]);
 
   const handleFileSelect = () => {
     const input = document.createElement('input');
@@ -66,13 +76,39 @@ export default function ImagePreviewSection({
                 className="relative cursor-pointer"
                 onClick={() => setShowViewer(true)}
               >
-                <Image
-                  src={displayUrl}
-                  alt={label}
-                  width={200}
-                  height={200}
-                  className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
-                />
+                {imageError ? (
+                  <div className="w-full h-[200px] bg-gray-100 rounded flex flex-col items-center justify-center">
+                    <div className="text-gray-400 text-center">
+                      <svg className="h-12 w-12 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.694-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <p className="text-sm">Failed to load image</p>
+                      <p className="text-xs text-gray-500">Image may be corrupted or unavailable</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {imageLoading && (
+                      <div className="absolute inset-0 bg-gray-100 rounded flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                      </div>
+                    )}
+                    <Image
+                      src={displayUrl}
+                      alt={label}
+                      width={200}
+                      height={200}
+                      className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
+                      onLoad={() => setImageLoading(false)}
+                      onError={() => {
+                        setImageError(true);
+                        setImageLoading(false);
+                      }}
+                      priority={false}
+                      unoptimized={displayUrl?.includes('supabase.co') || false}
+                    />
+                  </>
+                )}
                 <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
                   <Eye className="h-6 w-6 text-white" />
                 </div>
@@ -158,6 +194,11 @@ export default function ImagePreviewSection({
                 width={800}
                 height={600}
                 className="max-w-full max-h-[70vh] sm:max-h-[55vh] lg:max-h-[50vh] xl:max-h-[45vh] object-contain"
+                onError={(e) => {
+                  console.error('Image failed to load in modal:', displayUrl);
+                }}
+                priority={false}
+                unoptimized={displayUrl?.includes('supabase.co') || false}
               />
             </div>
           </DialogContent>
