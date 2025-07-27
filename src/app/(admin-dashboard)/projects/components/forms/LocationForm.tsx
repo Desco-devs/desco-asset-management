@@ -14,6 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { Loader2 } from "lucide-react"
 import { useCreateLocation, useUpdateLocation, useLocations } from '@/hooks/api/use-projects'
 import { toast } from 'sonner'
 import type { Location } from '@/types/projects'
@@ -125,6 +126,7 @@ export function LocationForm({ location, onSuccess, onCancel }: LocationFormProp
             type="submit"
             disabled={isPending}
           >
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isPending ? (
               isEditing ? 'Updating...' : 'Creating...'
             ) : (

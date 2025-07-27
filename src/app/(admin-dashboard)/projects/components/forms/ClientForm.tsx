@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Loader2 } from "lucide-react"
 import { useCreateClient, useUpdateClient, useClients, useLocations } from '@/hooks/api/use-projects'
 import { useProjectsStore } from '@/stores/projects-store'
 import { toast } from 'sonner'
@@ -176,6 +177,7 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
             type="submit"
             disabled={isPending}
           >
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isPending ? (
               isEditing ? 'Updating...' : 'Creating...'
             ) : (
