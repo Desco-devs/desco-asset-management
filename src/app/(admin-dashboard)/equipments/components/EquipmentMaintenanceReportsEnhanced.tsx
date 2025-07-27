@@ -437,21 +437,23 @@ export default function EquipmentMaintenanceReportsEnhanced({
               {equipmentReports.length !== 1 ? "s" : ""} found
             </p>
           </div>
-          <Button
-            onClick={() => {
-              console.log('Add Report button clicked - setting maintenance modal open');
-              setIsMaintenanceModalOpen(true);
-            }}
-            disabled={isMaintenanceModalOpen}
-            className="gap-2"
-          >
-            {isMaintenanceModalOpen ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
-            Add Report
-          </Button>
+          {!isEditMode && (
+            <Button
+              onClick={() => {
+                console.log('Add Report button clicked - setting maintenance modal open');
+                setIsMaintenanceModalOpen(true);
+              }}
+              disabled={isMaintenanceModalOpen}
+              className="gap-2"
+            >
+              {isMaintenanceModalOpen ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              Add Report
+            </Button>
+          )}
         </div>
 
         {equipmentReports.length === 0 ? (
@@ -464,21 +466,23 @@ export default function EquipmentMaintenanceReportsEnhanced({
               Track equipment maintenance, repairs, and inspections by creating
               your first report
             </p>
-            <Button
-              onClick={() => {
-                console.log('Create First Report button clicked - setting maintenance modal open');
-                setIsMaintenanceModalOpen(true);
-              }}
-              disabled={isMaintenanceModalOpen}
-              className="gap-2"
-            >
-              {isMaintenanceModalOpen ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              Create First Report
-            </Button>
+            {!isEditMode && (
+              <Button
+                onClick={() => {
+                  console.log('Create First Report button clicked - setting maintenance modal open');
+                  setIsMaintenanceModalOpen(true);
+                }}
+                disabled={isMaintenanceModalOpen}
+                className="gap-2"
+              >
+                {isMaintenanceModalOpen ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                Create First Report
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-2">

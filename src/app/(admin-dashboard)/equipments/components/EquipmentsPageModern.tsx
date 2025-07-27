@@ -262,7 +262,14 @@ export default function EquipmentsPageModern() {
 
       {/* Edit Equipment Modal - Handled by EquipmentModalModern when isEditMode is true */}
 
-      {/* Maintenance modals temporarily disabled for simplified implementation */}
+      {/* Maintenance Report Modals */}
+      {selectedEquipment && (
+        <>
+          <CreateEquipmentMaintenanceReportModal equipmentId={selectedEquipment.id} />
+          <MaintenanceReportDetailDrawer />
+          <EditEquipmentMaintenanceReportDrawer />
+        </>
+      )}
 
       {/* Global Image Viewer Modal - Always available */}
       <ImageViewerModal />
