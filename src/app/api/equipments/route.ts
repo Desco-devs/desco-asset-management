@@ -22,18 +22,37 @@ const extractFilePathFromUrl = (fileUrl: string): string | null => {
   }
 };
 
-// Delete a file from Supabase storage
+// Delete a file from Supabase storage with improved error handling
 const deleteFileFromSupabase = async (
   fileUrl: string,
   tag: string
 ): Promise<void> => {
-  const path = extractFilePathFromUrl(fileUrl);
-  console.log(`🔍 Extracted path for ${tag}:`, path);
-  if (!path) throw new Error(`Cannot parse path for ${tag}`);
+  // Additional validation for URL format
+  if (!fileUrl || typeof fileUrl !== 'string' || fileUrl.trim() === '') {
+    throw new Error(`Invalid file URL provided for ${tag}`);
+  }
   
+  const path = extractFilePathFromUrl(fileUrl);
+  console.log(`🔍 Extracted path for ${tag}:`, path, 'from URL:', fileUrl);
+  
+  if (!path) {
+    throw new Error(`Cannot parse storage path from URL for ${tag}: ${fileUrl}`);
+  }
+  
+  // Validate that path is specific (not a directory)
+  if (path.endsWith('/') || !path.includes('.')) {
+    throw new Error(`Invalid file path detected for ${tag} - appears to be a directory: ${path}`);
+  }
+  
+  console.log(`🗑️ Attempting to delete single file: ${path}`);
   const { error } = await supabase.storage.from("equipments").remove([path]);
+  
   console.log(`🗂️ Supabase delete result for ${tag}:`, error ? `ERROR: ${error.message}` : 'SUCCESS');
-  if (error) throw error;
+  
+  if (error) {
+    // Enhanced error message for debugging
+    throw new Error(`Failed to delete file from storage for ${tag}: ${error.message} (Path: ${path})`);
+  }
 };
 
 // Delete old files of specific type for an equipment (for replacement scenarios)
@@ -934,17 +953,39 @@ export const PUT = withResourcePermission(
         pgpcInspection: formData.get("pgpcInspection") ? 'FILE_PRESENT' : 'NO_FILE'
       });
       
-      // Delete removed equipment images only
+      // IMPROVED: Delete removed equipment images with better error handling and validation
       const equipmentImageFields = ['image_url', 'thirdparty_inspection_image', 'pgpc_inspection_image'];
+      const processedUrls = new Set<string>(); // Prevent duplicate deletions
+      
       for (const fieldName of removedImages) {
         if (equipmentImageFields.includes(fieldName)) {
           const existingUrl = existing[fieldName as keyof typeof existing] as string;
-          if (existingUrl) {
+          
+          // Additional validation to ensure we have a valid URL and it hasn't been processed
+          if (existingUrl && existingUrl.trim() && !processedUrls.has(existingUrl)) {
             console.log(`🗑️ DELETING equipment image ${fieldName}:`, existingUrl);
-            await deleteFileFromSupabase(existingUrl, fieldName);
+            
+            try {
+              await deleteFileFromSupabase(existingUrl, fieldName);
+              processedUrls.add(existingUrl); // Mark as processed
+              updateData[fieldName] = null;
+              console.log(`✅ Successfully deleted equipment image ${fieldName}`);
+            } catch (deleteError) {
+              console.error(`❌ Failed to delete ${fieldName}:`, deleteError);
+              // Continue processing other files even if one fails
+              // Still set field to null to reflect user intent
+              updateData[fieldName] = null;
+            }
+          } else if (!existingUrl) {
+            // Field is already empty, just ensure it's set to null
+            console.log(`ℹ️ Field ${fieldName} is already empty, setting to null`);
             updateData[fieldName] = null;
-            console.log(`✅ Successfully deleted equipment image ${fieldName}`);
+          } else if (processedUrls.has(existingUrl)) {
+            console.log(`⚠️ URL already processed for deletion: ${existingUrl}`);
+            updateData[fieldName] = null;
           }
+        } else {
+          console.warn(`⚠️ Invalid field name in removedImages: ${fieldName}`);
         }
       }
 

@@ -268,6 +268,25 @@ export default function EquipmentModalModern() {
   const handleSaveChanges = useCallback(async () => {
     if (!selectedEquipment) return;
     
+    // Safety check: Warn if user is removing all images
+    const imageFields = ['image_url', 'thirdparty_inspection_image', 'pgpc_inspection_image'];
+    const hasExistingImages = imageFields.some(field => {
+      const url = selectedEquipment[field as keyof typeof selectedEquipment] as string;
+      return url && !removedFiles.has(field);
+    });
+    const hasNewImages = Object.keys(uploadedFiles).some(field => 
+      imageFields.includes(field) && uploadedFiles[field]
+    );
+    
+    if (!hasExistingImages && !hasNewImages && removedFiles.size > 0) {
+      const confirmRemoveAll = window.confirm(
+        'You are about to remove all images from this equipment. This action cannot be undone. Are you sure you want to continue?'
+      );
+      if (!confirmRemoveAll) {
+        return;
+      }
+    }
+    
     try {
       // Access current form data from ref - this prevents callback recreation on form changes
       const currentFormData = editFormDataRef.current;
@@ -315,9 +334,24 @@ export default function EquipmentModalModern() {
         formData.append(apiFieldName, file);
       });
       
-      // Send removed files to API
+      // Send removed files to API with validation
       if (removedFiles.size > 0) {
-        formData.append('removedImages', JSON.stringify(Array.from(removedFiles)));
+        const removedFilesArray = Array.from(removedFiles);
+        console.log(`📄 Sending removal request for fields:`, removedFilesArray);
+        
+        // Validate that we're only removing valid image fields
+        const validImageFields = ['image_url', 'thirdparty_inspection_image', 'pgpc_inspection_image'];
+        const validRemovals = removedFilesArray.filter(field => validImageFields.includes(field));
+        
+        if (validRemovals.length !== removedFilesArray.length) {
+          const invalidFields = removedFilesArray.filter(field => !validImageFields.includes(field));
+          console.warn(`⚠️ Invalid fields in removal request:`, invalidFields);
+        }
+        
+        if (validRemovals.length > 0) {
+          formData.append('removedImages', JSON.stringify(validRemovals));
+          console.log(`✅ Valid image removals to process:`, validRemovals);
+        }
       }
       
       // Convert equipment parts back to database format using correct field name
@@ -396,29 +430,38 @@ export default function EquipmentModalModern() {
 
   // Removed defaultValues - no longer needed with global edit approach
 
+  // IMPROVED: Modal state cleanup with logging
   useEffect(() => {
     if (!isModalOpen) {
+      console.log('🔄 Resetting modal state - modal closed');
       setActiveTab("details");
       // Reset global edit mode when modal closes
       setIsGlobalEditMode(false);
-      // SUPER SIMPLE: Reset uploaded files and removals
+      // Reset uploaded files and removals
       setUploadedFiles({});
       setRemovedFiles(new Set());
     }
   }, [isModalOpen]);
+  
+  // Safety cleanup function
+  const resetFileStates = useCallback(() => {
+    console.log('🔄 Resetting file states manually');
+    setUploadedFiles({});
+    setRemovedFiles(new Set());
+  }, []);
 
   // Form data is now managed by the global edit state and editFormData
 
 
   const handleClose = () => {
+    console.log('🚪 Closing modal - cleaning up all states');
     setIsModalOpen(false);
     setSelectedEquipment(null);
     setIsEditMode(false);
     // Reset global edit state
     setIsGlobalEditMode(false);
-    // Reset upload state
-    setUploadedFiles({});
-    setRemovedFiles(new Set());
+    // Reset upload state using safety function
+    resetFileStates();
   };
 
   const handleEdit = () => {
@@ -434,8 +477,25 @@ export default function EquipmentModalModern() {
 
   // Dirty tracking is no longer needed with global edit approach
 
-  // SUPER SIMPLE: File handlers (following REALTIME_PATTERN.md)
+  // IMPROVED: File handlers with better validation and logging
   const handleFileSelect = useCallback((fieldName: string, file: File | null) => {
+    console.log(`📁 File selection for ${fieldName}:`, file ? `NEW FILE: ${file.name}` : 'REMOVE EXISTING');
+    
+    // Validate fieldName to prevent issues
+    const validFieldNames = [
+      'image_url',
+      'thirdparty_inspection_image', 
+      'pgpc_inspection_image',
+      'original_receipt_url',
+      'equipment_registration_url'
+    ];
+    
+    if (!validFieldNames.includes(fieldName)) {
+      console.error(`❌ Invalid field name: ${fieldName}`);
+      toast.error(`Invalid field name: ${fieldName}`);
+      return;
+    }
+    
     if (file) {
       // Add to uploads - will show preview immediately
       setUploadedFiles(prev => ({ ...prev, [fieldName]: file }));
@@ -443,6 +503,7 @@ export default function EquipmentModalModern() {
       setRemovedFiles(prev => {
         const updated = new Set(prev);
         updated.delete(fieldName);
+        console.log(`✅ Restored ${fieldName} from removal list`);
         return updated;
       });
     } else {
@@ -452,7 +513,11 @@ export default function EquipmentModalModern() {
         delete updated[fieldName];
         return updated;
       });
-      setRemovedFiles(prev => new Set([...prev, fieldName]));
+      setRemovedFiles(prev => {
+        const updated = new Set([...prev, fieldName]);
+        console.log(`🗑️ Added ${fieldName} to removal list. Total removals:`, updated.size);
+        return updated;
+      });
     }
   }, []);
 
@@ -1296,21 +1361,20 @@ export default function EquipmentModalModern() {
 
       {/* Documents Tab */}
       {activeTab === 'documents' && (
-        <div>
-          {/* Tab Title and Description */}
-          <div className={`mb-6 ${isMobile ? 'mb-4' : ''}`}>
-            <h2 className={`font-semibold flex items-center gap-2 mb-2 ${isMobile ? 'text-lg' : 'text-xl'}`}>
-              <FileText className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
-              Equipment Documents
-            </h2>
-            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
-              Official documents and certificates related to equipment purchase and registration
-            </p>
-          </div>
-          
+        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
           <Card>
-            <CardContent className="p-6">
-              <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Equipment Documents {isMobile ? '' : '(Optional)'}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Upload official documents and certificates. These files help with compliance, registration, and maintenance records.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 <EquipmentFormErrorBoundary fallback={
                   <div className="p-4 border border-red-200 rounded-lg bg-red-50">
                     <p className="text-sm text-red-600">Purchase Receipt upload component failed to load</p>
@@ -1346,6 +1410,7 @@ export default function EquipmentModalModern() {
                     hideChangeButton={true}
                   />
                 </EquipmentFormErrorBoundary>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1502,9 +1567,8 @@ export default function EquipmentModalModern() {
                       type="button"
                       variant="outline"
                       onClick={() => {
-                        // SUPER SIMPLE: Reset uploaded files and removals on cancel
-                        setUploadedFiles({});
-                        setRemovedFiles(new Set());
+                        console.log('❌ Cancel button clicked - resetting states');
+                        resetFileStates();
                         setIsGlobalEditMode(false);
                       }}
                       className="flex-1"
@@ -1571,9 +1635,8 @@ export default function EquipmentModalModern() {
                       type="button"
                       variant="outline"
                       onClick={() => {
-                        // SUPER SIMPLE: Reset uploaded files and removals on cancel
-                        setUploadedFiles({});
-                        setRemovedFiles(new Set());
+                        console.log('❌ Cancel button clicked - resetting states');
+                        resetFileStates();
                         setIsGlobalEditMode(false);
                       }}
                       size="sm"
