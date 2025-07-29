@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CheckCircle, Upload, X, Eye } from "lucide-react";
+import { CheckCircle, Upload, X, Eye, FileText, File, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import { useState, useCallback, useEffect } from "react";
 
@@ -93,8 +93,63 @@ export function FileUploadSectionSimple({
   // No longer needed - simplified logic
 
   // SUPER SIMPLE: Display logic (following REALTIME_PATTERN.md)
-  const isImage = accept.includes("image");
+  const isImage = accept.includes("image") || accept.includes(".jpg") || accept.includes(".jpeg") || accept.includes(".png") || accept.includes(".gif") || accept.includes(".webp");
   const showPreview = Boolean(preview);
+  
+  // Helper function to check if a URL/file is actually an image by extension
+  const isActualImage = (url: string | null) => {
+    if (!url) return false;
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const ext = getFileExtension(url);
+    return ext ? imageExtensions.includes(ext) : false;
+  };
+  
+  // Helper function to determine file type for icon display
+  const getFileExtension = (url: string | null) => {
+    if (!url) return null;
+    const match = url.match(/\.([^.]+)$/);
+    return match ? match[1].toLowerCase() : null;
+  };
+  
+  // Helper function to get appropriate icon for file type
+  const getFileIcon = (url: string | null) => {
+    const ext = getFileExtension(url);
+    switch (ext) {
+      case 'pdf':
+        return <FileText className="h-8 w-8 text-red-500" />;
+      case 'doc':
+      case 'docx':
+        return <FileText className="h-8 w-8 text-blue-500" />;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'webp':
+        return <Eye className="h-8 w-8 text-green-500" />;
+      default:
+        return <File className="h-8 w-8 text-gray-500" />;
+    }
+  };
+  
+  // Helper function to get file name from URL
+  const getFileName = (url: string | null) => {
+    if (!url) return 'Unknown file';
+    try {
+      const urlParts = url.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      // Remove query parameters if any
+      return fileName.split('?')[0] || 'Document';
+    } catch {
+      return 'Document';
+    }
+  };
+  
+  // Function to handle document/file opening
+  const handleFileOpen = () => {
+    if (preview) {
+      window.open(preview, '_blank', 'noopener,noreferrer');
+    }
+  };
   
   
   
@@ -132,7 +187,7 @@ export function FileUploadSectionSimple({
       >
         {showPreview && preview ? (
           <div className="space-y-2">
-            {isImage ? (
+            {(isImage || isActualImage(preview)) ? (
               <div className="relative w-full max-w-[200px] mx-auto group">
                 <div 
                   className="relative cursor-pointer"
@@ -158,9 +213,29 @@ export function FileUploadSectionSimple({
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2 p-2 bg-gray-100 rounded">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                <span className="text-sm">File selected</span>
+              // Document preview section - for non-image files like PDFs
+              <div className="relative w-full max-w-[200px] mx-auto group">
+                <div 
+                  className="relative cursor-pointer p-4 bg-gray-50 rounded-lg border-2 border-gray-200 hover:border-gray-300 transition-colors"
+                  onClick={handleFileOpen}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    {getFileIcon(preview)}
+                    <div className="text-center">
+                      <div className="text-sm font-medium text-gray-700 truncate max-w-[150px]">
+                        {getFileName(preview)}
+                      </div>
+                      <div className="text-xs text-gray-500 uppercase mt-1">
+                        {getFileExtension(preview) || 'file'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Hover overlay with external link icon */}
+                  <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded-lg">
+                    <ExternalLink className="h-6 w-6 text-white" />
+                  </div>
+                </div>
               </div>
             )}
             
@@ -256,7 +331,7 @@ export function FileUploadSectionSimple({
       </div>
 
       {/* Image Viewer Modal - Responsive sizing for mobile and desktop */}
-      {showImageViewer && preview && isImage && (
+      {showImageViewer && preview && (isImage || isActualImage(preview)) && (
         <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
           <DialogContent 
             className="!max-w-none p-4 
