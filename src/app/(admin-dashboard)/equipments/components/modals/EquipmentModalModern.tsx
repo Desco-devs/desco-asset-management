@@ -110,6 +110,12 @@ export default function EquipmentModalModern() {
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({});
   const [removedFiles, setRemovedFiles] = useState<Set<string>>(new Set());
   
+  // Parts deletion tracking - similar to removedFiles for images/documents
+  const [deletedParts, setDeletedParts] = useState<{
+    files: Array<{ fileId: string; folderPath?: string; fileName: string }>,
+    folders: Array<{ folderPath: string; folderName: string }>
+  }>({ files: [], folders: [] });
+  
   // DIRTY STATE TRACKING: Track which fields have been modified
   const [dirtyFields, setDirtyFields] = useState<Set<string>>(new Set());
   
@@ -204,6 +210,7 @@ export default function EquipmentModalModern() {
               id: file.id || `file-${Date.now()}-${Math.random()}`,
               name: file.name || 'Unknown file',
               url: file.url || file.preview,
+              preview: file.preview || file.url, // CRITICAL FIX: Ensure preview is always set
               type: file.type || (file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document')
             })) : [],
             folders: Array.isArray(parsedParts.folders) ? parsedParts.folders.map((folder: any) => ({
@@ -213,6 +220,7 @@ export default function EquipmentModalModern() {
                 id: file.id || `file-${Date.now()}-${Math.random()}`,
                 name: file.name || 'Unknown file',
                 url: file.url || file.preview,
+                preview: file.preview || file.url, // CRITICAL FIX: Ensure preview is always set
                 type: file.type || (file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document')
               })) : [],
               created_at: new Date(folder.created_at || Date.now())
@@ -318,7 +326,7 @@ export default function EquipmentModalModern() {
       // PERFORMANCE OPTIMIZATION: Only send dirty fields and files that have changes
       const hasFormChanges = dirtyFields.size > 0;
       const hasFileChanges = Object.keys(uploadedFiles).length > 0 || removedFiles.size > 0;
-      const hasPartsChanges = isGlobalEditMode; // Parts changes are tracked by edit mode state
+      const hasPartsChanges = isGlobalEditMode || deletedParts.files.length > 0 || deletedParts.folders.length > 0; // Parts changes are tracked by edit mode state and deletions
       
       console.log('🔍 Save Changes Debug:', {
         hasFormChanges,
@@ -327,9 +335,13 @@ export default function EquipmentModalModern() {
         dirtyFieldsCount: dirtyFields.size,
         uploadedFilesCount: Object.keys(uploadedFiles).length,
         removedFilesCount: removedFiles.size,
+        deletedPartsFilesCount: deletedParts.files.length,
+        deletedPartsFoldersCount: deletedParts.folders.length,
         dirtyFields: Array.from(dirtyFields),
         uploadedFileKeys: Object.keys(uploadedFiles),
-        removedFileKeys: Array.from(removedFiles)
+        removedFileKeys: Array.from(removedFiles),
+        deletedPartsFiles: deletedParts.files,
+        deletedPartsFolders: deletedParts.folders
       });
       
       if (!hasFormChanges && !hasFileChanges && !hasPartsChanges) {
@@ -419,6 +431,16 @@ export default function EquipmentModalModern() {
         }
       }
       
+      // Send parts deletion requests to API - similar to removedImages/removedDocuments
+      if (deletedParts.files.length > 0 || deletedParts.folders.length > 0) {
+        const deletePartsPayload = {
+          files: deletedParts.files,
+          folders: deletedParts.folders
+        };
+        formData.append('deleteParts', JSON.stringify(deletePartsPayload));
+        console.log(`📁 Sending parts deletion request:`, deletePartsPayload);
+      }
+      
       // CRITICAL FIX: Convert equipment parts and extract File objects for upload
       if (isGlobalEditMode) {
         const equipmentPartsData = {
@@ -480,6 +502,57 @@ export default function EquipmentModalModern() {
         pgpc_inspection_image: updatedEquipment.pgpc_inspection_image
       });
       
+      // CRITICAL FIX: Update parts structure with fresh server data to prevent duplicates
+      if (updatedEquipment.equipment_parts && isGlobalEditMode) {
+        try {
+          let parsedParts: any = updatedEquipment.equipment_parts;
+          
+          // Handle array with JSON string format
+          if (Array.isArray(parsedParts) && parsedParts.length > 0 && typeof parsedParts[0] === 'string') {
+            parsedParts = JSON.parse(parsedParts[0]);
+          }
+          
+          // Handle string format
+          if (typeof parsedParts === 'string') {
+            parsedParts = JSON.parse(parsedParts);
+          }
+          
+          if (parsedParts && typeof parsedParts === 'object') {
+            const updatedPartsStructure: PartsStructure = {
+              rootFiles: Array.isArray(parsedParts.rootFiles) ? parsedParts.rootFiles.map((file: any) => ({
+                id: file.id || `file-${Date.now()}-${Math.random()}`,
+                name: file.name || 'Unknown file',
+                url: file.url || file.preview,
+                type: file.type || (file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document')
+              })) : [],
+              folders: Array.isArray(parsedParts.folders) ? parsedParts.folders.map((folder: any) => ({
+                id: folder.id || `folder-${Date.now()}-${Math.random()}`,
+                name: folder.name,
+                files: Array.isArray(folder.files) ? folder.files.map((file: any) => ({
+                  id: file.id || `file-${Date.now()}-${Math.random()}`,
+                  name: file.name || 'Unknown file',
+                  url: file.url || file.preview,
+                  type: file.type || (file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document')
+                })) : [],
+                created_at: new Date(folder.created_at || Date.now())
+              })) : []
+            };
+            
+            // Apply deduplication to prevent duplicate entries
+            const deduplicatedStructure = deduplicatePartsStructure(updatedPartsStructure);
+            
+            console.log('🔄 Updating partsStructure with server data to prevent duplicates:', deduplicatedStructure);
+            
+            // Clean up old blob URLs before updating with server data
+            cleanupBlobUrls(partsStructure);
+            
+            setPartsStructure(deduplicatedStructure);
+          }
+        } catch (error) {
+          console.warn('Error parsing updated equipment parts:', error);
+        }
+      }
+      
       // ANTI-FLICKER FIX: Update selectedEquipment first, then clear state synchronously
       // This prevents the preview from briefly showing old URLs
       console.log('🔄 BEFORE setSelectedEquipment - Current:', selectedEquipment?.image_url);
@@ -494,6 +567,7 @@ export default function EquipmentModalModern() {
       setIsGlobalEditMode(false);
       setUploadedFiles({});
       setRemovedFiles(new Set());
+      setDeletedParts({ files: [], folders: [] }); // Clear parts deletions after successful save
       setDirtyFields(new Set()); // Clear dirty state after successful save
       
       console.log('✅ Updated selectedEquipment synchronously and cleared upload state');
@@ -503,7 +577,7 @@ export default function EquipmentModalModern() {
       console.error('Failed to update equipment:', error);
       toast.error('Failed to update equipment. Please try again.');
     }
-  }, [selectedEquipment, updateEquipmentMutation, setIsGlobalEditMode, isGlobalEditMode, partsStructure, dirtyFields]); // Added dirtyFields dependency
+  }, [selectedEquipment, updateEquipmentMutation, setIsGlobalEditMode, isGlobalEditMode, partsStructure, dirtyFields, deletedParts]); // Added dirtyFields and deletedParts dependencies
 
   // Actions
   const {
@@ -525,21 +599,103 @@ export default function EquipmentModalModern() {
       setActiveTab("details");
       // Reset global edit mode when modal closes
       setIsGlobalEditMode(false);
+      // Clean up blob URLs before resetting
+      cleanupBlobUrls(partsStructure);
       // Reset uploaded files and removals
       setUploadedFiles({});
       setRemovedFiles(new Set());
+      // Reset parts deletions
+      setDeletedParts({ files: [], folders: [] });
       // Reset dirty state
       setDirtyFields(new Set());
+      // Reset parts structure
+      setPartsStructure({ rootFiles: [], folders: [] });
     }
   }, [isModalOpen]);
+
+  // BLOB URL CLEANUP: Clean up on component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up blob URLs when component unmounts to prevent memory leaks
+      if (partsStructure.rootFiles.length > 0 || partsStructure.folders.length > 0) {
+        cleanupBlobUrls(partsStructure);
+      }
+    };
+  }, []); // Empty dependency - only cleanup on unmount
   
+  // BLOB URL CLEANUP: Utility function to revoke blob URLs to prevent memory leaks
+  const cleanupBlobUrls = useCallback((structure: PartsStructure) => {
+    // Clean up root files
+    structure.rootFiles.forEach(file => {
+      if (file.preview && file.preview.startsWith('blob:')) {
+        URL.revokeObjectURL(file.preview);
+      }
+    });
+    
+    // Clean up folder files
+    structure.folders.forEach(folder => {
+      folder.files.forEach(file => {
+        if (file.preview && file.preview.startsWith('blob:')) {
+          URL.revokeObjectURL(file.preview);
+        }
+      });
+    });
+  }, []);
+
+  // DEDUPLICATION: Utility function to remove duplicate files based on name and type
+  const deduplicatePartsStructure = useCallback((structure: PartsStructure): PartsStructure => {
+    return {
+      rootFiles: structure.rootFiles.filter((file, index, array) => {
+        // Keep files with Supabase URLs over blob URLs
+        const duplicateIndex = array.findIndex(f => f.name === file.name);
+        if (duplicateIndex !== index) {
+          // If current file has blob URL and duplicate has Supabase URL, remove current
+          if (file.url && file.url.startsWith('blob:') && array[duplicateIndex].url && !array[duplicateIndex].url.startsWith('blob:')) {
+            return false;
+          }
+          // If current file has Supabase URL and duplicate has blob URL, keep current
+          if (file.url && !file.url.startsWith('blob:') && array[duplicateIndex].url && array[duplicateIndex].url.startsWith('blob:')) {
+            return true;
+          }
+        }
+        return duplicateIndex === index; // Keep first occurrence
+      }),
+      folders: structure.folders.map(folder => ({
+        ...folder,
+        files: folder.files.filter((file, index, array) => {
+          // Keep files with Supabase URLs over blob URLs
+          const duplicateIndex = array.findIndex(f => f.name === file.name);
+          if (duplicateIndex !== index) {
+            // If current file has blob URL and duplicate has Supabase URL, remove current
+            if (file.url && file.url.startsWith('blob:') && array[duplicateIndex].url && !array[duplicateIndex].url.startsWith('blob:')) {
+              return false;
+            }
+            // If current file has Supabase URL and duplicate has blob URL, keep current
+            if (file.url && !file.url.startsWith('blob:') && array[duplicateIndex].url && array[duplicateIndex].url.startsWith('blob:')) {
+              return true;
+            }
+          }
+          return duplicateIndex === index; // Keep first occurrence
+        })
+      }))
+    };
+  }, []);
+
   // Safety cleanup function
   const resetFileStates = useCallback(() => {
     console.log('🔄 Resetting file states manually');
+    
+    // Clean up blob URLs before resetting parts structure
+    cleanupBlobUrls(partsStructure);
+    
     setUploadedFiles({});
     setRemovedFiles(new Set());
+    setDeletedParts({ files: [], folders: [] });
     setDirtyFields(new Set());
-  }, []);
+    
+    // Reset parts structure to empty state
+    setPartsStructure({ rootFiles: [], folders: [] });
+  }, [partsStructure, cleanupBlobUrls]);
 
   // Form data is now managed by the global edit state and editFormData
 
@@ -615,6 +771,30 @@ export default function EquipmentModalModern() {
     }
   }, []);
 
+  // Parts deletion callbacks - similar to handleFileSelect
+  const handlePartFileDelete = useCallback((fileId: string, fileName: string, folderPath?: string) => {
+    console.log(`📁 Part file marked for deletion: ${fileName} (ID: ${fileId}, Folder: ${folderPath || 'root'})`);
+    
+    setDeletedParts(prev => ({
+      ...prev,
+      files: [...prev.files, { fileId, fileName, folderPath }]
+    }));
+    
+    // Mark as dirty to enable save button
+    setDirtyFields(prev => new Set([...prev, 'equipment_parts']));
+  }, []);
+
+  const handlePartFolderDelete = useCallback((folderPath: string, folderName: string) => {
+    console.log(`📁 Part folder marked for deletion: ${folderName} (Path: ${folderPath})`);
+    
+    setDeletedParts(prev => ({
+      ...prev,
+      folders: [...prev.folders, { folderPath, folderName }]
+    }));
+    
+    // Mark as dirty to enable save button
+    setDirtyFields(prev => new Set([...prev, 'equipment_parts']));
+  }, []);
 
   // Helper function to calculate days until expiry
   const getDaysUntilExpiry = (expiryDate: string | Date | null | undefined) => {
@@ -1535,12 +1715,16 @@ export default function EquipmentModalModern() {
               <PartsFolderManager
                 onChange={setPartsStructure}
                 initialData={partsStructure}
+                onPartFileDelete={handlePartFileDelete}
+                onPartFolderDelete={handlePartFolderDelete}
               />
             </div>
           ) : (
             <EquipmentPartsViewer 
               equipmentParts={selectedEquipment.equipment_parts} 
               isEditable={false}
+              onPartFileDelete={handlePartFileDelete}
+              onPartFolderDelete={handlePartFolderDelete}
             />
           )}
         </div>
@@ -1663,7 +1847,7 @@ export default function EquipmentModalModern() {
                       onClick={() => {
                         console.log('❌ Cancel button clicked - resetting states');
                         // Check if there are unsaved changes
-                        if (dirtyFields.size > 0 || Object.keys(uploadedFiles).length > 0 || removedFiles.size > 0) {
+                        if (dirtyFields.size > 0 || Object.keys(uploadedFiles).length > 0 || removedFiles.size > 0 || deletedParts.files.length > 0 || deletedParts.folders.length > 0) {
                           const confirmCancel = window.confirm(
                             'You have unsaved changes. Are you sure you want to cancel? All changes will be lost.'
                           );
@@ -1740,7 +1924,7 @@ export default function EquipmentModalModern() {
                       onClick={() => {
                         console.log('❌ Cancel button clicked - resetting states');
                         // Check if there are unsaved changes
-                        if (dirtyFields.size > 0 || Object.keys(uploadedFiles).length > 0 || removedFiles.size > 0) {
+                        if (dirtyFields.size > 0 || Object.keys(uploadedFiles).length > 0 || removedFiles.size > 0 || deletedParts.files.length > 0 || deletedParts.folders.length > 0) {
                           const confirmCancel = window.confirm(
                             'You have unsaved changes. Are you sure you want to cancel? All changes will be lost.'
                           );

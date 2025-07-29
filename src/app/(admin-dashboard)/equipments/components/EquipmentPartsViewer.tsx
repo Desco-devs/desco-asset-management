@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -42,6 +42,8 @@ interface EquipmentPartsViewerProps {
   equipmentParts?: string[] | { rootFiles: any[]; folders: any[] } | string;
   isEditable?: boolean;
   onPartsChange?: (newParts: { rootFiles: any[]; folders: any[] }) => void;
+  onPartFileDelete?: (fileId: string, fileName: string, folderPath?: string) => void;
+  onPartFolderDelete?: (folderPath: string, folderName: string) => void;
 }
 
 interface ParsedFile {
@@ -67,7 +69,9 @@ interface ParsedPartData {
 export default function EquipmentPartsViewer({ 
   equipmentParts = [], 
   isEditable = false, 
-  onPartsChange 
+  onPartsChange,
+  onPartFileDelete,
+  onPartFolderDelete
 }: EquipmentPartsViewerProps) {
   // Collapsible states - same as PartsFolderManager
   const [isRootCollapsed, setIsRootCollapsed] = useState(false);
@@ -120,23 +124,33 @@ export default function EquipmentPartsViewer({
           return parsed;
         }
         // If it's just a string URL, treat it as single file
+        const fileName = parts.split('/').pop() || 'File';
+        const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+        const isImage = imageExtensions.includes(fileExtension);
+        
         return { 
           rootFiles: [{
             id: 'file-0',
-            name: parts.split('/').pop() || 'File',
+            name: fileName,
             url: parts,
-            type: parts.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document'
+            type: isImage ? 'image' : 'document'
           }], 
           folders: [] 
         };
       } catch {
         // If JSON parse fails, treat as single URL
+        const fileName = parts.split('/').pop() || 'File';
+        const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+        const isImage = imageExtensions.includes(fileExtension);
+        
         return { 
           rootFiles: [{
             id: 'file-0',
-            name: parts.split('/').pop() || 'File',
+            name: fileName,
             url: parts,
-            type: parts.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document'
+            type: isImage ? 'image' : 'document'
           }], 
           folders: [] 
         };
@@ -152,10 +166,12 @@ export default function EquipmentPartsViewer({
             const fileUrl = file.preview || file.url || '';
             const fileName = file.name || fileUrl.split('/').pop() || `File ${index + 1}`;
             
-            // Better image detection - check file extension and MIME type
+            // FIXED: Better image detection - consistent with working FileUploadSectionSimple
             const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-            const isImageByExtension = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
-            const isImageByUrl = fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+            const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+            const isImageByExtension = imageExtensions.includes(fileExtension);
+            const urlExtension = fileUrl.split('.').pop()?.toLowerCase().split('?')[0] || ''; // Remove query params
+            const isImageByUrl = imageExtensions.includes(urlExtension);
             const isImageByMimeType = file.file?.type?.startsWith('image/');
             const isImage = isImageByExtension || isImageByUrl || isImageByMimeType || file.type === 'image';
             
@@ -163,7 +179,7 @@ export default function EquipmentPartsViewer({
               id: file.id || `file-${index}`,
               name: fileName,
               url: fileUrl,
-              preview: file.preview || fileUrl,
+              preview: file.preview || fileUrl || file.url, // CRITICAL FIX: Ensure preview is always set
               type: isImage ? 'image' : 'document',
               file: file.file // Preserve original File object if it exists
             } as ParsedFile;
@@ -174,10 +190,12 @@ export default function EquipmentPartsViewer({
               const fileUrl = file.preview || file.url || '';
               const fileName = file.name || fileUrl.split('/').pop() || `File ${index + 1}`;
               
-              // Better image detection - check file extension and MIME type
+              // FIXED: Better image detection - consistent with working FileUploadSectionSimple
               const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-              const isImageByExtension = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
-              const isImageByUrl = fileUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+              const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+              const isImageByExtension = imageExtensions.includes(fileExtension);
+              const urlExtension = fileUrl.split('.').pop()?.toLowerCase().split('?')[0] || ''; // Remove query params
+              const isImageByUrl = imageExtensions.includes(urlExtension);
               const isImageByMimeType = file.file?.type?.startsWith('image/');
               const isImage = isImageByExtension || isImageByUrl || isImageByMimeType || file.type === 'image';
               
@@ -185,7 +203,7 @@ export default function EquipmentPartsViewer({
                 id: file.id || `file-${index}`,
                 name: fileName,
                 url: fileUrl,
-                preview: file.preview || fileUrl,
+                preview: file.preview || fileUrl || file.url, // CRITICAL FIX: Ensure preview is always set
                 type: isImage ? 'image' : 'document',
                 file: file.file // Preserve original File object if it exists
               } as ParsedFile;
@@ -208,7 +226,9 @@ export default function EquipmentPartsViewer({
 
       parts.forEach((url, index) => {
         const fileName = url.split('/').pop() || `Part ${index + 1}`;
-        const isImage = url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+        const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+        const isImage = imageExtensions.includes(fileExtension);
         
         const file: ParsedFile = {
           id: `file-${index}`,
@@ -229,18 +249,81 @@ export default function EquipmentPartsViewer({
 
   const parsedData = parsePartsData(equipmentParts);
 
+  // FIXED DEDUPLICATION: Simple deduplication based on file name only
+  // This prevents the creation of "stored file" duplicates
+  const deduplicatePartsData = (data: ParsedPartData): ParsedPartData => {
+    const deduplicateFiles = (files: ParsedFile[]): ParsedFile[] => {
+      const seen = new Map<string, ParsedFile>();
+      
+      for (const file of files) {
+        const key = file.name.toLowerCase();
+        const existing = seen.get(key);
+        
+        if (!existing) {
+          // First occurrence - keep it
+          seen.set(key, file);
+        } else {
+          // Duplicate found - prefer files with actual File objects (new uploads)
+          // or files with proper preview URLs over those without
+          const currentHasFile = !!file.file;
+          const existingHasFile = !!existing.file;
+          const currentHasValidPreview = !!(file.preview || file.url);
+          const existingHasValidPreview = !!(existing.preview || existing.url);
+          
+          // Priority: File object > Valid preview > First occurrence
+          if (currentHasFile && !existingHasFile) {
+            seen.set(key, file);
+          } else if (!currentHasFile && existingHasFile) {
+            // Keep existing
+          } else if (currentHasValidPreview && !existingHasValidPreview) {
+            seen.set(key, file);
+          }
+          // Otherwise keep the first occurrence (existing)
+        }
+      }
+      
+      return Array.from(seen.values());
+    };
+
+    return {
+      rootFiles: deduplicateFiles(data.rootFiles),
+      folders: data.folders.map(folder => ({
+        ...folder,
+        files: deduplicateFiles(folder.files)
+      }))
+    };
+  };
+
+  // Apply deduplication to display clean data
+  const displayData = useMemo(() => {
+    return deduplicatePartsData(parsedData);
+  }, [parsedData]);
+
   // Edit helper functions
   const removeFile = (fileId: string, folderId?: string) => {
-    const newData = { ...parsedData };
+    const newData = { ...displayData };
     
     if (folderId) {
       // Remove from folder
       const folder = newData.folders.find(f => f.id === folderId);
       if (folder) {
+        // Find the file to check if it's an existing file that needs deletion tracking
+        const fileToRemove = folder.files.find(f => f.id === fileId);
+        if (fileToRemove && (fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
+          // Get folder name from folder object
+          const folderPath = folder.name;
+          onPartFileDelete(fileToRemove.id, fileToRemove.name, folderPath);
+        }
+        
         folder.files = folder.files.filter(f => f.id !== fileId);
       }
     } else {
       // Remove from root
+      const fileToRemove = newData.rootFiles.find(f => f.id === fileId);
+      if (fileToRemove && (fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
+        onPartFileDelete(fileToRemove.id, fileToRemove.name, 'root');
+      }
+      
       newData.rootFiles = newData.rootFiles.filter(f => f.id !== fileId);
     }
     
@@ -250,7 +333,26 @@ export default function EquipmentPartsViewer({
   };
   
   const deleteFolder = (folderId: string) => {
-    const newData = { ...parsedData };
+    const newData = { ...displayData };
+    
+    // Find the folder to be deleted for deletion tracking
+    const folderToDelete = newData.folders.find(f => f.id === folderId);
+    if (folderToDelete) {
+      // Check if folder contains existing files (not new uploads) and notify parent for deletion tracking
+      const hasExistingFiles = folderToDelete.files.some(file => (file.url || file.preview) && !file.file);
+      if (hasExistingFiles && onPartFolderDelete) {
+        // Notify parent that the entire folder should be deleted from storage
+        onPartFolderDelete(folderToDelete.name, folderToDelete.name);
+      } else if (onPartFileDelete) {
+        // If no cascade deletion, handle individual file deletions for existing files
+        folderToDelete.files.forEach(file => {
+          if ((file.url || file.preview) && !file.file) {
+            onPartFileDelete(file.id, file.name, folderToDelete.name);
+          }
+        });
+      }
+    }
+    
     newData.folders = newData.folders.filter(f => f.id !== folderId);
     
     if (onPartsChange) {
@@ -259,7 +361,7 @@ export default function EquipmentPartsViewer({
   };
   
   const renameFolder = (folderId: string, newName: string) => {
-    const newData = { ...parsedData };
+    const newData = { ...displayData };
     const folder = newData.folders.find(f => f.id === folderId);
     if (folder) {
       folder.name = newName.trim();
@@ -274,7 +376,7 @@ export default function EquipmentPartsViewer({
   const addFile = (files: FileList | null, folderId?: string) => {
     if (!files || files.length === 0) return;
     
-    const newData = { ...parsedData };
+    const newData = { ...displayData };
     const newFiles: ParsedFile[] = Array.from(files).map((file, index) => {
       const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
       const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension) || file.type.startsWith('image/');
@@ -307,7 +409,7 @@ export default function EquipmentPartsViewer({
   
   // Create folder helper function
   const createFolder = (name: string) => {
-    const newData = { ...parsedData };
+    const newData = { ...displayData };
     const newFolder: ParsedFolder = {
       id: `folder-${Date.now()}`,
       name: name.trim(),
@@ -352,12 +454,28 @@ export default function EquipmentPartsViewer({
   }) => {
     const fileUrl = file.preview || file.url;
     
-    // Better image detection - check file extension and MIME type
-    const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
-    const isImageByExtension = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(fileExtension);
-    const isImageByUrl = fileUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
-    const isImageByType = file.type === 'image';
-    const isImage = isImageByExtension || isImageByUrl || isImageByType;
+    // Helper function to check if a URL/file is actually an image by extension - FIXED LOGIC
+    const isActualImage = (url: string | null, fileName: string) => {
+      if (!url && !fileName) return false;
+      const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+      
+      // Check file name extension
+      const fileExt = fileName.split('.').pop()?.toLowerCase();
+      if (fileExt && imageExtensions.includes(fileExt)) return true;
+      
+      // Check URL extension
+      if (url) {
+        const urlExt = url.split('.').pop()?.toLowerCase().split('?')[0]; // Remove query params
+        if (urlExt && imageExtensions.includes(urlExt)) return true;
+      }
+      
+      // Check file type property
+      if (file.type === 'image') return true;
+      
+      return false;
+    };
+    
+    const isImage = isActualImage(fileUrl, file.name);
     
     // For stored files, try to get file size from name or estimate
     const getFileDisplayInfo = (file: ParsedFile) => {
@@ -366,8 +484,13 @@ export default function EquipmentPartsViewer({
         return `${(file.file.size / 1024).toFixed(1)} KB`;
       }
       
-      // If it's an existing stored file, show appropriate label
-      return fileUrl ? 'Stored file' : isImage ? 'Image file' : 'Document';
+      // FIXED: Improve display text for existing files
+      if (fileUrl) {
+        return isImage ? 'Image' : 'Document';
+      }
+      
+      // Fallback for files without URLs
+      return 'File';
     };
 
     const handleClick = () => {
@@ -398,7 +521,7 @@ export default function EquipmentPartsViewer({
                   }
                 }}
               />
-              <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-100 transition-opacity bg-black/40 rounded">
+              <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
                 <Eye className="h-3 w-3 text-white" />
               </div>
             </div>
@@ -647,7 +770,7 @@ export default function EquipmentPartsViewer({
 
   // Check if we have any structure to display (including empty folders)
   // Show the component if there are any folders (even empty) or any root files
-  const hasAnyStructure = parsedData.folders.length > 0 || parsedData.rootFiles.length > 0;
+  const hasAnyStructure = displayData.folders.length > 0 || displayData.rootFiles.length > 0;
   
   if (!hasAnyStructure) {
     return (
@@ -684,7 +807,7 @@ export default function EquipmentPartsViewer({
             >
               <div className="flex items-center gap-2">
                 <ImageIcon className="h-5 w-5" />
-                Root Files ({parsedData.rootFiles.length})
+                Root Files ({displayData.rootFiles.length})
               </div>
               {isRootCollapsed ? (
                 <ChevronDown className="h-4 w-4" />
@@ -696,7 +819,7 @@ export default function EquipmentPartsViewer({
           {!isRootCollapsed && (
             <CardContent>
               <div className="space-y-4">
-                {parsedData.rootFiles.length === 0 ? (
+                {displayData.rootFiles.length === 0 ? (
                   <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg bg-muted/20">
                     <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
                     <p className="text-sm font-medium text-muted-foreground">Root folder is empty</p>
@@ -729,7 +852,7 @@ export default function EquipmentPartsViewer({
                 ) : (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {parsedData.rootFiles.map((file) => (
+                      {displayData.rootFiles.map((file) => (
                         <FilePreview 
                           key={file.id} 
                           file={file} 
@@ -769,13 +892,13 @@ export default function EquipmentPartsViewer({
         </Card>
 
         {/* Folders Section - Always show if folders exist, even if empty, or if in edit mode */}
-        {(parsedData.folders.length > 0 || isEditable) && (
+        {(displayData.folders.length > 0 || isEditable) && (
           <div className="space-y-4">
             <div 
               className="flex items-center justify-between cursor-pointer"
               onClick={() => setIsFoldersCollapsed(!isFoldersCollapsed)}
             >
-              <h4 className="font-medium">Folders ({parsedData.folders.length})</h4>
+              <h4 className="font-medium">Folders ({displayData.folders.length})</h4>
               <div className="flex items-center gap-2">
                 {isEditable && (
                   <Button
@@ -854,9 +977,9 @@ export default function EquipmentPartsViewer({
                 )}
                 
                 {/* Existing folders */}
-                {parsedData.folders.length > 0 ? (
+                {displayData.folders.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                    {parsedData.folders.map((folder) => (
+                    {displayData.folders.map((folder) => (
                       <FolderComponent key={folder.id} folder={folder} />
                     ))}
                   </div>

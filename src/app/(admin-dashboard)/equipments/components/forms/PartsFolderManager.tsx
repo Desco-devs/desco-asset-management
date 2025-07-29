@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,11 +58,15 @@ export interface PartsStructure {
 interface PartsFolderManagerProps {
   onChange: (partsStructure: PartsStructure) => void;
   initialData?: PartsStructure;
+  onPartFileDelete?: (fileId: string, fileName: string, folderPath?: string) => void;
+  onPartFolderDelete?: (folderPath: string, folderName: string) => void;
 }
 
 export default function PartsFolderManager({ 
   onChange, 
-  initialData 
+  initialData,
+  onPartFileDelete,
+  onPartFolderDelete
 }: PartsFolderManagerProps) {
   // State management - ensure safe defaults
   const [partsStructure, setPartsStructure] = useState<PartsStructure>(() => {
@@ -135,6 +139,29 @@ export default function PartsFolderManager({
     return '';
   };
 
+  // Helper function to detect if file is an image based on type or extension - FIXED LOGIC
+  const isImageFile = (file: PartFile): boolean => {
+    // Check File object type first (for new uploads)
+    if (file.file?.type?.startsWith('image/')) return true;
+    
+    // Check explicit type property
+    if (file.type === 'image') return true;
+    
+    // Check file name extension
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    if (fileExt && imageExtensions.includes(fileExt)) return true;
+    
+    // Check URL extension (both preview and url should be checked)
+    const url = file.preview || file.url;
+    if (url) {
+      const urlExt = url.split('.').pop()?.toLowerCase().split('?')[0]; // Remove query params
+      if (urlExt && imageExtensions.includes(urlExt)) return true;
+    }
+    
+    return false;
+  };
+
   // Helper functions to trigger file uploads
   const handleAddRootFiles = () => {
     rootFileInputRef.current?.click();
@@ -147,10 +174,74 @@ export default function PartsFolderManager({
     }
   };
 
-  // Update parent component when structure changes
+  // DEDUPLICATION: Utility function to remove duplicate files based on name and type
+  const deduplicatePartsStructure = (structure: PartsStructure): PartsStructure => {
+    const deduplicateFileArray = (files: PartFile[]): PartFile[] => {
+      const seenFiles = new Map<string, PartFile>();
+      
+      files.forEach(file => {
+        const key = file.name.toLowerCase();
+        const existing = seenFiles.get(key);
+        
+        if (!existing) {
+          // First occurrence, keep it
+          seenFiles.set(key, file);
+        } else {
+          // Duplicate found, apply priority logic
+          const currentPriority = getFilePriority(file);
+          const existingPriority = getFilePriority(existing);
+          
+          // Keep the file with higher priority (lower number = higher priority)
+          if (currentPriority < existingPriority) {
+            // Clean up the old file's blob URL if it exists
+            if (existing.preview && existing.preview.startsWith('blob:')) {
+              URL.revokeObjectURL(existing.preview);
+            }
+            seenFiles.set(key, file);
+          } else {
+            // Clean up the current file's blob URL if it exists
+            if (file.preview && file.preview.startsWith('blob:')) {
+              URL.revokeObjectURL(file.preview);
+            }
+          }
+        }
+      });
+      
+      return Array.from(seenFiles.values());
+    };
+    
+    return {
+      rootFiles: deduplicateFileArray(structure.rootFiles),
+      folders: structure.folders.map(folder => ({
+        ...folder,
+        files: deduplicateFileArray(folder.files)
+      }))
+    };
+  };
+
+  // Helper function to determine file priority for deduplication
+  const getFilePriority = (file: PartFile): number => {
+    // Priority order (lower number = higher priority):
+    // 1. New uploads with File object (highest priority)
+    // 2. Existing files with Supabase URLs 
+    // 3. Files with blob URLs only (lowest priority)
+    
+    if (file.file && file.file instanceof File) {
+      return 1; // New upload, highest priority
+    }
+    
+    if (file.url && !file.url.startsWith('blob:')) {
+      return 2; // Existing Supabase file, medium priority
+    }
+    
+    return 3; // Blob URL only, lowest priority
+  };
+
+  // Update parent component when structure changes - with deduplication
   const updatePartsStructure = (newStructure: PartsStructure) => {
-    setPartsStructure(newStructure);
-    onChange(newStructure);
+    const deduplicatedStructure = deduplicatePartsStructure(newStructure);
+    setPartsStructure(deduplicatedStructure);
+    onChange(deduplicatedStructure);
   };
 
   // Folder operations
@@ -234,6 +325,20 @@ export default function PartsFolderManager({
   };
 
   const confirmDeleteFolder = (folder: PartFolder) => {
+    // Check if folder contains existing files (not new uploads) and notify parent for deletion tracking
+    const hasExistingFiles = folder.files.some(file => (file.url || file.preview) && !file.file);
+    if (hasExistingFiles && onPartFolderDelete) {
+      // Notify parent that the entire folder should be deleted from storage
+      onPartFolderDelete(folder.name, folder.name);
+    } else if (onPartFileDelete) {
+      // If no cascade deletion, handle individual file deletions for existing files
+      folder.files.forEach(file => {
+        if ((file.url || file.preview) && !file.file) {
+          onPartFileDelete(file.id, file.name, folder.name);
+        }
+      });
+    }
+
     const newStructure = {
       ...partsStructure,
       folders: partsStructure.folders.filter((f) => f.id !== folder.id),
@@ -251,12 +356,21 @@ export default function PartsFolderManager({
 
     for (const file of files) {
       const preview = createFilePreview(file);
-      newFiles.push({
+      // FIXED: Better type detection for new files
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
+      const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+      const isImageByExt = imageExtensions.includes(fileExtension);
+      const isImageByType = file.type.startsWith('image/');
+      
+      const partFile: PartFile = {
         id: generateId(),
         name: file.name,
         file,
-        preview: preview || undefined,
-      });
+        preview: preview, // Always set preview for new files
+        url: preview, // CRITICAL FIX: Set url to match preview for consistency
+        type: (isImageByExt || isImageByType) ? 'image' : 'document'
+      };
+      newFiles.push(partFile);
     }
 
     const newStructure = {
@@ -281,12 +395,21 @@ export default function PartsFolderManager({
 
     for (const file of files) {
       const preview = createFilePreview(file);
-      newFiles.push({
+      // FIXED: Better type detection for new files
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
+      const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
+      const isImageByExt = imageExtensions.includes(fileExtension);
+      const isImageByType = file.type.startsWith('image/');
+      
+      const partFile: PartFile = {
         id: generateId(),
         name: file.name,
         file,
-        preview: preview || undefined,
-      });
+        preview: preview, // Always set preview for new files
+        url: preview, // CRITICAL FIX: Set url to match preview for consistency
+        type: (isImageByExt || isImageByType) ? 'image' : 'document'
+      };
+      newFiles.push(partFile);
     }
 
     const newStructure = {
@@ -314,13 +437,19 @@ export default function PartsFolderManager({
       if (fileToRemove?.preview && fileToRemove.preview.startsWith('blob:')) {
         URL.revokeObjectURL(fileToRemove.preview);
       }
+      return fileToRemove;
     };
 
     if (folderId) {
       // Remove from folder
       const folder = partsStructure.folders.find(f => f.id === folderId);
       if (folder) {
-        findAndCleanupFile(folder.files);
+        const fileToRemove = findAndCleanupFile(folder.files);
+        
+        // If file has an existing URL (not a new upload), notify parent for deletion tracking
+        if (fileToRemove && (fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
+          onPartFileDelete(fileToRemove.id, fileToRemove.name, folder.name);
+        }
       }
       
       const newStructure = {
@@ -334,7 +463,12 @@ export default function PartsFolderManager({
       updatePartsStructure(newStructure);
     } else {
       // Remove from root
-      findAndCleanupFile(partsStructure.rootFiles);
+      const fileToRemove = findAndCleanupFile(partsStructure.rootFiles);
+      
+      // If file has an existing URL (not a new upload), notify parent for deletion tracking
+      if (fileToRemove && (fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
+        onPartFileDelete(fileToRemove.id, fileToRemove.name, 'root');
+      }
       
       const newStructure = {
         ...partsStructure,
@@ -349,7 +483,7 @@ export default function PartsFolderManager({
     const [showImageViewer, setShowImageViewer] = useState(false);
 
     const handleImageClick = () => {
-      if (file.preview || (file.url && file.type === 'image')) {
+      if (isImageFile(file)) {
         setShowImageViewer(true);
       }
     };
@@ -363,10 +497,10 @@ export default function PartsFolderManager({
       <>
         <div 
           className="relative group border rounded-lg p-2 bg-card hover:bg-muted/50 transition-colors cursor-pointer"
-          onClick={(file.preview || (file.url && file.type === 'image')) ? handleImageClick : undefined}
+          onClick={isImageFile(file) ? handleImageClick : undefined}
         >
           <div className="flex items-center gap-2">
-            {(file.preview || (file.url && file.type === 'image')) ? (
+            {isImageFile(file) ? (
               <div className="relative group/image">
                 <img
                   src={file.preview || file.url}
@@ -382,7 +516,7 @@ export default function PartsFolderManager({
                     }
                   }}
                 />
-                <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
+                <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-100 transition-opacity bg-black/40 rounded">
                   <Eye className="h-3 w-3 text-white" />
                 </div>
               </div>
@@ -417,7 +551,7 @@ export default function PartsFolderManager({
         </div>
 
         {/* Image Viewer Modal */}
-        {showImageViewer && (file.preview || (file.url && file.type === 'image')) && (
+        {showImageViewer && isImageFile(file) && (
           <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
             <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
               <DialogHeader className="pb-4">
@@ -431,6 +565,9 @@ export default function PartsFolderManager({
                   alt={file.name}
                   className="max-w-full max-h-[70vh] object-contain"
                   onClick={(e) => e.stopPropagation()}
+                  onError={(e) => {
+                    console.error('Image failed to load in viewer:', file.preview || file.url);
+                  }}
                 />
               </div>
             </DialogContent>
@@ -577,6 +714,11 @@ export default function PartsFolderManager({
     );
   };
 
+  // Apply deduplication before rendering to ensure clean display
+  const displayPartsStructure = useMemo(() => {
+    return deduplicatePartsStructure(partsStructure);
+  }, [partsStructure]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -600,7 +742,7 @@ export default function PartsFolderManager({
           >
             <div className="flex items-center gap-2">
               <Image className="h-5 w-5" />
-              Root Files ({partsStructure.rootFiles.length})
+              Root Files ({displayPartsStructure.rootFiles.length})
             </div>
             {isRootCollapsed ? (
               <ChevronDown className="h-4 w-4" />
@@ -612,7 +754,7 @@ export default function PartsFolderManager({
         {!isRootCollapsed && (
           <CardContent>
           <div className="space-y-4">
-            {partsStructure.rootFiles.length === 0 ? (
+            {displayPartsStructure.rootFiles.length === 0 ? (
               <div className="text-center py-6 border-2 border-dashed border-gray-300 rounded-lg bg-muted/20">
                 <Image className="h-10 w-10 mx-auto text-muted-foreground/60 mb-3" />
                 <p className="text-sm font-medium text-muted-foreground">Root folder is empty</p>
@@ -620,7 +762,7 @@ export default function PartsFolderManager({
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {partsStructure.rootFiles.map((file) => (
+                {displayPartsStructure.rootFiles.map((file) => (
                   <FilePreview
                     key={file.id}
                     file={file}
@@ -654,13 +796,13 @@ export default function PartsFolderManager({
       </Card>
 
       {/* Folders Section - Always show if folders exist, even if empty */}
-      {partsStructure.folders.length > 0 && (
+      {displayPartsStructure.folders.length > 0 && (
         <div className="space-y-4">
           <div 
             className="flex items-center justify-between cursor-pointer"
             onClick={() => setIsFoldersCollapsed(!isFoldersCollapsed)}
           >
-            <h4 className="font-medium">Folders ({partsStructure.folders.length})</h4>
+            <h4 className="font-medium">Folders ({displayPartsStructure.folders.length})</h4>
             {isFoldersCollapsed ? (
               <ChevronDown className="h-4 w-4" />
             ) : (
@@ -669,7 +811,7 @@ export default function PartsFolderManager({
           </div>
           {!isFoldersCollapsed && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {partsStructure.folders.map((folder) => (
+              {displayPartsStructure.folders.map((folder) => (
                 <FolderComponent key={folder.id} folder={folder} />
               ))}
             </div>
