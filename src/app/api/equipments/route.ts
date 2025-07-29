@@ -989,6 +989,46 @@ export const PUT = withResourcePermission(
         }
       }
 
+      // NEW: Handle removed equipment documents with same logic as images
+      const removedDocumentsData = formData.get('removedDocuments') as string;
+      const removedDocuments = removedDocumentsData ? JSON.parse(removedDocumentsData) : [];
+      
+      console.log('🔍 DEBUG: Backend received removedDocuments:', removedDocuments);
+      
+      const equipmentDocumentFields = ['original_receipt_url', 'equipment_registration_url'];
+      
+      for (const fieldName of removedDocuments) {
+        if (equipmentDocumentFields.includes(fieldName)) {
+          const existingUrl = existing[fieldName as keyof typeof existing] as string;
+          
+          // Additional validation to ensure we have a valid URL and it hasn't been processed
+          if (existingUrl && existingUrl.trim() && !processedUrls.has(existingUrl)) {
+            console.log(`🗑️ DELETING equipment document ${fieldName}:`, existingUrl);
+            
+            try {
+              await deleteFileFromSupabase(existingUrl, fieldName);
+              processedUrls.add(existingUrl); // Mark as processed
+              updateData[fieldName] = null;
+              console.log(`✅ Successfully deleted equipment document ${fieldName}`);
+            } catch (deleteError) {
+              console.error(`❌ Failed to delete ${fieldName}:`, deleteError);
+              // Continue processing other files even if one fails
+              // Still set field to null to reflect user intent
+              updateData[fieldName] = null;
+            }
+          } else if (!existingUrl) {
+            // Field is already empty, just ensure it's set to null
+            console.log(`ℹ️ Field ${fieldName} is already empty, setting to null`);
+            updateData[fieldName] = null;
+          } else if (processedUrls.has(existingUrl)) {
+            console.log(`⚠️ URL already processed for deletion: ${existingUrl}`);
+            updateData[fieldName] = null;
+          }
+        } else {
+          console.warn(`⚠️ Invalid field name in removedDocuments: ${fieldName}`);
+        }
+      }
+
       // Handle new equipment image uploads (3 fixed images only)
       const fileJobs: Promise<{ field: string; url: string }>[] = [];
       

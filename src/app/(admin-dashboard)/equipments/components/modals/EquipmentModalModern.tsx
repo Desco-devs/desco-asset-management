@@ -110,6 +110,9 @@ export default function EquipmentModalModern() {
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({});
   const [removedFiles, setRemovedFiles] = useState<Set<string>>(new Set());
   
+  // DIRTY STATE TRACKING: Track which fields have been modified
+  const [dirtyFields, setDirtyFields] = useState<Set<string>>(new Set());
+  
   // CRITICAL FIX: Use ref for form data to prevent re-renders entirely
   const editFormDataRef = useRef({
     brand: '',
@@ -257,6 +260,9 @@ export default function EquipmentModalModern() {
 
   // CRITICAL FIX: Update form data via ref without causing re-renders
   const handleFieldChange = useCallback((field: string, value: any) => {
+    // DIRTY STATE: Mark field as dirty
+    setDirtyFields(prev => new Set([...prev, field]));
+    
     editFormDataRef.current = { ...editFormDataRef.current, [field]: value };
     // Trigger re-render for date fields to update UI immediately
     if (field === 'inspection_date' || field === 'registration_expiry' || field === 'insurance_expiration_date') {
@@ -268,19 +274,19 @@ export default function EquipmentModalModern() {
   const handleSaveChanges = useCallback(async () => {
     if (!selectedEquipment) return;
     
-    // Safety check: Warn if user is removing all images
-    const imageFields = ['image_url', 'thirdparty_inspection_image', 'pgpc_inspection_image'];
-    const hasExistingImages = imageFields.some(field => {
+    // Safety check: Warn if user is removing all files
+    const allFileFields = ['image_url', 'thirdparty_inspection_image', 'pgpc_inspection_image', 'original_receipt_url', 'equipment_registration_url'];
+    const hasExistingFiles = allFileFields.some(field => {
       const url = selectedEquipment[field as keyof typeof selectedEquipment] as string;
       return url && !removedFiles.has(field);
     });
-    const hasNewImages = Object.keys(uploadedFiles).some(field => 
-      imageFields.includes(field) && uploadedFiles[field]
+    const hasNewFiles = Object.keys(uploadedFiles).some(field => 
+      allFileFields.includes(field) && uploadedFiles[field]
     );
     
-    if (!hasExistingImages && !hasNewImages && removedFiles.size > 0) {
+    if (!hasExistingFiles && !hasNewFiles && removedFiles.size > 0) {
       const confirmRemoveAll = window.confirm(
-        'You are about to remove all images from this equipment. This action cannot be undone. Are you sure you want to continue?'
+        'You are about to remove all files from this equipment. This action cannot be undone. Are you sure you want to continue?'
       );
       if (!confirmRemoveAll) {
         return;
@@ -309,16 +315,63 @@ export default function EquipmentModalModern() {
       
       const formData = new FormData();
       
-      // Add all form fields with correct API field names (no mapping needed)
-      Object.entries(currentFormData).forEach(([key, value]) => {
+      // PERFORMANCE OPTIMIZATION: Only send dirty fields and files that have changes
+      const hasFormChanges = dirtyFields.size > 0;
+      const hasFileChanges = Object.keys(uploadedFiles).length > 0 || removedFiles.size > 0;
+      const hasPartsChanges = isGlobalEditMode; // Parts changes are tracked by edit mode state
+      
+      console.log('🔍 Save Changes Debug:', {
+        hasFormChanges,
+        hasFileChanges, 
+        hasPartsChanges,
+        dirtyFieldsCount: dirtyFields.size,
+        uploadedFilesCount: Object.keys(uploadedFiles).length,
+        removedFilesCount: removedFiles.size,
+        dirtyFields: Array.from(dirtyFields),
+        uploadedFileKeys: Object.keys(uploadedFiles),
+        removedFileKeys: Array.from(removedFiles)
+      });
+      
+      if (!hasFormChanges && !hasFileChanges && !hasPartsChanges) {
+        toast.info('No changes to save');
+        return;
+      }
+      
+      // CRITICAL FIX: Always include required fields, then add any dirty fields
+      const alwaysRequiredFields = ['brand', 'model', 'type', 'owner', 'project_id'];
+      
+      // Always add equipmentId first (required by API)
+      formData.append('equipmentId', selectedEquipment.id);
+      console.log('✅ Added equipmentId:', selectedEquipment.id);
+      
+      // Always add required fields to prevent "Missing required fields" error
+      alwaysRequiredFields.forEach(fieldName => {
+        const value = currentFormData[fieldName as keyof typeof currentFormData];
         if (value !== undefined && value !== null) {
           if (value instanceof Date) {
-            formData.append(key, value.toISOString().split('T')[0]);
+            formData.append(fieldName, value.toISOString().split('T')[0]);
           } else {
-            formData.append(key, value.toString());
+            formData.append(fieldName, value.toString());
           }
+          console.log(`✅ Added required field ${fieldName}:`, value);
+        } else {
+          console.warn(`⚠️ Required field ${fieldName} is missing or null:`, value);
         }
       });
+      
+      // Add any additional dirty fields that aren't already included
+      if (hasFormChanges) {
+        Object.entries(currentFormData).forEach(([key, value]) => {
+          // Only include fields that were actually changed and aren't required fields (already added above)
+          if (dirtyFields.has(key) && !alwaysRequiredFields.includes(key) && value !== undefined && value !== null) {
+            if (value instanceof Date) {
+              formData.append(key, value.toISOString().split('T')[0]);
+            } else {
+              formData.append(key, value.toString());
+            }
+          }
+        });
+      }
       
       // SUPER SIMPLE: Send uploaded files and removals (following REALTIME_PATTERN.md)
       Object.entries(uploadedFiles).forEach(([fieldName, file]) => {
@@ -334,27 +387,39 @@ export default function EquipmentModalModern() {
         formData.append(apiFieldName, file);
       });
       
-      // Send removed files to API with validation
+      // Send removed files to API with validation - UPDATED to handle both images and documents
       if (removedFiles.size > 0) {
         const removedFilesArray = Array.from(removedFiles);
         console.log(`📄 Sending removal request for fields:`, removedFilesArray);
         
-        // Validate that we're only removing valid image fields
+        // Separate image and document removals for the API
         const validImageFields = ['image_url', 'thirdparty_inspection_image', 'pgpc_inspection_image'];
-        const validRemovals = removedFilesArray.filter(field => validImageFields.includes(field));
+        const validDocumentFields = ['original_receipt_url', 'equipment_registration_url'];
         
-        if (validRemovals.length !== removedFilesArray.length) {
-          const invalidFields = removedFilesArray.filter(field => !validImageFields.includes(field));
+        const imageRemovals = removedFilesArray.filter(field => validImageFields.includes(field));
+        const documentRemovals = removedFilesArray.filter(field => validDocumentFields.includes(field));
+        const invalidFields = removedFilesArray.filter(field => 
+          !validImageFields.includes(field) && !validDocumentFields.includes(field)
+        );
+        
+        if (invalidFields.length > 0) {
           console.warn(`⚠️ Invalid fields in removal request:`, invalidFields);
         }
         
-        if (validRemovals.length > 0) {
-          formData.append('removedImages', JSON.stringify(validRemovals));
-          console.log(`✅ Valid image removals to process:`, validRemovals);
+        // Send image removals (existing API)
+        if (imageRemovals.length > 0) {
+          formData.append('removedImages', JSON.stringify(imageRemovals));
+          console.log(`✅ Valid image removals to process:`, imageRemovals);
+        }
+        
+        // Send document removals (new - same format as images for consistency)
+        if (documentRemovals.length > 0) {
+          formData.append('removedDocuments', JSON.stringify(documentRemovals));
+          console.log(`✅ Valid document removals to process:`, documentRemovals);
         }
       }
       
-      // Convert equipment parts back to database format using correct field name
+      // CRITICAL FIX: Convert equipment parts and extract File objects for upload
       if (isGlobalEditMode) {
         const equipmentPartsData = {
           rootFiles: partsStructure.rootFiles.map((file) => ({
@@ -380,9 +445,31 @@ export default function EquipmentModalModern() {
         
         // Use the correct field name that API expects
         formData.append('partsStructure', JSON.stringify(equipmentPartsData));
+        
+        // CRITICAL FIX: Extract and append actual File objects from partsStructure
+        // This is what was missing - the API expects partsFile_* FormData entries
+        
+        // Add root files to FormData
+        partsStructure.rootFiles.forEach((partFile, index) => {
+          if (partFile.file && partFile.file.size > 0) {
+            formData.append(`partsFile_root_${index}`, partFile.file);
+            formData.append(`partsFile_root_${index}_name`, partFile.name);
+            console.log(`📁 Added root parts file ${index}: ${partFile.name}`);
+          }
+        });
+        
+        // Add folder files to FormData
+        partsStructure.folders.forEach((folder, folderIndex) => {
+          folder.files.forEach((partFile, fileIndex) => {
+            if (partFile.file && partFile.file.size > 0) {
+              formData.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
+              formData.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
+              formData.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
+              console.log(`📁 Added folder parts file ${folderIndex}/${fileIndex}: ${partFile.name} in folder: ${folder.name}`);
+            }
+          });
+        });
       }
-      
-      formData.append('equipmentId', selectedEquipment.id);
       
       const updatedEquipment = await updateEquipmentMutation.mutateAsync(formData);
       
@@ -407,6 +494,7 @@ export default function EquipmentModalModern() {
       setIsGlobalEditMode(false);
       setUploadedFiles({});
       setRemovedFiles(new Set());
+      setDirtyFields(new Set()); // Clear dirty state after successful save
       
       console.log('✅ Updated selectedEquipment synchronously and cleared upload state');
       console.log('🧹 Anti-flicker sync update completed');
@@ -415,7 +503,7 @@ export default function EquipmentModalModern() {
       console.error('Failed to update equipment:', error);
       toast.error('Failed to update equipment. Please try again.');
     }
-  }, [selectedEquipment, updateEquipmentMutation, setIsGlobalEditMode, isGlobalEditMode, partsStructure]); // No editFormData dependency!
+  }, [selectedEquipment, updateEquipmentMutation, setIsGlobalEditMode, isGlobalEditMode, partsStructure, dirtyFields]); // Added dirtyFields dependency
 
   // Actions
   const {
@@ -440,6 +528,8 @@ export default function EquipmentModalModern() {
       // Reset uploaded files and removals
       setUploadedFiles({});
       setRemovedFiles(new Set());
+      // Reset dirty state
+      setDirtyFields(new Set());
     }
   }, [isModalOpen]);
   
@@ -448,6 +538,7 @@ export default function EquipmentModalModern() {
     console.log('🔄 Resetting file states manually');
     setUploadedFiles({});
     setRemovedFiles(new Set());
+    setDirtyFields(new Set());
   }, []);
 
   // Form data is now managed by the global edit state and editFormData
@@ -477,11 +568,11 @@ export default function EquipmentModalModern() {
 
   // Dirty tracking is no longer needed with global edit approach
 
-  // IMPROVED: File handlers with better validation and logging
+  // IMPROVED: File handlers with better validation and logging - UPDATED to support documents
   const handleFileSelect = useCallback((fieldName: string, file: File | null) => {
     console.log(`📁 File selection for ${fieldName}:`, file ? `NEW FILE: ${file.name}` : 'REMOVE EXISTING');
     
-    // Validate fieldName to prevent issues
+    // Validate fieldName to prevent issues - UPDATED to include document fields
     const validFieldNames = [
       'image_url',
       'thirdparty_inspection_image', 
@@ -495,6 +586,9 @@ export default function EquipmentModalModern() {
       toast.error(`Invalid field name: ${fieldName}`);
       return;
     }
+    
+    // DIRTY STATE: Mark file changes as dirty
+    setDirtyFields(prev => new Set([...prev, fieldName]));
     
     if (file) {
       // Add to uploads - will show preview immediately
@@ -1367,7 +1461,7 @@ export default function EquipmentModalModern() {
               <CardTitle className="text-base flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Equipment Documents {isMobile ? '' : '(Optional)'}
-              </CardTitle>
+              </CardTitle>       
               <p className="text-sm text-muted-foreground mt-2">
                 Upload official documents and certificates. These files help with compliance, registration, and maintenance records.
               </p>
@@ -1383,7 +1477,7 @@ export default function EquipmentModalModern() {
                   <FileUploadSectionSimple
                     label="Purchase Receipt"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    currentFileUrl={selectedEquipment.original_receipt_url}
+                    currentFileUrl={!removedFiles.has('original_receipt_url') ? selectedEquipment.original_receipt_url : null}
                     selectedFile={uploadedFiles['original_receipt_url'] || null}
                     onFileChange={(file) => handleFileSelect('original_receipt_url', file)}
                     onKeepExistingChange={() => {}}
@@ -1401,7 +1495,7 @@ export default function EquipmentModalModern() {
                   <FileUploadSectionSimple
                     label="Registration Document"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    currentFileUrl={selectedEquipment.equipment_registration_url}
+                    currentFileUrl={!removedFiles.has('equipment_registration_url') ? selectedEquipment.equipment_registration_url : null}
                     selectedFile={uploadedFiles['equipment_registration_url'] || null}
                     onFileChange={(file) => handleFileSelect('equipment_registration_url', file)}
                     onKeepExistingChange={() => {}}
@@ -1568,6 +1662,15 @@ export default function EquipmentModalModern() {
                       variant="outline"
                       onClick={() => {
                         console.log('❌ Cancel button clicked - resetting states');
+                        // Check if there are unsaved changes
+                        if (dirtyFields.size > 0 || Object.keys(uploadedFiles).length > 0 || removedFiles.size > 0) {
+                          const confirmCancel = window.confirm(
+                            'You have unsaved changes. Are you sure you want to cancel? All changes will be lost.'
+                          );
+                          if (!confirmCancel) {
+                            return;
+                          }
+                        }
                         resetFileStates();
                         setIsGlobalEditMode(false);
                       }}
@@ -1636,6 +1739,15 @@ export default function EquipmentModalModern() {
                       variant="outline"
                       onClick={() => {
                         console.log('❌ Cancel button clicked - resetting states');
+                        // Check if there are unsaved changes
+                        if (dirtyFields.size > 0 || Object.keys(uploadedFiles).length > 0 || removedFiles.size > 0) {
+                          const confirmCancel = window.confirm(
+                            'You have unsaved changes. Are you sure you want to cancel? All changes will be lost.'
+                          );
+                          if (!confirmCancel) {
+                            return;
+                          }
+                        }
                         resetFileStates();
                         setIsGlobalEditMode(false);
                       }}

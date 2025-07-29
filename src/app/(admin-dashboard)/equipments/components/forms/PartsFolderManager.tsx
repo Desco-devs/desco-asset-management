@@ -104,21 +104,35 @@ export default function PartsFolderManager({
     }
   }, [initialData, JSON.stringify(initialData)]);
 
+  // FIXED: Cleanup object URLs on component unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      // Clean up all object URLs when component unmounts
+      const cleanupFiles = (files: PartFile[]) => {
+        files.forEach(file => {
+          if (file.preview && file.preview.startsWith('blob:')) {
+            URL.revokeObjectURL(file.preview);
+          }
+        });
+      };
+
+      cleanupFiles(partsStructure.rootFiles);
+      partsStructure.folders.forEach(folder => {
+        cleanupFiles(folder.files);
+      });
+    };
+  }, []); // Empty dependency array - only run on unmount
+
   // Helper function to generate unique IDs
   const generateId = () => Math.random().toString(36).substring(2, 15);
 
 
-  // Helper function to create file preview
-  const createFilePreview = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      } else {
-        resolve('');
-      }
-    });
+  // Helper function to create file preview - FIXED: Use object URLs instead of base64
+  const createFilePreview = (file: File): string => {
+    if (file.type.startsWith('image/')) {
+      return URL.createObjectURL(file);
+    }
+    return '';
   };
 
   // Helper functions to trigger file uploads
@@ -230,13 +244,13 @@ export default function PartsFolderManager({
     setFolderToDelete(null);
   };
 
-  // File operations
-  const handleRootFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // File operations - FIXED: Use synchronous preview function
+  const handleRootFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     const newFiles: PartFile[] = [];
 
     for (const file of files) {
-      const preview = await createFilePreview(file);
+      const preview = createFilePreview(file);
       newFiles.push({
         id: generateId(),
         name: file.name,
@@ -258,7 +272,7 @@ export default function PartsFolderManager({
     }
   };
 
-  const handleFolderFileUpload = async (
+  const handleFolderFileUpload = (
     folderId: string,
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -266,7 +280,7 @@ export default function PartsFolderManager({
     const newFiles: PartFile[] = [];
 
     for (const file of files) {
-      const preview = await createFilePreview(file);
+      const preview = createFilePreview(file);
       newFiles.push({
         id: generateId(),
         name: file.name,
@@ -294,8 +308,21 @@ export default function PartsFolderManager({
   };
 
   const removeFile = (fileId: string, folderId?: string) => {
+    // FIXED: Clean up object URLs to prevent memory leaks
+    const findAndCleanupFile = (files: PartFile[]) => {
+      const fileToRemove = files.find(f => f.id === fileId);
+      if (fileToRemove?.preview && fileToRemove.preview.startsWith('blob:')) {
+        URL.revokeObjectURL(fileToRemove.preview);
+      }
+    };
+
     if (folderId) {
       // Remove from folder
+      const folder = partsStructure.folders.find(f => f.id === folderId);
+      if (folder) {
+        findAndCleanupFile(folder.files);
+      }
+      
       const newStructure = {
         ...partsStructure,
         folders: partsStructure.folders.map((folder) =>
@@ -307,6 +334,8 @@ export default function PartsFolderManager({
       updatePartsStructure(newStructure);
     } else {
       // Remove from root
+      findAndCleanupFile(partsStructure.rootFiles);
+      
       const newStructure = {
         ...partsStructure,
         rootFiles: partsStructure.rootFiles.filter((f) => f.id !== fileId),
