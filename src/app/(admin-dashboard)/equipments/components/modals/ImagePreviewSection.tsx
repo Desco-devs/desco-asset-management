@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,6 +17,7 @@ interface ImagePreviewSectionProps {
   previewUrl?: string;
   onFileSelect: (fieldName: string, file: File) => void;
   onRemove: (fieldName: string) => void;
+  cacheKey?: string; // Cache busting key to force image reload
 }
 
 export default function ImagePreviewSection({
@@ -29,12 +30,19 @@ export default function ImagePreviewSection({
   previewUrl,
   onFileSelect,
   onRemove,
+  cacheKey,
 }: ImagePreviewSectionProps) {
   const [showViewer, setShowViewer] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
   
-  const displayUrl = previewUrl || url;
+  // Add cache busting for images that might have been overwritten
+  const displayUrl = useMemo(() => {
+    if (previewUrl) return previewUrl;
+    if (!url) return null;
+    // Add cache busting key if provided to force reload of overwritten images
+    return cacheKey ? `${url}?v=${cacheKey}` : url;
+  }, [previewUrl, url, cacheKey]);
+  
   const isNewUpload = !!previewUrl;
   const hasImage = !!displayUrl;
 
@@ -42,7 +50,6 @@ export default function ImagePreviewSection({
   useEffect(() => {
     if (displayUrl) {
       setImageError(false);
-      setImageLoading(true);
     }
   }, [displayUrl]);
 
@@ -87,27 +94,19 @@ export default function ImagePreviewSection({
                     </div>
                   </div>
                 ) : (
-                  <>
-                    {imageLoading && (
-                      <div className="absolute inset-0 bg-gray-100 rounded flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                      </div>
-                    )}
-                    <Image
-                      src={displayUrl}
-                      alt={label}
-                      width={200}
-                      height={200}
-                      className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
-                      onLoad={() => setImageLoading(false)}
-                      onError={() => {
-                        setImageError(true);
-                        setImageLoading(false);
-                      }}
-                      priority={false}
-                      unoptimized={displayUrl?.includes('supabase.co') || false}
-                    />
-                  </>
+                  <Image
+                    src={displayUrl}
+                    alt={label}
+                    width={200}
+                    height={200}
+                    className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
+                    onError={() => {
+                      setImageError(true);
+                    }}
+                    priority={false}
+                    unoptimized={true}
+                    key={displayUrl}
+                  />
                 )}
                 <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
                   <Eye className="h-6 w-6 text-white" />
@@ -142,32 +141,40 @@ export default function ImagePreviewSection({
       </p>
 
       {/* Edit Mode Buttons */}
-      {isEditMode && (
-        <div className="mt-3 space-y-2">
-          {/* Remove button - show if there's an existing image or preview */}
-          {hasImage && (
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              className="w-full"
-              onClick={handleRemove}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Remove {label}
-            </Button>
-          )}
-          
-          {/* Upload/Replace button */}
+      {isEditMode && hasImage && (
+        <div className="mt-3 flex gap-2 justify-center">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="w-full"
             onClick={handleFileSelect}
           >
-            <Upload className="h-4 w-4 mr-2" />
-            {isNewUpload ? `Replace ${label}` : `Upload ${label}`}
+            <Upload className="h-4 w-4 mr-1" />
+            Change
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleRemove}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Remove
+          </Button>
+        </div>
+      )}
+      
+      {/* Upload button for empty state */}
+      {isEditMode && !hasImage && (
+        <div className="mt-3 flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleFileSelect}
+          >
+            <Upload className="h-4 w-4 mr-1" />
+            Upload {label}
           </Button>
         </div>
       )}
@@ -198,7 +205,8 @@ export default function ImagePreviewSection({
                   console.error('Image failed to load in modal:', displayUrl);
                 }}
                 priority={false}
-                unoptimized={displayUrl?.includes('supabase.co') || false}
+                unoptimized={true}
+                key={displayUrl}
               />
             </div>
           </DialogContent>

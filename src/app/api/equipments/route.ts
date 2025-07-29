@@ -28,9 +28,71 @@ const deleteFileFromSupabase = async (
   tag: string
 ): Promise<void> => {
   const path = extractFilePathFromUrl(fileUrl);
+  console.log(`🔍 Extracted path for ${tag}:`, path);
   if (!path) throw new Error(`Cannot parse path for ${tag}`);
+  
   const { error } = await supabase.storage.from("equipments").remove([path]);
+  console.log(`🗂️ Supabase delete result for ${tag}:`, error ? `ERROR: ${error.message}` : 'SUCCESS');
   if (error) throw error;
+};
+
+// Delete old files of specific type for an equipment (for replacement scenarios)
+const deleteOldEquipmentFiles = async (
+  equipmentId: string,
+  fileType: 'image' | 'thirdparty_inspection' | 'pgpc_inspection' | 'receipt' | 'registration'
+): Promise<void> => {
+  try {
+    const getSubfolderForFileType = (type: string) => {
+      switch (type) {
+        case 'image':
+        case 'thirdparty_inspection':
+        case 'pgpc_inspection':
+          return 'equipment-images';
+        case 'receipt':
+        case 'registration':
+          return 'equipment-documents';
+        default:
+          return 'equipment-files';
+      }
+    };
+    
+    const subfolder = getSubfolderForFileType(fileType);
+    const equipmentDir = `equipment-${equipmentId}/${subfolder}`;
+    
+    // List files in the specific directory
+    const { data: files, error } = await supabase.storage
+      .from("equipments")
+      .list(equipmentDir);
+
+    if (error || !files) return; // Directory might not exist yet
+    
+    // Filter files based on type prefix
+    const typePatterns = {
+      image: /^equipment_image_\d+\./,
+      thirdparty_inspection: /^thirdparty_inspection_\d+\./,
+      pgpc_inspection: /^pgpc_inspection_\d+\./,
+      receipt: /^original_receipt_\d+\./,
+      registration: /^equipment_registration_\d+\./
+    };
+    
+    const filesToDelete = files
+      .filter(file => typePatterns[fileType].test(file.name))
+      .map(file => `${equipmentDir}/${file.name}`);
+    
+    if (filesToDelete.length > 0) {
+      const { error: deleteError } = await supabase.storage
+        .from("equipments")
+        .remove(filesToDelete);
+        
+      if (deleteError) {
+        console.warn(`Warning: Could not delete some old ${fileType} files:`, deleteError.message);
+        // Don't throw - proceed with upload even if cleanup fails
+      }
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not clean up old ${fileType} files:`, error);
+    // Don't throw - proceed with upload even if cleanup fails
+  }
 };
 
 // Ensure directory exists in Supabase storage by creating a placeholder file
@@ -74,17 +136,36 @@ const uploadFileToSupabase = async (
 ): Promise<{ field: string; url: string }> => {
   const timestamp = Date.now();
   const ext = file.name.split(".").pop();
-  const filename = `${prefix}_${timestamp}.${ext}`;
+  
+  // Generate unique filename with timestamp to prevent browser caching issues
+  const getFilename = (prefix: string) => {
+    switch (prefix) {
+      case 'image':
+        return `equipment_image_${timestamp}.${ext}`;
+      case 'thirdparty_inspection':
+        return `thirdparty_inspection_${timestamp}.${ext}`;
+      case 'pgpc_inspection':
+        return `pgpc_inspection_${timestamp}.${ext}`;
+      case 'receipt':
+        return `original_receipt_${timestamp}.${ext}`;
+      case 'registration':
+        return `equipment_registration_${timestamp}.${ext}`;
+      default:
+        return `${prefix}_${timestamp}.${ext}`;
+    }
+  };
+
+  const filename = getFilename(prefix);
 
   // NEW STRUCTURE: equipment-{equipmentId}/equipment-images/ or equipment-documents/
   const getSubfolder = (prefix: string) => {
     switch (prefix) {
-      case 'equipment_image':
-        return 'equipment-images';
+      case 'image':
       case 'thirdparty_inspection':
       case 'pgpc_inspection':
-      case 'original_receipt':
-      case 'equipment_registration':
+        return 'equipment-images';
+      case 'receipt':
+      case 'registration':
         return 'equipment-documents';
       default:
         return 'equipment-files';
@@ -97,12 +178,43 @@ const uploadFileToSupabase = async (
   // Ensure directory exists before uploading
   await ensureDirectoryExists(equipmentDir);
   
+  // Clean up old files with same prefix (for true overwrite)
+  const filePrefix = prefix; // e.g., "image", "thirdparty_inspection"
+  try {
+    const { data: existingFiles, error } = await supabase.storage
+      .from("equipments")
+      .list(equipmentDir);
+    
+    if (existingFiles && !error) {
+      // Match files that start with the prefix pattern (e.g., "equipment_image_")
+      const prefixPattern = `${prefix === 'image' ? 'equipment_image' : 
+                              prefix === 'thirdparty_inspection' ? 'thirdparty_inspection' :
+                              prefix === 'pgpc_inspection' ? 'pgpc_inspection' :
+                              prefix === 'receipt' ? 'original_receipt' :
+                              prefix === 'registration' ? 'equipment_registration' : prefix}_`;
+      
+      const filesToDelete = existingFiles
+        .filter(file => file.name.startsWith(prefixPattern))
+        .map(file => `${equipmentDir}/${file.name}`);
+      
+      if (filesToDelete.length > 0) {
+        console.log(`🧹 Cleaning up old ${prefix} files:`, filesToDelete);
+        await supabase.storage
+          .from("equipments")
+          .remove(filesToDelete);
+      }
+    }
+  } catch (error) {
+    // Continue with upload even if cleanup fails
+    console.warn(`Warning: Could not clean up old ${prefix} files:`, error);
+  }
+  
   const filepath = `${equipmentDir}/${filename}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { data: uploadData, error: uploadErr } = await supabase.storage
     .from("equipments")
-    .upload(filepath, buffer, { cacheControl: "3600", upsert: false });
+    .upload(filepath, buffer, { cacheControl: "3600", upsert: true });
 
   if (uploadErr || !uploadData) {
     throw new Error(`Upload ${prefix} failed: ${uploadErr?.message}`);
@@ -115,25 +227,22 @@ const uploadFileToSupabase = async (
   return { field: getFieldName(prefix), url: urlData.publicUrl };
 };
 
-// Upload equipment part with numbered prefix and folder support
+// Upload equipment part with unique identifier for tracking
 const uploadEquipmentPart = async (
   file: File,
   projectId: string,
   equipmentId: string,
-  partNumber: number,
-  folderPath: string = "main",
+  fileId: string, // Unique identifier for tracking/deletion
+  folderPath: string = "root",
   projectName?: string,
   clientName?: string,
   brand?: string,
   model?: string,
   type?: string
-): Promise<string> => {
-  const timestamp = Date.now();
+): Promise<{ id: string; url: string; name: string; type: string }> => {
   const ext = file.name.split(".").pop();
-  const filename = `${partNumber}_${file.name.replace(
-    /\.[^/.]+$/,
-    ""
-  )}_${timestamp}.${ext}`;
+  const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._\-]/g, "_");
+  const filename = `${fileId}_${sanitizedFileName}`;
 
   // NEW STRUCTURE: equipment-{equipmentId}/parts-management/{folderPath}/
   const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
@@ -148,19 +257,68 @@ const uploadEquipmentPart = async (
 
   const { data: uploadData, error: uploadErr } = await supabase.storage
     .from("equipments")
-    .upload(filepath, buffer, { cacheControl: "3600", upsert: false });
+    .upload(filepath, buffer, { cacheControl: "3600", upsert: true });
 
   if (uploadErr || !uploadData) {
-    throw new Error(`Upload part ${partNumber} failed: ${uploadErr?.message}`);
+    throw new Error(`Upload part file failed: ${uploadErr?.message}`);
   }
 
   const { data: urlData } = supabase.storage
     .from("equipments")
     .getPublicUrl(uploadData.path);
 
-  return urlData.publicUrl;
+  return {
+    id: fileId,
+    url: urlData.publicUrl,
+    name: file.name,
+    type: file.type.startsWith('image/') ? 'image' : 'document'
+  };
 };
 
+// Delete individual part file by ID
+const deletePartFile = async (equipmentId: string, fileId: string, folderPath: string = "root"): Promise<void> => {
+  try {
+    const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
+    const sanitizedFolderPath = sanitizeForPath(folderPath);
+    const partsDir = `equipment-${equipmentId}/parts-management/${sanitizedFolderPath}`;
+    
+    // List files in the directory to find the one with our fileId
+    const { data: files, error } = await supabase.storage
+      .from("equipments")
+      .list(partsDir);
+
+    if (error || !files) return; // Directory might not exist
+
+    // Find file that starts with our fileId
+    const fileToDelete = files.find(file => file.name.startsWith(`${fileId}_`));
+    
+    if (fileToDelete) {
+      const { error: deleteError } = await supabase.storage
+        .from("equipments")
+        .remove([`${partsDir}/${fileToDelete.name}`]);
+        
+      if (deleteError) {
+        console.warn(`Warning: Could not delete part file ${fileId}:`, deleteError.message);
+      }
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not delete part file ${fileId}:`, error);
+  }
+};
+
+// CASCADE DELETE: Delete entire folder and all files within it
+const deletePartFolder = async (equipmentId: string, folderPath: string): Promise<void> => {
+  try {
+    const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
+    const sanitizedFolderPath = sanitizeForPath(folderPath);
+    const partsDir = `equipment-${equipmentId}/parts-management/${sanitizedFolderPath}`;
+    
+    // Use the existing recursive delete function
+    await deleteDirectoryRecursively(partsDir);
+  } catch (error) {
+    console.warn(`Warning: Could not delete part folder ${folderPath}:`, error);
+  }
+};
 
 // Map file-prefix to Prisma field name
 const getFieldName = (prefix: string): string => {
@@ -399,17 +557,18 @@ export const POST = withResourcePermission(
             })) : []
           };
           
-          // Upload root files and build structure
+          // Upload root files and build structure with unique IDs
           for (let i = 0; formData.get(`partsFile_root_${i}`); i++) {
             const file = formData.get(`partsFile_root_${i}`) as File;
             const fileName = formData.get(`partsFile_root_${i}_name`) as string;
             
             if (file && file.size > 0) {
-              const url = await uploadEquipmentPart(
+              const fileId = `root_file_${i}`; // Predictable identifier for edit mode tracking
+              const uploadResult = await uploadEquipmentPart(
                 file,
                 projectId,
                 equipment.id,
-                i + 1,
+                fileId,
                 'root',
                 projectName,
                 clientName,
@@ -418,12 +577,7 @@ export const POST = withResourcePermission(
                 type
               );
               
-              partsStructureWithUrls.rootFiles.push({
-                id: `root_${i}`,
-                name: fileName,
-                url: url,
-                type: file.type.startsWith('image/') ? 'image' : 'document'
-              });
+              partsStructureWithUrls.rootFiles.push(uploadResult);
             }
           }
           
@@ -442,11 +596,12 @@ export const POST = withResourcePermission(
               const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
               
               if (file && file.size > 0) {
-                const url = await uploadEquipmentPart(
+                const fileId = `folder_${folderName}_file_${fileIndex}`; // Predictable identifier for edit mode tracking
+                const uploadResult = await uploadEquipmentPart(
                   file,
                   projectId,
                   equipment.id,
-                  fileIndex + 1,
+                  fileId,
                   folderName,
                   projectName,
                   clientName,
@@ -464,12 +619,7 @@ export const POST = withResourcePermission(
                   };
                 }
                 
-                folderMap[folderName].files.push({
-                  id: `folder_${folderIndex}_file_${fileIndex}`,
-                  name: fileName,
-                  url: url,
-                  type: file.type.startsWith('image/') ? 'image' : 'document'
-                });
+                folderMap[folderName].files.push(uploadResult);
               }
             }
           }
@@ -773,72 +923,85 @@ export const PUT = withResourcePermission(
 
 
       // Rest of the PUT function remains the same...
-      // Handle regular files
-      const configs = [
-        {
-          newFile: formData.get("equipmentImage") as File | null,
-          keep: formData.get("keepExistingImage") as string,
-          existingUrl: existing.image_url,
-          prefix: "image",
-          field: "image_url",
-          tag: "image",
-        },
-        {
-          newFile: formData.get("originalReceipt") as File | null,
-          keep: formData.get("keepExistingReceipt") as string,
-          existingUrl: existing.original_receipt_url,
-          prefix: "receipt",
-          field: "original_receipt_url",
-          tag: "receipt",
-        },
-        {
-          newFile: formData.get("equipmentRegistration") as File | null,
-          keep: formData.get("keepExistingRegistration") as string,
-          existingUrl: existing.equipment_registration_url,
-          prefix: "registration",
-          field: "equipment_registration_url",
-          tag: "registration",
-        },
-        {
-          newFile: formData.get("thirdpartyInspection") as File | null,
-          keep: formData.get("keepExistingThirdpartyInspection") as string,
-          existingUrl: existing.thirdparty_inspection_image,
-          prefix: "thirdparty_inspection",
-          field: "thirdparty_inspection_image",
-          tag: "3rd-party inspection",
-        },
-        {
-          newFile: formData.get("pgpcInspection") as File | null,
-          keep: formData.get("keepExistingPgpcInspection") as string,
-          existingUrl: existing.pgpc_inspection_image,
-          prefix: "pgpc_inspection",
-          field: "pgpc_inspection_image",
-          tag: "PGPC inspection",
-        },
+      // SIMPLE: Handle removed equipment images (3 fixed images only)
+      const removedImagesData = formData.get('removedImages') as string;
+      const removedImages = removedImagesData ? JSON.parse(removedImagesData) : [];
+      
+      console.log('🔍 DEBUG: Backend received removedImages:', removedImages);
+      console.log('🔍 DEBUG: Backend received new files:', {
+        equipmentImage: formData.get("equipmentImage") ? 'FILE_PRESENT' : 'NO_FILE',
+        thirdpartyInspection: formData.get("thirdpartyInspection") ? 'FILE_PRESENT' : 'NO_FILE',
+        pgpcInspection: formData.get("pgpcInspection") ? 'FILE_PRESENT' : 'NO_FILE'
+      });
+      
+      // Delete removed equipment images only
+      const equipmentImageFields = ['image_url', 'thirdparty_inspection_image', 'pgpc_inspection_image'];
+      for (const fieldName of removedImages) {
+        if (equipmentImageFields.includes(fieldName)) {
+          const existingUrl = existing[fieldName as keyof typeof existing] as string;
+          if (existingUrl) {
+            console.log(`🗑️ DELETING equipment image ${fieldName}:`, existingUrl);
+            await deleteFileFromSupabase(existingUrl, fieldName);
+            updateData[fieldName] = null;
+            console.log(`✅ Successfully deleted equipment image ${fieldName}`);
+          }
+        }
+      }
+
+      // Handle new equipment image uploads (3 fixed images only)
+      const fileJobs: Promise<{ field: string; url: string }>[] = [];
+      
+      const equipmentImageConfigs = [
+        { file: formData.get("equipmentImage") as File | null, prefix: "image" },
+        { file: formData.get("thirdpartyInspection") as File | null, prefix: "thirdparty_inspection" },
+        { file: formData.get("pgpcInspection") as File | null, prefix: "pgpc_inspection" },
       ];
 
-      const fileJobs: Promise<{ field: string; url: string }>[] = [];
-
-      for (const cfg of configs) {
-        if (cfg.newFile && cfg.newFile.size > 0) {
-          // delete old if exists
-          if (cfg.existingUrl) {
-            await deleteFileFromSupabase(cfg.existingUrl, cfg.tag);
-          }
+      for (const cfg of equipmentImageConfigs) {
+        if (cfg.file && cfg.file.size > 0) {
+          console.log(`📤 UPLOADING new ${cfg.prefix} file: ${cfg.file.name} (${cfg.file.size} bytes)`);
           fileJobs.push(
-            uploadFileToSupabase(
-              cfg.newFile,
-              projectId,
-              equipmentId,
-              cfg.prefix
-            )
+            uploadFileToSupabase(cfg.file, projectId, equipmentId, cfg.prefix)
           );
-        } else if (cfg.keep !== "true") {
-          // user removed it
-          if (cfg.existingUrl) {
-            await deleteFileFromSupabase(cfg.existingUrl, cfg.tag);
+        }
+      }
+
+      // Handle documents separately (not part of images tab)
+      const documentConfigs = [
+        { file: formData.get("originalReceipt") as File | null, prefix: "receipt" },
+        { file: formData.get("equipmentRegistration") as File | null, prefix: "registration" },
+      ];
+
+      for (const cfg of documentConfigs) {
+        if (cfg.file && cfg.file.size > 0) {
+          fileJobs.push(
+            uploadFileToSupabase(cfg.file, projectId, equipmentId, cfg.prefix)
+          );
+        }
+      }
+
+      // Handle parts deletion requests first
+      const deletePartsData = formData.get('deleteParts') as string;
+      if (deletePartsData) {
+        try {
+          const deleteRequests = JSON.parse(deletePartsData);
+          
+          // Handle individual file deletions
+          if (deleteRequests.files && Array.isArray(deleteRequests.files)) {
+            for (const fileDelete of deleteRequests.files) {
+              await deletePartFile(equipmentId, fileDelete.fileId, fileDelete.folderPath || 'root');
+            }
           }
-          updateData[cfg.field] = null;
+          
+          // Handle folder cascade deletions
+          if (deleteRequests.folders && Array.isArray(deleteRequests.folders)) {
+            for (const folderDelete of deleteRequests.folders) {
+              await deletePartFolder(equipmentId, folderDelete.folderPath);
+            }
+          }
+        } catch (error) {
+          // Continue processing even if some deletions fail
+          console.warn('Warning: Some parts deletion operations failed:', error);
         }
       }
 
@@ -861,30 +1024,8 @@ export const PUT = withResourcePermission(
             })) : []
           };
           
-          // Upload root files and build structure
-          for (let i = 0; formData.get(`partsFile_root_${i}`); i++) {
-            const file = formData.get(`partsFile_root_${i}`) as File;
-            const fileName = formData.get(`partsFile_root_${i}_name`) as string;
-            
-            if (file && file.size > 0) {
-              const url = await uploadEquipmentPart(
-                file,
-                projectId,
-                equipmentId,
-                i + 1,
-                'root'
-              );
-              
-              partsStructureWithUrls.rootFiles.push({
-                id: `root_${i}`,
-                name: fileName,
-                url: url,
-                type: file.type.startsWith('image/') ? 'image' : 'document'
-              });
-            }
-          }
-          
-          // CRITICAL FIX: Process existing root files (for existing data preservation)
+          // CRITICAL FIX: Process existing root files FIRST (for existing data preservation)
+          let nextRootFileIndex = 0;
           if (partsStructure.rootFiles && Array.isArray(partsStructure.rootFiles)) {
             partsStructure.rootFiles.forEach((existingFile: any) => {
               // Only add if it has a valid URL (existing stored file)
@@ -895,8 +1036,34 @@ export const PUT = withResourcePermission(
                   url: existingFile.url || existingFile.preview,
                   type: existingFile.type || 'document'
                 });
+                
+                // Calculate next available index from existing file IDs
+                const match = existingFile.id.match(/^root_file_(\d+)$/);
+                if (match) {
+                  const fileIndex = parseInt(match[1], 10);
+                  nextRootFileIndex = Math.max(nextRootFileIndex, fileIndex + 1);
+                }
               }
             });
+          }
+          
+          // Upload NEW root files with continued sequence
+          for (let i = 0; formData.get(`partsFile_root_${i}`); i++) {
+            const file = formData.get(`partsFile_root_${i}`) as File;
+            const fileName = formData.get(`partsFile_root_${i}_name`) as string;
+            
+            if (file && file.size > 0) {
+              const fileId = `root_file_${nextRootFileIndex + i}`; // Continue sequence from existing files
+              const uploadResult = await uploadEquipmentPart(
+                file,
+                projectId,
+                equipmentId,
+                fileId,
+                'root'
+              );
+              
+              partsStructureWithUrls.rootFiles.push(uploadResult);
+            }
           }
           
           // Upload folder files and build structure
@@ -907,18 +1074,43 @@ export const PUT = withResourcePermission(
             folderMap[folder.name] = folder;
           });
           
+          // Upload NEW folder files with continued sequence per folder
           for (let folderIndex = 0; formData.get(`partsFile_folder_${folderIndex}_0`); folderIndex++) {
+            let currentFolderName = '';
+            let nextFileIndexForFolder = 0;
+            
+            // First pass: determine folder name and calculate next file index
+            for (let fileIndex = 0; formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`); fileIndex++) {
+              const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
+              if (!currentFolderName) {
+                currentFolderName = folderName;
+                
+                // Calculate next available file index for this folder
+                if (folderMap[folderName] && folderMap[folderName].files) {
+                  folderMap[folderName].files.forEach((existingFile: any) => {
+                    const match = existingFile.id.match(/^folder_.*_file_(\d+)$/);
+                    if (match) {
+                      const fileIndex = parseInt(match[1], 10);
+                      nextFileIndexForFolder = Math.max(nextFileIndexForFolder, fileIndex + 1);
+                    }
+                  });
+                }
+              }
+            }
+            
+            // Second pass: upload files with correct sequence
             for (let fileIndex = 0; formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`); fileIndex++) {
               const file = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
               const fileName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string;
               const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
               
               if (file && file.size > 0) {
-                const url = await uploadEquipmentPart(
+                const fileId = `folder_${folderName}_file_${nextFileIndexForFolder + fileIndex}`; // Continue sequence from existing files
+                const uploadResult = await uploadEquipmentPart(
                   file,
                   projectId,
                   equipmentId,
-                  fileIndex + 1,
+                  fileId,
                   folderName
                 );
                 
@@ -931,12 +1123,7 @@ export const PUT = withResourcePermission(
                   };
                 }
                 
-                folderMap[folderName].files.push({
-                  id: `folder_${folderIndex}_file_${fileIndex}`,
-                  name: fileName,
-                  url: url,
-                  type: file.type.startsWith('image/') ? 'image' : 'document'
-                });
+                folderMap[folderName].files.push(uploadResult);
               }
             }
           }
@@ -983,10 +1170,13 @@ export const PUT = withResourcePermission(
       if (fileJobs.length) {
         try {
           const ups = await Promise.all(fileJobs);
+          console.log('🎯 UPLOAD RESULTS:', ups.map(u => ({ field: u.field, url: u.url })));
           ups.forEach((u) => {
             updateData[u.field] = u.url;
+            console.log(`✅ Setting ${u.field} = ${u.url}`);
           });
         } catch (e) {
+          console.error('❌ FILE UPLOAD FAILED:', e);
           return NextResponse.json(
             { error: "File upload failed" },
             { status: 500 }
@@ -997,10 +1187,12 @@ export const PUT = withResourcePermission(
       // Only update if we have changes to make
       let updated = existing;
       if (Object.keys(updateData).length > 0) {
+        console.log('📝 FINAL UPDATE DATA BEING SAVED:', updateData);
         updated = await prisma.equipment.update({
           where: { id: equipmentId },
           data: updateData,
         });
+        console.log('💾 DATABASE UPDATE SUCCESSFUL');
       }
 
       const result = await prisma.equipment.findUnique({
@@ -1010,6 +1202,12 @@ export const PUT = withResourcePermission(
             include: { client: { include: { location: true } } },
           },
         },
+      });
+
+      console.log('🚀 FINAL API RESPONSE IMAGE URLS:', {
+        image_url: result?.image_url,
+        thirdparty_inspection_image: result?.thirdparty_inspection_image,
+        pgpc_inspection_image: result?.pgpc_inspection_image
       });
 
       return NextResponse.json(result);

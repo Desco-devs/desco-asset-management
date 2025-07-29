@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { Settings, Camera, FileText, Upload, CalendarIcon, User, Building2, Wrench, Hash, Shield, Loader2, ClipboardCheck, Package, ImageIcon, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { Settings, Camera, FileText, Upload, CalendarIcon, User, Building2, Wrench, Hash, Shield, Loader2, ClipboardCheck, Package, ImageIcon, Plus, Trash2, ChevronDown, ChevronRight, X } from "lucide-react";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import PartsFolderManager, { type PartsStructure } from "./PartsFolderManager";
 import EquipmentFormErrorBoundary, { useErrorHandler } from "@/components/error-boundary/EquipmentFormErrorBoundary";
@@ -43,9 +43,11 @@ interface CreateEquipmentFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
   isMobile?: boolean;
+  projectsLoading?: boolean;
+  projectsError?: Error | null;
 }
 
-export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isMobile = false }: CreateEquipmentFormProps) {
+export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isMobile = false, projectsLoading, projectsError }: CreateEquipmentFormProps) {
   // Error handling
   const { handleError } = useErrorHandler();
   
@@ -654,21 +656,62 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
 
                 <div className="space-y-2">
                   <Label htmlFor="equipment-project">Assigned Project *</Label>
-                  <Select value={formData.projectId} onValueChange={(value) => setFormData(prev => ({ ...prev, projectId: value }))}>
+                  <Select 
+                    value={formData.projectId} 
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, projectId: value }))}
+                    disabled={projectsLoading}
+                  >
                     <SelectTrigger id="equipment-project" className="w-full transition-all duration-200 focus:ring-2 focus:ring-blue-500" aria-describedby="equipment-project-description">
-                      <SelectValue placeholder="Select project" />
+                      <SelectValue placeholder={
+                        projectsLoading 
+                          ? "Loading projects..." 
+                          : projectsError 
+                          ? "Error loading projects" 
+                          : projects.length === 0 
+                          ? "No projects available" 
+                          : "Select project"
+                      } />
                     </SelectTrigger>
                     <SelectContent className="w-full max-h-[200px] overflow-y-auto">
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
+                      {projectsLoading ? (
+                        <SelectItem value="loading" disabled>
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading projects...
+                          </div>
                         </SelectItem>
-                      ))}
+                      ) : projectsError ? (
+                        <SelectItem value="error" disabled>
+                          <div className="flex items-center gap-2 text-red-600">
+                            <X className="h-4 w-4" />
+                            Failed to load projects
+                          </div>
+                        </SelectItem>
+                      ) : projects.length === 0 ? (
+                        <SelectItem value="empty" disabled>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Building2 className="h-4 w-4" />
+                            No projects available
+                          </div>
+                        </SelectItem>
+                      ) : (
+                        projects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <div id="equipment-project-description" className="sr-only">
                     Select the project this equipment will be assigned to
                   </div>
+                  {/* Debug information */}
+                  {projects.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {projects.length} project{projects.length !== 1 ? 's' : ''} available
+                    </p>
+                  )}
                 </div>
               </div>
 

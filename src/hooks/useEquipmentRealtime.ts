@@ -20,8 +20,14 @@ export function useEquipmentRealtime() {
           table: 'equipment',
         },
         () => {
-          // Just invalidate - let TanStack Query handle the rest
-          queryClient.invalidateQueries({ queryKey: ['equipments'] })
+          console.log('🔄 Realtime equipment update detected');
+          
+          // Add delay to let server responses finish first
+          setTimeout(() => {
+            console.log('⏰ Processing realtime update after delay');
+            queryClient.invalidateQueries({ queryKey: ['equipments'] })
+            queryClient.invalidateQueries({ queryKey: ['equipments', 'list'] })
+          }, 500); // Increased delay to ensure server response completes
         }
       )
       .subscribe()
@@ -51,6 +57,7 @@ export function useMaintenanceReportsRealtime() {
           // Just invalidate - let TanStack Query handle the rest
           queryClient.invalidateQueries({ queryKey: ['maintenance-reports'] })
           queryClient.invalidateQueries({ queryKey: ['equipments'] }) // Equipment might have new reports
+          queryClient.invalidateQueries({ queryKey: ['equipments', 'list'] }) // Match query pattern
         }
       )
       .subscribe()

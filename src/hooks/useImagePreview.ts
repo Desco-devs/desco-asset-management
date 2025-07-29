@@ -18,22 +18,31 @@ export function useImagePreview() {
 
   // Cleanup function to revoke preview URLs and prevent memory leaks
   const cleanupPreviewUrls = useCallback(() => {
-    Object.values(newFilePreviewUrls).forEach(url => {
-      if (url.startsWith('blob:')) {
-        URL.revokeObjectURL(url);
-      }
+    setNewFilePreviewUrls(currentUrls => {
+      Object.values(currentUrls).forEach(url => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+      return {};
     });
-  }, [newFilePreviewUrls]);
+  }, []); // No dependencies to prevent callback recreation
 
   // Handle file selection
   const handleFileSelect = useCallback((fieldName: string, file: File) => {
-    // Clean up any existing preview URL for this field
-    const existingPreviewUrl = newFilePreviewUrls[fieldName];
-    if (existingPreviewUrl && existingPreviewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(existingPreviewUrl);
-    }
+    // Clean up any existing preview URL for this field only
+    setNewFilePreviewUrls(prev => {
+      const existingUrl = prev[fieldName];
+      if (existingUrl && existingUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(existingUrl);
+      }
+      return {
+        ...prev,
+        [fieldName]: URL.createObjectURL(file)
+      };
+    });
     
-    // Update states
+    // Update other states
     setRemovedItems(prev => {
       const newSet = new Set(prev);
       newSet.delete(fieldName);
@@ -44,22 +53,22 @@ export function useImagePreview() {
       ...prev,
       [fieldName]: file
     }));
-    
-    setNewFilePreviewUrls(prev => ({
-      ...prev,
-      [fieldName]: URL.createObjectURL(file)
-    }));
-  }, [newFilePreviewUrls]);
+  }, []);
 
   // Handle file removal
   const handleFileRemove = useCallback((fieldName: string) => {
-    // Clean up preview URL if exists
-    const existingPreviewUrl = newFilePreviewUrls[fieldName];
-    if (existingPreviewUrl && existingPreviewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(existingPreviewUrl);
-    }
+    // Clean up preview URL if exists and remove from state
+    setNewFilePreviewUrls(prev => {
+      const existingUrl = prev[fieldName];
+      if (existingUrl && existingUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(existingUrl);
+      }
+      const updated = { ...prev };
+      delete updated[fieldName];
+      return updated;
+    });
     
-    // Update states
+    // Update other states
     setRemovedItems(prev => new Set([...prev, fieldName]));
     
     setNewFileUploads(prev => {
@@ -67,28 +76,37 @@ export function useImagePreview() {
       delete updated[fieldName];
       return updated;
     });
-    
-    setNewFilePreviewUrls(prev => {
-      const updated = { ...prev };
-      delete updated[fieldName];
-      return updated;
-    });
-  }, [newFilePreviewUrls]);
+  }, []);
 
   // Reset all state
   const resetPreviewState = useCallback(() => {
-    cleanupPreviewUrls();
+    // Clean up existing URLs before resetting
+    setNewFilePreviewUrls(currentUrls => {
+      Object.values(currentUrls).forEach(url => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+      return {};
+    });
     setNewFileUploads({});
-    setNewFilePreviewUrls({});
     setRemovedItems(new Set());
-  }, [cleanupPreviewUrls]);
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      cleanupPreviewUrls();
+      // Clean up all URLs on unmount
+      setNewFilePreviewUrls(currentUrls => {
+        Object.values(currentUrls).forEach(url => {
+          if (url.startsWith('blob:')) {
+            URL.revokeObjectURL(url);
+          }
+        });
+        return {};
+      });
     };
-  }, [cleanupPreviewUrls]);
+  }, []);
 
   return {
     // State

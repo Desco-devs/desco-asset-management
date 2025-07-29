@@ -4,6 +4,26 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 
+// Helper function to delete file from Supabase storage
+const deleteFileFromStorage = async (fileUrl: string) => {
+  try {
+    const supabase = await createServerSupabaseClient();
+    // Extract file path from URL
+    const urlParts = fileUrl.split('/storage/v1/object/public/equipments/');
+    if (urlParts.length > 1) {
+      const filePath = urlParts[1];
+      const { error } = await supabase.storage.from('equipments').remove([filePath]);
+      if (error) {
+        console.warn(`Failed to delete file from storage: ${filePath}`, error);
+      } else {
+        console.log(`Successfully deleted file from storage: ${filePath}`);
+      }
+    }
+  } catch (error) {
+    console.warn(`Error deleting file from storage: ${fileUrl}`, error);
+  }
+};
+
 // Helper to upload maintenance files to Supabase
 const uploadMaintenanceFileToSupabase = async (
   file: File,
@@ -196,8 +216,8 @@ const getFieldName = (prefix: string): string => {
 export async function createEquipmentAction(formData: FormData) {
   // Enhanced transaction handling with rollback capabilities
   let createdEquipment: any = null;
-  let createdMaintenanceReport: any = null;
-  let uploadedFiles: string[] = [];
+  const createdMaintenanceReport: any = null;
+  const uploadedFiles: string[] = [];
   
   try {
     // Input validation and sanitization
@@ -776,7 +796,7 @@ export async function updateEquipmentAction(formData: FormData) {
     if (before !== null) updateData.before = before ? parseInt(before) : null;
     if (remarks !== null) updateData.remarks = remarks || null;
 
-    // CRITICAL FIX: Handle file removals - set fields to null if they should be removed
+    // CRITICAL FIX: Handle file removals - delete from storage AND set fields to null
     const removalFields = {
       'remove_equipmentImage': 'image_url',
       'remove_thirdpartyInspection': 'thirdparty_inspection_image',
@@ -785,11 +805,22 @@ export async function updateEquipmentAction(formData: FormData) {
       'remove_equipmentRegistration': 'equipment_registration_url'
     };
 
-    Object.entries(removalFields).forEach(([removeKey, dbField]) => {
+
+    // Process file removals - delete from storage before updating database
+    for (const [removeKey, dbField] of Object.entries(removalFields)) {
       if (formData.get(removeKey) === 'true') {
-        updateData[dbField] = null; // Set to null to remove from database
+        // Get current file URL from existing equipment
+        const currentFileUrl = existingEquipment[dbField as keyof typeof existingEquipment] as string;
+        
+        // Delete file from storage if it exists
+        if (currentFileUrl) {
+          await deleteFileFromStorage(currentFileUrl);
+        }
+        
+        // Set database field to null
+        updateData[dbField] = null;
       }
-    });
+    }
 
     // Handle regular file uploads (if new files are provided)
     const uploadPromises: Promise<{ field: string; url: string }>[] = [];
@@ -813,8 +844,19 @@ export async function updateEquipmentAction(formData: FormData) {
       const file = formData.get(field) as File;
       if (file && file.size > 0) {
         const prefix = prefixMapping[field];
-        uploadPromises.push(
-          uploadFileToSupabase(
+        
+        // Before uploading new file, delete existing file if it exists
+        const dbField = getFieldName(prefix);
+        const existingFileUrl = existingEquipment[dbField as keyof typeof existingEquipment] as string;
+        
+        const uploadPromise = (async () => {
+          // Delete existing file first if replacing
+          if (existingFileUrl) {
+            await deleteFileFromStorage(existingFileUrl);
+          }
+          
+          // Upload new file
+          return await uploadFileToSupabase(
             file,
             projectId,
             equipmentId,
@@ -824,8 +866,10 @@ export async function updateEquipmentAction(formData: FormData) {
             brand,
             model,
             plateNumber
-          )
-        );
+          );
+        })();
+        
+        uploadPromises.push(uploadPromise);
       }
     });
 
@@ -837,6 +881,19 @@ export async function updateEquipmentAction(formData: FormData) {
     // CRITICAL FIX: Always process parts structure when provided, even if empty (for deletions)
     if (partsStructureData) {
       const partsStructure = JSON.parse(partsStructureData);
+      console.log('Processing parts structure for equipment:', equipmentId);
+      console.log('Parts structure data:', partsStructure);
+      
+      // Debug: Log all formData entries related to parts
+      console.log('FormData entries for parts:');
+      for (let i = 0; i < 10; i++) {
+        const file = formData.get(`partsFile_root_${i}`);
+        const name = formData.get(`partsFile_root_${i}_name`);
+        if (file || name) {
+          console.log(`  partsFile_root_${i}:`, file ? `File(${(file as File).name})` : 'null');
+          console.log(`  partsFile_root_${i}_name:`, name);
+        }
+      }
       
       // CRITICAL FIX: Initialize with existing structure to preserve empty folders
       partsStructureWithUrls = {
@@ -848,12 +905,14 @@ export async function updateEquipmentAction(formData: FormData) {
         })) : []
       };
       
-      // Upload root files and build structure
-      for (let i = 0; formData.get(`partsFile_root_${i}`); i++) {
+      // Upload root files and build structure - FIXED: Scan all possible indices
+      // Don't rely on continuous indexing since existing files might create gaps
+      for (let i = 0; i < 100; i++) { // Reasonable limit to avoid infinite loop
         const file = formData.get(`partsFile_root_${i}`) as File;
         const fileName = formData.get(`partsFile_root_${i}_name`) as string;
         
-        if (file && file.size > 0) {
+        if (file && file.size > 0 && fileName) {
+          console.log(`Uploading root file ${i}: ${fileName}`);
           const url = await uploadPartFileToSupabase(
             file,
             fileName,
@@ -866,6 +925,7 @@ export async function updateEquipmentAction(formData: FormData) {
             model,
             plateNumber
           );
+          console.log(`Root file ${i} uploaded to: ${url}`);
           
           partsStructureWithUrls.rootFiles.push({
             id: `root_${i}`,
@@ -899,13 +959,15 @@ export async function updateEquipmentAction(formData: FormData) {
         folderMap[folder.name] = folder;
       });
       
-      for (let folderIndex = 0; formData.get(`partsFile_folder_${folderIndex}_0`); folderIndex++) {
-        for (let fileIndex = 0; formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`); fileIndex++) {
+      // FIXED: Scan all possible folder indices without relying on continuous indexing
+      for (let folderIndex = 0; folderIndex < 50; folderIndex++) { // Reasonable limit for folders
+        for (let fileIndex = 0; fileIndex < 100; fileIndex++) { // Reasonable limit for files per folder
           const file = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
           const fileName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string;
           const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
           
-          if (file && file.size > 0) {
+          if (file && file.size > 0 && fileName && folderName) {
+            console.log(`Uploading folder file ${folderIndex}/${fileIndex}: ${fileName} to folder: ${folderName}`);
             const url = await uploadPartFileToSupabase(
               file,
               fileName,
@@ -918,6 +980,7 @@ export async function updateEquipmentAction(formData: FormData) {
               model,
               plateNumber
             );
+            console.log(`Folder file ${folderIndex}/${fileIndex} uploaded to: ${url}`);
             
             // Initialize folder if it doesn't exist
             if (!folderMap[folderName]) {
@@ -939,6 +1002,44 @@ export async function updateEquipmentAction(formData: FormData) {
       }
       
       // CRITICAL FIX: Preserve existing files in folders ONLY for folders that still exist
+      // Also delete files from storage if folders are deleted
+      const currentPartsData = existingEquipment.equipment_parts?.[0];
+      if (currentPartsData && typeof currentPartsData === 'string') {
+        try {
+          const currentPartsStructure = JSON.parse(currentPartsData);
+          
+          // Check for deleted folders and cleanup their files
+          if (currentPartsStructure.folders && Array.isArray(currentPartsStructure.folders)) {
+            for (const existingFolder of currentPartsStructure.folders) {
+              const folderStillExists = partsStructureWithUrls.folders.some((f: any) => f.name === existingFolder.name);
+              
+              if (!folderStillExists && existingFolder.files && Array.isArray(existingFolder.files)) {
+                // Folder was deleted, clean up its files from storage
+                for (const deletedFile of existingFolder.files) {
+                  if (deletedFile.url) {
+                    await deleteFileFromStorage(deletedFile.url);
+                  }
+                }
+              }
+            }
+          }
+          
+          // Check for deleted root files and cleanup
+          if (currentPartsStructure.rootFiles && Array.isArray(currentPartsStructure.rootFiles)) {
+            for (const existingRootFile of currentPartsStructure.rootFiles) {
+              const fileStillExists = partsStructureWithUrls.rootFiles.some((f: any) => f.url === existingRootFile.url);
+              
+              if (!fileStillExists && existingRootFile.url) {
+                // Root file was deleted, clean up from storage
+                await deleteFileFromStorage(existingRootFile.url);
+              }
+            }
+          }
+        } catch (error) {
+          // Failed to parse existing parts data, skip cleanup
+        }
+      }
+      
       if (partsStructure.folders && Array.isArray(partsStructure.folders)) {
         partsStructure.folders.forEach((existingFolder: any) => {
           if (existingFolder.files && Array.isArray(existingFolder.files)) {
@@ -956,7 +1057,7 @@ export async function updateEquipmentAction(formData: FormData) {
                 }
               });
             }
-            // If folder is not in folderMap, it was deleted - don't preserve it
+            // If folder is not in folderMap, it was deleted - files already cleaned up above
           }
         });
       }

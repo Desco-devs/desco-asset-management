@@ -34,9 +34,18 @@ export default function CreateEquipmentModalModern() {
     };
   }, [setIsMobile]);
 
-  // Get reference data
-  const { data: projectsData } = useProjects();
+  // Get reference data with loading and error states
+  const { data: projectsData, isLoading: projectsLoading, error: projectsError } = useProjects();
   const projects = projectsData?.data || [];
+
+  // Add console logging for debugging
+  console.log('🚀 CreateEquipmentModalModern - Projects data:', {
+    projectsData,
+    projects,
+    projectsCount: projects.length,
+    isLoading: projectsLoading,
+    error: projectsError
+  });
 
   const handleSuccess = () => {
     setIsCreateModalOpen(false);
@@ -83,6 +92,8 @@ export default function CreateEquipmentModalModern() {
               onSuccess={handleSuccess}
               onCancel={handleClose}
               isMobile={true}
+              projectsLoading={projectsLoading}
+              projectsError={projectsError}
             />
           </div>
         </DrawerContent>
@@ -113,6 +124,8 @@ export default function CreateEquipmentModalModern() {
             onSuccess={handleSuccess}
             onCancel={() => setIsCreateModalOpen(false)}
             isMobile={false}
+            projectsLoading={projectsLoading}
+            projectsError={projectsError}
           />
         </div>
       </DialogContent>

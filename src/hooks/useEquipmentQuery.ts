@@ -172,7 +172,7 @@ export function useUpdateEquipment() {
       // Snapshot previous value
       const previousEquipments = queryClient.getQueryData<Equipment[]>(equipmentKeys.list());
       
-      // Optimistically update specific equipment
+      // Optimistically update specific equipment with image handling
       if (equipmentId) {
         queryClient.setQueryData<Equipment[]>(
           equipmentKeys.list(),
@@ -180,7 +180,7 @@ export function useUpdateEquipment() {
             if (!old) return old;
             return old.map((equipment) => {
               if (equipment.id === equipmentId) {
-                return {
+                const updatedEquipment = {
                   ...equipment,
                   brand: (formData.get('brand') as string) || equipment.brand,
                   model: (formData.get('model') as string) || equipment.model,
@@ -189,6 +189,12 @@ export function useUpdateEquipment() {
                   status: (formData.get('status') as 'OPERATIONAL' | 'NON_OPERATIONAL') || equipment.status,
                   updated_at: new Date().toISOString(),
                 };
+
+                // SIMPLIFIED: Don't handle image changes optimistically to prevent flickering
+                // Let the server response and realtime handle image updates for consistency
+                // This prevents race conditions between optimistic updates and server responses
+
+                return updatedEquipment;
               }
               return equipment;
             });
@@ -206,8 +212,28 @@ export function useUpdateEquipment() {
       toast.error(`Failed to update equipment: ${error.message}`);
     },
     onSuccess: (updatedEquipment) => {
+      console.log('✅ Server response received, updating cache immediately');
+      console.log('📄 Updated equipment URLs:', {
+        image: updatedEquipment.image_url,
+        receipt: updatedEquipment.original_receipt_url,
+        registration: updatedEquipment.equipment_registration_url
+      });
+      console.log('🔍 Full server response equipment:', updatedEquipment);
+      
+      // Immediately update cache with the actual server response
+      queryClient.setQueryData<Equipment[]>(
+        equipmentKeys.list(),
+        (old) => {
+          if (!old) return [updatedEquipment];
+          return old.map((equipment) => 
+            equipment.id === updatedEquipment.id ? updatedEquipment : equipment
+          );
+        }
+      );
+      
+      // Don't force immediate refetch - trust the server response data
+      
       toast.success(`Equipment "${updatedEquipment.brand} ${updatedEquipment.model}" updated successfully!`);
-      // Realtime will handle the cache update
     },
   });
 }

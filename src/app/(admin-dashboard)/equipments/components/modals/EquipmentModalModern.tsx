@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+import { flushSync } from "react-dom";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -79,8 +81,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { useImagePreview } from "@/hooks/useImagePreview";
-import ImagePreviewSection from "./ImagePreviewSection";
+import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
+import EquipmentFormErrorBoundary from "@/components/error-boundary/EquipmentFormErrorBoundary";
 
 export default function EquipmentModalModern() {
   // Server state from TanStack Query
@@ -104,16 +106,9 @@ export default function EquipmentModalModern() {
   // Global edit mode state
   const [isGlobalEditMode, setIsGlobalEditMode] = useState(false);
   
-  // Image preview management (following REALTIME_PATTERN.md)
-  const {
-    newFileUploads,
-    newFilePreviewUrls,
-    removedItems,
-    handleFileSelect,
-    handleFileRemove,
-    resetPreviewState,
-    cleanupPreviewUrls,
-  } = useImagePreview();
+  // SUPER SIMPLE: Just track uploaded files and removals (following REALTIME_PATTERN.md)
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({});
+  const [removedFiles, setRemovedFiles] = useState<Set<string>>(new Set());
   
   // CRITICAL FIX: Use ref for form data to prevent re-renders entirely
   const editFormDataRef = useRef({
@@ -168,9 +163,18 @@ export default function EquipmentModalModern() {
   );
   
   // CRITICAL FIX: Memoize selectedEquipment to prevent re-renders and focus loss
+  // Always prioritize fresh data from equipments array over store data
   const selectedEquipment = useMemo(() => {
     if (!selectedEquipmentFromStore) return null;
-    return equipments.find((e) => e.id === selectedEquipmentFromStore.id) || selectedEquipmentFromStore;
+    
+    // Always try to get the latest data from the equipments array first
+    const freshEquipment = equipments.find((e) => e.id === selectedEquipmentFromStore.id);
+    if (freshEquipment) {
+      return freshEquipment;
+    }
+    
+    // Fallback to store data if not found in array (shouldn't happen after successful updates)
+    return selectedEquipmentFromStore;
   }, [selectedEquipmentFromStore?.id, equipments]);
 
   // Initialize equipment parts when entering edit mode
@@ -297,41 +301,24 @@ export default function EquipmentModalModern() {
         }
       });
       
-      // Handle file uploads
-      Object.entries(newFileUploads).forEach(([fieldName, file]) => {
-        if (file && file.size > 0) {
-          // Map field names to expected API field names
-          const apiFieldMap: Record<string, string> = {
-            'image_url': 'equipmentImage',
-            'original_receipt_url': 'originalReceipt',
-            'equipment_registration_url': 'equipmentRegistration',
-            'thirdparty_inspection_image': 'thirdpartyInspection',
-            'pgpc_inspection_image': 'pgpcInspection'
-          };
-          
-          const apiFieldName = apiFieldMap[fieldName] || fieldName;
-          formData.append(apiFieldName, file);
-        }
-      });
-      
-      // Handle file removals by setting keep flags
-      const fileFields = ['image_url', 'original_receipt_url', 'equipment_registration_url', 'thirdparty_inspection_image', 'pgpc_inspection_image'];
-      fileFields.forEach(field => {
-        const keepFlagMap: Record<string, string> = {
-          'image_url': 'keepExistingImage',
-          'original_receipt_url': 'keepExistingReceipt',
-          'equipment_registration_url': 'keepExistingRegistration',
-          'thirdparty_inspection_image': 'keepExistingThirdpartyInspection',
-          'pgpc_inspection_image': 'keepExistingPgpcInspection'
+      // SUPER SIMPLE: Send uploaded files and removals (following REALTIME_PATTERN.md)
+      Object.entries(uploadedFiles).forEach(([fieldName, file]) => {
+        const apiFieldMap: Record<string, string> = {
+          'image_url': 'equipmentImage',
+          'original_receipt_url': 'originalReceipt',
+          'equipment_registration_url': 'equipmentRegistration',
+          'thirdparty_inspection_image': 'thirdpartyInspection',
+          'pgpc_inspection_image': 'pgpcInspection',
         };
         
-        const flagName = keepFlagMap[field];
-        if (flagName) {
-          // If the item is removed or has a new upload, don't keep existing
-          const shouldKeep = !removedItems.has(field) && !newFileUploads[field];
-          formData.append(flagName, shouldKeep ? 'true' : 'false');
-        }
+        const apiFieldName = apiFieldMap[fieldName] || fieldName;
+        formData.append(apiFieldName, file);
       });
+      
+      // Send removed files to API
+      if (removedFiles.size > 0) {
+        formData.append('removedImages', JSON.stringify(Array.from(removedFiles)));
+      }
       
       // Convert equipment parts back to database format using correct field name
       if (isGlobalEditMode) {
@@ -363,9 +350,32 @@ export default function EquipmentModalModern() {
       
       formData.append('equipmentId', selectedEquipment.id);
       
-      await updateEquipmentMutation.mutateAsync(formData);
+      const updatedEquipment = await updateEquipmentMutation.mutateAsync(formData);
+      
+      console.log('🔄 Updating selectedEquipment with fresh server data:', updatedEquipment);
+      console.log('📸 New image URLs:', {
+        image_url: updatedEquipment.image_url,
+        thirdparty_inspection_image: updatedEquipment.thirdparty_inspection_image,
+        pgpc_inspection_image: updatedEquipment.pgpc_inspection_image
+      });
+      
+      // ANTI-FLICKER FIX: Update selectedEquipment first, then clear state synchronously
+      // This prevents the preview from briefly showing old URLs
+      console.log('🔄 BEFORE setSelectedEquipment - Current:', selectedEquipment?.image_url);
+      console.log('🔄 BEFORE setSelectedEquipment - New:', updatedEquipment.image_url);
+      
+      // Force synchronous update to prevent flicker
+      flushSync(() => {
+        setSelectedEquipment(updatedEquipment);
+      });
+      
+      // Then clear the upload state
       setIsGlobalEditMode(false);
-      resetPreviewState(); // Clear all preview state after successful save
+      setUploadedFiles({});
+      setRemovedFiles(new Set());
+      
+      console.log('✅ Updated selectedEquipment synchronously and cleared upload state');
+      console.log('🧹 Anti-flicker sync update completed');
       // Note: Success toast is handled by useUpdateEquipment hook
     } catch (error) {
       console.error('Failed to update equipment:', error);
@@ -391,8 +401,9 @@ export default function EquipmentModalModern() {
       setActiveTab("details");
       // Reset global edit mode when modal closes
       setIsGlobalEditMode(false);
-      // Reset image preview state
-      resetPreviewState();
+      // SUPER SIMPLE: Reset uploaded files and removals
+      setUploadedFiles({});
+      setRemovedFiles(new Set());
     }
   }, [isModalOpen]);
 
@@ -405,8 +416,9 @@ export default function EquipmentModalModern() {
     setIsEditMode(false);
     // Reset global edit state
     setIsGlobalEditMode(false);
-    // Reset image preview state
-    resetPreviewState();
+    // Reset upload state
+    setUploadedFiles({});
+    setRemovedFiles(new Set());
   };
 
   const handleEdit = () => {
@@ -422,9 +434,27 @@ export default function EquipmentModalModern() {
 
   // Dirty tracking is no longer needed with global edit approach
 
-  // Old handlers removed - now using global edit form with handleFieldChange
-
-  // Old tab handlers removed - now using global edit with handleSaveChanges
+  // SUPER SIMPLE: File handlers (following REALTIME_PATTERN.md)
+  const handleFileSelect = useCallback((fieldName: string, file: File | null) => {
+    if (file) {
+      // Add to uploads - will show preview immediately
+      setUploadedFiles(prev => ({ ...prev, [fieldName]: file }));
+      // Remove from removed list if it was there
+      setRemovedFiles(prev => {
+        const updated = new Set(prev);
+        updated.delete(fieldName);
+        return updated;
+      });
+    } else {
+      // Remove from uploads and mark as removed
+      setUploadedFiles(prev => {
+        const updated = { ...prev };
+        delete updated[fieldName];
+        return updated;
+      });
+      setRemovedFiles(prev => new Set([...prev, fieldName]));
+    }
+  }, []);
 
 
   // Helper function to calculate days until expiry
@@ -1186,88 +1216,77 @@ export default function EquipmentModalModern() {
 
       {/* Images Tab */}
       {activeTab === 'images' && (
-        <div>
-          {/* Tab Title and Description */}
-          <div className={`mb-6 ${isMobile ? 'mb-4' : ''}`}>
-            <h2 className={`font-semibold flex items-center gap-2 mb-2 ${isMobile ? 'text-lg' : 'text-xl'}`}>
-              <Camera className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
-              Equipment Images
-            </h2>
-            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
-              Visual documentation of the equipment including main photo and inspection images
-            </p>
-          </div>
-          
+        <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
           <Card>
-            <CardContent className="p-6">
-              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
-                {/* Equipment Image */}
-                <div className="space-y-2">
-                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
-                    <Camera className="h-4 w-4" />
-                    Equipment Image
-                  </h3>
-                  <ImagePreviewSection
-                    fieldName="image_url"
-                    url={!removedItems.has('image_url') ? selectedEquipment.image_url : null}
-                    label="Equipment Image"
-                    description="Main equipment photo"
-                    accept="image/*"
-                    isEditMode={isGlobalEditMode}
-                    previewUrl={newFilePreviewUrls['image_url']}
-                    onFileSelect={(fieldName, file) => {
-                      handleFileSelect(fieldName, file);
-                      handleFieldChange('image_url', file);
-                    }}
-                    onRemove={(fieldName) => {
-                      handleFileRemove(fieldName);
-                      handleFieldChange('image_url', null);
-                    }}
-                  />
-                </div>
-
-                {/* Third-party Inspection */}
-                <div className="space-y-2">
-                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    Third-party Inspection
-                  </h3>
-                  <ImagePreviewSection
-                    fieldName="thirdparty_inspection_image"
-                    url={!removedItems.has('thirdparty_inspection_image') ? selectedEquipment.thirdparty_inspection_image : null}
-                    label="Third-party Inspection"
-                    description="Third-party inspection documentation"
-                    accept="image/*"
-                    isEditMode={isGlobalEditMode}
-                    previewUrl={newFilePreviewUrls['thirdparty_inspection_image']}
-                    onFileSelect={(fieldName, file) => {
-                      handleFileSelect(fieldName, file);
-                      handleFieldChange('thirdparty_inspection_image', file);
-                    }}
-                    onRemove={(fieldName) => {
-                      handleFileRemove(fieldName);
-                      handleFieldChange('thirdparty_inspection_image', null);
-                    }}
-                  />
-                </div>
-
-                {/* PGPC Inspection */}
-                <div>
-                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2 mb-2">
-                    <Shield className="h-4 w-4" />
-                    PGPC Inspection
-                  </h3>
-                  <ImagePreviewSection
-                    fieldName="pgpc_inspection_image"
-                    url={!removedItems.has('pgpc_inspection_image') ? selectedEquipment.pgpc_inspection_image : null}
-                    label="PGPC Inspection"
-                    description="PGPC inspection documentation"
-                    accept="image/*"
-                    isEditMode={isGlobalEditMode}
-                    previewUrl={newFilePreviewUrls['pgpc_inspection_image']}
-                    onFileSelect={handleFileSelect}
-                    onRemove={handleFileRemove}
-                  />
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Camera className="h-4 w-4" />
+                Equipment Images {isMobile ? '' : '(Optional)'}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Upload clear photos of your equipment. These images help with identification, insurance claims, and maintenance records.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  <EquipmentFormErrorBoundary fallback={
+                    <div className="p-4 border border-red-200 rounded-lg bg-red-50">
+                      <p className="text-sm text-red-600">Equipment Image upload component failed to load</p>
+                    </div>
+                  }>
+                    <FileUploadSectionSimple
+                      label="Equipment Image"
+                      accept="image/*"
+                      currentFileUrl={(() => {
+                        const url = !removedFiles.has('image_url') ? selectedEquipment.image_url : null;
+                        console.log('🖼️ [Equipment Image View] currentFileUrl:', url, 'readOnly:', !isGlobalEditMode);
+                        return url;
+                      })()}
+                      selectedFile={uploadedFiles['image_url'] || null}
+                      onFileChange={(file) => handleFileSelect('image_url', file)}
+                      onKeepExistingChange={() => {}}
+                      icon={<Upload className="h-4 w-4" />}
+                      readOnly={!isGlobalEditMode}
+                      hideChangeButton={true}
+                    />
+                  </EquipmentFormErrorBoundary>
+                  
+                  <EquipmentFormErrorBoundary fallback={
+                    <div className="p-4 border border-red-200 rounded-lg bg-red-50">
+                      <p className="text-sm text-red-600">Third-party Inspection upload component failed to load</p>
+                    </div>
+                  }>
+                    <FileUploadSectionSimple
+                      label="Third-party Inspection"
+                      accept="image/*"
+                      currentFileUrl={!removedFiles.has('thirdparty_inspection_image') ? selectedEquipment.thirdparty_inspection_image : null}
+                      selectedFile={uploadedFiles['thirdparty_inspection_image'] || null}
+                      onFileChange={(file) => handleFileSelect('thirdparty_inspection_image', file)}
+                      onKeepExistingChange={() => {}}
+                      icon={<Upload className="h-4 w-4" />}
+                      readOnly={!isGlobalEditMode}
+                      hideChangeButton={true}
+                    />
+                  </EquipmentFormErrorBoundary>
+                  
+                  <EquipmentFormErrorBoundary fallback={
+                    <div className="p-4 border border-red-200 rounded-lg bg-red-50">
+                      <p className="text-sm text-red-600">PGPC Inspection upload component failed to load</p>
+                    </div>
+                  }>
+                    <FileUploadSectionSimple
+                      label="PGPC Inspection"
+                      accept="image/*"
+                      currentFileUrl={!removedFiles.has('pgpc_inspection_image') ? selectedEquipment.pgpc_inspection_image : null}
+                      selectedFile={uploadedFiles['pgpc_inspection_image'] || null}
+                      onFileChange={(file) => handleFileSelect('pgpc_inspection_image', file)}
+                      onKeepExistingChange={() => {}}
+                      icon={<Upload className="h-4 w-4" />}
+                      readOnly={!isGlobalEditMode}
+                      hideChangeButton={true}
+                    />
+                  </EquipmentFormErrorBoundary>
                 </div>
               </div>
             </CardContent>
@@ -1291,44 +1310,42 @@ export default function EquipmentModalModern() {
           
           <Card>
             <CardContent className="p-6">
-              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                {/* Purchase Receipt */}
-                <div>
-                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2 mb-2">
-                    <Receipt className="h-4 w-4" />
-                    Purchase Receipt
-                  </h3>
-                  <ImagePreviewSection
-                    fieldName="original_receipt_url"
-                    url={!removedItems.has('original_receipt_url') ? selectedEquipment.original_receipt_url : null}
+              <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                <EquipmentFormErrorBoundary fallback={
+                  <div className="p-4 border border-red-200 rounded-lg bg-red-50">
+                    <p className="text-sm text-red-600">Purchase Receipt upload component failed to load</p>
+                  </div>
+                }>
+                  <FileUploadSectionSimple
                     label="Purchase Receipt"
-                    description="Equipment purchase documentation"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    isEditMode={isGlobalEditMode}
-                    previewUrl={newFilePreviewUrls['original_receipt_url']}
-                    onFileSelect={handleFileSelect}
-                    onRemove={handleFileRemove}
+                    currentFileUrl={selectedEquipment.original_receipt_url}
+                    selectedFile={uploadedFiles['original_receipt_url'] || null}
+                    onFileChange={(file) => handleFileSelect('original_receipt_url', file)}
+                    onKeepExistingChange={() => {}}
+                    icon={<Upload className="h-4 w-4" />}
+                    readOnly={!isGlobalEditMode}
+                    hideChangeButton={true}
                   />
-                </div>
-
-                {/* Registration Document */}
-                <div>
-                  <h3 className="font-medium text-sm text-muted-foreground flex items-center gap-2 mb-2">
-                    <FileText className="h-4 w-4" />
-                    Registration Document
-                  </h3>
-                  <ImagePreviewSection
-                    fieldName="equipment_registration_url"
-                    url={!removedItems.has('equipment_registration_url') ? selectedEquipment.equipment_registration_url : null}
+                </EquipmentFormErrorBoundary>
+                
+                <EquipmentFormErrorBoundary fallback={
+                  <div className="p-4 border border-red-200 rounded-lg bg-red-50">
+                    <p className="text-sm text-red-600">Registration Document upload component failed to load</p>
+                  </div>
+                }>
+                  <FileUploadSectionSimple
                     label="Registration Document"
-                    description="Official equipment registration certificate"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    isEditMode={isGlobalEditMode}
-                    previewUrl={newFilePreviewUrls['equipment_registration_url']}
-                    onFileSelect={handleFileSelect}
-                    onRemove={handleFileRemove}
+                    currentFileUrl={selectedEquipment.equipment_registration_url}
+                    selectedFile={uploadedFiles['equipment_registration_url'] || null}
+                    onFileChange={(file) => handleFileSelect('equipment_registration_url', file)}
+                    onKeepExistingChange={() => {}}
+                    icon={<Upload className="h-4 w-4" />}
+                    readOnly={!isGlobalEditMode}
+                    hideChangeButton={true}
                   />
-                </div>
+                </EquipmentFormErrorBoundary>
               </div>
             </CardContent>
           </Card>
@@ -1485,8 +1502,9 @@ export default function EquipmentModalModern() {
                       type="button"
                       variant="outline"
                       onClick={() => {
-                        // Clean up preview state on cancel
-                        resetPreviewState();
+                        // SUPER SIMPLE: Reset uploaded files and removals on cancel
+                        setUploadedFiles({});
+                        setRemovedFiles(new Set());
                         setIsGlobalEditMode(false);
                       }}
                       className="flex-1"
@@ -1553,8 +1571,9 @@ export default function EquipmentModalModern() {
                       type="button"
                       variant="outline"
                       onClick={() => {
-                        // Clean up preview state on cancel
-                        resetPreviewState();
+                        // SUPER SIMPLE: Reset uploaded files and removals on cancel
+                        setUploadedFiles({});
+                        setRemovedFiles(new Set());
                         setIsGlobalEditMode(false);
                       }}
                       size="sm"
