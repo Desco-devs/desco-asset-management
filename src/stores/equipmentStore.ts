@@ -12,13 +12,16 @@ import type { Equipment } from '@/types/equipment';
  */
 
 interface EquipmentUIState {
-  // Modal State
+  // Modal State - Unified Modal Management
   selectedEquipment: Equipment | null;
   isModalOpen: boolean;
   isCreateModalOpen: boolean;
   isEditMode: boolean;
   isExportModalOpen: boolean;
   isMaintenanceModalOpen: boolean;
+  
+  // Global Modal Coordination - Only ONE modal can be open at a time
+  activeModal: 'equipment' | 'maintenance-view' | 'maintenance-edit' | 'maintenance-create' | null;
   
   // Image Viewer
   viewerImage: { url: string; title: string } | null;
@@ -51,6 +54,10 @@ interface EquipmentUIState {
   setIsEditMode: (isEdit: boolean) => void;
   setIsExportModalOpen: (open: boolean) => void;
   setIsMaintenanceModalOpen: (open: boolean) => void;
+  
+  // Global Modal Coordination Actions
+  setActiveModal: (modal: 'equipment' | 'maintenance-view' | 'maintenance-edit' | 'maintenance-create' | null) => void;
+  closeAllModalsAndClearState: () => void;
   setViewerImage: (image: { url: string; title: string } | null) => void;
   setDeleteConfirmation: (state: { isOpen: boolean; equipment: Equipment | null }) => void;
   setCurrentPage: (page: number) => void;
@@ -82,6 +89,7 @@ export const useEquipmentStore = create<EquipmentUIState>()(
       isEditMode: false,
       isExportModalOpen: false,
       isMaintenanceModalOpen: false,
+      activeModal: null,
       viewerImage: null,
       deleteConfirmation: {
         isOpen: false,
@@ -110,6 +118,36 @@ export const useEquipmentStore = create<EquipmentUIState>()(
       setIsEditMode: (isEdit) => set({ isEditMode: isEdit }),
       setIsExportModalOpen: (open) => set({ isExportModalOpen: open }),
       setIsMaintenanceModalOpen: (open) => set({ isMaintenanceModalOpen: open }),
+      
+      // Global Modal Coordination Actions
+      setActiveModal: (modal) => {
+        // When setting a new active modal, close all other modals
+        const newState: Partial<EquipmentUIState> = { activeModal: modal };
+        
+        // Close all other modals when a new one is activated
+        if (modal !== 'equipment') newState.isModalOpen = false;
+        if (modal !== 'maintenance-create') newState.isMaintenanceModalOpen = false;
+        if (modal !== null) {
+          newState.isExportModalOpen = false;
+          newState.viewerImage = null;
+          newState.deleteConfirmation = { isOpen: false, equipment: null };
+        }
+        
+        set(newState);
+      },
+      
+      closeAllModalsAndClearState: () => set({
+        isModalOpen: false,
+        isCreateModalOpen: false,
+        isExportModalOpen: false,
+        isMaintenanceModalOpen: false,
+        selectedEquipment: null,
+        isEditMode: false,
+        viewerImage: null,
+        deleteConfirmation: { isOpen: false, equipment: null },
+        activeModal: null,
+      }),
+      
       setViewerImage: (image) => set({ viewerImage: image }),
       setDeleteConfirmation: (state) => set({ deleteConfirmation: state }),
       setCurrentPage: (page) => set({ currentPage: page }),
@@ -146,6 +184,7 @@ export const useEquipmentStore = create<EquipmentUIState>()(
         isEditMode: false,
         viewerImage: null,
         deleteConfirmation: { isOpen: false, equipment: null },
+        activeModal: null,
       }),
       
       // Simple filtering function
@@ -273,3 +312,4 @@ export const selectFilterProject = (state: EquipmentUIState) => state.filterProj
 export const selectFilterType = (state: EquipmentUIState) => state.filterType;
 export const selectFilterOwner = (state: EquipmentUIState) => state.filterOwner;
 export const selectFilterMaintenance = (state: EquipmentUIState) => state.filterMaintenance;
+export const selectActiveModal = (state: EquipmentUIState) => state.activeModal;

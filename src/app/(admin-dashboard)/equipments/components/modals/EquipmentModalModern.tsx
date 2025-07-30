@@ -35,8 +35,10 @@ import {
   selectIsMobile,
   selectIsModalOpen,
   selectSelectedEquipment,
+  selectActiveModal,
   useEquipmentStore,
 } from "@/stores/equipmentStore";
+import { useEquipmentsStore } from "@/stores/equipmentsStore";
 import {
   Building2,
   CalendarDays,
@@ -99,6 +101,10 @@ export default function EquipmentModalModern() {
   const isModalOpen = useEquipmentStore(selectIsModalOpen);
   const isEditMode = useEquipmentStore(selectIsEditMode);
   const isMobile = useEquipmentStore(selectIsMobile);
+  const activeModal = useEquipmentStore(selectActiveModal);
+
+  // Add maintenance report detail state for mutual exclusion
+  const isMaintenanceReportDetailOpen = useEquipmentsStore((state) => state.isMaintenanceReportDetailOpen);
 
   // Custom tab state - EXACTLY like CreateEquipmentForm with Images and Documents tabs
   const [activeTab, setActiveTab] = useState<'details' | 'images' | 'documents' | 'parts' | 'maintenance'>('details');
@@ -579,10 +585,17 @@ export default function EquipmentModalModern() {
   // Actions
   const {
     setIsModalOpen,
+    setIsMaintenanceModalOpen,
     setIsEditMode,
     setSelectedEquipment,
     setDeleteConfirmation,
+    setActiveModal,
   } = useEquipmentStore();
+  const { 
+    setSelectedMaintenanceReportForDetail,
+    setSelectedEquipmentMaintenanceReport,
+    setIsMaintenanceReportDetailOpen 
+  } = useEquipmentsStore();
 
   // Mutations
   const deleteEquipmentMutation = useDeleteEquipment();
@@ -702,6 +715,13 @@ export default function EquipmentModalModern() {
     setIsModalOpen(false);
     setSelectedEquipment(null);
     setIsEditMode(false);
+    // Use unified modal coordination to close all modals
+    setActiveModal(null);
+    // Close any maintenance report modals
+    setIsMaintenanceModalOpen(false);
+    setIsMaintenanceReportDetailOpen(false);
+    setSelectedMaintenanceReportForDetail(null);
+    setSelectedEquipmentMaintenanceReport(null);
     // Reset global edit state
     setIsGlobalEditMode(false);
     // Reset upload state using safety function
@@ -807,6 +827,11 @@ export default function EquipmentModalModern() {
   };
 
   if (!selectedEquipment) return null;
+
+  // CRITICAL: Force mutual exclusion - don't render if maintenance report detail is open
+  if (isMaintenanceReportDetailOpen) {
+    return null;
+  }
 
   const daysUntilExpiry = getDaysUntilExpiry(selectedEquipment.insurance_expiration_date);
 
@@ -1778,8 +1803,7 @@ export default function EquipmentModalModern() {
           <Card>
             <CardContent className="p-6">
               <EquipmentMaintenanceReportsEnhanced 
-                equipmentId={selectedEquipment.id} 
-                isEditMode={isGlobalEditMode}
+                equipmentId={selectedEquipment.id}
               />
             </CardContent>
           </Card>
@@ -1798,7 +1822,7 @@ export default function EquipmentModalModern() {
   if (isMobile) {
     return (
       <>
-        <Drawer open={isModalOpen} onOpenChange={handleClose}>
+        <Drawer open={isModalOpen && !isMaintenanceReportDetailOpen} onOpenChange={handleClose}>
           <DrawerContent className="!max-h-[95dvh] flex flex-col">
             {/* Mobile Header */}
             <DrawerHeader className="flex-shrink-0 p-4 pb-0 border-b relative">
@@ -1921,7 +1945,7 @@ export default function EquipmentModalModern() {
   // Desktop dialog implementation - With fixed tab navigation in header
   return (
     <>
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <Dialog open={isModalOpen && (activeModal === 'equipment' || activeModal === null) && !isMaintenanceReportDetailOpen} onOpenChange={handleClose}>
         <DialogContent 
           className="!max-w-none !w-[55vw] max-h-[95dvh] overflow-hidden flex flex-col p-0"
           style={{ maxWidth: '55vw', width: '55vw' }}
