@@ -50,33 +50,49 @@ export function FileUploadSectionSimple({
   
   const [preview, setPreview] = useState<string | null>(currentFileUrl || null);
   
-  // SUPER SIMPLE: Show preview based on state (following REALTIME_PATTERN.md)
+  // Preview initialization on component mount
   useEffect(() => {
-    if (selectedFile) {
-      // New file selected - show preview
-      const newPreview = URL.createObjectURL(selectedFile);
-      setPreview(newPreview);
-      return () => URL.revokeObjectURL(newPreview);
-    } else if (currentFileUrl) {
-      // Show existing file (parent handles removal by setting currentFileUrl to null)
+    if (!selectedFile && currentFileUrl) {
       setPreview(currentFileUrl);
-    } else {
-      // No file - empty state
+    } else if (!selectedFile && !currentFileUrl) {
       setPreview(null);
     }
-  }, [selectedFile, currentFileUrl]);
+  }, []); // Run once on mount
 
 
-  // Clean up preview URL on component unmount - DISABLED FOR DEBUGGING
-  /*
+  // Cleanup blob URLs when selectedFile changes or component unmounts
   useEffect(() => {
+    let currentPreview: string | null = null;
+    
+    if (selectedFile) {
+      currentPreview = URL.createObjectURL(selectedFile);
+      console.log(`🖼️ FileUploadSectionSimple[${label}]: Created preview for new file:`, {
+        fileName: selectedFile.name,
+        previewUrl: currentPreview.substring(0, 30) + '...',
+        fileSize: selectedFile.size
+      });
+      setPreview(currentPreview);
+    }
+    
+    // Cleanup function - only clean up the blob URL we created
     return () => {
-      if (preview && !currentFileUrl && selectedFile) {
-        URL.revokeObjectURL(preview);
+      if (currentPreview && currentPreview.startsWith('blob:')) {
+        console.log(`🧹 FileUploadSectionSimple[${label}]: Cleaning up preview:`, currentPreview.substring(0, 30) + '...');
+        URL.revokeObjectURL(currentPreview);
       }
     };
-  }, [preview, currentFileUrl, selectedFile]);
-  */
+  }, [selectedFile]); // Only depend on selectedFile changes
+  
+  // Separate effect for handling currentFileUrl (existing files)
+  useEffect(() => {
+    if (!selectedFile) {
+      if (currentFileUrl) {
+        setPreview(currentFileUrl);
+      } else {
+        setPreview(null);
+      }
+    }
+  }, [currentFileUrl, selectedFile]);
 
   const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;

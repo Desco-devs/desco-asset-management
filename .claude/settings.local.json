@@ -7,7 +7,9 @@
       "Bash(npm run lint)",
       "Bash(find:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(rm:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

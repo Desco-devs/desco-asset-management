@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -36,13 +36,13 @@ import {
   FolderPlus,
   Plus,
 } from "lucide-react";
-import Image from "next/image";
+// Removed Next.js Image import - using regular img tags for blob URL compatibility
 
 interface EquipmentPartsViewerProps {
   equipmentParts?: string[] | { rootFiles: any[]; folders: any[] } | string;
   isEditable?: boolean;
   onPartsChange?: (newParts: { rootFiles: any[]; folders: any[] }) => void;
-  onPartFileDelete?: (fileId: string, fileName: string, folderPath?: string) => void;
+  onPartFileDelete?: (fileId: string, fileName: string, folderPath?: string, fileUrl?: string) => void;
   onPartFolderDelete?: (folderPath: string, folderName: string) => void;
 }
 
@@ -95,21 +95,18 @@ export default function EquipmentPartsViewer({
   const [newFolderName, setNewFolderName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Parse equipment parts data into folder structure
+  // Parse equipment parts data into folder structure - simplified approach
   const parsePartsData = (parts: string[] | { rootFiles: any[]; folders: any[] } | string | undefined): ParsedPartData => {
     if (!parts) {
       return { rootFiles: [], folders: [] };
     }
 
-    // Handle database format: array with JSON string
+    // Handle database format: array with JSON string (most common)
     if (Array.isArray(parts) && parts.length > 0 && typeof parts[0] === 'string') {
       try {
         const parsed = JSON.parse(parts[0]);
-        if (parsed && typeof parsed === 'object') {
-          return {
-            rootFiles: Array.isArray(parsed.rootFiles) ? parsed.rootFiles : [],
-            folders: Array.isArray(parsed.folders) ? parsed.folders : []
-          };
+        if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
+          return parsed;
         }
       } catch {
         // If JSON parse fails, fall through to legacy handling
@@ -123,33 +120,17 @@ export default function EquipmentPartsViewer({
         if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
           return parsed;
         }
-        // If it's just a string URL, treat it as single file
-        const fileName = parts.split('/').pop() || 'File';
-        const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-        const isImage = imageExtensions.includes(fileExtension);
-        
-        return { 
-          rootFiles: [{
-            id: 'file-0',
-            name: fileName,
-            url: parts,
-            type: isImage ? 'image' : 'document'
-          }], 
-          folders: [] 
-        };
       } catch {
-        // If JSON parse fails, treat as single URL
+        // Not JSON, treat as single URL
         const fileName = parts.split('/').pop() || 'File';
-        const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-        const isImage = imageExtensions.includes(fileExtension);
+        const isImage = parts.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
         
         return { 
           rootFiles: [{
             id: 'file-0',
             name: fileName,
             url: parts,
+            preview: parts,
             type: isImage ? 'image' : 'document'
           }], 
           folders: [] 
@@ -159,88 +140,32 @@ export default function EquipmentPartsViewer({
 
     // Handle object format (already parsed)
     if (typeof parts === 'object' && !Array.isArray(parts)) {
-      if (parts.rootFiles !== undefined && parts.folders !== undefined) {
-        // Ensure files have proper structure with type detection
-        const processedData = {
-          rootFiles: Array.isArray(parts.rootFiles) ? parts.rootFiles.map((file: any, index: number) => {
-            const fileUrl = file.preview || file.url || '';
-            const fileName = file.name || fileUrl.split('/').pop() || `File ${index + 1}`;
-            
-            // FIXED: Better image detection - consistent with working FileUploadSectionSimple
-            const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-            const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-            const isImageByExtension = imageExtensions.includes(fileExtension);
-            const urlExtension = fileUrl.split('.').pop()?.toLowerCase().split('?')[0] || ''; // Remove query params
-            const isImageByUrl = imageExtensions.includes(urlExtension);
-            const isImageByMimeType = file.file?.type?.startsWith('image/');
-            const isImage = isImageByExtension || isImageByUrl || isImageByMimeType || file.type === 'image';
-            
-            return {
-              id: file.id || `file-${index}`,
-              name: fileName,
-              url: fileUrl,
-              preview: file.preview || fileUrl || file.url, // CRITICAL FIX: Ensure preview is always set
-              type: isImage ? 'image' : 'document',
-              file: file.file // Preserve original File object if it exists
-            } as ParsedFile;
-          }) : [],
-          folders: Array.isArray(parts.folders) ? parts.folders.map((folder: any) => ({
-            ...folder,
-            files: folder.files?.map((file: any, index: number) => {
-              const fileUrl = file.preview || file.url || '';
-              const fileName = file.name || fileUrl.split('/').pop() || `File ${index + 1}`;
-              
-              // FIXED: Better image detection - consistent with working FileUploadSectionSimple
-              const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-              const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-              const isImageByExtension = imageExtensions.includes(fileExtension);
-              const urlExtension = fileUrl.split('.').pop()?.toLowerCase().split('?')[0] || ''; // Remove query params
-              const isImageByUrl = imageExtensions.includes(urlExtension);
-              const isImageByMimeType = file.file?.type?.startsWith('image/');
-              const isImage = isImageByExtension || isImageByUrl || isImageByMimeType || file.type === 'image';
-              
-              return {
-                id: file.id || `file-${index}`,
-                name: fileName,
-                url: fileUrl,
-                preview: file.preview || fileUrl || file.url, // CRITICAL FIX: Ensure preview is always set
-                type: isImage ? 'image' : 'document',
-                file: file.file // Preserve original File object if it exists
-              } as ParsedFile;
-            }) || []
-          })) : []
-        };
-        
-        return processedData;
+      if (parts.rootFiles && parts.folders) {
+        return parts;
       }
     }
 
-    // Handle array format (legacy)
+    // Handle array format (legacy - URLs only)
     if (Array.isArray(parts)) {
       if (parts.length === 0) {
         return { rootFiles: [], folders: [] };
       }
 
-      const rootFiles: ParsedFile[] = [];
-      const folders: ParsedFolder[] = [];
-
-      parts.forEach((url, index) => {
+      // Convert legacy URL array to new format
+      const rootFiles: ParsedFile[] = parts.map((url, index) => {
         const fileName = url.split('/').pop() || `Part ${index + 1}`;
-        const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-        const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-        const isImage = imageExtensions.includes(fileExtension);
+        const isImage = url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
         
-        const file: ParsedFile = {
+        return {
           id: `file-${index}`,
           name: fileName,
           url,
+          preview: url,
           type: isImage ? 'image' : 'document',
         };
-
-        rootFiles.push(file);
       });
 
-      return { rootFiles, folders };
+      return { rootFiles, folders: [] };
     }
 
     // Fallback
@@ -248,56 +173,9 @@ export default function EquipmentPartsViewer({
   };
 
   const parsedData = parsePartsData(equipmentParts);
-
-  // FIXED DEDUPLICATION: Simple deduplication based on file name only
-  // This prevents the creation of "stored file" duplicates
-  const deduplicatePartsData = (data: ParsedPartData): ParsedPartData => {
-    const deduplicateFiles = (files: ParsedFile[]): ParsedFile[] => {
-      const seen = new Map<string, ParsedFile>();
-      
-      for (const file of files) {
-        const key = file.name.toLowerCase();
-        const existing = seen.get(key);
-        
-        if (!existing) {
-          // First occurrence - keep it
-          seen.set(key, file);
-        } else {
-          // Duplicate found - prefer files with actual File objects (new uploads)
-          // or files with proper preview URLs over those without
-          const currentHasFile = !!file.file;
-          const existingHasFile = !!existing.file;
-          const currentHasValidPreview = !!(file.preview || file.url);
-          const existingHasValidPreview = !!(existing.preview || existing.url);
-          
-          // Priority: File object > Valid preview > First occurrence
-          if (currentHasFile && !existingHasFile) {
-            seen.set(key, file);
-          } else if (!currentHasFile && existingHasFile) {
-            // Keep existing
-          } else if (currentHasValidPreview && !existingHasValidPreview) {
-            seen.set(key, file);
-          }
-          // Otherwise keep the first occurrence (existing)
-        }
-      }
-      
-      return Array.from(seen.values());
-    };
-
-    return {
-      rootFiles: deduplicateFiles(data.rootFiles),
-      folders: data.folders.map(folder => ({
-        ...folder,
-        files: deduplicateFiles(folder.files)
-      }))
-    };
-  };
-
-  // Apply deduplication to display clean data
-  const displayData = useMemo(() => {
-    return deduplicatePartsData(parsedData);
-  }, [parsedData]);
+  
+  // Simple display data - no deduplication needed with simplified API
+  const displayData = parsedData;
 
   // Edit helper functions
   const removeFile = (fileId: string, folderId?: string) => {
@@ -309,10 +187,11 @@ export default function EquipmentPartsViewer({
       if (folder) {
         // Find the file to check if it's an existing file that needs deletion tracking
         const fileToRemove = folder.files.find(f => f.id === fileId);
+        
         if (fileToRemove && (fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
           // Get folder name from folder object
           const folderPath = folder.name;
-          onPartFileDelete(fileToRemove.id, fileToRemove.name, folderPath);
+          onPartFileDelete(fileToRemove.id, fileToRemove.name, folderPath, fileToRemove.url || fileToRemove.preview);
         }
         
         folder.files = folder.files.filter(f => f.id !== fileId);
@@ -320,8 +199,9 @@ export default function EquipmentPartsViewer({
     } else {
       // Remove from root
       const fileToRemove = newData.rootFiles.find(f => f.id === fileId);
+      
       if (fileToRemove && (fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
-        onPartFileDelete(fileToRemove.id, fileToRemove.name, 'root');
+        onPartFileDelete(fileToRemove.id, fileToRemove.name, 'root', fileToRemove.url || fileToRemove.preview);
       }
       
       newData.rootFiles = newData.rootFiles.filter(f => f.id !== fileId);
@@ -452,6 +332,7 @@ export default function EquipmentPartsViewer({
     folderId?: string; 
     onRemove?: (fileId: string, folderId?: string) => void; 
   }) => {
+    const [imageLoadError, setImageLoadError] = useState(false);
     const fileUrl = file.preview || file.url;
     
     // Helper function to check if a URL/file is actually an image by extension - FIXED LOGIC
@@ -475,7 +356,7 @@ export default function EquipmentPartsViewer({
       return false;
     };
     
-    const isImage = isActualImage(fileUrl, file.name);
+    const isImage = isActualImage(fileUrl, file.name) && !imageLoadError;
     
     // For stored files, try to get file size from name or estimate
     const getFileDisplayInfo = (file: ParsedFile) => {
@@ -484,7 +365,7 @@ export default function EquipmentPartsViewer({
         return `${(file.file.size / 1024).toFixed(1)} KB`;
       }
       
-      // FIXED: Improve display text for existing files
+      // FIXED: Improve display text for existing files - consistent with data layer fixes
       if (fileUrl) {
         return isImage ? 'Image' : 'Document';
       }
@@ -494,9 +375,19 @@ export default function EquipmentPartsViewer({
     };
 
     const handleClick = () => {
-      if (fileUrl && (isImage || fileUrl)) {
+      if (fileUrl && isImage && !imageLoadError) {
         handleImageClick(fileUrl, file.name);
       }
+    };
+    
+    const handleImageError = () => {
+      console.error('Image failed to load:', fileUrl);
+      setImageLoadError(true);
+    };
+    
+    const handleImageLoad = () => {
+      console.log('Image loaded successfully:', fileUrl);
+      setImageLoadError(false);
     };
     
     return (
@@ -511,15 +402,6 @@ export default function EquipmentPartsViewer({
                 src={fileUrl}
                 alt={file.name}
                 className="w-10 h-10 object-cover rounded hover:opacity-80 transition-opacity"
-                onError={(e) => {
-                  // If image fails to load, show file icon instead
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const parentDiv = target.parentElement;
-                  if (parentDiv) {
-                    parentDiv.innerHTML = `<div class="w-10 h-10 flex items-center justify-center border rounded bg-muted"><svg class="h-6 w-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div>`;
-                  }
-                }}
               />
               <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
                 <Eye className="h-3 w-3 text-white" />
@@ -1025,6 +907,13 @@ export default function EquipmentPartsViewer({
                 alt={viewerImageName}
                 className="max-w-full max-h-[70vh] object-contain"
                 onClick={(e) => e.stopPropagation()}
+                onError={() => {
+                  console.error('Image failed to load in viewer:', viewerImageUrl);
+                  setShowImageViewer(false);
+                }}
+                onLoad={() => {
+                  console.log('Image loaded successfully in viewer:', viewerImageUrl);
+                }}
               />
             </div>
           </DialogContent>

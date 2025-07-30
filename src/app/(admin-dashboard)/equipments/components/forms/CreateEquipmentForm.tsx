@@ -233,6 +233,23 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       return;
     }
     
+    // Add parts structure data - EXACT COPY FROM VEHICLES
+    formDataFromForm.append('partsStructure', JSON.stringify(partsStructure));
+    
+    // Add all parts files to formData with folder information - EXACT COPY FROM VEHICLES
+    partsStructure.rootFiles.forEach((partFile, index) => {
+      formDataFromForm.append(`partsFile_root_${index}`, partFile.file);
+      formDataFromForm.append(`partsFile_root_${index}_name`, partFile.name);
+    });
+
+    partsStructure.folders.forEach((folder, folderIndex) => {
+      folder.files.forEach((partFile, fileIndex) => {
+        formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
+        formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
+        formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
+      });
+    });
+
     // Add all the files to formData
     Object.entries(files).forEach(([key, file]) => {
       if (key === 'maintenanceAttachments' && Array.isArray(file)) {
@@ -245,27 +262,6 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       } else if (file && !Array.isArray(file)) {
         formDataFromForm.append(key, file);
       }
-    });
-
-    // Add parts structure data
-    formDataFromForm.append('partsStructure', JSON.stringify(partsStructure));
-    
-    // Add all parts files to formData with folder information
-    partsStructure.rootFiles.forEach((partFile, index) => {
-      if (partFile.file) {
-        formDataFromForm.append(`partsFile_root_${index}`, partFile.file);
-        formDataFromForm.append(`partsFile_root_${index}_name`, partFile.name);
-      }
-    });
-
-    partsStructure.folders.forEach((folder, folderIndex) => {
-      folder.files.forEach((partFile, fileIndex) => {
-        if (partFile.file) {
-          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
-          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
-          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
-        }
-      });
     });
     
     // Add all form field values to formData
@@ -1085,17 +1081,10 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
               </p>
             </CardHeader>
             <CardContent>
-              <EquipmentFormErrorBoundary fallback={
-                <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-                  <p className="text-sm text-red-600">Parts management component failed to load</p>
-                  <p className="text-xs text-muted-foreground mt-1">Please refresh the page to try again</p>
-                </div>
-              }>
-                <PartsFolderManager 
-                  onChange={setPartsStructure}
-                  initialData={partsStructure}
-                />
-              </EquipmentFormErrorBoundary>
+              <PartsFolderManager 
+                onChange={setPartsStructure}
+                initialData={partsStructure}
+              />
             </CardContent>
           </Card>
         </div>

@@ -33,9 +33,8 @@ const deleteFileFromSupabase = async (
   }
   
   const path = extractFilePathFromUrl(fileUrl);
-  console.log(`🔍 Extracted path for ${tag}:`, path, 'from URL:', fileUrl);
   
-  if (!path) {
+  if (!path) { 
     throw new Error(`Cannot parse storage path from URL for ${tag}: ${fileUrl}`);
   }
   
@@ -44,10 +43,7 @@ const deleteFileFromSupabase = async (
     throw new Error(`Invalid file path detected for ${tag} - appears to be a directory: ${path}`);
   }
   
-  console.log(`🗑️ Attempting to delete single file: ${path}`);
   const { error } = await supabase.storage.from("equipments").remove([path]);
-  
-  console.log(`🗂️ Supabase delete result for ${tag}:`, error ? `ERROR: ${error.message}` : 'SUCCESS');
   
   if (error) {
     // Enhanced error message for debugging
@@ -1070,7 +1066,17 @@ export const PUT = withResourcePermission(
           // Handle individual file deletions
           if (deleteRequests.files && Array.isArray(deleteRequests.files)) {
             for (const fileDelete of deleteRequests.files) {
-              await deletePartFile(equipmentId, fileDelete.fileId, fileDelete.folderPath || 'root');
+              // If file has URL, it's an existing file - delete by URL
+              if (fileDelete.fileUrl) {
+                try {
+                  await deleteFileFromSupabase(fileDelete.fileUrl, `part file ${fileDelete.fileName}`);
+                } catch (error) {
+                  console.warn(`Failed to delete part file by URL: ${fileDelete.fileName}`, error);
+                }
+              } else {
+                // No URL means it's a new file - delete by ID
+                await deletePartFile(equipmentId, fileDelete.fileId, fileDelete.folderPath || 'root');
+              }
             }
           }
           
@@ -1086,165 +1092,128 @@ export const PUT = withResourcePermission(
         }
       }
 
-      // Handle equipment parts updates - support both new and legacy formats - CRITICAL FIX: Support empty folders
+      // Handle equipment parts updates - simplified approach following vehicles pattern
       const partsStructureData = formData.get('partsStructure') as string;
       let partsStructureWithUrls: any = null;
       
       if (partsStructureData) {
-        // Handle new parts structure (matching server actions)
         try {
           const partsStructure = JSON.parse(partsStructureData);
           
-          // CRITICAL FIX: Initialize with existing structure to preserve empty folders
-          partsStructureWithUrls = {
-            rootFiles: [],
-            folders: partsStructure.folders ? partsStructure.folders.map((folder: any) => ({
-              id: folder.id,
-              name: folder.name,
-              files: [] // Start with empty files array, will be populated with actual uploaded files
-            })) : []
+          // Create the final structure with uploaded URLs - only process NEW uploads
+          const processedStructure = {
+            rootFiles: [] as any[],
+            folders: [] as any[]
           };
           
-          // CRITICAL FIX: Process existing root files FIRST (for existing data preservation)
-          let nextRootFileIndex = 0;
+          // Process root files - only handle NEW uploads (files with File objects)
           if (partsStructure.rootFiles && Array.isArray(partsStructure.rootFiles)) {
-            partsStructure.rootFiles.forEach((existingFile: any) => {
-              // Only add if it has a valid URL (existing stored file)
-              if (existingFile.url || existingFile.preview) {
-                partsStructureWithUrls.rootFiles.push({
-                  id: existingFile.id,
-                  name: existingFile.name,
-                  url: existingFile.url || existingFile.preview,
-                  type: existingFile.type || 'document'
-                });
-                
-                // Calculate next available index from existing file IDs
-                const match = existingFile.id.match(/^root_file_(\d+)$/);
-                if (match) {
-                  const fileIndex = parseInt(match[1], 10);
-                  nextRootFileIndex = Math.max(nextRootFileIndex, fileIndex + 1);
-                }
-              }
-            });
-          }
-          
-          // Upload NEW root files with continued sequence
-          for (let i = 0; formData.get(`partsFile_root_${i}`); i++) {
-            const file = formData.get(`partsFile_root_${i}`) as File;
-            const fileName = formData.get(`partsFile_root_${i}_name`) as string;
-            
-            if (file && file.size > 0) {
-              const fileId = `root_file_${nextRootFileIndex + i}`; // Continue sequence from existing files
-              const uploadResult = await uploadEquipmentPart(
-                file,
-                projectId,
-                equipmentId,
-                fileId,
-                'root'
-              );
+            for (let i = 0; i < partsStructure.rootFiles.length; i++) {
+              const rootFile = partsStructure.rootFiles[i];
               
-              partsStructureWithUrls.rootFiles.push(uploadResult);
-            }
-          }
-          
-          // Upload folder files and build structure
-          const folderMap: { [key: string]: any } = {};
-          
-          // CRITICAL FIX: Initialize folderMap with existing folders to preserve empty ones
-          partsStructureWithUrls.folders.forEach((folder: any) => {
-            folderMap[folder.name] = folder;
-          });
-          
-          // Upload NEW folder files with continued sequence per folder
-          for (let folderIndex = 0; formData.get(`partsFile_folder_${folderIndex}_0`); folderIndex++) {
-            let currentFolderName = '';
-            let nextFileIndexForFolder = 0;
-            
-            // First pass: determine folder name and calculate next file index
-            for (let fileIndex = 0; formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`); fileIndex++) {
-              const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
-              if (!currentFolderName) {
-                currentFolderName = folderName;
-                
-                // Calculate next available file index for this folder
-                if (folderMap[folderName] && folderMap[folderName].files) {
-                  folderMap[folderName].files.forEach((existingFile: any) => {
-                    const match = existingFile.id.match(/^folder_.*_file_(\d+)$/);
-                    if (match) {
-                      const fileIndex = parseInt(match[1], 10);
-                      nextFileIndexForFolder = Math.max(nextFileIndexForFolder, fileIndex + 1);
-                    }
+              const partFile = formData.get(`partsFile_root_${i}`) as File;
+              const partName = formData.get(`partsFile_root_${i}_name`) as string || rootFile.name;
+              
+              // Check if this is a new file upload
+              if (partFile && partFile.size > 0) {
+                try {
+                  const fileId = `root_file_${i}_${Date.now()}`;
+                  const uploadResult = await uploadEquipmentPart(
+                    partFile,
+                    projectId,
+                    equipmentId,
+                    fileId,
+                    'root'
+                  );
+                  
+                  processedStructure.rootFiles.push({
+                    id: uploadResult.id,
+                    name: rootFile.name,
+                    url: uploadResult.url,
+                    preview: uploadResult.preview || uploadResult.url,
+                    type: uploadResult.type
                   });
+                } catch (error) {
+                  console.error(`Failed to upload root file ${i}:`, error);
+                  // Continue with other files
                 }
-              }
-            }
-            
-            // Second pass: upload files with correct sequence
-            for (let fileIndex = 0; formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`); fileIndex++) {
-              const file = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
-              const fileName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string;
-              const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
-              
-              if (file && file.size > 0) {
-                const fileId = `folder_${folderName}_file_${nextFileIndexForFolder + fileIndex}`; // Continue sequence from existing files
-                const uploadResult = await uploadEquipmentPart(
-                  file,
-                  projectId,
-                  equipmentId,
-                  fileId,
-                  folderName
-                );
-                
-                // Initialize folder if it doesn't exist
-                if (!folderMap[folderName]) {
-                  folderMap[folderName] = {
-                    id: `folder_${folderIndex}`,
-                    name: folderName,
-                    files: []
-                  };
-                }
-                
-                folderMap[folderName].files.push(uploadResult);
+              } else if (rootFile.url || rootFile.preview) {
+                // This is an existing file, preserve it
+                processedStructure.rootFiles.push({
+                  id: rootFile.id,
+                  name: rootFile.name,
+                  url: rootFile.url || rootFile.preview,
+                  preview: rootFile.preview || rootFile.url,
+                  type: rootFile.type || (rootFile.url?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
+                });
               }
             }
           }
           
-          // CRITICAL FIX: Preserve existing files in folders
+          // Process folder files
           if (partsStructure.folders && Array.isArray(partsStructure.folders)) {
-            partsStructure.folders.forEach((existingFolder: any) => {
-              if (existingFolder.files && Array.isArray(existingFolder.files)) {
-                // Ensure folder exists in folderMap
-                if (!folderMap[existingFolder.name]) {
-                  folderMap[existingFolder.name] = {
-                    id: existingFolder.id,
-                    name: existingFolder.name,
-                    files: []
-                  };
-                }
-                
-                // Add existing files that have valid URLs
-                existingFolder.files.forEach((existingFile: any) => {
-                  if (existingFile.url || existingFile.preview) {
-                    folderMap[existingFolder.name].files.push({
-                      id: existingFile.id,
-                      name: existingFile.name,
-                      url: existingFile.url || existingFile.preview,
-                      type: existingFile.type || 'document'
+            for (let folderIndex = 0; folderIndex < partsStructure.folders.length; folderIndex++) {
+              const folder = partsStructure.folders[folderIndex];
+              const processedFolder = {
+                id: folder.id,
+                name: folder.name,
+                files: [] as any[],
+                created_at: folder.created_at
+              };
+              
+              if (folder.files && Array.isArray(folder.files)) {
+                for (let fileIndex = 0; fileIndex < folder.files.length; fileIndex++) {
+                  const folderFile = folder.files[fileIndex];
+                  
+                  const partFile = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
+                  const partName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string || folderFile.name;
+                  
+                  // Check if this is a new file upload
+                  if (partFile && partFile.size > 0) {
+                    try {
+                      const fileId = `folder_${folder.name}_file_${fileIndex}_${Date.now()}`;
+                      const uploadResult = await uploadEquipmentPart(
+                        partFile,
+                        projectId,
+                        equipmentId,
+                        fileId,
+                        folder.name
+                      );
+                      
+                      processedFolder.files.push({
+                        id: uploadResult.id,
+                        name: folderFile.name,
+                        url: uploadResult.url,
+                        preview: uploadResult.preview || uploadResult.url,
+                        type: uploadResult.type
+                      });
+                    } catch (error) {
+                      console.error(`Failed to upload folder file ${folderIndex}-${fileIndex}:`, error);
+                      // Continue with other files
+                    }
+                  } else if (folderFile.url || folderFile.preview) {
+                    // This is an existing file, preserve it
+                    processedFolder.files.push({
+                      id: folderFile.id,
+                      name: folderFile.name,
+                      url: folderFile.url || folderFile.preview,
+                      preview: folderFile.preview || folderFile.url,
+                      type: folderFile.type || (folderFile.url?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
                     });
                   }
-                });
+                }
               }
-            });
+              
+              processedStructure.folders.push(processedFolder);
+            }
           }
           
-          // Convert folderMap to array
-          partsStructureWithUrls.folders = Object.values(folderMap);
-          
+          partsStructureWithUrls = processedStructure;
           
           // Store as array with single JSON string element
           updateData.equipment_parts = [JSON.stringify(partsStructureWithUrls)];
         } catch (error) {
-          // Failed to parse parts structure during update
+          console.error('Failed to process parts structure during update:', error);
         }
       }
 

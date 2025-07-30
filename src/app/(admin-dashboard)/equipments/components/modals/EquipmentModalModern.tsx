@@ -112,7 +112,7 @@ export default function EquipmentModalModern() {
   
   // Parts deletion tracking - similar to removedFiles for images/documents
   const [deletedParts, setDeletedParts] = useState<{
-    files: Array<{ fileId: string; folderPath?: string; fileName: string }>,
+    files: Array<{ fileId: string; folderPath?: string; fileName: string; fileUrl?: string }>,
     folders: Array<{ folderPath: string; folderName: string }>
   }>({ files: [], folders: [] });
   
@@ -438,7 +438,6 @@ export default function EquipmentModalModern() {
           folders: deletedParts.folders
         };
         formData.append('deleteParts', JSON.stringify(deletePartsPayload));
-        console.log(`📁 Sending parts deletion request:`, deletePartsPayload);
       }
       
       // CRITICAL FIX: Convert equipment parts and extract File objects for upload
@@ -538,15 +537,13 @@ export default function EquipmentModalModern() {
               })) : []
             };
             
-            // Apply deduplication to prevent duplicate entries
-            const deduplicatedStructure = deduplicatePartsStructure(updatedPartsStructure);
-            
-            console.log('🔄 Updating partsStructure with server data to prevent duplicates:', deduplicatedStructure);
+            console.log('🔄 Updating partsStructure with server data (no deduplication needed):', updatedPartsStructure);
             
             // Clean up old blob URLs before updating with server data
             cleanupBlobUrls(partsStructure);
             
-            setPartsStructure(deduplicatedStructure);
+            // Use server data directly - no deduplication needed since server data is already clean
+            setPartsStructure(updatedPartsStructure);
           }
         } catch (error) {
           console.warn('Error parsing updated equipment parts:', error);
@@ -772,12 +769,10 @@ export default function EquipmentModalModern() {
   }, []);
 
   // Parts deletion callbacks - similar to handleFileSelect
-  const handlePartFileDelete = useCallback((fileId: string, fileName: string, folderPath?: string) => {
-    console.log(`📁 Part file marked for deletion: ${fileName} (ID: ${fileId}, Folder: ${folderPath || 'root'})`);
-    
+  const handlePartFileDelete = useCallback((fileId: string, fileName: string, folderPath?: string, fileUrl?: string) => {
     setDeletedParts(prev => ({
       ...prev,
-      files: [...prev.files, { fileId, fileName, folderPath }]
+      files: [...prev.files, { fileId, fileName, folderPath, fileUrl }]
     }));
     
     // Mark as dirty to enable save button
@@ -785,8 +780,6 @@ export default function EquipmentModalModern() {
   }, []);
 
   const handlePartFolderDelete = useCallback((folderPath: string, folderName: string) => {
-    console.log(`📁 Part folder marked for deletion: ${folderName} (Path: ${folderPath})`);
-    
     setDeletedParts(prev => ({
       ...prev,
       folders: [...prev.folders, { folderPath, folderName }]
@@ -889,39 +882,76 @@ export default function EquipmentModalModern() {
     if (selectedEquipment?.equipment_registration_url) count++;
     return count;
   };
+  // Helper function to count equipment parts for selected equipment - EXACTLY like VehicleModalModern
   const getEquipmentPartsCount = () => {
-    if (!selectedEquipment?.equipment_parts || selectedEquipment.equipment_parts.length === 0) return 0;
+    if (!selectedEquipment || !selectedEquipment.equipment_parts) return 0;
     
-    try {
-      // Parse the equipment_parts from the database format
-      let parsedParts: any = selectedEquipment.equipment_parts;
-      
-      // Handle array with JSON string format
-      if (Array.isArray(parsedParts) && parsedParts.length > 0 && typeof parsedParts[0] === 'string') {
-        parsedParts = JSON.parse(parsedParts[0]);
+    // Parse equipment parts data using the same logic as EquipmentPartsViewer
+    const parsePartsData = (parts: any) => {
+      if (!parts) return { rootFiles: [], folders: [] };
+
+      // Handle string (JSON) format
+      if (typeof parts === 'string') {
+        try {
+          const parsed = JSON.parse(parts);
+          if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
+            return parsed;
+          }
+          return { rootFiles: [parsed], folders: [] };
+        } catch {
+          return { rootFiles: [], folders: [] };
+        }
       }
-      
-      // Handle string format
-      if (typeof parsedParts === 'string') {
-        parsedParts = JSON.parse(parsedParts);
+
+      // Handle object format
+      if (typeof parts === 'object' && !Array.isArray(parts)) {
+        if (parts.rootFiles && parts.folders) {
+          return parts;
+        }
       }
-      
-      // Count actual files in the structure
-      if (parsedParts && typeof parsedParts === 'object') {
-        const rootFilesCount = Array.isArray(parsedParts.rootFiles) ? parsedParts.rootFiles.length : 0;
-        const folderFilesCount = Array.isArray(parsedParts.folders) 
-          ? parsedParts.folders.reduce((sum: number, folder: any) => {
-              return sum + (Array.isArray(folder.files) ? folder.files.length : 0);
-            }, 0)
-          : 0;
-        return rootFilesCount + folderFilesCount;
+
+      // Handle array format - NEW: Check if first element is structured JSON (like EquipmentPartsViewer)
+      if (Array.isArray(parts)) {
+        if (parts.length === 0) {
+          return { rootFiles: [], folders: [] };
+        }
+
+        // NEW: Check if first element contains structured data (JSON)
+        if (parts.length === 1 && typeof parts[0] === 'string') {
+          try {
+            const parsed = JSON.parse(parts[0]);
+            if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
+              // This is the new structured format stored as JSON in array
+              return parsed;
+            }
+          } catch (error) {
+            // First array element is not JSON, treating as legacy URL
+          }
+        }
+
+        // LEGACY: Handle old format where each element is a URL
+        return { rootFiles: parts, folders: [] };
       }
-    } catch (error) {
-      // If parsing fails, return 0
-      return 0;
+
+      return { rootFiles: [], folders: [] };
+    };
+
+    const parsedData = parsePartsData(selectedEquipment.equipment_parts);
+    
+    // Count files in rootFiles array and recursively in folders
+    let count = 0;
+    if (Array.isArray(parsedData.rootFiles)) {
+      count += parsedData.rootFiles.length;
+    }
+    if (Array.isArray(parsedData.folders)) {
+      parsedData.folders.forEach((folder: any) => {
+        if (folder && Array.isArray(folder.files)) {
+          count += folder.files.length;
+        }
+      });
     }
     
-    return 0;
+    return count;
   };  
   const getMaintenanceReportsCount = () => {
     if (!selectedEquipment?.id || !Array.isArray(maintenanceReports)) return 0;
@@ -1691,44 +1721,45 @@ export default function EquipmentModalModern() {
         </div>
       )}
 
-      {/* Parts Tab */}
-      {activeTab === 'parts' && (
-        <div className="space-y-6">
-          {/* Tab Title and Description */}
-          <div className={`mb-6 ${isMobile ? 'mb-4' : ''}`}>
-            <h2 className={`font-semibold flex items-center gap-2 mb-2 ${isMobile ? 'text-lg' : 'text-xl'}`}>
-              <Wrench className={`${isMobile ? 'h-4 w-4' : 'h-5 w-5'}`} />
-              Equipment Parts
-            </h2>
-            <p className={`text-muted-foreground ${isMobile ? 'text-xs' : 'text-sm'}`}>
-              Components and parts associated with this equipment for inventory tracking
-            </p>
-          </div>
-          {isGlobalEditMode ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold">Equipment Parts Management (Optional)</h3>
-                <p className="text-sm text-muted-foreground">
-                  Organize parts documentation in folders or upload directly to root. This creates a structured file system for easy parts management.
-                </p>
+        {/* Parts Tab - EXACT COPY FROM VEHICLES WITH EDIT MODE */}
+        {activeTab === 'parts' && (
+          <div className={`space-y-4 ${isMobile ? '' : 'border-t pt-4'}`}>
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">Equipment Parts</h3>
+              <p className="text-sm text-muted-foreground">
+                {isGlobalEditMode ? 
+                  "Organize parts documentation in folders or upload directly to root. This creates a structured file system for easy parts management." :
+                  "View and browse parts documentation organized in folders."
+                }
+              </p>
+            </div>
+            {isGlobalEditMode ? (
+              <div className={`${isMobile ? 'max-h-[45vh]' : 'max-h-[50vh]'} overflow-y-auto border rounded-lg p-4 bg-muted/20`}>
+                <PartsFolderManager 
+                  key={selectedEquipment?.id || 'edit'} 
+                  onChange={setPartsStructure}
+                  initialData={partsStructure}
+                  onPartFileDelete={handlePartFileDelete}
+                  onPartFolderDelete={handlePartFolderDelete}
+                />
               </div>
-              <PartsFolderManager
-                onChange={setPartsStructure}
-                initialData={partsStructure}
+            ) : (
+              <EquipmentPartsViewer 
+                equipmentParts={
+                  selectedEquipment.equipment_parts 
+                    ? typeof selectedEquipment.equipment_parts === 'string'
+                      ? JSON.parse(selectedEquipment.equipment_parts)
+                      : selectedEquipment.equipment_parts
+                    : { rootFiles: [], folders: [] }
+                }
+                isEditable={isGlobalEditMode}
+                onPartsChange={setPartsStructure}
                 onPartFileDelete={handlePartFileDelete}
                 onPartFolderDelete={handlePartFolderDelete}
               />
-            </div>
-          ) : (
-            <EquipmentPartsViewer 
-              equipmentParts={selectedEquipment.equipment_parts} 
-              isEditable={false}
-              onPartFileDelete={handlePartFileDelete}
-              onPartFolderDelete={handlePartFolderDelete}
-            />
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
 
       {/* Maintenance Tab */}
       {activeTab === 'maintenance' && (
