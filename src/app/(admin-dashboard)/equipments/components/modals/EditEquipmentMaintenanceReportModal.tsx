@@ -24,7 +24,7 @@ import {
   useEquipmentsWithReferenceData,
 } from "@/hooks/useEquipmentsQuery";
 import { useEquipmentsStore } from "@/stores/equipmentsStore";
-import { Plus, Trash2, Settings, Clock, MapPin, Wrench, FileText, Camera, Upload } from "lucide-react";
+import { Plus, Trash2, Settings, Clock, MapPin, Wrench, FileText, Camera, Upload, X } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -50,10 +50,18 @@ export default function EditEquipmentMaintenanceReportModal() {
   });
   const [partsFiles, setPartsFiles] = useState<File[]>([]);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [deletedAttachments, setDeletedAttachments] = useState<string[]>([]);
 
   // Populate form when selectedReport changes
   useEffect(() => {
     if (selectedReport) {
+      const partsReplaced = selectedReport.parts_replaced?.length > 0 
+        ? selectedReport.parts_replaced.filter(part => part.trim() !== "") 
+        : [];
+      const attachmentUrls = selectedReport.attachment_urls?.length > 0 
+        ? selectedReport.attachment_urls.filter(url => url.trim() !== "") 
+        : [];
+
       setFormData({
         issue_description: selectedReport.issue_description || "",
         remarks: selectedReport.remarks || "",
@@ -63,8 +71,8 @@ export default function EditEquipmentMaintenanceReportModal() {
         status: selectedReport.status || "REPORTED",
         downtime_hours: selectedReport.downtime_hours || "",
         location_id: selectedReport.location_id || "",
-        parts_replaced: selectedReport.parts_replaced?.length > 0 ? selectedReport.parts_replaced.filter(part => part.trim() !== "") : [],
-        attachment_urls: selectedReport.attachment_urls?.length > 0 ? selectedReport.attachment_urls.filter(url => url.trim() !== "") : [],
+        parts_replaced: partsReplaced.length > 0 ? partsReplaced : [""],
+        attachment_urls: attachmentUrls.length > 0 ? attachmentUrls : [""],
       });
     }
   }, [selectedReport]);
@@ -86,6 +94,7 @@ export default function EditEquipmentMaintenanceReportModal() {
     });
     setPartsFiles([]);
     setAttachmentFiles([]);
+    setDeletedAttachments([]);
   }, [setSelectedEquipmentMaintenanceReport]);
 
   const handleInputChange = useCallback((field: string, value: string) => {
@@ -114,10 +123,18 @@ export default function EditEquipmentMaintenanceReportModal() {
     field: "parts_replaced" | "attachment_urls",
     index: number
   ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: prev[field].filter((_, i) => i !== index),
-    }));
+    setFormData((prev) => {
+      // If removing an attachment URL, track it for deletion
+      if (field === "attachment_urls" && prev[field][index]?.trim() !== "") {
+        const urlToDelete = prev[field][index];
+        setDeletedAttachments(prevDeleted => [...prevDeleted, urlToDelete]);
+      }
+      
+      return {
+        ...prev,
+        [field]: prev[field].filter((_, i) => i !== index),
+      };
+    });
   }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -138,84 +155,71 @@ export default function EditEquipmentMaintenanceReportModal() {
       (url) => url.trim() !== ""
     );
 
-    // Upload files first
-    const uploadedPartUrls: string[] = [];
-    const uploadedAttachmentUrls: string[] = [];
-
     try {
-      // Upload part images
-      for (let i = 0; i < partsFiles.length; i++) {
-        const file = partsFiles[i];
+      // Create FormData for file uploads and data
+      const formDataToSend = new FormData();
+      
+      // Add basic form fields
+      formDataToSend.append('equipment_id', selectedReport.equipment_id);
+      formDataToSend.append('location_id', formData.location_id);
+      formDataToSend.append('issue_description', formData.issue_description);
+      formDataToSend.append('remarks', formData.remarks);
+      formDataToSend.append('inspection_details', formData.inspection_details);
+      formDataToSend.append('action_taken', formData.action_taken);
+      formDataToSend.append('priority', formData.priority);
+      formDataToSend.append('status', formData.status);
+      formDataToSend.append('downtime_hours', formData.downtime_hours);
+      formDataToSend.append('reported_by', selectedReport.reported_by || '');
+      formDataToSend.append('repaired_by', selectedReport.repaired_by || '');
+      
+      // Set repair date if status is completed and no repair date exists
+      const repairDate = formData.status === "COMPLETED" && !selectedReport.date_repaired
+        ? new Date().toISOString()
+        : selectedReport.date_repaired;
+      if (repairDate) {
+        formDataToSend.append('date_repaired', repairDate);
+      }
+      
+      // Add arrays as JSON strings
+      formDataToSend.append('parts_replaced', JSON.stringify(filteredPartsReplaced));
+      formDataToSend.append('attachment_urls', JSON.stringify(filteredAttachmentUrls));
+      
+      // Add files to delete
+      if (deletedAttachments.length > 0) {
+        formDataToSend.append('filesToDelete', JSON.stringify(deletedAttachments));
+      }
+      
+      // Add new attachment files
+      attachmentFiles.forEach((file, index) => {
         if (file) {
-          const formDataUpload = new FormData();
-          formDataUpload.append('file', file);
-          formDataUpload.append('folder', `equipment-${selectedReport.equipment_id}/maintenance-reports/${selectedReport.id}/parts`);
-          
-          const uploadResponse = await fetch('/api/upload', {
-            method: 'POST',
-            body: formDataUpload,
-          });
-          
-          if (uploadResponse.ok) {
-            const result = await uploadResponse.json();
-            uploadedPartUrls[i] = result.url;
-          }
+          formDataToSend.append(`attachment_${index}`, file);
         }
+      });
+
+      // Make direct API call with FormData
+      const response = await fetch(`/api/equipments/maintenance-reports/${selectedReport.id}`, {
+        method: 'PUT',
+        body: formDataToSend,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update maintenance report');
       }
 
-      // Upload attachment files
-      for (let i = 0; i < attachmentFiles.length; i++) {
-        const file = attachmentFiles[i];
-        if (file) {
-          const formDataUpload = new FormData();
-          formDataUpload.append('file', file);
-          formDataUpload.append('folder', `equipment-${selectedReport.equipment_id}/maintenance-reports/${selectedReport.id}/attachments`);
-          
-          const uploadResponse = await fetch('/api/upload', {
-            method: 'POST',
-            body: formDataUpload,
-          });
-          
-          if (uploadResponse.ok) {
-            const result = await uploadResponse.json();
-            uploadedAttachmentUrls.push(result.url);
-          }
-        }
-      }
-
-      // Combine uploaded file URLs with manual URLs
-      const allAttachmentUrls = [
-        ...uploadedPartUrls.filter(url => url), // Part images first
-        ...uploadedAttachmentUrls, // Then attachment files
-        ...filteredAttachmentUrls // Then manual URLs
-      ];
-
-      const reportData = {
-        id: selectedReport.id,
-        issue_description: formData.issue_description,
-        remarks: formData.remarks || undefined,
-        inspection_details: formData.inspection_details || undefined,
-        action_taken: formData.action_taken || undefined,
-        priority: formData.priority,
-        status: formData.status,
-        downtime_hours: formData.downtime_hours || undefined,
-        location_id: formData.location_id || undefined,
-        parts_replaced: filteredPartsReplaced,
-        attachment_urls: allAttachmentUrls,
-        // Set repair date if status is completed and no repair date exists
-        date_repaired: 
-          formData.status === "COMPLETED" && !selectedReport.date_repaired
-            ? new Date().toISOString()
-            : selectedReport.date_repaired,
-      };
-
-      await updateMaintenanceReportMutation.mutateAsync(reportData);
+      const updatedReport = await response.json();
+      
       toast.success("Equipment maintenance report updated successfully");
       handleClose();
+      
+      // Trigger data refetch by calling the mutation with the result
+      // This ensures the UI updates with the latest data
+      updateMaintenanceReportMutation.mutate(updatedReport);
     } catch (error) {
-      toast.error("Failed to update maintenance report");
+      console.error('Submit error:', error);
+      toast.error(error instanceof Error ? error.message : "Failed to update maintenance report");
     }
-  }, [formData, selectedReport, updateMaintenanceReportMutation, handleClose, partsFiles, attachmentFiles]);
+  }, [formData, selectedReport, updateMaintenanceReportMutation, handleClose, attachmentFiles, deletedAttachments]);
 
   if (!selectedReport) return null;
 
@@ -390,6 +394,161 @@ export default function EditEquipmentMaintenanceReportModal() {
                         placeholder="Describe the actions taken..."
                         className="min-h-[100px]"
                       />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Parts Replaced Card */}
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Wrench className="h-5 w-5" />
+                      Parts Replaced
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      List all parts that were replaced during maintenance
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {formData.parts_replaced.map((part, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <Input
+                          value={part}
+                          onChange={(e) => handleArrayChange("parts_replaced", index, e.target.value)}
+                          placeholder={`Part ${index + 1}...`}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeArrayItem("parts_replaced", index)}
+                          className="px-2"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addArrayItem("parts_replaced")}
+                      className="w-full"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Part
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Attachments Card */}
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Camera className="h-5 w-5" />
+                      Attachments & Images
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Upload photos of work done, receipts, before/after images, and any related documents
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Existing Attachments */}
+                    {formData.attachment_urls.filter(url => url.trim() !== "").length > 0 && (
+                      <div className="space-y-3">
+                        <Label className="text-sm font-medium">Current Attachments</Label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                          {formData.attachment_urls
+                            .filter(url => url.trim() !== "")
+                            .map((url, index) => (
+                              <div key={index} className="relative group">
+                                <div className="aspect-square rounded-lg overflow-hidden border bg-muted">
+                                  {url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? (
+                                    <img
+                                      src={url}
+                                      alt={`Attachment ${index + 1}`}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        const parent = target.parentElement;
+                                        if (parent) {
+                                          parent.innerHTML = `
+                                            <div class="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+                                              <FileText size="32" />
+                                              <span class="text-xs text-center mt-2">Failed to load</span>
+                                            </div>
+                                          `;
+                                        }
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+                                      <FileText size={32} />
+                                      <span className="text-xs text-center mt-2">Document</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  className="absolute -top-2 -right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => removeArrayItem("attachment_urls", index)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                                {/* Show filename as tooltip */}
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity truncate">
+                                  {url.split('/').pop()?.split('_').pop() || 'File'}
+                                </div>
+                              </div>
+                            ))
+                          }
+                        </div>
+                      </div>
+                    )}
+
+                    {/* File Upload Section */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">Upload New Files</Label>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                        💡 <strong>Tip:</strong> Upload work photos, receipts, before/after images, or any documentation related to this maintenance
+                      </div>
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
+                        <Input
+                          type="file"
+                          accept="image/*,application/pdf,.doc,.docx"
+                          multiple
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            setAttachmentFiles(files);
+                          }}
+                          className="w-full"
+                        />
+                        {attachmentFiles.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {attachmentFiles.map((file, index) => (
+                              <div key={index} className="flex items-center gap-2 text-sm">
+                                <FileText className="h-4 w-4" />
+                                <span className="flex-1">{file.name}</span>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setAttachmentFiles(prev => prev.filter((_, i) => i !== index));
+                                  }}
+                                  className="px-2"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

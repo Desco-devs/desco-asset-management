@@ -1130,7 +1130,7 @@ export const PUT = withResourcePermission(
                     id: uploadResult.id,
                     name: rootFile.name,
                     url: uploadResult.url,
-                    preview: uploadResult.preview || uploadResult.url,
+                    preview: uploadResult.url,
                     type: uploadResult.type
                   });
                 } catch (error) {
@@ -1184,7 +1184,7 @@ export const PUT = withResourcePermission(
                         id: uploadResult.id,
                         name: folderFile.name,
                         url: uploadResult.url,
-                        preview: uploadResult.preview || uploadResult.url,
+                        preview: uploadResult.url,
                         type: uploadResult.type
                       });
                     } catch (error) {

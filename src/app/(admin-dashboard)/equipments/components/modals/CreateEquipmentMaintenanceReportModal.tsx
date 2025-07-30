@@ -314,7 +314,6 @@ export default function CreateEquipmentMaintenanceReportModal({
     const reportId = createdReport.id;
 
     // Step 2: Upload files with the report ID
-    const processedPartImages: string[] = [];
     const uploadedAttachmentUrls: string[] = [];
 
     console.log('Starting file uploads for report:', reportId);
@@ -322,38 +321,14 @@ export default function CreateEquipmentMaintenanceReportModal({
     console.log('Local attachment files:', localAttachmentFiles);
 
     try {
-      // Upload part images with report ID
-      for (let i = 0; i < localPartsFiles.length; i++) {
-        const partFile = localPartsFiles[i];
-        if (partFile) {
-          const folderPath = `equipment-${equipmentId}/maintenance-reports/${reportId}/parts`;
-          console.log('Uploading part file:', partFile.name, 'to folder:', folderPath);
-          
-          const formDataUpload = new FormData();
-          formDataUpload.append('file', partFile);
-          formDataUpload.append('folder', folderPath);
-          
-          const uploadResponse = await fetch('/api/upload', {
-            method: 'POST',
-            body: formDataUpload,
-          });
-          
-          if (uploadResponse.ok) {
-            const result = await uploadResponse.json();
-            processedPartImages.push(result.url);
-            console.log('Part image uploaded successfully:', result);
-          } else {
-            console.error('Part image upload failed:', uploadResponse.status, await uploadResponse.text());
-          }
-        }
-      }
-
-      // Upload attachment files with report ID
-      for (let i = 0; i < localAttachmentFiles.length; i++) {
-        const file = localAttachmentFiles[i];
+      // Upload ALL files (both parts and attachments) to attachments folder for simplicity
+      const allFiles = [...localPartsFiles, ...localAttachmentFiles];
+      
+      for (let i = 0; i < allFiles.length; i++) {
+        const file = allFiles[i];
         if (file) {
           const folderPath = `equipment-${equipmentId}/maintenance-reports/${reportId}/attachments`;
-          console.log('Uploading attachment file:', file.name, 'to folder:', folderPath);
+          console.log('Uploading file:', file.name, 'to folder:', folderPath);
           
           const formDataUpload = new FormData();
           formDataUpload.append('file', file);
@@ -367,19 +342,18 @@ export default function CreateEquipmentMaintenanceReportModal({
           if (uploadResponse.ok) {
             const result = await uploadResponse.json();
             uploadedAttachmentUrls.push(result.url);
-            console.log('Attachment uploaded successfully:', result);
+            console.log('File uploaded successfully:', result);
           } else {
-            console.error('Attachment upload failed:', uploadResponse.status, await uploadResponse.text());
+            console.error('File upload failed:', uploadResponse.status, await uploadResponse.text());
           }
         }
       }
 
       // Step 3: Update the report with file URLs if any files were uploaded
-      if (processedPartImages.length > 0 || uploadedAttachmentUrls.length > 0) {
+      if (uploadedAttachmentUrls.length > 0 || filteredAttachmentUrls.length > 0) {
         const allAttachmentUrls = [
-          ...processedPartImages.filter(url => url), // Part images first
-          ...uploadedAttachmentUrls, // Then attachment files  
-          ...filteredAttachmentUrls // Then manual URLs
+          ...uploadedAttachmentUrls, // Uploaded files
+          ...filteredAttachmentUrls // Manual URLs
         ];
 
         // Update the report with file URLs

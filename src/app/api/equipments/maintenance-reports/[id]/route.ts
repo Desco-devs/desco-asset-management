@@ -67,9 +67,71 @@ export async function PUT(
 ) {
   try {
     const { id } = await context.params;
-    const body = await request.json();
     
-    // Debug: Log the incoming data
+    // Check if this is FormData (file uploads) or JSON
+    const contentType = request.headers.get('content-type') || '';
+    const isFormData = contentType.includes('multipart/form-data');
+    
+    let body: any = {};
+    let filesToDelete: string[] = [];
+    let newAttachmentFiles: File[] = [];
+    
+    if (isFormData) {
+      const formData = await request.formData();
+      
+      // Extract form fields
+      const formFields = [
+        'equipment_id', 'location_id', 'issue_description', 'remarks',
+        'inspection_details', 'action_taken', 'priority', 'status',
+        'downtime_hours', 'date_repaired', 'reported_by', 'repaired_by'
+      ];
+      
+      formFields.forEach(field => {
+        const value = formData.get(field);
+        if (value !== null) {
+          body[field] = value;
+        }
+      });
+      
+      // Handle parts_replaced array
+      const partsReplacedData = formData.get('parts_replaced');
+      if (partsReplacedData) {
+        try {
+          body.parts_replaced = JSON.parse(partsReplacedData as string);
+        } catch {
+          body.parts_replaced = [];
+        }
+      }
+      
+      // Handle attachment_urls array
+      const attachmentUrlsData = formData.get('attachment_urls');
+      if (attachmentUrlsData) {
+        try {
+          body.attachment_urls = JSON.parse(attachmentUrlsData as string);
+        } catch {
+          body.attachment_urls = [];
+        }
+      }
+      
+      // Handle file deletions
+      const filesToDeleteData = formData.get('filesToDelete');
+      if (filesToDeleteData) {
+        try {
+          filesToDelete = JSON.parse(filesToDeleteData as string);
+        } catch {
+          filesToDelete = [];
+        }
+      }
+      
+      // Extract new attachment files
+      for (const [key, value] of formData.entries()) {
+        if (key.startsWith('attachment_') && value instanceof File && value.size > 0) {
+          newAttachmentFiles.push(value);
+        }
+      }
+    } else {
+      body = await request.json();
+    }
     
     const {
       equipment_id,
@@ -83,14 +145,21 @@ export async function PUT(
       status,
       downtime_hours,
       date_repaired,
-      attachment_urls,
+      attachment_urls = [],
       reported_by,
       repaired_by,
     } = body;
 
     // Check if report exists
     const existingReport = await prisma.maintenance_equipment_report.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        equipment: {
+          select: {
+            id: true
+          }
+        }
+      }
     });
 
     if (!existingReport) {
@@ -99,6 +168,78 @@ export async function PUT(
         { status: 404 }
       );
     }
+
+    // Handle file deletions first
+    if (filesToDelete.length > 0) {
+      const supabase = createClient();
+      
+      for (const fileUrl of filesToDelete) {
+        try {
+          // Extract the file path from the URL
+          const url = new URL(fileUrl);
+          const pathParts = url.pathname.split('/').filter(Boolean);
+          const equipmentsIndex = pathParts.findIndex(part => part === 'equipments');
+          
+          if (equipmentsIndex !== -1 && equipmentsIndex < pathParts.length - 1) {
+            const filePath = pathParts.slice(equipmentsIndex + 1).join('/');
+            const { error } = await supabase.storage
+              .from('equipments')
+              .remove([filePath]);
+            
+            if (error) {
+              console.warn(`Failed to delete file ${fileUrl}:`, error);
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to parse URL for deletion ${fileUrl}:`, error);
+        }
+      }
+    }
+
+    // Handle new file uploads
+    let newAttachmentUrls: string[] = [];
+    if (newAttachmentFiles.length > 0) {
+      const supabase = createClient();
+      const equipmentId = existingReport.equipment.id;
+      
+      for (let i = 0; i < newAttachmentFiles.length; i++) {
+        const file = newAttachmentFiles[i];
+        try {
+          const timestamp = Date.now();
+          const fileExt = file.name.split('.').pop();
+          const filename = `attachment_${i + 1}_${timestamp}.${fileExt}`;
+          const filePath = `equipment-${equipmentId}/maintenance-reports/${id}/attachments/${filename}`;
+          
+          const buffer = Buffer.from(await file.arrayBuffer());
+          
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('equipments')
+            .upload(filePath, buffer, {
+              cacheControl: '3600',
+              upsert: false
+            });
+          
+          if (uploadError || !uploadData) {
+            console.error(`Failed to upload attachment ${i}:`, uploadError);
+            continue;
+          }
+          
+          const { data: urlData } = supabase.storage
+            .from('equipments')
+            .getPublicUrl(uploadData.path);
+          
+          newAttachmentUrls.push(urlData.publicUrl);
+        } catch (error) {
+          console.error(`Failed to process attachment ${i}:`, error);
+        }
+      }
+    }
+
+    // Combine existing attachment URLs with new ones
+    const finalAttachmentUrls = [
+      ...attachment_urls.filter((url: string) => url.trim() !== ''),
+      ...newAttachmentUrls
+    ];
 
     // Debug: Log the update data
     const updateData = {
@@ -113,7 +254,7 @@ export async function PUT(
       status,
       downtime_hours: downtime_hours || null,
       date_repaired: date_repaired ? new Date(date_repaired) : null,
-      attachment_urls: attachment_urls || [],
+      attachment_urls: finalAttachmentUrls,
       reported_by,
       repaired_by,
     };

@@ -221,22 +221,8 @@ export default function EquipmentMaintenanceReportsEnhanced({
     }));
   }, []);
 
-  // State for tracking files per report
-  const [reportPartsFiles, setReportPartsFiles] = useState<Record<string, (File | null)[]>>({});
+  // State for tracking attachment files per report  
   const [reportAttachmentFiles, setReportAttachmentFiles] = useState<Record<string, (File | null)[]>>({});
-
-  // Helper functions for file management (no auto-upload)
-  const updatePartsFile = useCallback((reportId: string, index: number, file: File | null) => {
-    setReportPartsFiles(prev => {
-      const currentFiles = prev[reportId] || [];
-      const newFiles = [...currentFiles];
-      newFiles[index] = file;
-      return {
-        ...prev,
-        [reportId]: newFiles
-      };
-    });
-  }, []);
 
   const updateAttachmentFile = useCallback((reportId: string, index: number, file: File | null) => {
     setReportAttachmentFiles(prev => {
@@ -286,24 +272,8 @@ export default function EquipmentMaintenanceReportsEnhanced({
         return;
       }
 
-      // Handle file uploads
-      const uploadedPartUrls: string[] = [];
+      // Handle file uploads - all files go to attachments folder
       const uploadedAttachmentUrls: string[] = [];
-
-      // Upload part images
-      const partsFiles = reportPartsFiles[reportId] || [];
-      for (let i = 0; i < partsFiles.length; i++) {
-        const file = partsFiles[i];
-        if (file) {
-          try {
-            const uploadedUrl = await uploadFileToSupabase(file, 'parts');
-            uploadedPartUrls[i] = uploadedUrl;
-          } catch {
-            toast.error(`Failed to upload part ${i + 1} image`);
-            return;
-          }
-        }
-      }
 
       // Upload attachment files
       const attachmentFiles = reportAttachmentFiles[reportId] || [];
@@ -320,27 +290,16 @@ export default function EquipmentMaintenanceReportsEnhanced({
         }
       }
 
-      // Combine existing URLs with newly uploaded files
+      // Combine existing URLs with newly uploaded files and manual URLs
       const existingAttachmentUrls = report.attachment_urls || [];
       const filteredManualUrls = (formData.attachment_urls || []).filter((url: string) => url.trim() !== "");
       
-      // Create final attachment URLs array
-      const finalAttachmentUrls = [...existingAttachmentUrls];
-      
-      // Update with new part images
-      uploadedPartUrls.forEach((url, index) => {
-        if (url) finalAttachmentUrls[index] = url;
-      });
-      
-      // Add new attachment files
-      uploadedAttachmentUrls.forEach(url => {
-        finalAttachmentUrls.push(url);
-      });
-      
-      // Add manual URLs
-      filteredManualUrls.forEach(url => {
-        finalAttachmentUrls.push(url);
-      });
+      // Create final attachment URLs array (all files in one place)
+      const finalAttachmentUrls = [
+        ...existingAttachmentUrls,
+        ...uploadedAttachmentUrls,
+        ...filteredManualUrls
+      ];
 
       const reportData = {
         id: report.id,
@@ -364,13 +323,12 @@ export default function EquipmentMaintenanceReportsEnhanced({
       toast.success("Maintenance report updated successfully");
       
       // Clear file states after successful update
-      setReportPartsFiles(prev => ({ ...prev, [reportId]: [] }));
       setReportAttachmentFiles(prev => ({ ...prev, [reportId]: [] }));
       
     } catch {
       toast.error("Failed to update maintenance report");
     }
-  }, [reportFormData, reportPartsFiles, reportAttachmentFiles, uploadFileToSupabase, updateMaintenanceReportMutation]);
+  }, [reportFormData, reportAttachmentFiles, uploadFileToSupabase, updateMaintenanceReportMutation]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -597,7 +555,7 @@ export default function EquipmentMaintenanceReportsEnhanced({
                             }`}
                           >
                             <Wrench className="h-4 w-4" />
-                            Parts
+                            Parts Replaced
                           </button>
                           <button
                             type="button"
@@ -609,7 +567,7 @@ export default function EquipmentMaintenanceReportsEnhanced({
                             }`}
                           >
                             <Camera className="h-4 w-4" />
-                            Attachments
+                            Attachments & Images
                           </button>
                       </div>
 
@@ -755,41 +713,34 @@ export default function EquipmentMaintenanceReportsEnhanced({
                                 </Button>
                               </div>
                               
-                              <div className="space-y-4">
+                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mb-4">
+                                💡 <strong>Tip:</strong> List the parts that were replaced during maintenance. For photos and documentation, use the "Attachments & Images" tab.
+                              </div>
+                              
+                              <div className="space-y-3">
                                 {(reportFormData[report.id]?.parts_replaced || []).map((part: string, index: number) => (
-                                  <div key={index} className="space-y-2 p-2 sm:p-3 border rounded-lg">
-                                    <FileUploadSectionSimple
-                                      label={`Part ${index + 1} Image`}
-                                      accept="image/*"
-                                      currentFileUrl={report.attachment_urls?.[index] || null}
-                                      selectedFile={reportPartsFiles[report.id]?.[index] || null}
-                                      onFileChange={(file) => updatePartsFile(report.id, index, file)}
-                                      onKeepExistingChange={() => {}}
-                                      required={false}
-                                      hideChangeButton={true}
+                                  <div key={index} className="flex gap-2 items-center p-3 border rounded-lg bg-gray-50">
+                                    <Wrench className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                    <Input
+                                      value={part}
+                                      onChange={(e) => {
+                                        const currentParts = [...(reportFormData[report.id]?.parts_replaced || [])];
+                                        currentParts[index] = e.target.value;
+                                        updateFormData(report.id, "parts_replaced", currentParts);
+                                      }}
+                                      placeholder={`e.g., "Engine oil filter", "Brake pads - front left", "Transmission fluid"`}
+                                      className="flex-1 text-sm border-none bg-transparent focus:bg-white"
                                     />
-                                    <div className="flex gap-2">
-                                      <Input
-                                        value={part}
-                                        onChange={(e) => {
-                                          const currentParts = [...(reportFormData[report.id]?.parts_replaced || [])];
-                                          currentParts[index] = e.target.value;
-                                          updateFormData(report.id, "parts_replaced", currentParts);
-                                        }}
-                                        placeholder="Part name or description..."
-                                        className="flex-1 text-sm"
-                                      />
-                                      {(reportFormData[report.id]?.parts_replaced || []).length > 1 && (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => removePartFromReport(report.id, index)}
-                                          className="px-2"
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                      )}
-                                    </div>
+                                    {(reportFormData[report.id]?.parts_replaced || []).length > 1 && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => removePartFromReport(report.id, index)}
+                                        className="px-2 flex-shrink-0"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    )}
                                   </div>
                                 ))}
                                 
@@ -821,51 +772,104 @@ export default function EquipmentMaintenanceReportsEnhanced({
                                 </Button>
                               </div>
                               
-                              <div className="space-y-4">
-                                {(reportFormData[report.id]?.attachment_urls || []).map((url: string, index: number) => {
-                                  // Skip parts images by looking at the actual attachment URLs (parts images are typically first)
-                                  const partsCount = reportFormData[report.id]?.parts_replaced?.length || 0;
-                                  const attachmentIndex = index + partsCount;
-                                  const currentFileUrl = report.attachment_urls?.[attachmentIndex] || null;
-                                  
-                                  return (
-                                    <div key={index} className="space-y-2 p-2 sm:p-3 border rounded-lg">
-                                      <FileUploadSectionSimple
-                                        label={`Attachment ${index + 1}`}
-                                        accept="image/*,application/pdf,.doc,.docx"
-                                        currentFileUrl={currentFileUrl}
-                                        selectedFile={reportAttachmentFiles[report.id]?.[index] || null}
-                                        onFileChange={(file) => updateAttachmentFile(report.id, index, file)}
-                                        onKeepExistingChange={() => {}}
-                                        required={false}
-                                        hideChangeButton={true}
-                                      />
-                                      <div className="flex gap-2">
-                                        <Input
-                                          value={url}
-                                          onChange={(e) => {
-                                            const currentUrls = [...(reportFormData[report.id]?.attachment_urls || [])];
-                                            currentUrls[index] = e.target.value;
-                                            updateFormData(report.id, "attachment_urls", currentUrls);
-                                          }}
-                                          placeholder="Or enter URL: https://example.com/image.jpg"
-                                          type="url"
-                                          className="flex-1 text-sm"
-                                        />
-                                        {(reportFormData[report.id]?.attachment_urls || []).length > 1 && (
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => removeAttachmentFromReport(report.id, index)}
-                                            className="px-2"
-                                          >
-                                            <Trash2 className="h-3 w-3" />
-                                          </Button>
-                                        )}
+                              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 mb-4">
+                                📸 <strong>Tip:</strong> Upload photos of work done, receipts, before/after images, or any documentation related to this maintenance.
+                              </div>
+                              
+                              {/* Display existing attachments in a grid */}
+                              {report.attachment_urls && report.attachment_urls.length > 0 && (
+                                <div className="space-y-3">
+                                  <h5 className="text-sm font-medium text-gray-700">Current Attachments</h5>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    {report.attachment_urls.map((url: string, index: number) => (
+                                      <div key={index} className="relative group">
+                                        <div className="aspect-square rounded-lg overflow-hidden border bg-muted">
+                                          {url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? (
+                                            <img
+                                              src={url}
+                                              alt={`Attachment ${index + 1}`}
+                                              className="w-full h-full object-cover cursor-pointer"
+                                              onClick={() => window.open(url, '_blank')}
+                                              onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.style.display = 'none';
+                                                const parent = target.parentElement;
+                                                if (parent) {
+                                                  parent.innerHTML = `
+                                                    <div class="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+                                                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                                        <polyline points="14,2 14,8 20,8"/>
+                                                      </svg>
+                                                      <span class="text-xs mt-1">Failed to load</span>
+                                                    </div>
+                                                  `;
+                                                }
+                                              }}
+                                            />
+                                          ) : (
+                                            <a 
+                                              href={url} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              className="w-full h-full flex flex-col items-center justify-center text-muted-foreground hover:text-primary transition-colors"
+                                            >
+                                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                                <polyline points="14,2 14,8 20,8"/>
+                                              </svg>
+                                              <span className="text-xs text-center mt-1">Document</span>
+                                            </a>
+                                          )}
+                                        </div>
+                                        {/* Filename tooltip */}
+                                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity truncate">
+                                          {url.split('/').pop()?.split('_').pop() || 'File'}
+                                        </div>
                                       </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Add new attachments section */}
+                              <div className="space-y-4">
+                                {(reportFormData[report.id]?.attachment_urls || []).map((url: string, index: number) => (
+                                  <div key={index} className="space-y-2 p-3 border rounded-lg bg-gray-50">
+                                    <FileUploadSectionSimple
+                                      label={`New Attachment ${index + 1}`}
+                                      accept="image/*,application/pdf,.doc,.docx"
+                                      currentFileUrl={null}
+                                      selectedFile={reportAttachmentFiles[report.id]?.[index] || null}
+                                      onFileChange={(file) => updateAttachmentFile(report.id, index, file)}
+                                      onKeepExistingChange={() => {}}
+                                      required={false}
+                                      hideChangeButton={true}
+                                    />
+                                    <div className="flex gap-2">
+                                      <Input
+                                        value={url}
+                                        onChange={(e) => {
+                                          const currentUrls = [...(reportFormData[report.id]?.attachment_urls || [])];
+                                          currentUrls[index] = e.target.value;
+                                          updateFormData(report.id, "attachment_urls", currentUrls);
+                                        }}
+                                        placeholder="Or enter file URL manually..."
+                                        className="flex-1 text-sm"
+                                      />
+                                      {(reportFormData[report.id]?.attachment_urls || []).length > 1 && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => removeAttachmentFromReport(report.id, index)}
+                                          className="px-2"
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      )}
                                     </div>
-                                  );
-                                })}
+                                  </div>
+                                ))}
                                 
                                 {(!reportFormData[report.id]?.attachment_urls || reportFormData[report.id]?.attachment_urls.length === 0) && (
                                   <p className="text-sm text-muted-foreground text-center py-4">
@@ -887,7 +891,6 @@ export default function EquipmentMaintenanceReportsEnhanced({
                                 // Reset form data to original values
                                 initializeFormData(report, true);
                                 // Clear file states
-                                setReportPartsFiles(prev => ({ ...prev, [report.id]: [] }));
                                 setReportAttachmentFiles(prev => ({ ...prev, [report.id]: [] }));
                                 toast.success("Form reset to original values");
                               }}

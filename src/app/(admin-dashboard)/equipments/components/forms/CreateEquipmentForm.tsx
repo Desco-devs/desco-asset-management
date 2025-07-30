@@ -238,14 +238,18 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     
     // Add all parts files to formData with folder information - EXACT COPY FROM VEHICLES
     partsStructure.rootFiles.forEach((partFile, index) => {
-      formDataFromForm.append(`partsFile_root_${index}`, partFile.file);
-      formDataFromForm.append(`partsFile_root_${index}_name`, partFile.name);
+      if (partFile.file) {
+        formDataFromForm.append(`partsFile_root_${index}`, partFile.file);
+        formDataFromForm.append(`partsFile_root_${index}_name`, partFile.name);
+      }
     });
 
     partsStructure.folders.forEach((folder, folderIndex) => {
       folder.files.forEach((partFile, fileIndex) => {
-        formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
-        formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
+        if (partFile.file) {
+          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
+          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
+        }
         formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
       });
     });
