@@ -25,7 +25,8 @@ import {
   selectFilterMaintenance,
   selectIsMobile,
   selectSortBy,
-  selectSortOrder
+  selectSortOrder,
+  selectActiveModal
 } from "@/stores/equipmentStore";
 import {
   AlertTriangle,
@@ -102,6 +103,7 @@ export default function EquipmentsListModern() {
     setSelectedEquipment,
     setIsModalOpen,
     setIsCreateModalOpen,
+    setActiveModal,
     setIsExportModalOpen,
     setCurrentPage,
     setIsMobile,
@@ -125,6 +127,8 @@ export default function EquipmentsListModern() {
   }, [setIsMobile]);
 
   const handleEquipmentClick = (equipment: Equipment) => {
+    // Use unified modal coordination
+    setActiveModal('equipment');
     setSelectedEquipment(equipment);
     setIsModalOpen(true);
   };

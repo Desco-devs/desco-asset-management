@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -24,6 +25,7 @@ import {
   useEquipmentsWithReferenceData,
 } from "@/hooks/useEquipmentsQuery";
 import { useEquipmentsStore } from "@/stores/equipmentsStore";
+import { useEquipmentStore, selectActiveModal } from "@/stores/equipmentStore";
 import { Plus, Trash2, Settings, Clock, MapPin, Wrench, FileText, Camera, Upload, X } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +33,9 @@ import { toast } from "sonner";
 
 export default function EditEquipmentMaintenanceReportModal() {
   const selectedReport = useEquipmentsStore((state) => state.selectedEquipmentMaintenanceReport);
+  const activeModal = useEquipmentStore(selectActiveModal);
   const { setSelectedEquipmentMaintenanceReport } = useEquipmentsStore();
+  const { setActiveModal } = useEquipmentStore();
   const { locations } = useEquipmentsWithReferenceData();
   const updateMaintenanceReportMutation = useUpdateEquipmentMaintenanceReport();
 
@@ -79,6 +83,8 @@ export default function EditEquipmentMaintenanceReportModal() {
 
   const handleClose = useCallback(() => {
     setSelectedEquipmentMaintenanceReport(null);
+    // Clear active modal coordination
+    setActiveModal(null);
     // Reset form
     setFormData({
       issue_description: "",
@@ -95,7 +101,7 @@ export default function EditEquipmentMaintenanceReportModal() {
     setPartsFiles([]);
     setAttachmentFiles([]);
     setDeletedAttachments([]);
-  }, [setSelectedEquipmentMaintenanceReport]);
+  }, [setSelectedEquipmentMaintenanceReport, setActiveModal]);
 
   const handleInputChange = useCallback((field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -221,25 +227,28 @@ export default function EditEquipmentMaintenanceReportModal() {
     }
   }, [formData, selectedReport, updateMaintenanceReportMutation, handleClose, attachmentFiles, deletedAttachments]);
 
-  if (!selectedReport) return null;
+  // Only render when this is the active modal and we have a report to edit
+  const shouldShow = activeModal === 'maintenance-edit' && !!selectedReport;
+  
+  if (!selectedReport || !shouldShow) return null;
 
   return (
-    <Dialog open={!!selectedReport} onOpenChange={handleClose}>
+    <Dialog open={shouldShow} onOpenChange={handleClose}>
       <DialogContent 
         className="!max-w-none !w-[70vw] max-h-[95dvh] overflow-hidden flex flex-col p-6"
         style={{ maxWidth: '70vw', width: '70vw' }}
+        aria-describedby="edit-report-description"
       >
         <DialogHeader className="flex-shrink-0 pb-4">
           <DialogTitle className="text-xl">Edit Equipment Maintenance Report</DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <DialogDescription id="edit-report-description" className="text-sm text-muted-foreground">
             Update maintenance report details, parts replaced, and status information
-          </p>
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-full">
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="p-0">
-              <div className="space-y-6">
+          <div className="flex-1 overflow-y-auto min-h-0 pr-2">
+            <div className="space-y-6">
                 {/* Issue Information Card */}
                 <Card>
                   <CardHeader className="pb-4">
@@ -577,28 +586,27 @@ export default function EditEquipmentMaintenanceReportModal() {
                         </div>
                       </CardContent>
                     </Card>
-                </div>
-              </div>
             </div>
+          </div>
             
-            {/* Desktop Action Buttons in Footer */}
-            <DialogFooter className="pt-4 border-t bg-background">
-              <div className="flex gap-2 w-full justify-end">
-                <Button type="button" variant="outline" onClick={handleClose} size="lg">
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={updateMaintenanceReportMutation.isPending}
-                  size="lg"
-                >
-                  {updateMaintenanceReportMutation.isPending
-                    ? "Updating..."
-                    : "Update Report"}
-                </Button>
-              </div>
-            </DialogFooter>
-          </form>
+          {/* Fixed Footer Outside Scroll Area */}
+          <DialogFooter className="flex-shrink-0 pt-4 border-t bg-background">
+            <div className="flex gap-2 w-full justify-end">
+              <Button type="button" variant="outline" onClick={handleClose} size="lg">
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={updateMaintenanceReportMutation.isPending}
+                size="lg"
+              >
+                {updateMaintenanceReportMutation.isPending
+                  ? "Updating..."
+                  : "Update Report"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -934,9 +935,9 @@ export default function CreateEquipmentMaintenanceReportModal({
       >
         <DialogHeader className="flex-shrink-0 pb-4">
           <DialogTitle className="text-xl">Add New Equipment Maintenance Report</DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            Add new equipment to your inventory with comprehensive details
-          </p>
+          <DialogDescription className="text-sm text-muted-foreground">
+            Create a new maintenance report with issue details, parts replaced, and attachments
+          </DialogDescription>
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto min-h-0">
