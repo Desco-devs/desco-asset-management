@@ -45,16 +45,9 @@ const data = {
       icon: Frame,
       isActive: true,
     },
-
     {
       title: "Projects",
       url: "/projects",
-      icon: GalleryVerticalEnd,
-      isActive: true,
-    },
-    {
-      title: "Equipments",
-      url: "/equipments",
       icon: GalleryVerticalEnd,
       isActive: true,
     },
@@ -64,7 +57,12 @@ const data = {
       icon: GalleryVerticalEnd,
       isActive: true,
     },
-
+    {
+      title: "Equipments",
+      url: "/equipments",
+      icon: GalleryVerticalEnd,
+      isActive: true,
+    },
     {
       title: "User & Permissions",
       url: "/users",
