@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth';
 import { prisma } from '@/lib/prisma';
+import { 
+  createVehicleMaintenanceReportSchema,
+  sanitizePartsArray,
+  sanitizeAttachmentUrls
+} from '@/lib/validations/maintenance-reports';
 
 // GET /api/vehicles/maintenance-reports - Get all vehicle maintenance reports
 export const GET = withResourcePermission('maintenance_reports', 'view', async (request: NextRequest, _user: AuthenticatedUser) => {
@@ -90,40 +95,45 @@ export const POST = withResourcePermission('maintenance_reports', 'create', asyn
   try {
     const body = await request.json();
     
-    const {
-      vehicle_id,
-      location_id,
-      issue_description,
-      remarks,
-      inspection_details,
-      parts_replaced,
-      priority,
-      status,
-      downtime_hours,
-      attachment_urls
-    } = body;
+    // Sanitize parts_replaced and attachment_urls before validation
+    const sanitizedBody = {
+      ...body,
+      parts_replaced: sanitizePartsArray(body.parts_replaced),
+      attachment_urls: sanitizeAttachmentUrls(body.attachment_urls),
+      reported_by: _user.id, // Set from authenticated user
+    };
 
-    // Validate required fields
-    if (!vehicle_id || !location_id || !issue_description) {
+    // Validate the entire request body with Zod
+    const validationResult = createVehicleMaintenanceReportSchema.safeParse(sanitizedBody);
+    
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: 'vehicle_id, location_id, and issue_description are required' },
+        { 
+          error: 'Validation failed',
+          details: validationResult.error.errors.map(err => ({
+            field: err.path.join('.'),
+            message: err.message
+          }))
+        },
         { status: 400 }
       );
     }
 
+    const validatedData = validationResult.data;
+
     // Create maintenance report
     const report = await prisma.maintenance_vehicle_report.create({
       data: {
-        vehicle_id,
-        location_id,
-        issue_description,
-        remarks: remarks || null,
-        inspection_details: inspection_details || null,
-        parts_replaced: parts_replaced || [],
-        priority: priority || 'MEDIUM',
-        status: status || 'REPORTED',
-        downtime_hours: downtime_hours || null,
-        attachment_urls: attachment_urls || [],
+        vehicle_id: validatedData.vehicle_id,
+        location_id: validatedData.location_id,
+        issue_description: validatedData.issue_description,
+        remarks: validatedData.remarks,
+        inspection_details: validatedData.inspection_details,
+        parts_replaced: validatedData.parts_replaced,
+        priority: validatedData.priority || 'MEDIUM',
+        status: validatedData.status || 'REPORTED',
+        downtime_hours: validatedData.downtime_hours,
+        attachment_urls: validatedData.attachment_urls,
         reported_by: _user.id,
         date_reported: new Date()
       },

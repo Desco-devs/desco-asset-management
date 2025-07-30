@@ -189,7 +189,7 @@ export function withResourcePermission(
 }
 
 /**
- * Apply Row Level Security (RLS) filters for VIEWER role
+ * Apply role-based filters for VIEWER role
  */
 export function applyViewerFilters(user: AuthenticatedUser) {
   if (user.role !== 'VIEWER') {

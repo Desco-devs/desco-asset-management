@@ -554,97 +554,27 @@ export const POST = withResourcePermission(
           )
         );
 
-      // 3) handle equipment parts with new standardized structure (matching server actions) - CRITICAL FIX: Support empty folders
-      const partsStructureData = formData.get('partsStructure') as string;
-      let partsStructureWithUrls: any = null;
+      // 3) Handle equipment parts as simple string array (aligned with UI changes)
+      const equipmentPartsData = formData.get('equipmentParts') as string;
+      let equipmentParts: string[] = [];
       
-      if (partsStructureData) {
+      if (equipmentPartsData) {
         try {
-          const partsStructure = JSON.parse(partsStructureData);
-          
-          // CRITICAL FIX: Initialize with existing structure to preserve empty folders
-          partsStructureWithUrls = {
-            rootFiles: [],
-            folders: partsStructure.folders ? partsStructure.folders.map((folder: any) => ({
-              id: folder.id,
-              name: folder.name,
-              files: [] // Start with empty files array, will be populated with actual uploaded files
-            })) : []
-          };
-          
-          // Upload root files and build structure with unique IDs
-          for (let i = 0; formData.get(`partsFile_root_${i}`); i++) {
-            const file = formData.get(`partsFile_root_${i}`) as File;
-            const fileName = formData.get(`partsFile_root_${i}_name`) as string;
-            
-            if (file && file.size > 0) {
-              const fileId = `root_file_${i}`; // Predictable identifier for edit mode tracking
-              const uploadResult = await uploadEquipmentPart(
-                file,
-                projectId,
-                equipment.id,
-                fileId,
-                'root',
-                projectName,
-                clientName,
-                brand,
-                model,
-                type
-              );
-              
-              partsStructureWithUrls.rootFiles.push(uploadResult);
-            }
+          const partsArray = JSON.parse(equipmentPartsData);
+          if (Array.isArray(partsArray)) {
+            // Filter and validate parts as strings
+            equipmentParts = partsArray
+              .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+              .map(part => part.trim())
+              .slice(0, 50); // Reasonable limit
           }
-          
-          // Upload folder files and build structure
-          const folderMap: { [key: string]: any } = {};
-          
-          // CRITICAL FIX: Initialize folderMap with existing folders to preserve empty ones
-          partsStructureWithUrls.folders.forEach((folder: any) => {
-            folderMap[folder.name] = folder;
-          });
-          
-          for (let folderIndex = 0; formData.get(`partsFile_folder_${folderIndex}_0`); folderIndex++) {
-            for (let fileIndex = 0; formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`); fileIndex++) {
-              const file = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
-              const fileName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string;
-              const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
-              
-              if (file && file.size > 0) {
-                const fileId = `folder_${folderName}_file_${fileIndex}`; // Predictable identifier for edit mode tracking
-                const uploadResult = await uploadEquipmentPart(
-                  file,
-                  projectId,
-                  equipment.id,
-                  fileId,
-                  folderName,
-                  projectName,
-                  clientName,
-                  brand,
-                  model,
-                  type
-                );
-                
-                // Initialize folder if it doesn't exist
-                if (!folderMap[folderName]) {
-                  folderMap[folderName] = {
-                    id: `folder_${folderIndex}`,
-                    name: folderName,
-                    files: []
-                  };
-                }
-                
-                folderMap[folderName].files.push(uploadResult);
-              }
-            }
-          }
-          
-          // Convert folderMap to array
-          partsStructureWithUrls.folders = Object.values(folderMap);
-          
         } catch (error) {
-          // Failed to parse parts structure
-          // Fall back to legacy handling if JSON parsing fails
+          // If parsing fails, try to handle as comma-separated string
+          equipmentParts = equipmentPartsData
+            .split(',')
+            .map(part => part.trim())
+            .filter(part => part.length > 0)
+            .slice(0, 50);
         }
       }
 
@@ -666,10 +596,9 @@ export const POST = withResourcePermission(
         }
       }
 
-      // Handle parts upload using new structure
-      if (partsStructureWithUrls) {
-        // Store as array with single JSON string element (to match existing API expectations)
-        updateData.equipment_parts = [JSON.stringify(partsStructureWithUrls)];
+      // Update equipment parts if provided
+      if (equipmentParts.length > 0) {
+        updateData.equipment_parts = equipmentParts;
       }
 
       // Update if we have any files
@@ -1092,128 +1021,32 @@ export const PUT = withResourcePermission(
         }
       }
 
-      // Handle equipment parts updates - simplified approach following vehicles pattern
-      const partsStructureData = formData.get('partsStructure') as string;
-      let partsStructureWithUrls: any = null;
+      // Handle equipment parts updates - simplified to match UI changes
+      const equipmentPartsData = formData.get('equipmentParts') as string;
       
-      if (partsStructureData) {
+      if (equipmentPartsData) {
         try {
-          const partsStructure = JSON.parse(partsStructureData);
-          
-          // Create the final structure with uploaded URLs - only process NEW uploads
-          const processedStructure = {
-            rootFiles: [] as any[],
-            folders: [] as any[]
-          };
-          
-          // Process root files - only handle NEW uploads (files with File objects)
-          if (partsStructure.rootFiles && Array.isArray(partsStructure.rootFiles)) {
-            for (let i = 0; i < partsStructure.rootFiles.length; i++) {
-              const rootFile = partsStructure.rootFiles[i];
-              
-              const partFile = formData.get(`partsFile_root_${i}`) as File;
-              const partName = formData.get(`partsFile_root_${i}_name`) as string || rootFile.name;
-              
-              // Check if this is a new file upload
-              if (partFile && partFile.size > 0) {
-                try {
-                  const fileId = `root_file_${i}_${Date.now()}`;
-                  const uploadResult = await uploadEquipmentPart(
-                    partFile,
-                    projectId,
-                    equipmentId,
-                    fileId,
-                    'root'
-                  );
-                  
-                  processedStructure.rootFiles.push({
-                    id: uploadResult.id,
-                    name: rootFile.name,
-                    url: uploadResult.url,
-                    preview: uploadResult.url,
-                    type: uploadResult.type
-                  });
-                } catch (error) {
-                  console.error(`Failed to upload root file ${i}:`, error);
-                  // Continue with other files
-                }
-              } else if (rootFile.url || rootFile.preview) {
-                // This is an existing file, preserve it
-                processedStructure.rootFiles.push({
-                  id: rootFile.id,
-                  name: rootFile.name,
-                  url: rootFile.url || rootFile.preview,
-                  preview: rootFile.preview || rootFile.url,
-                  type: rootFile.type || (rootFile.url?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
-                });
-              }
-            }
+          const partsArray = JSON.parse(equipmentPartsData);
+          if (Array.isArray(partsArray)) {
+            // Filter and validate parts as strings
+            const equipmentParts = partsArray
+              .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+              .map(part => part.trim())
+              .slice(0, 50); // Reasonable limit
+            
+            updateData.equipment_parts = equipmentParts;
           }
-          
-          // Process folder files
-          if (partsStructure.folders && Array.isArray(partsStructure.folders)) {
-            for (let folderIndex = 0; folderIndex < partsStructure.folders.length; folderIndex++) {
-              const folder = partsStructure.folders[folderIndex];
-              const processedFolder = {
-                id: folder.id,
-                name: folder.name,
-                files: [] as any[],
-                created_at: folder.created_at
-              };
-              
-              if (folder.files && Array.isArray(folder.files)) {
-                for (let fileIndex = 0; fileIndex < folder.files.length; fileIndex++) {
-                  const folderFile = folder.files[fileIndex];
-                  
-                  const partFile = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
-                  const partName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string || folderFile.name;
-                  
-                  // Check if this is a new file upload
-                  if (partFile && partFile.size > 0) {
-                    try {
-                      const fileId = `folder_${folder.name}_file_${fileIndex}_${Date.now()}`;
-                      const uploadResult = await uploadEquipmentPart(
-                        partFile,
-                        projectId,
-                        equipmentId,
-                        fileId,
-                        folder.name
-                      );
-                      
-                      processedFolder.files.push({
-                        id: uploadResult.id,
-                        name: folderFile.name,
-                        url: uploadResult.url,
-                        preview: uploadResult.url,
-                        type: uploadResult.type
-                      });
-                    } catch (error) {
-                      console.error(`Failed to upload folder file ${folderIndex}-${fileIndex}:`, error);
-                      // Continue with other files
-                    }
-                  } else if (folderFile.url || folderFile.preview) {
-                    // This is an existing file, preserve it
-                    processedFolder.files.push({
-                      id: folderFile.id,
-                      name: folderFile.name,
-                      url: folderFile.url || folderFile.preview,
-                      preview: folderFile.preview || folderFile.url,
-                      type: folderFile.type || (folderFile.url?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
-                    });
-                  }
-                }
-              }
-              
-              processedStructure.folders.push(processedFolder);
-            }
-          }
-          
-          partsStructureWithUrls = processedStructure;
-          
-          // Store as array with single JSON string element
-          updateData.equipment_parts = [JSON.stringify(partsStructureWithUrls)];
         } catch (error) {
-          console.error('Failed to process parts structure during update:', error);
+          // If parsing fails, try to handle as comma-separated string
+          const equipmentParts = equipmentPartsData
+            .split(',')
+            .map(part => part.trim())
+            .filter(part => part.length > 0)
+            .slice(0, 50);
+          
+          if (equipmentParts.length > 0) {
+            updateData.equipment_parts = equipmentParts;
+          }
         }
       }
 

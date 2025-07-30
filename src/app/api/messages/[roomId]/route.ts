@@ -1,48 +1,63 @@
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-
 import { NextRequest, NextResponse } from "next/server";
-// import { prisma } from "@/lib/prisma";
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ roomId: string }> }
-) {
-  return NextResponse.json(
-    { error: "Chat app temporarily disabled" },
-    { status: 503 }
-  );
-}
-
-/*
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { createServerClient } from "@supabase/ssr";
+import { ChatQueries } from "@/lib/database/chat-queries";
+import { messagesPaginationSchema } from "@/lib/validations/chat";
+import { z } from "zod";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-    const cursor = searchParams.get("cursor");
-    const limit = parseInt(searchParams.get("limit") || "50");
+    // Create Supabase client for authentication
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            // No-op for request handling
+          },
+        },
+      }
+    );
 
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
     const { roomId } = await params;
 
-    if (!roomId || !userId) {
+    // Validate roomId
+    if (!roomId || !z.string().uuid().safeParse(roomId).success) {
       return NextResponse.json(
-        { error: "Missing roomId or userId parameter" },
+        { error: "Invalid room ID" },
         { status: 400 }
       );
     }
 
-    // Verify user is a member of the room
-    const roomMember = await prisma.room_member.findFirst({
-      where: {
-        room_id: roomId,
-        user_id: userId,
-      },
-    });
+    // Validate query parameters
+    const queryParams = {
+      cursor: searchParams.get("cursor") || undefined,
+      limit: searchParams.get("limit") || "50",
+      includeReplies: searchParams.get("includeReplies") !== "false",
+    };
+
+    const validatedQuery = messagesPaginationSchema.parse(queryParams);
+    const { cursor, limit, includeReplies } = validatedQuery;
+
+    // Verify user is a member of the room and get room info
+    const roomMember = await ChatQueries.verifyRoomMembership(roomId, user.id);
 
     if (!roomMember) {
       return NextResponse.json(
@@ -51,58 +66,37 @@ export async function GET(
       );
     }
 
-    // Get messages with pagination
-    const messages = await prisma.message.findMany({
-      where: {
-        room_id: roomId,
-        ...(cursor && {
-          created_at: {
-            lt: new Date(cursor),
-          },
-        }),
-      },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            username: true,
-            full_name: true,
-            user_profile: true,
-          },
-        },
-        room: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-          },
-        },
-      },
-      orderBy: {
-        created_at: "desc",
-      },
-      take: limit,
+    // Get messages with optimized pagination
+    const { messages, hasMore, nextCursor } = await ChatQueries.getMessages({
+      roomId,
+      cursor,
+      limit,
+      includeReplies,
     });
 
-    // Check if there are more messages
-    const hasMore = messages.length === limit;
-    const nextCursor = hasMore ? messages[messages.length - 1].created_at.toISOString() : null;
-
-    // Return messages in chronological order (oldest first)
-    const reversedMessages = messages.reverse();
+    // Update user's last read timestamp for this room
+    await ChatQueries.markMessagesAsRead(roomId, user.id);
 
     return NextResponse.json({
-      messages: reversedMessages,
+      messages,
       hasMore,
       nextCursor,
+      room: roomMember.room,
     });
 
   } catch (error) {
     console.error("Error fetching messages:", error);
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid query parameters", details: error.errors },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to fetch messages" },
       { status: 500 }
     );
   }
 }
-*/

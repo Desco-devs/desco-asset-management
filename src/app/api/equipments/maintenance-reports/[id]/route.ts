@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createClient } from '@/lib/supabase';
+import { 
+  updateEquipmentMaintenanceReportSchema,
+  sanitizePartsArray,
+  sanitizeAttachmentUrls
+} from '@/lib/validations/maintenance-reports';
 
 // GET - Fetch specific equipment maintenance report
 export async function GET(
@@ -241,22 +246,58 @@ export async function PUT(
       ...newAttachmentUrls
     ];
 
-    // Debug: Log the update data
-    const updateData = {
+    // Prepare and sanitize the update data
+    const updateDataForValidation = {
       equipment_id,
       location_id,
       issue_description,
       remarks,
       inspection_details,
       action_taken,
-      parts_replaced: parts_replaced || [],
+      parts_replaced: sanitizePartsArray(parts_replaced),
       priority,
       status,
-      downtime_hours: downtime_hours || null,
-      date_repaired: date_repaired ? new Date(date_repaired) : null,
-      attachment_urls: finalAttachmentUrls,
+      downtime_hours,
+      date_repaired,
+      attachment_urls: sanitizeAttachmentUrls(finalAttachmentUrls),
       reported_by,
       repaired_by,
+    };
+
+    // Validate the update data with Zod
+    const validationResult = updateEquipmentMaintenanceReportSchema.safeParse(updateDataForValidation);
+    
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { 
+          error: 'Validation failed',
+          details: validationResult.error.errors.map(err => ({
+            field: err.path.join('.'),
+            message: err.message
+          }))
+        },
+        { status: 400 }
+      );
+    }
+
+    const validatedData = validationResult.data;
+
+    // Build the final update data with properly typed values
+    const updateData = {
+      ...(validatedData.equipment_id && { equipment_id: validatedData.equipment_id }),
+      ...(validatedData.location_id && { location_id: validatedData.location_id }),
+      ...(validatedData.issue_description && { issue_description: validatedData.issue_description }),
+      ...(validatedData.remarks !== undefined && { remarks: validatedData.remarks }),
+      ...(validatedData.inspection_details !== undefined && { inspection_details: validatedData.inspection_details }),
+      ...(validatedData.action_taken !== undefined && { action_taken: validatedData.action_taken }),
+      parts_replaced: validatedData.parts_replaced || [],
+      ...(validatedData.priority !== undefined && { priority: validatedData.priority }),
+      ...(validatedData.status !== undefined && { status: validatedData.status }),
+      ...(validatedData.downtime_hours !== undefined && { downtime_hours: validatedData.downtime_hours }),
+      ...(validatedData.date_repaired !== undefined && { date_repaired: validatedData.date_repaired }),
+      attachment_urls: validatedData.attachment_urls || [],
+      ...(validatedData.reported_by !== undefined && { reported_by: validatedData.reported_by }),
+      ...(validatedData.repaired_by !== undefined && { repaired_by: validatedData.repaired_by }),
     };
 
     const updatedReport = await prisma.maintenance_equipment_report.update({

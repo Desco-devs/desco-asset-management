@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { MessageWithRelations, MessageType, RoomType } from '@/types/chat-app';
+import { useRealtimeMessaging } from './useRealtimeMessaging';
 
 // Database record type (matches the actual table structure from schema.prisma)
 interface MessageRecord {
@@ -52,16 +53,62 @@ const convertToMessageWithRelations = (record: any): MessageWithRelations => {
 
 interface UseSupabaseMessagesOptions {
   roomId?: string;
+  userId?: string;
   enabled?: boolean;
 }
 
 export const useSupabaseMessages = ({ 
   roomId, 
+  userId,
   enabled = true 
 }: UseSupabaseMessagesOptions) => {
   const [messages, setMessages] = useState<MessageWithRelations[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Array<{ id: string; name: string }>>([]);
+
+  // Real-time message handlers
+  const handleMessageReceived = useCallback((message: MessageWithRelations) => {
+    setMessages(prev => {
+      // Check if message already exists (avoid duplicates)
+      const exists = prev.some(m => m.id === message.id);
+      if (exists) return prev;
+      
+      // Insert message in chronological order
+      const newMessages = [...prev, message];
+      return newMessages.sort((a, b) => a.created_at.getTime() - b.created_at.getTime());
+    });
+  }, []);
+
+  const handleMessageUpdated = useCallback((message: MessageWithRelations) => {
+    setMessages(prev => 
+      prev.map(m => m.id === message.id ? message : m)
+    );
+  }, []);
+
+  const handleMessageDeleted = useCallback((messageId: string) => {
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+  }, []);
+
+  const handleTypingUpdate = useCallback((users: Array<{ id: string; name: string }>) => {
+    setTypingUsers(users);
+  }, []);
+
+  // Real-time messaging hook
+  const {
+    isConnected: realtimeConnected,
+    connectionError: realtimeError,
+    broadcastMessage,
+    sendTypingIndicator,
+  } = useRealtimeMessaging({
+    roomId,
+    userId,
+    enabled: enabled && !!roomId && !!userId,
+    onMessageReceived: handleMessageReceived,
+    onMessageUpdated: handleMessageUpdated,
+    onMessageDeleted: handleMessageDeleted,
+    onTypingUpdate: handleTypingUpdate,
+  });
 
   // Fetch initial messages
   useEffect(() => {
@@ -105,109 +152,7 @@ export const useSupabaseMessages = ({
     fetchMessages();
   }, [roomId, enabled]);
 
-  // Subscribe to real-time changes
-  useEffect(() => {
-    if (!enabled || !roomId) return;
-
-    const supabase = createClient();
-    const subscription = supabase
-      .channel(`messages:${roomId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `room_id=eq.${roomId}`,
-        },
-        async (payload: RealtimePostgresChangesPayload<MessageRecord>) => {
-          // Check if we have new data and required id
-          const newMessageRecord = payload.new as MessageRecord;
-          if (!newMessageRecord?.id) return;
-          
-          // Fetch the complete message with relations
-          const supabase = createClient();
-          const { data: messageWithRelations } = await supabase
-            .from('messages')
-            .select(`
-              *,
-              sender:users (
-                id,
-                full_name,
-                user_profile
-              )
-            `)
-            .eq('id', newMessageRecord.id)
-            .single();
-
-          if (messageWithRelations) {
-            const convertedMessage = convertToMessageWithRelations(messageWithRelations);
-            setMessages(prev => [...prev, convertedMessage]);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `room_id=eq.${roomId}`,
-        },
-        async (payload: RealtimePostgresChangesPayload<MessageRecord>) => {
-          // Check if we have new data and required id
-          const updatedMessageRecord = payload.new as MessageRecord;
-          if (!updatedMessageRecord?.id) return;
-          
-          // Fetch the updated message with relations
-          const supabase = createClient();
-          const { data: messageWithRelations } = await supabase
-            .from('messages')
-            .select(`
-              *,
-              sender:users (
-                id,
-                full_name,
-                user_profile
-              )
-            `)
-            .eq('id', updatedMessageRecord.id)
-            .single();
-
-          if (messageWithRelations) {
-            const convertedMessage = convertToMessageWithRelations(messageWithRelations);
-            setMessages(prev => 
-              prev.map(msg => 
-                msg.id === updatedMessageRecord.id ? convertedMessage : msg
-              )
-            );
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'messages',
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload: RealtimePostgresChangesPayload<MessageRecord>) => {
-          // Check if we have old data and required id
-          const deletedMessage = payload.old as MessageRecord;
-          if (!deletedMessage?.id) return;
-          
-          setMessages(prev => 
-            prev.filter(msg => msg.id !== deletedMessage.id)
-          );
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [roomId, enabled]);
+  // Note: Real-time subscriptions are now handled by useRealtimeMessaging hook
 
   // Send message function
   const sendMessage = async (content: string, type: 'TEXT' | 'IMAGE' | 'FILE' = 'TEXT', replyToId?: string) => {
@@ -249,8 +194,12 @@ export const useSupabaseMessages = ({
   return {
     messages,
     loading,
-    error,
+    error: error || realtimeError,
     sendMessage,
+    typingUsers,
+    sendTypingIndicator,
+    broadcastMessage,
+    isRealtimeConnected: realtimeConnected,
   };
 };
 

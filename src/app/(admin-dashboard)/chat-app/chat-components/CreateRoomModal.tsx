@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,10 +68,8 @@ const CreateRoomModal = ({
   const [selectedUsers, setSelectedUsers] = useState<ChatUser[]>([]);
 
   // Get users who have existing direct message conversations or pending invitations with the current user
-  const getUsersWithExistingDirectMessages = () => {
+  const usersWithExistingDirectMessages = useMemo(() => {
     const directRooms = rooms.filter((room) => room.type === RoomType.DIRECT);
-
-    console.log("CreateRoomModal - Direct rooms found:", directRooms.length);
 
     const usersWithDMs = directRooms
       .map((room) => {
@@ -80,7 +78,6 @@ const CreateRoomModal = ({
           // If pending, the other user is the one who invited or was invited
           const otherUserId =
             room.invited_by?.id !== currentUserId ? room.invited_by?.id : null;
-          console.log("- Pending DM with user:", otherUserId);
           return otherUserId;
         } else {
           // If accepted, get the other member from room.members
@@ -88,20 +85,16 @@ const CreateRoomModal = ({
             (member) => (member.user?.id || member.user_id) !== currentUserId
           );
           const otherUserId = otherMember?.user?.id || otherMember?.user_id;
-          console.log("- Active DM with user:", otherUserId);
           return otherUserId;
         }
       })
       .filter(Boolean);
 
-    console.log("- Users with existing DMs:", usersWithDMs);
     return usersWithDMs;
-  };
-
-  const usersWithExistingDirectMessages = getUsersWithExistingDirectMessages();
+  }, [rooms, currentUserId]);
 
   // Filter users based on room type and existing conversations
-  const getFilteredUsers = () => {
+  const filteredUsers = useMemo(() => {
     let filtered = users.filter(
       (user) =>
         user.id !== currentUserId &&
@@ -117,11 +110,9 @@ const CreateRoomModal = ({
     }
 
     return filtered;
-  };
+  }, [users, currentUserId, searchQuery, roomType, usersWithExistingDirectMessages]);
 
-  const filteredUsers = getFilteredUsers();
-
-  const getSuggestedUsers = () => {
+  const suggestedUsers = useMemo(() => {
     let suggested = users.filter(
       (user) =>
         user.id !== currentUserId &&
@@ -136,9 +127,7 @@ const CreateRoomModal = ({
     }
 
     return suggested.slice(0, 5);
-  };
-
-  const suggestedUsers = getSuggestedUsers();
+  }, [users, currentUserId, inviteUsername, roomType, usersWithExistingDirectMessages]);
 
   const handleReset = () => {
     setStep("type");

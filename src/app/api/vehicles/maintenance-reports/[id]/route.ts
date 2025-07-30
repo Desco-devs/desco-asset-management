@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withResourcePermission, AuthenticatedUser } from '@/lib/auth/api-auth';
 import { prisma } from '@/lib/prisma';
+import { 
+  updateVehicleMaintenanceReportSchema,
+  sanitizePartsArray,
+  sanitizeAttachmentUrls
+} from '@/lib/validations/maintenance-reports';
 
 // GET /api/vehicles/maintenance-reports/[id] - Get single vehicle maintenance report
 export async function GET(
@@ -78,19 +83,30 @@ export async function PUT(
         return NextResponse.json({ error: 'Maintenance report not found' }, { status: 404 });
       }
 
-      // Extract and validate the fields we want to update
-      const {
-        issue_description,
-        remarks,
-        inspection_details,
-        action_taken,
-        parts_replaced,
-        priority,
-        status,
-        downtime_hours,
-        attachment_urls,
-        location_id
-      } = body;
+      // Sanitize parts_replaced and attachment_urls before validation
+      const sanitizedBody = {
+        ...body,
+        parts_replaced: sanitizePartsArray(body.parts_replaced),
+        attachment_urls: sanitizeAttachmentUrls(body.attachment_urls),
+      };
+
+      // Validate the update data with Zod
+      const validationResult = updateVehicleMaintenanceReportSchema.safeParse(sanitizedBody);
+      
+      if (!validationResult.success) {
+        return NextResponse.json(
+          { 
+            error: 'Validation failed',
+            details: validationResult.error.errors.map(err => ({
+              field: err.path.join('.'),
+              message: err.message
+            }))
+          },
+          { status: 400 }
+        );
+      }
+
+      const validatedData = validationResult.data;
 
       // Prepare update data with only valid fields
       const updateData: any = {
@@ -98,19 +114,19 @@ export async function PUT(
       };
 
       // Only add fields that are provided and valid
-      if (issue_description !== undefined) updateData.issue_description = issue_description;
-      if (remarks !== undefined) updateData.remarks = remarks || null;
-      if (inspection_details !== undefined) updateData.inspection_details = inspection_details || null;
-      if (action_taken !== undefined) updateData.action_taken = action_taken || null;
-      if (parts_replaced !== undefined) updateData.parts_replaced = Array.isArray(parts_replaced) ? parts_replaced : [];
-      if (priority !== undefined) updateData.priority = priority;
-      if (status !== undefined) updateData.status = status;
-      if (downtime_hours !== undefined) updateData.downtime_hours = downtime_hours || null;
-      if (attachment_urls !== undefined) updateData.attachment_urls = Array.isArray(attachment_urls) ? attachment_urls : [];
-      if (location_id !== undefined) updateData.location_id = location_id;
+      if (validatedData.issue_description !== undefined) updateData.issue_description = validatedData.issue_description;
+      if (validatedData.remarks !== undefined) updateData.remarks = validatedData.remarks;
+      if (validatedData.inspection_details !== undefined) updateData.inspection_details = validatedData.inspection_details;
+      if (validatedData.action_taken !== undefined) updateData.action_taken = validatedData.action_taken;
+      if (validatedData.parts_replaced !== undefined) updateData.parts_replaced = validatedData.parts_replaced;
+      if (validatedData.priority !== undefined) updateData.priority = validatedData.priority;
+      if (validatedData.status !== undefined) updateData.status = validatedData.status;
+      if (validatedData.downtime_hours !== undefined) updateData.downtime_hours = validatedData.downtime_hours;
+      if (validatedData.attachment_urls !== undefined) updateData.attachment_urls = validatedData.attachment_urls;
+      if (body.location_id !== undefined) updateData.location_id = body.location_id;
 
       // Handle completion logic
-      if (status === 'COMPLETED') {
+      if (validatedData.status === 'COMPLETED') {
         if (!existingReport.repaired_by) updateData.repaired_by = _user.id;
         if (!existingReport.date_repaired) updateData.date_repaired = new Date();
       }

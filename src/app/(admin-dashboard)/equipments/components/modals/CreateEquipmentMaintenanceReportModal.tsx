@@ -4,7 +4,6 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,6 +30,7 @@ import {
 import {
   useCreateEquipmentMaintenanceReport,
   useEquipmentsWithReferenceData,
+  equipmentKeys,
 } from "@/hooks/useEquipmentsQuery";
 import { useEquipmentStore, selectIsMobile } from "@/stores/equipmentStore";
 import { 
@@ -48,13 +48,12 @@ import {
   ClipboardCheck, 
   Package, 
   ImageIcon, 
-  ChevronDown, 
-  ChevronRight,
   CalendarIcon,
   Loader2
 } from "lucide-react";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface CreateEquipmentMaintenanceReportModalProps {
   equipmentId: string;
@@ -83,6 +82,7 @@ export default function CreateEquipmentMaintenanceReportModal({
   const { locations } = useEquipmentsWithReferenceData();
   const { data: usersData } = useUsers();
   const createMaintenanceReportMutation = useCreateEquipmentMaintenanceReport();
+  const queryClient = useQueryClient();
 
   // Tab state for navigation
   const [activeTab, setActiveTab] = useState<'details' | 'parts' | 'attachments'>('details');
@@ -109,14 +109,8 @@ export default function CreateEquipmentMaintenanceReportModal({
       setIsSubmitting(false);
       
       // Reset all local file states
-      setLocalPartsFiles([]);
       setLocalAttachmentFiles([]);
       
-      // Reset collapsible states
-      setOpenParts({ 0: true });
-      setOpenAttachments({ 0: true });
-      setIsPartsReplacedOpen(false);
-      setIsAttachmentsOpen(false);
       
       // Reset date state
       setDateRepaired(undefined);
@@ -154,16 +148,11 @@ export default function CreateEquipmentMaintenanceReportModal({
     };
   }, []);
   
-  // Local UI state for collapsibles and date picker
-  const [isPartsReplacedOpen, setIsPartsReplacedOpen] = useState(false);
-  const [isAttachmentsOpen, setIsAttachmentsOpen] = useState(false);
-  const [openParts, setOpenParts] = useState<Record<number, boolean>>({ 0: true });
-  const [openAttachments, setOpenAttachments] = useState<Record<number, boolean>>({ 0: true });
+  // Local UI state for date picker
   const [dateRepairedOpen, setDateRepairedOpen] = useState(false);
   const [dateRepaired, setDateRepaired] = useState<Date | undefined>();
   
   // Local file state - NO store subscriptions
-  const [localPartsFiles, setLocalPartsFiles] = useState<File[]>([]);
   const [localAttachmentFiles, setLocalAttachmentFiles] = useState<File[]>([]);
 
   // Debug logging to track re-renders and focus issues
@@ -175,14 +164,6 @@ export default function CreateEquipmentMaintenanceReportModal({
     setActiveTab(tab);
   }, []);
 
-  // Toggle functions for collapsibles
-  const togglePartOpen = useCallback((index: number) => {
-    setOpenParts(prev => ({ ...prev, [index]: !prev[index] }));
-  }, []);
-
-  const toggleAttachmentOpen = useCallback((index: number) => {
-    setOpenAttachments(prev => ({ ...prev, [index]: !prev[index] }));
-  }, []);
 
   // Stable event handlers using useCallback
   const handleClose = useCallback(() => {
@@ -190,24 +171,10 @@ export default function CreateEquipmentMaintenanceReportModal({
     resetForm();
     setActiveTab('details');
     setDateRepaired(undefined);
-    setIsPartsReplacedOpen(false);
-    setIsAttachmentsOpen(false);
-    setOpenParts({ 0: true });
-    setOpenAttachments({ 0: true });
     // Modal should stay closed after cleanup
   }, [setIsMaintenanceModalOpen, resetForm]);
 
   // File upload handlers - use local state
-  const handlePartImageUpload = useCallback((index: number, file: File | null) => {
-    const newFiles = [...localPartsFiles];
-    if (file) {
-      newFiles[index] = file;
-    } else {
-      newFiles.splice(index, 1);
-    }
-    setLocalPartsFiles(newFiles);
-  }, [localPartsFiles]);
-
   const handleAttachmentUpload = useCallback((index: number, file: File | null) => {
     const newFiles = [...localAttachmentFiles];
     if (file) {
@@ -224,8 +191,6 @@ export default function CreateEquipmentMaintenanceReportModal({
       ...formDataRef.current, 
       parts_replaced: [...formDataRef.current.parts_replaced, ''] 
     };
-    const newIndex = formDataRef.current.parts_replaced.length - 1;
-    setOpenParts(prevOpen => ({ ...prevOpen, [newIndex]: true }));
   }, []);
 
   const removePartReplaced = useCallback((index: number) => {
@@ -233,33 +198,8 @@ export default function CreateEquipmentMaintenanceReportModal({
       ...formDataRef.current, 
       parts_replaced: formDataRef.current.parts_replaced.filter((_, i) => i !== index)
     };
-    setOpenParts(prevOpen => {
-      const newState = { ...prevOpen };
-      delete newState[index];
-      return newState;
-    });
   }, []);
 
-  const addAttachment = useCallback(() => {
-    formDataRef.current = { 
-      ...formDataRef.current, 
-      attachment_urls: [...formDataRef.current.attachment_urls, ''] 
-    };
-    const newIndex = formDataRef.current.attachment_urls.length - 1;
-    setOpenAttachments(prevOpen => ({ ...prevOpen, [newIndex]: true }));
-  }, []);
-
-  const removeAttachment = useCallback((index: number) => {
-    formDataRef.current = { 
-      ...formDataRef.current, 
-      attachment_urls: formDataRef.current.attachment_urls.filter((_, i) => i !== index)
-    };
-    setOpenAttachments(prevOpen => {
-      const newState = { ...prevOpen };
-      delete newState[index];
-      return newState;
-    });
-  }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,11 +221,10 @@ export default function CreateEquipmentMaintenanceReportModal({
     
     for (let i = 0; i < currentFormData.parts_replaced.length; i++) {
       const partName = currentFormData.parts_replaced[i];
-      const partFile = localPartsFiles[i];
       
-      // If there's either a part name or a part image, include this part
-      if (partName?.trim() || partFile) {
-        processedParts.push(partName?.trim() || `Part ${i + 1}`); // Use default name if empty but has image
+      // Only include parts with actual names (no file uploads for parts anymore)
+      if (partName?.trim()) {
+        processedParts.push(partName.trim());
       }
     }
 
@@ -318,12 +257,11 @@ export default function CreateEquipmentMaintenanceReportModal({
     const uploadedAttachmentUrls: string[] = [];
 
     console.log('Starting file uploads for report:', reportId);
-    console.log('Local parts files:', localPartsFiles);
     console.log('Local attachment files:', localAttachmentFiles);
 
     try {
-      // Upload ALL files (both parts and attachments) to attachments folder for simplicity
-      const allFiles = [...localPartsFiles, ...localAttachmentFiles];
+      // Upload attachment files only
+      const allFiles = [...localAttachmentFiles];
       
       for (let i = 0; i < allFiles.length; i++) {
         const file = allFiles[i];
@@ -358,12 +296,26 @@ export default function CreateEquipmentMaintenanceReportModal({
         ];
 
         // Update the report with file URLs
-        await fetch(`/api/equipments/maintenance-reports/${reportId}`, {
+        const updateResponse = await fetch(`/api/equipments/maintenance-reports/${reportId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             attachment_urls: allAttachmentUrls,
           }),
+        });
+
+        if (updateResponse.ok) {
+          // CRITICAL FIX: Invalidate the cache to ensure fresh data is displayed
+          console.log('Invalidating maintenance reports cache after file upload');
+          await queryClient.invalidateQueries({ 
+            queryKey: equipmentKeys.equipmentMaintenanceReports() 
+          });
+        }
+      } else {
+        // Even if no files were uploaded, invalidate cache to ensure fresh data
+        console.log('Invalidating maintenance reports cache after report creation');
+        await queryClient.invalidateQueries({ 
+          queryKey: equipmentKeys.equipmentMaintenanceReports() 
         });
       }
       handleClose();
@@ -372,7 +324,7 @@ export default function CreateEquipmentMaintenanceReportModal({
       toast.error('Failed to create maintenance report');
       setIsSubmitting(false);
     }
-  }, [equipmentId, createMaintenanceReportMutation, handleClose, localPartsFiles, localAttachmentFiles, dateRepaired]);
+  }, [equipmentId, createMaintenanceReportMutation, handleClose, localAttachmentFiles, dateRepaired]);
 
   console.log('CreateEquipmentMaintenanceReportModal - isOpen:', isOpen, 'equipmentId:', equipmentId);
   
@@ -382,7 +334,7 @@ export default function CreateEquipmentMaintenanceReportModal({
     <div className="space-y-4">
       {/* Tab Navigation - Always Horizontal */}
       <div className="border-b mb-4">
-        <div className={`${isMobile ? 'flex overflow-x-auto gap-1 pb-1' : 'flex gap-0'}`}>
+        <div className={`${isMobile ? 'flex overflow-x-auto gap-1 pb-1' : 'flex gap-0 justify-center'}`}>
           {isMobile ? (
             <>
               {/* Mobile Tab Buttons */}
@@ -687,76 +639,53 @@ export default function CreateEquipmentMaintenanceReportModal({
                 <span className="truncate">Parts Replaced</span>
               </CardTitle>
               <p className={`text-muted-foreground mt-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                Upload images and details of parts that were replaced during maintenance
+                List the names and descriptions of parts that were replaced during maintenance
               </p>
             </CardHeader>
             <CardContent className={`space-y-4 ${isMobile ? 'px-4 pb-4' : ''}`}>
               {formDataRef.current.parts_replaced.map((part, index) => {
-                const isPartOpen = openParts[index] ?? (index === 0); // First part open by default
                 return (
-                  <Collapsible key={`part-input-${index}`} open={isPartOpen} onOpenChange={() => togglePartOpen(index)}>
-                    <div className={`border rounded-lg ${isMobile ? '' : ''}`}>
-                      <CollapsibleTrigger asChild>
-                        <div className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
-                          <div className="flex items-center gap-2">
-                            <Package className="h-4 w-4 text-muted-foreground" />
-                            <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
-                              Part {index + 1}
-                              {part && ` - ${part.slice(0, 30)}${part.length > 30 ? '...' : ''}`}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {formDataRef.current.parts_replaced.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removePartReplaced(index);
-                                }}
-                                className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                            {isPartOpen ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </div>
-                        </div>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className={`space-y-3 ${isMobile ? 'p-3 pt-0' : 'p-4 pt-0'}`}>
-                          <FileUploadSectionSimple
-                            label={`Part ${index + 1} Image`}
-                            accept="image/*"
-                            onFileChange={(file) => handlePartImageUpload(index, file)}
-                            onKeepExistingChange={() => {}}
-                            selectedFile={localPartsFiles[index]}
-                            required={false}
-                          />
-                          <Input
-                            defaultValue={part}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              // Update ref directly without store sync
-                              formDataRef.current = {
-                                ...formDataRef.current,
-                                parts_replaced: formDataRef.current.parts_replaced.map((item, i) => 
-                                  i === index ? value : item
-                                )
-                              };
-                            }}
-                            placeholder="Part name or description..."
-                            className={`${isMobile ? 'h-10 text-sm' : ''}`}
-                          />
-                        </div>
-                      </CollapsibleContent>
+                  <div key={`part-input-${index}`} className={`border rounded-lg ${isMobile ? '' : ''}`}>
+                    <div className={`flex items-center justify-between p-3 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
+                          Part {index + 1}
+                          {part && ` - ${part.slice(0, 30)}${part.length > 30 ? '...' : ''}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {formDataRef.current.parts_replaced.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removePartReplaced(index)}
+                            className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </Collapsible>
+                    <div className={`space-y-3 border-t ${isMobile ? 'p-3' : 'p-4'}`}>
+                      <Input
+                        defaultValue={part}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Update ref directly without store sync
+                          formDataRef.current = {
+                            ...formDataRef.current,
+                            parts_replaced: formDataRef.current.parts_replaced.map((item, i) => 
+                              i === index ? value : item
+                            )
+                          };
+                        }}
+                        placeholder="Part name or description..."
+                        className={`${isMobile ? 'h-10 text-sm' : ''}`}
+                      />
+                    </div>
+                  </div>
                 );
               })}
               <div className="flex justify-center">
@@ -789,85 +718,24 @@ export default function CreateEquipmentMaintenanceReportModal({
               </p>
             </CardHeader>
             <CardContent className={`space-y-4 ${isMobile ? 'px-4 pb-4' : ''}`}>
-              {formDataRef.current.attachment_urls.map((url, index) => {
-                const isAttachmentOpen = openAttachments[index] ?? (index === 0); // First attachment open by default
-                return (
-                  <Collapsible key={`attachment-input-${index}`} open={isAttachmentOpen} onOpenChange={() => toggleAttachmentOpen(index)}>
-                    <div className={`border rounded-lg ${isMobile ? '' : ''}`}>
-                      <CollapsibleTrigger asChild>
-                        <div className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
-                          <div className="flex items-center gap-2">
-                            <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                            <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
-                              Attachment {index + 1}
-                              {localAttachmentFiles[index] && ` - ${localAttachmentFiles[index].name.slice(0, 30)}${localAttachmentFiles[index].name.length > 30 ? '...' : ''}`}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {formDataRef.current.attachment_urls.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeAttachment(index);
-                                }}
-                                className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                            {isAttachmentOpen ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </div>
-                        </div>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className={`space-y-3 ${isMobile ? 'p-3 pt-0' : 'p-4 pt-0'}`}>
-                          <FileUploadSectionSimple
-                            label={`Attachment ${index + 1}`}
-                            accept="image/*,application/pdf,.doc,.docx"
-                            onFileChange={(file) => handleAttachmentUpload(index, file)}
-                            onKeepExistingChange={() => {}}
-                            selectedFile={localAttachmentFiles[index]}
-                            required={false}
-                          />
-                          <Input
-                            defaultValue={url}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              // Update ref directly without store sync
-                              formDataRef.current = {
-                                ...formDataRef.current,
-                                attachment_urls: formDataRef.current.attachment_urls.map((item, i) => 
-                                  i === index ? value : item
-                                )
-                              };
-                            }}
-                            placeholder="Or enter URL: https://example.com/image.jpg"
-                            type="url"
-                            className={`${isMobile ? 'h-10 text-sm' : ''}`}
-                          />
-                        </div>
-                      </CollapsibleContent>
-                    </div>
-                  </Collapsible>
-                );
-              })}
-              <div className="flex justify-center">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addAttachment}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Another Attachment
-                </Button>
+              <div className={`border rounded-lg ${isMobile ? '' : ''}`}>
+                <div className={`flex items-center gap-2 p-3 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                  <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
+                    Upload Attachments
+                    {localAttachmentFiles[0] && ` - ${localAttachmentFiles[0].name.slice(0, 30)}${localAttachmentFiles[0].name.length > 30 ? '...' : ''}`}
+                  </span>
+                </div>
+                <div className={`space-y-3 border-t ${isMobile ? 'p-3' : 'p-4'}`}>
+                  <FileUploadSectionSimple
+                    label="Attachment"
+                    accept="image/*,application/pdf,.doc,.docx"
+                    onFileChange={(file) => handleAttachmentUpload(0, file)}
+                    onKeepExistingChange={() => {}}
+                    selectedFile={localAttachmentFiles[0]}
+                    required={false}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>

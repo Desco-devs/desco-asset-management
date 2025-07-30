@@ -40,6 +40,9 @@ import InviteUsersModal from "./InviteUsersModal";
 import { DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { ChatUser, RoomListItem, RoomType } from "@/types/chat-app";
+import PresenceIndicator from "./PresenceIndicator";
+import PresenceStatus from "./PresenceStatus";
+import RoomInvitationNotifications from "./RoomInvitationNotifications";
 
 interface ChatHeaderProps {
   currentRoom?: RoomListItem;
@@ -61,6 +64,15 @@ interface ChatHeaderProps {
     inviteUsername?: string;
     inviteEmail?: string;
   }) => void; // Add invite functionality
+  // Presence props
+  isUserOnline?: (userId: string) => boolean;
+  onlineUserIds?: string[];
+  onlineMemberCount?: number;
+  roomMembersWithPresence?: Array<ChatUser & { isOnline: boolean }>;
+  
+  // Invitation notification props
+  onAcceptInvitation?: (invitationId: string) => Promise<void>;
+  onDeclineInvitation?: (invitationId: string) => Promise<void>;
 }
 
 const ChatHeader = ({
@@ -79,9 +91,16 @@ const ChatHeader = ({
   users = [],
   onDeleteRoom,
   onInviteUsers,
+  // Presence props with defaults
+  isUserOnline = () => false,
+  onlineUserIds = [],
+  onlineMemberCount = 0,
+  roomMembersWithPresence = [],
+  
+  // Invitation notification props
+  onAcceptInvitation,
+  onDeclineInvitation,
 }: ChatHeaderProps) => {
-  // TODO: Replace with Supabase realtime online status when migrating chat
-  const isUserOnline = (userId: string) => false;
   const getUserLastSeen = (userId: string) => null;
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -209,6 +228,8 @@ const ChatHeader = ({
               }}
               onCreateRoom={onCreateRoom}
               currentUserId={currentUserId}
+              isUserOnline={isUserOnline}
+              onlineUserIds={onlineUserIds}
             />
           </SheetContent>
         </Sheet>
@@ -221,12 +242,12 @@ const ChatHeader = ({
             </AvatarFallback>
           </Avatar>
           {currentRoom?.type === RoomType.DIRECT && (
-            <div
-              className={cn(
-                "absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background",
-                isOnline ? "bg-green-500" : "bg-gray-400"
-              )}
-            />
+            <div className="absolute -bottom-1 -right-1">
+              <PresenceIndicator
+                isOnline={isOnline}
+                size="md"
+              />
+            </div>
           )}
         </div>
 
@@ -242,24 +263,32 @@ const ChatHeader = ({
           {currentRoom?.type === RoomType.GROUP && (
             <p className="text-[10px] text-muted-foreground flex items-center">
               <Users className="h-3 w-3 mr-1" />
+              {onlineMemberCount > 0 && (
+                <span className="text-green-600 font-medium">
+                  {onlineMemberCount} online •{" "}
+                </span>
+              )}
               {currentRoom.member_count}{" "}
-              {currentRoom.member_count !== 0 ? "member" : "members"}
+              {currentRoom.member_count !== 1 ? "members" : "member"}
             </p>
           )}
           {currentRoom?.type === RoomType.DIRECT && (
-            <p
-              className={cn(
-                "text-xs",
-                isOnline ? "text-green-600" : "text-muted-foreground"
-              )}
-            >
-              {getOnlineStatusText()}
-            </p>
+            <PresenceStatus
+              isOnline={isOnline}
+              lastSeen={lastSeen ? new Date(lastSeen) : undefined}
+            />
           )}
         </div>
       </div>
 
       <div className="flex items-center space-x-2 px-2">
+        {/* Room Invitation Notifications */}
+        <RoomInvitationNotifications
+          userId={currentUserId}
+          onAcceptInvitation={onAcceptInvitation}
+          onDeclineInvitation={onDeclineInvitation}
+        />
+        
         <Button variant="ghost" size="sm" onClick={onCall}>
           <Phone className="h-4 w-4" />
         </Button>

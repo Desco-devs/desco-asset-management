@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, Paperclip, Smile } from "lucide-react";
@@ -10,6 +10,7 @@ interface MessageInputProps {
   onSendMessage: (message: string) => void;
   onAttachFile?: () => void;
   onEmojiPicker?: () => void;
+  onTyping?: (isTyping: boolean) => void;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -19,15 +20,30 @@ const MessageInput = ({
   onSendMessage,
   onAttachFile,
   onEmojiPicker,
+  onTyping,
   placeholder,
   disabled = false,
 }: MessageInputProps) => {
   const [message, setMessage] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSendMessage = () => {
     if (message.trim() && !disabled) {
       onSendMessage(message.trim());
       setMessage("");
+      
+      // Stop typing indicator when message is sent
+      if (isTyping) {
+        setIsTyping(false);
+        onTyping?.(false);
+      }
+      
+      // Clear typing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
     }
   };
 
@@ -37,6 +53,49 @@ const MessageInput = ({
       handleSendMessage();
     }
   };
+  
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setMessage(newValue);
+    
+    if (!onTyping) return;
+    
+    // Start typing indicator if not already typing
+    if (!isTyping && newValue.trim()) {
+      setIsTyping(true);
+      onTyping(true);
+    }
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Set new timeout to stop typing indicator
+    if (newValue.trim()) {
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+        onTyping(false);
+        typingTimeoutRef.current = null;
+      }, 1000); // Stop typing indicator after 1 second of inactivity
+    } else {
+      // If input is empty, immediately stop typing indicator
+      setIsTyping(false);
+      onTyping(false);
+    }
+  }, [onTyping, isTyping]);
+  
+  // Cleanup typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      if (isTyping && onTyping) {
+        onTyping(false);
+      }
+    };
+  }, [isTyping, onTyping]);
 
   return (
     <div className="p-2 sm:p-4 bg-background">
@@ -54,7 +113,7 @@ const MessageInput = ({
         <div className="flex-1 relative">
           <Input
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={handleInputChange}
             placeholder={placeholder || `Message ${roomName}...`}
             className="pr-20"
             onKeyPress={handleKeyPress}

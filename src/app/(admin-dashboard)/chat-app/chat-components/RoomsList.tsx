@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InvitationStatus, RoomListItem, RoomType } from "@/types/chat-app";
+import PresenceIndicator from "./PresenceIndicator";
 
 interface RoomsListProps {
   rooms: RoomListItem[];
@@ -24,6 +25,8 @@ interface RoomsListProps {
   onRoomSelect: (roomId: string) => void;
   onCreateRoom?: () => void;
   currentUserId?: string;
+  isUserOnline?: (userId: string) => boolean;
+  onlineUserIds?: string[];
 }
 
 const RoomsList = ({
@@ -32,10 +35,10 @@ const RoomsList = ({
   onRoomSelect,
   onCreateRoom,
   currentUserId,
+  isUserOnline = () => false,
+  onlineUserIds = [],
 }: RoomsListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  // TODO: Replace with Supabase realtime online status when migrating chat
-  const isUserOnline = (userId: string) => false;
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -128,18 +131,15 @@ const RoomsList = ({
                           <Clock className="h-2 w-2 text-white" />
                         </div>
                       ) : room.type === RoomType.DIRECT ? (
-                        <div
-                          className={cn(
-                            "absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background",
-                            // Check if the other user in this DM is online
-                            (() => {
+                        <div className="absolute -bottom-1 -right-1">
+                          <PresenceIndicator
+                            isOnline={(() => {
                               const otherUserId = getOtherUserId(room);
-                              return otherUserId && isUserOnline(otherUserId)
-                                ? "bg-green-500"
-                                : "bg-gray-400";
-                            })()
-                          )}
-                        />
+                              return otherUserId ? isUserOnline(otherUserId) : false;
+                            })()}
+                            size="md"
+                          />
+                        </div>
                       ) : null}
                     </div>
 

@@ -88,9 +88,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
     parts_replaced: [""] as string[],
     attachment_urls: [""] as string[],
   });
-  const [partsFiles, setPartsFiles] = useState<File[]>([]);
-  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
-  const [removedPartImages, setRemovedPartImages] = useState<number[]>([]);
+  const [localAttachmentFiles, setLocalAttachmentFiles] = useState<File[]>([]);
   const [removedAttachments, setRemovedAttachments] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -128,9 +126,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
     setSelectedMaintenanceReportForEdit(null);
     // Reset form state
     setActiveTab('details');
-    setPartsFiles([]);
-    setAttachmentFiles([]);
-    setRemovedPartImages([]);
+    setLocalAttachmentFiles([]);
     setRemovedAttachments([]);
     setFormData({
       issue_description: "",
@@ -171,9 +167,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       setSelectedMaintenanceReportForEdit(null);
       // Reset form state
       setActiveTab('details');
-      setPartsFiles([]);
-      setAttachmentFiles([]);
-      setRemovedPartImages([]);
+      setLocalAttachmentFiles([]);
       setRemovedAttachments([]);
       setFormData({
         issue_description: "",
@@ -190,7 +184,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       // Equipment modal stays closed since we're opening detail drawer
       // (Detail drawer will handle reopening equipment modal when it closes)
     }
-  }, [selectedReport, setSelectedMaintenanceReportForDetail, setIsMaintenanceReportDetailOpen, setIsEditMaintenanceReportDrawerOpen, setSelectedMaintenanceReportForEdit, setPartsFiles, setAttachmentFiles, setFormData, setActiveTab, queryClient]);
+  }, [selectedReport, setSelectedMaintenanceReportForDetail, setIsMaintenanceReportDetailOpen, setIsEditMaintenanceReportDrawerOpen, setSelectedMaintenanceReportForEdit, setLocalAttachmentFiles, setFormData, setActiveTab, queryClient]);
 
   const handleInputChange = useCallback((field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -220,10 +214,8 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       ...prev,
       parts_replaced: prev.parts_replaced.filter((_, i) => i !== index),
     }));
-    // Also remove corresponding files
-    setPartsFiles((prev) => prev.filter((_, i) => i !== index));
-    setRemovedPartImages((prev) => prev.filter(i => i !== index).map(i => i > index ? i - 1 : i));
   }, []);
+
 
   const addAttachment = useCallback(() => {
     setFormData((prev) => ({
@@ -238,7 +230,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       attachment_urls: prev.attachment_urls.filter((_, i) => i !== index),
     }));
     // Also remove corresponding files
-    setAttachmentFiles((prev) => prev.filter((_, i) => i !== index));
+    setLocalAttachmentFiles((prev) => prev.filter((_, i) => i !== index));
     setRemovedAttachments((prev) => prev.filter(i => i !== index).map(i => i > index ? i - 1 : i));
   }, []);
 
@@ -320,70 +312,20 @@ export default function EditEquipmentMaintenanceReportDrawer() {
     }
 
     try {
-      // Step 0: Delete removed part images from storage
-      for (const removedIndex of removedPartImages) {
+      // Step 1: Process parts (text-only, no images)
+      const filteredPartsReplaced: string[] = formData.parts_replaced.filter(
+        (part) => part.trim() !== ""
+      );
+
+      // Step 2: Delete removed attachment files from storage  
+      for (const removedIndex of removedAttachments) {
         const existingUrl = selectedReport?.attachment_urls?.[removedIndex];
         if (existingUrl) {
           await deleteFileFromSupabase(existingUrl);
         }
       }
 
-      // Step 1: Process parts and their images
-      const partUrls: string[] = [];
-      const filteredPartsReplaced: string[] = [];
-      
-      for (let i = 0; i < formData.parts_replaced.length; i++) {
-        const part = formData.parts_replaced[i];
-        
-        // Skip empty parts or removed parts
-        if (!part.trim() || removedPartImages.includes(i)) {
-          continue;
-        }
-        
-        // Add the part name to filtered list
-        filteredPartsReplaced.push(part);
-        
-        // Handle part image
-        const file = partsFiles[i];
-        if (file) {
-          // Delete old file if replacing
-          const existingUrl = selectedReport?.attachment_urls?.[i];
-          if (existingUrl) {
-            await deleteFileFromSupabase(existingUrl);
-          }
-          
-          // Upload new file
-          try {
-            const uploadedUrl = await uploadFileToSupabase(file, `part_${filteredPartsReplaced.length - 1}`, false);
-            partUrls.push(uploadedUrl);
-          } catch (uploadError) {
-            toast.error(`Failed to upload part ${filteredPartsReplaced.length} image`);
-            setIsSubmitting(false);
-            return;
-          }
-        } else {
-          // Keep existing URL if available
-          const existingUrl = selectedReport?.attachment_urls?.[i];
-          if (existingUrl) {
-            partUrls.push(existingUrl);
-          } else {
-            // No image for this part
-            partUrls.push("");
-          }
-        }
-      }
-
-      // Step 1.5: Delete removed attachment files from storage  
-      for (const removedIndex of removedAttachments) {
-        // Calculate the actual index in attachment_urls array (after parts)
-        const attachmentIndex = filteredPartsReplaced.length + removedIndex;
-        const existingUrl = selectedReport?.attachment_urls?.[attachmentIndex];
-        if (existingUrl) {
-          await deleteFileFromSupabase(existingUrl);
-        }
-      }
-
-      // Step 2: Process attachment files
+      // Step 3: Process attachment files
       const attachmentUrls: string[] = [];
       
       for (let i = 0; i < formData.attachment_urls.length; i++) {
@@ -392,11 +334,10 @@ export default function EditEquipmentMaintenanceReportDrawer() {
           continue;
         }
         
-        const file = attachmentFiles[i];
+        const file = localAttachmentFiles[i];
         if (file) {
           // Delete old attachment file if replacing
-          const attachmentIndex = filteredPartsReplaced.length + attachmentUrls.length;
-          const existingUrl = selectedReport?.attachment_urls?.[attachmentIndex];
+          const existingUrl = selectedReport?.attachment_urls?.[attachmentUrls.length];
           if (existingUrl) {
             await deleteFileFromSupabase(existingUrl);
           }
@@ -416,33 +357,6 @@ export default function EditEquipmentMaintenanceReportDrawer() {
         }
       }
 
-      // Step 3: Build final attachment URLs array with proper indexing
-      // Parts images go at the same indices as their corresponding parts
-      // Standalone attachments go after all parts
-      const finalAttachmentUrls: string[] = [];
-      
-      // First, add part images at their corresponding indices
-      for (let i = 0; i < filteredPartsReplaced.length; i++) {
-        if (partUrls[i] && partUrls[i].trim() !== "") {
-          finalAttachmentUrls[i] = partUrls[i];
-        } else {
-          finalAttachmentUrls[i] = ""; // Empty string to maintain index alignment
-        }
-      }
-      
-      // Then, add standalone attachments after the parts
-      attachmentUrls.forEach(url => {
-        if (url && url.trim() !== "") {
-          finalAttachmentUrls.push(url);
-        }
-      });
-      
-      // Clean up empty strings at the end but keep them in part positions
-      while (finalAttachmentUrls.length > filteredPartsReplaced.length && 
-             finalAttachmentUrls[finalAttachmentUrls.length - 1] === "") {
-        finalAttachmentUrls.pop();
-      }
-
       // Step 4: Update the maintenance report with new data
       const reportData = {
         id: selectedReport.id,
@@ -457,7 +371,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
         // location_id is required in schema, fallback to existing value if empty
         location_id: formData.location_id || selectedReport.location_id,
         parts_replaced: filteredPartsReplaced,
-        attachment_urls: finalAttachmentUrls,
+        attachment_urls: attachmentUrls,
         date_repaired: formData.status === "COMPLETED" && !selectedReport.date_repaired 
           ? new Date().toISOString() 
           : selectedReport.date_repaired,
@@ -472,7 +386,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       setIsSubmitting(false);
       toast.error("Failed to update maintenance report");
     }
-  }, [formData, selectedReport, updateMaintenanceReportMutation, handleSaveAndViewDetails, partsFiles, attachmentFiles, uploadFileToSupabase, removedPartImages, removedAttachments]);
+  }, [formData, selectedReport, updateMaintenanceReportMutation, handleSaveAndViewDetails, localAttachmentFiles, uploadFileToSupabase, removedAttachments]);
 
 
   // Stable tab button renderer
@@ -519,10 +433,37 @@ export default function EditEquipmentMaintenanceReportDrawer() {
           <div className="flex-1 overflow-y-auto p-4">
             <div className="space-y-6">
               {/* Tab Navigation */}
-              <div className="grid grid-cols-3 bg-muted rounded-md p-1">
-                {renderTabButton('details', 'Details', <ClipboardCheck className="h-4 w-4" />)}
-                {renderTabButton('parts', 'Parts', <Package className="h-4 w-4" />, getPartsCount() > 0 ? getPartsCount() : undefined)}
-                {renderTabButton('attachments', 'Files', <ImageIcon className="h-4 w-4" />, getAttachmentsCount() > 0 ? getAttachmentsCount() : undefined)}
+              <div className="flex overflow-x-auto gap-1 pb-1">
+                <Button
+                  type="button"
+                  variant={activeTab === 'details' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => handleTabChange('details')}
+                  className="flex-shrink-0 flex items-center gap-2 min-w-0"
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  <span className="truncate">Details</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant={activeTab === 'parts' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => handleTabChange('parts')}
+                  className="flex-shrink-0 flex items-center gap-2 min-w-0"
+                >
+                  <Package className="h-4 w-4" />
+                  <span className="truncate">Parts</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant={activeTab === 'attachments' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => handleTabChange('attachments')}
+                  className="flex-shrink-0 flex items-center gap-2 min-w-0"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  <span className="truncate">Files</span>
+                </Button>
               </div>
 
               {/* Details Tab */}
@@ -688,59 +629,55 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                       Parts Replaced
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Update images and details of parts that were replaced during maintenance
+                      Update the names and descriptions of parts that were replaced during maintenance
                     </p>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    {formData.parts_replaced.map((part, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Part {index + 1}</span>
-                          {formData.parts_replaced.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removePartReplaced(index)}
-                              className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
+                  <CardContent className="space-y-4">
+                    {formData.parts_replaced.map((part, index) => {
+                      return (
+                        <div key={`part-input-${index}`} className="border rounded-lg">
+                          <div className="flex items-center justify-between p-3 px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium text-sm">
+                                Part {index + 1}
+                                {part && ` - ${part.slice(0, 30)}${part.length > 30 ? '...' : ''}`}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {formData.parts_replaced.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removePartReplaced(index)}
+                                  className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-3 border-t p-3">
+                            <Input
+                              value={part}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  parts_replaced: prev.parts_replaced.map((item, i) => 
+                                    i === index ? value : item
+                                  )
+                                }));
+                              }}
+                              placeholder="Part name or description..."
+                              className="h-10 text-sm"
+                            />
+                          </div>
                         </div>
-                        <FileUploadSectionSimple
-                          label={`Part ${index + 1} Image`}
-                          accept="image/*"
-                          currentFileUrl={removedPartImages.includes(index) ? null : (selectedReport?.attachment_urls?.[index] || null)}
-                          selectedFile={partsFiles[index] || null}
-                          onFileChange={(file) => {
-                            const newFiles = [...partsFiles];
-                            if (file) {
-                              newFiles[index] = file;
-                              // Remove from removed list if re-adding
-                              setRemovedPartImages(prev => prev.filter(i => i !== index));
-                            } else {
-                              // Mark as removed instead of deleting
-                              setRemovedPartImages(prev => [...prev, index]);
-                              newFiles[index] = undefined as any;
-                            }
-                            setPartsFiles(newFiles);
-                          }}
-                          onKeepExistingChange={() => {}}
-                          required={false}
-                          hideChangeButton={true}
-                        />
-                        <div className="flex gap-2">
-                          <Input
-                            value={part}
-                            onChange={(e) => handleArrayChange("parts_replaced", index, e.target.value)}
-                            placeholder="Part name or description..."
-                            className="flex-1"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                    <div className="flex justify-center pt-2">
+                      );
+                    })}
+                    <div className="flex justify-center">
                       <Button
                         type="button"
                         variant="outline"
@@ -767,66 +704,34 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                       Update additional images, documents, or reference materials for this maintenance report
                     </p>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    {formData.attachment_urls.map((url, index) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">Attachment {index + 1}</span>
-                          {formData.attachment_urls.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeAttachment(index)}
-                              className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
+                  <CardContent className="space-y-4">
+                    <div className="border rounded-lg">
+                      <div className="flex items-center gap-2 p-3 px-3 py-2">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-sm">
+                          Upload Attachments
+                          {localAttachmentFiles[0] && ` - ${localAttachmentFiles[0].name.slice(0, 30)}${localAttachmentFiles[0].name.length > 30 ? '...' : ''}`}
+                        </span>
+                      </div>
+                      <div className="space-y-3 border-t p-3">
                         <FileUploadSectionSimple
-                          label={`Attachment ${index + 1}`}
+                          label="Attachment"
                           accept="image/*,application/pdf,.doc,.docx"
-                          currentFileUrl={removedAttachments.includes(index) ? null : (formData.attachment_urls[index] || null)}
-                          selectedFile={attachmentFiles[index] || null}
                           onFileChange={(file) => {
-                            const newFiles = [...attachmentFiles];
+                            const newFiles = [...localAttachmentFiles];
                             if (file) {
-                              newFiles[index] = file;
-                              // Remove from removed list if re-adding
-                              setRemovedAttachments(prev => prev.filter(i => i !== index));
+                              newFiles[0] = file;
                             } else {
-                              // Mark as removed instead of deleting
-                              setRemovedAttachments(prev => [...prev, index]);
-                              newFiles[index] = undefined as any;
+                              newFiles.splice(0, 1);
                             }
-                            setAttachmentFiles(newFiles);
+                            setLocalAttachmentFiles(newFiles);
                           }}
                           onKeepExistingChange={() => {}}
+                          selectedFile={localAttachmentFiles[0]}
+                          currentFileUrl={formData.attachment_urls[0] || null}
                           required={false}
-                          hideChangeButton={true}
                         />
-                        <div className="flex gap-2">
-                          <Input
-                            value={url}
-                            onChange={(e) => handleArrayChange("attachment_urls", index, e.target.value)}
-                            placeholder="Or enter URL: https://example.com/image.jpg"
-                            type="url"
-                            className="flex-1"
-                          />
-                        </div>
                       </div>
-                    ))}
-                    <div className="flex justify-center pt-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={addAttachment}
-                        className="flex items-center gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add Another Attachment
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -882,7 +787,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
             <button
               type="button"
               onClick={() => handleTabChange('details')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 whitespace-nowrap ${
                 activeTab === 'details'
                   ? 'border-primary text-primary bg-primary/5'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
@@ -894,7 +799,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
             <button
               type="button"
               onClick={() => handleTabChange('parts')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 whitespace-nowrap ${
                 activeTab === 'parts'
                   ? 'border-primary text-primary bg-primary/5'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
@@ -902,28 +807,18 @@ export default function EditEquipmentMaintenanceReportDrawer() {
             >
               <Package className="h-4 w-4" />
               Parts Replaced
-              {getPartsCount() > 0 && (
-                <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
-                  {getPartsCount()}
-                </span>
-              )}
             </button>
             <button
               type="button"
               onClick={() => handleTabChange('attachments')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 whitespace-nowrap ${
                 activeTab === 'attachments'
                   ? 'border-primary text-primary bg-primary/5'
-                  : 'border-transparent text-muted-foreground hover:border-muted-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
               }`}
             >
               <ImageIcon className="h-4 w-4" />
               Attachments & Images
-              {getAttachmentsCount() > 0 && (
-                <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
-                  {getAttachmentsCount()}
-                </span>
-              )}
             </button>
           </div>
 
@@ -1050,64 +945,60 @@ export default function EditEquipmentMaintenanceReportDrawer() {
 
           {/* Parts Tab */}
           {activeTab === 'parts' && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div>
                 <h3 className="text-lg font-medium flex items-center gap-2">
                   <Package className="h-4 w-4" />
                   Parts Replaced
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Update images and details of parts that were replaced during maintenance
+                  Update the names and descriptions of parts that were replaced during maintenance
                 </p>
               </div>
-              {formData.parts_replaced.map((part, index) => (
-                <div key={index} className="space-y-3 p-4 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Part {index + 1}</span>
-                    {formData.parts_replaced.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removePartReplaced(index)}
-                        className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
+              {formData.parts_replaced.map((part, index) => {
+                return (
+                  <div key={`part-input-${index}`} className="border rounded-lg">
+                    <div className="flex items-center justify-between p-3 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-sm">
+                          Part {index + 1}
+                          {part && ` - ${part.slice(0, 30)}${part.length > 30 ? '...' : ''}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {formData.parts_replaced.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removePartReplaced(index)}
+                            className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-3 border-t p-3">
+                      <Input
+                        value={part}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData((prev) => ({
+                            ...prev,
+                            parts_replaced: prev.parts_replaced.map((item, i) => 
+                              i === index ? value : item
+                            )
+                          }));
+                        }}
+                        placeholder="Part name or description..."
+                        className="h-10 text-sm"
+                      />
+                    </div>
                   </div>
-                  <FileUploadSectionSimple
-                    label={`Part ${index + 1} Image`}
-                    accept="image/*"
-                    currentFileUrl={removedPartImages.includes(index) ? null : (selectedReport?.attachment_urls?.[index] || null)}
-                    selectedFile={partsFiles[index] || null}
-                    onFileChange={(file) => {
-                      const newFiles = [...partsFiles];
-                      if (file) {
-                        newFiles[index] = file;
-                        // Remove from removed list if re-adding
-                        setRemovedPartImages(prev => prev.filter(i => i !== index));
-                      } else {
-                        // Mark as removed instead of deleting
-                        setRemovedPartImages(prev => [...prev, index]);
-                        newFiles[index] = undefined as any;
-                      }
-                      setPartsFiles(newFiles);
-                    }}
-                    onKeepExistingChange={() => {}}
-                    required={false}
-                    hideChangeButton={true}
-                  />
-                  <div className="flex gap-2">
-                    <Input
-                      value={part}
-                      onChange={(e) => handleArrayChange("parts_replaced", index, e.target.value)}
-                      placeholder="Part name or description..."
-                      className="flex-1"
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               <div className="flex justify-center">
                 <Button
                   type="button"
@@ -1134,65 +1025,33 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                   Update additional images, documents, or reference materials for this maintenance report
                 </p>
               </div>
-              {formData.attachment_urls.map((url, index) => (
-                <div key={index} className="space-y-3 p-4 border rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Attachment {index + 1}</span>
-                    {formData.attachment_urls.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeAttachment(index)}
-                        className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
+              <div className="border rounded-lg">
+                <div className="flex items-center gap-2 p-3 px-3 py-2">
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">
+                    Upload Attachments
+                    {localAttachmentFiles[0] && ` - ${localAttachmentFiles[0].name.slice(0, 30)}${localAttachmentFiles[0].name.length > 30 ? '...' : ''}`}
+                  </span>
+                </div>
+                <div className="space-y-3 border-t p-3">
                   <FileUploadSectionSimple
-                    label={`Attachment ${index + 1}`}
+                    label="Attachment"
                     accept="image/*,application/pdf,.doc,.docx"
-                    currentFileUrl={removedAttachments.includes(index) ? null : (formData.attachment_urls[index] || null)}
-                    selectedFile={attachmentFiles[index] || null}
                     onFileChange={(file) => {
-                      const newFiles = [...attachmentFiles];
+                      const newFiles = [...localAttachmentFiles];
                       if (file) {
-                        newFiles[index] = file;
-                        // Remove from removed list if re-adding
-                        setRemovedAttachments(prev => prev.filter(i => i !== index));
+                        newFiles[0] = file;
                       } else {
-                        // Mark as removed instead of deleting
-                        setRemovedAttachments(prev => [...prev, index]);
-                        newFiles[index] = undefined as any;
+                        newFiles.splice(0, 1);
                       }
-                      setAttachmentFiles(newFiles);
+                      setLocalAttachmentFiles(newFiles);
                     }}
                     onKeepExistingChange={() => {}}
+                    selectedFile={localAttachmentFiles[0]}
+                    currentFileUrl={formData.attachment_urls[0] || null}
                     required={false}
-                    hideChangeButton={true}
                   />
-                  <div className="flex gap-2">
-                    <Input
-                      value={url}
-                      onChange={(e) => handleArrayChange("attachment_urls", index, e.target.value)}
-                      placeholder="Or enter URL: https://example.com/image.jpg"
-                      type="url"
-                      className="flex-1"
-                    />
-                  </div>
                 </div>
-              ))}
-              <div className="flex justify-center">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addAttachment}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Another Attachment
-                </Button>
               </div>
             </div>
           )}

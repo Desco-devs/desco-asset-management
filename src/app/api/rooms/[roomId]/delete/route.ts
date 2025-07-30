@@ -1,21 +1,6 @@
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-
-import { NextRequest, NextResponse } from "next/server";
-// import { prisma } from "@/lib/prisma";
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ roomId: string }> }
-) {
-  return NextResponse.json(
-    { error: "Chat app temporarily disabled" },
-    { status: 503 }
-  );
-}
-
-/*
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { authenticateRequest } from "@/lib/auth/api-auth";
 
 export async function DELETE(
   request: NextRequest,
@@ -23,14 +8,21 @@ export async function DELETE(
 ) {
   try {
     const { roomId } = await params;
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
 
-    console.log("DELETE API - Received roomId:", roomId, "userId:", userId);
+    // Authenticate user
+    const authResult = await authenticateRequest(request);
+    if (!authResult.success || !authResult.user) {
+      return authResult.response || NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
 
-    if (!roomId || !userId) {
+    const userId = authResult.user.id;
+
+    if (!roomId) {
       return NextResponse.json(
-        { error: "Missing roomId or userId parameter" },
+        { error: "Missing roomId parameter" },
         { status: 400 }
       );
     }
@@ -68,45 +60,20 @@ export async function DELETE(
       );
     }
 
-    // Get all room members before deletion for socket notification
+    // Get all room members before deletion for potential notifications
     const roomMembers = await prisma.room_member.findMany({
       where: { room_id: roomId },
       select: { user_id: true },
     });
 
-    // Delete room and all related data (cascade should handle this)
-    // Order matters due to foreign key constraints
-    
-    // Delete messages first
-    await prisma.message.deleteMany({
-      where: { room_id: roomId },
-    });
-
-    // Delete room members
-    await prisma.room_member.deleteMany({
-      where: { room_id: roomId },
-    });
-
-    // Delete room invitations
-    await prisma.room_invitation.deleteMany({
-      where: { room_id: roomId },
-    });
-
-    // Finally delete the room
-    await prisma.room.delete({
-      where: { id: roomId },
-    });
-
-    // Emit socket event for real-time updates
-    if (global.io) {
-      // Notify all room members about deletion
-      roomMembers.forEach((member) => {
-        global.io?.to(`user:${member.user_id}`).emit('room:deleted', {
-          roomId: roomId,
-          deletedBy: userId,
-        });
+    // Delete room using transaction - cascade will handle related data
+    await prisma.$transaction(async (tx) => {
+      // The schema has onDelete: Cascade, so deleting the room will automatically 
+      // delete related messages, invitations, and members
+      await tx.room.delete({
+        where: { id: roomId },
       });
-    }
+    });
 
     return NextResponse.json({
       success: true,
@@ -121,4 +88,3 @@ export async function DELETE(
     );
   }
 }
-*/

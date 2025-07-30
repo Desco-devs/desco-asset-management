@@ -288,6 +288,13 @@ export interface OnlineStatus {
   last_seen?: Date;
 }
 
+// Message callback types for real-time subscriptions
+export interface MessageCallbacks {
+  onNewMessage?: (message: MessageWithRelations) => void;
+  onMessageUpdated?: (message: MessageWithRelations) => void;
+  onMessageDeleted?: (messageId: string, roomId: string) => void;
+}
+
 export interface ChatNotification {
   id: string;
   type: 'message' | 'invitation' | 'mention';

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase';
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { RoomListItem, RoomType } from '@/types/chat-app';
+import { useRealtimeRooms } from './useRealtimeRooms';
 
 // Database record types (matches schema.prisma)
 interface RoomRecord {
@@ -84,28 +85,123 @@ const convertToRoomListItem = (record: any, currentUserId: string): RoomListItem
   };
 };
 
-export const useSupabaseRooms = () => {
+interface UseSupabaseRoomsOptions {
+  userId?: string;
+  enabled?: boolean;
+  onRoomAdded?: (room: RoomListItem) => void;
+  onRoomUpdated?: (roomUpdate: Partial<RoomListItem> & { id: string }) => void;
+  onRoomDeleted?: (roomId: string) => void;
+  onMembershipChanged?: (roomId: string, memberCount: number) => void;
+  onUnreadCountUpdated?: (roomId: string, unreadCount: number) => void;
+}
+
+export const useSupabaseRooms = ({ 
+  userId, 
+  enabled = true,
+  onRoomAdded: externalOnRoomAdded,
+  onRoomUpdated: externalOnRoomUpdated,
+  onRoomDeleted: externalOnRoomDeleted,
+  onMembershipChanged: externalOnMembershipChanged,
+  onUnreadCountUpdated: externalOnUnreadCountUpdated,
+}: UseSupabaseRoomsOptions = {}) => {
   const [rooms, setRooms] = useState<RoomListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Real-time room handlers
+  const handleRoomAdded = useCallback((room: RoomListItem) => {
+    setRooms(prev => {
+      // Check if room already exists
+      const exists = prev.some(r => r.id === room.id);
+      if (exists) return prev;
+      
+      // Add room and sort by updated_at
+      const newRooms = [...prev, room];
+      return newRooms.sort((a, b) => (b.updated_at?.getTime() || 0) - (a.updated_at?.getTime() || 0));
+    });
+    
+    // Call external handler if provided
+    externalOnRoomAdded?.(room);
+  }, [externalOnRoomAdded]);
+
+  const handleRoomUpdated = useCallback((roomUpdate: Partial<RoomListItem> & { id: string }) => {
+    setRooms(prev => 
+      prev.map(room => 
+        room.id === roomUpdate.id 
+          ? { ...room, ...roomUpdate }
+          : room
+      ).sort((a, b) => (b.updated_at?.getTime() || 0) - (a.updated_at?.getTime() || 0))
+    );
+    
+    // Call external handler if provided
+    externalOnRoomUpdated?.(roomUpdate);
+  }, [externalOnRoomUpdated]);
+
+  const handleRoomDeleted = useCallback((roomId: string) => {
+    setRooms(prev => prev.filter(room => room.id !== roomId));
+    
+    // Call external handler if provided
+    externalOnRoomDeleted?.(roomId);
+  }, [externalOnRoomDeleted]);
+
+  const handleMembershipChanged = useCallback((roomId: string, memberCount: number) => {
+    setRooms(prev => 
+      prev.map(room => 
+        room.id === roomId 
+          ? { ...room, member_count: memberCount }
+          : room
+      )
+    );
+    
+    // Call external handler if provided
+    externalOnMembershipChanged?.(roomId, memberCount);
+  }, [externalOnMembershipChanged]);
+
+  const handleUnreadCountUpdated = useCallback((roomId: string, unreadCount: number) => {
+    setRooms(prev => 
+      prev.map(room => 
+        room.id === roomId 
+          ? { ...room, unread_count: unreadCount }
+          : room
+      )
+    );
+    
+    // Call external handler if provided
+    externalOnUnreadCountUpdated?.(roomId, unreadCount);
+  }, [externalOnUnreadCountUpdated]);
+
+  // Real-time rooms hook
+  const {
+    isConnected: realtimeConnected,
+    connectionError: realtimeError,
+    roomStates,
+    broadcastRoomUpdate,
+  } = useRealtimeRooms({
+    userId,
+    enabled: enabled && !!userId,
+    onRoomAdded: handleRoomAdded,
+    onRoomUpdated: handleRoomUpdated,
+    onRoomDeleted: handleRoomDeleted,
+    onMembershipChanged: handleMembershipChanged,
+    onUnreadCountUpdated: handleUnreadCountUpdated,
+  });
+
   // Extract fetchRooms function to be used by both initial load and subscriptions
   const fetchRooms = useCallback(async () => {
+    if (!enabled || !userId) {
+      setRooms([]);
+      return;
+    }
+
     setLoading(true);
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('User not authenticated, skipping room fetch');
-        setRooms([]);
-        return;
-      }
 
       // First get the room IDs for the user
       const { data: userRooms, error: roomMembersError } = await supabase
         .from('room_members')
         .select('room_id')
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
 
       if (roomMembersError) throw roomMembersError;
       
@@ -154,7 +250,7 @@ export const useSupabaseRooms = () => {
       if (error) throw error;
 
       // Convert to RoomListItem format
-      const convertedRooms = (data || []).map(room => convertToRoomListItem(room, user.id));
+      const convertedRooms = (data || []).map(room => convertToRoomListItem(room, userId));
       setRooms(convertedRooms);
     } catch (err) {
       console.error('Error fetching rooms:', err);
@@ -166,119 +262,26 @@ export const useSupabaseRooms = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [enabled, userId]);
 
   // Fetch initial rooms
   useEffect(() => {
     fetchRooms();
-  }, [fetchRooms]);
+  }, [enabled, userId]);
 
-  // Subscribe to real-time changes
-  useEffect(() => {
-    const supabase = createClient();
-    
-    // Subscribe to room changes
-    const roomSubscription = supabase
-      .channel('rooms')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'rooms',
-        },
-        (payload: RealtimePostgresChangesPayload<RoomRecord>) => {
-          if (payload.eventType === 'INSERT') {
-            // New room created, refetch to get complete data
-            fetchRooms();
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedRoom = payload.new as RoomRecord;
-            if (updatedRoom?.id) {
-              setRooms(prev => 
-                prev.map(room => 
-                  room.id === updatedRoom.id 
-                    ? { ...room, name: updatedRoom.name, description: updatedRoom.description, updated_at: new Date(updatedRoom.updated_at) }
-                    : room
-                )
-              );
-            }
-          } else if (payload.eventType === 'DELETE') {
-            const deletedRoom = payload.old as RoomRecord;
-            if (deletedRoom?.id) {
-              setRooms(prev => prev.filter(room => room.id !== deletedRoom.id));
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    // Subscribe to room member changes
-    const memberSubscription = supabase
-      .channel('room_members')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'room_members',
-        },
-        () => {
-          // Refetch rooms when membership changes
-          fetchRooms();
-        }
-      )
-      .subscribe();
-
-    // Subscribe to message changes for unread counts
-    const messageSubscription = supabase
-      .channel('messages')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-        },
-        (payload: RealtimePostgresChangesPayload<MessageRecord>) => {
-          // Check if we have new data and required fields
-          const newMessage = payload.new as MessageRecord;
-          if (!newMessage?.room_id || !newMessage?.created_at) return;
-          
-          // Update room's updated_at and increment unread count
-          setRooms(prev => 
-            prev.map(room => {
-              if (room.id === newMessage.room_id) {
-                return {
-                  ...room,
-                  updated_at: new Date(newMessage.created_at),
-                  unread_count: (room.unread_count || 0) + 1,
-                };
-              }
-              return room;
-            })
-          );
-        }
-      )
-      .subscribe();
-
-    return () => {
-      roomSubscription.unsubscribe();
-      memberSubscription.unsubscribe();
-      messageSubscription.unsubscribe();
-    };
-  }, []);
+  // Note: Real-time subscriptions are now handled by useRealtimeRooms hook
 
   // Mark room as read
   const markRoomAsRead = async (roomId: string) => {
+    if (!userId) return;
+    
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
 
     const { error } = await supabase
       .from('room_members')
       .update({ last_read: new Date().toISOString() })
       .eq('room_id', roomId)
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
 
     if (!error) {
       setRooms(prev => 
@@ -294,9 +297,12 @@ export const useSupabaseRooms = () => {
   return {
     rooms,
     loading,
-    error,
+    error: error || realtimeError,
     markRoomAsRead,
     refetch: fetchRooms,
+    roomStates,
+    broadcastRoomUpdate,
+    isRealtimeConnected: realtimeConnected,
   };
 };
 

@@ -1,172 +1,28 @@
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-
 import { NextRequest, NextResponse } from "next/server";
-// import { prisma } from "@/lib/prisma";
-
-export async function GET(request: NextRequest) {
-  return NextResponse.json(
-    { error: "Chat app temporarily disabled" },
-    { status: 503 }
-  );
-}
-
-/*
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { authenticateRequest } from "@/lib/auth/api-auth";
+import { ChatQueries } from "@/lib/database/chat-queries";
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Missing userId parameter" },
-        { status: 400 }
+    // Authenticate user
+    const authResult = await authenticateRequest(request);
+    if (!authResult.success || !authResult.user) {
+      return authResult.response || NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
       );
     }
 
-    // Get rooms where user is already a member
-    const memberRooms = await prisma.room.findMany({
-      where: {
-        members: {
-          some: {
-            user_id: userId,
-          },
-        },
-      },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            username: true,
-            full_name: true,
-            user_profile: true,
-          },
-        },
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                full_name: true,
-                user_profile: true,
-                user_status: true,
-                role: true,
-              },
-            },
-          },
-        },
-        messages: {
-          orderBy: {
-            created_at: "desc",
-          },
-          take: 1,
-          include: {
-            sender: {
-              select: {
-                id: true,
-                username: true,
-                full_name: true,
-                user_profile: true,
-              },
-            },
-          },
-        },
-        _count: {
-          select: {
-            members: true,
-          },
-        },
-      },
-      orderBy: [
-        {
-          messages: {
-            _count: "desc",
-          },
-        },
-        {
-          updated_at: "desc",
-        },
-      ],
-    });
+    const userId = authResult.user.id;
 
-    // Get pending invitations for this user
-    const pendingInvitations = await prisma.room_invitation.findMany({
-      where: {
-        invited_user: userId,
-        status: "PENDING",
-      },
-      include: {
-        room: {
-          include: {
-            owner: {
-              select: {
-                id: true,
-                username: true,
-                full_name: true,
-                user_profile: true,
-              },
-            },
-            members: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    username: true,
-                    full_name: true,
-                    user_profile: true,
-                    user_status: true,
-                    role: true,
-                  },
-                },
-              },
-            },
-            _count: {
-              select: {
-                members: true,
-              },
-            },
-          },
-        },
-        inviter: {
-          select: {
-            id: true,
-            username: true,
-            full_name: true,
-            user_profile: true,
-          },
-        },
-      },
-    });
+    // Get rooms where user is already a member (optimized query)
+    const memberRooms = await ChatQueries.getUserRooms(userId);
 
-    // Calculate unread counts for each room
-    const roomsWithUnreadCount = await Promise.all(
-      memberRooms.map(async (room) => {
-        // Find current user's membership to get last_read timestamp
-        const userMembership = room.members.find(member => member.user_id === userId);
-        const lastRead = userMembership?.last_read || new Date(0);
-        
-        // Count unread messages (messages after last_read that weren't sent by current user)
-        const unreadCount = await prisma.message.count({
-          where: {
-            room_id: room.id,
-            created_at: {
-              gt: lastRead,
-            },
-            sender_id: {
-              not: userId,
-            },
-          },
-        });
-        
-        return { ...room, unread_count: unreadCount };
-      })
-    );
+    // Get pending invitations for this user (optimized query)
+    const pendingInvitations = await ChatQueries.getPendingInvitations(userId);
 
     // Transform member rooms to RoomListItem format
-    const transformedMemberRooms = roomsWithUnreadCount.map((room) => {
+    const transformedMemberRooms = memberRooms.map((room) => {
       const lastMessage = room.messages[0];
       
       // For DIRECT rooms, display name should be the other participant's name
@@ -188,7 +44,7 @@ export async function GET(request: NextRequest) {
         description: room.description,
         type: room.type,
         avatar_url: displayAvatarUrl,
-        owner_id: room.owner_id, // Add owner_id
+        owner_id: room.owner_id,
         lastMessage: lastMessage ? {
           content: lastMessage.content,
           sender_name: lastMessage.sender.full_name,
@@ -268,4 +124,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-*/

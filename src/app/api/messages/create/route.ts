@@ -1,38 +1,44 @@
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-
 import { NextRequest, NextResponse } from "next/server";
-// import { prisma } from "@/lib/prisma";
-
-export async function POST(request: NextRequest) {
-  return NextResponse.json(
-    { error: "Chat app temporarily disabled" },
-    { status: 503 }
-  );
-}
-
-/*
-import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import { prisma } from "@/lib/prisma";
+import { ChatQueries } from "@/lib/database/chat-queries";
+import { createMessageSchema } from "@/lib/validations/chat";
+import { z } from "zod";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { roomId, content, senderId, type = "TEXT" } = body;
+    // Create Supabase client for authentication
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            // No-op for request handling
+          },
+        },
+      }
+    );
 
-    if (!roomId || !content || !senderId) {
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return NextResponse.json(
-        { error: "Missing required fields: roomId, content, or senderId" },
-        { status: 400 }
+        { error: "Unauthorized" },
+        { status: 401 }
       );
     }
 
+    const body = await request.json();
+    const validatedData = createMessageSchema.parse(body);
+    const { roomId, content, type, replyToId, fileUrl } = validatedData;
+
     // Verify user is a member of the room
-    const roomMember = await prisma.room_member.findFirst({
-      where: {
-        room_id: roomId,
-        user_id: senderId,
-      },
-    });
+    const roomMember = await ChatQueries.verifyRoomMembership(roomId, user.id);
 
     if (!roomMember) {
       return NextResponse.json(
@@ -41,38 +47,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the message
-    const message = await prisma.message.create({
-      data: {
-        room_id: roomId,
-        sender_id: senderId,
-        content: content.trim(),
-        type,
-      },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            username: true,
-            full_name: true,
-            user_profile: true,
-          },
+    // If replying to a message, verify it exists and is in the same room
+    if (replyToId) {
+      const replyToMessage = await prisma.message.findFirst({
+        where: {
+          id: replyToId,
+          room_id: roomId,
         },
-        room: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-          },
-        },
-      },
+      });
+
+      if (!replyToMessage) {
+        return NextResponse.json(
+          { error: "Reply target message not found" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Create the message with optimized transaction
+    const message = await ChatQueries.createMessage({
+      roomId,
+      senderId: user.id,
+      content,
+      type,
+      replyToId,
+      fileUrl,
     });
 
-    // Update room's updated_at timestamp for sorting
-    await prisma.room.update({
-      where: { id: roomId },
-      data: { updated_at: new Date() },
-    });
+    // TODO: Replace with Supabase realtime broadcast
+    // supabase.channel(`room:${roomId}`).send({
+    //   type: 'broadcast',
+    //   event: 'message:new',
+    //   payload: message
+    // });
 
     return NextResponse.json({
       success: true,
@@ -81,10 +88,17 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("Error creating message:", error);
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validation failed", details: error.errors },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to create message" },
       { status: 500 }
     );
   }
 }
-*/

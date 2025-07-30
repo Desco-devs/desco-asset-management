@@ -1,135 +1,92 @@
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-
 import { NextRequest, NextResponse } from "next/server";
-// import { prisma } from "@/lib/prisma";
-
-export async function POST(request: NextRequest) {
-  return NextResponse.json(
-    { error: "Chat app temporarily disabled" },
-    { status: 503 }
-  );
-}
-
-/*
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { createServerClient } from "@supabase/ssr";
+import { ChatQueries } from "@/lib/database/chat-queries";
+import { respondToInvitationSchema } from "@/lib/validations/chat";
+import { z } from "zod";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { invitationId, userId, action } = body;
-
-    if (!invitationId || !userId || !action) {
-      return NextResponse.json(
-        { error: "Missing required fields: invitationId, userId, or action" },
-        { status: 400 }
-      );
-    }
-
-    if (!["ACCEPTED", "DECLINED"].includes(action)) {
-      return NextResponse.json(
-        { error: "Invalid action. Must be ACCEPTED or DECLINED" },
-        { status: 400 }
-      );
-    }
-
-    const result = await prisma.$transaction(async (tx) => {
-      // Find the invitation
-      const invitation = await tx.room_invitation.findFirst({
-        where: {
-          id: invitationId,
-          invited_user: userId,
-          status: "PENDING",
-        },
-        include: {
-          room: true,
-        },
-      });
-
-      if (!invitation) {
-        throw new Error("Invitation not found or already responded to");
-      }
-
-      // Update invitation status
-      const updatedInvitation = await tx.room_invitation.update({
-        where: { id: invitationId },
-        data: { 
-          status: action,
-          responded_at: new Date(),
-        },
-      });
-
-      // If accepted, add user to room members
-      if (action === "ACCEPTED") {
-        await tx.room_member.create({
-          data: {
-            room_id: invitation.room_id,
-            user_id: userId,
+    // Create Supabase client for authentication
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
           },
-        });
+          setAll(cookiesToSet) {
+            // No-op for request handling
+          },
+        },
       }
+    );
 
-      // If declined and it's a DIRECT room, delete the room entirely
-      if (action === "DECLINED" && invitation.room.type === "DIRECT") {
-        // Delete all messages in the room
-        await tx.message.deleteMany({
-          where: { room_id: invitation.room_id },
-        });
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
 
-        // Delete all room members (the inviter)
-        await tx.room_member.deleteMany({
-          where: { room_id: invitation.room_id },
-        });
+    const body = await request.json();
+    const validatedData = respondToInvitationSchema.parse(body);
+    const { invitationId, action } = validatedData;
 
-        // Delete all invitations for this room
-        await tx.room_invitation.deleteMany({
-          where: { room_id: invitation.room_id },
-        });
-
-        // Delete the room itself
-        await tx.room.delete({
-          where: { id: invitation.room_id },
-        });
-
-        return { invitation: updatedInvitation, room: invitation.room, roomDeleted: true };
-      }
-
-      return { invitation: updatedInvitation, room: invitation.room };
+    // Use optimized invitation response handling
+    const result = await ChatQueries.respondToInvitation({
+      invitationId,
+      userId: user.id,
+      action,
     });
 
-    // Emit socket events for real-time updates
-    if (global.io) {
-      // If room was deleted due to decline, notify the inviter
-      if (result.roomDeleted) {
-        global.io.to(`user:${result.room.owner_id}`).emit('room:deleted', {
-          roomId: result.room.id,
-          deletedBy: userId, // The user who declined
-          reason: 'invitation_declined'
-        });
-      } else {
-        // Normal invitation response
-        global.io.emit('invitation:responded', {
-          invitationId: result.invitation.id,
-          userId,
-          action,
-          room: result.room,
-        });
-      }
-    }
+    // TODO: Replace with Supabase realtime broadcast
+    // if (result.roomDeleted) {
+    //   supabase.channel(`user:${result.room.owner_id}`).send({
+    //     type: 'broadcast',
+    //     event: 'room:deleted',
+    //     payload: {
+    //       roomId: result.room.id,
+    //       deletedBy: user.id,
+    //       reason: 'invitation_declined'
+    //     }
+    //   });
+    // } else {
+    //   supabase.channel('invitations').send({
+    //     type: 'broadcast',
+    //     event: 'invitation:responded',
+    //     payload: {
+    //       invitationId: result.invitation.id,
+    //       userId: user.id,
+    //       action,
+    //       room: result.room,
+    //     }
+    //   });
+    // }
 
     return NextResponse.json({
       success: true,
       invitation: result.invitation,
       room: result.room,
-      roomDeleted: result.roomDeleted || false,
+      roomDeleted: result.roomDeleted,
     });
 
   } catch (error) {
     console.error("Error responding to invitation:", error);
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validation failed", details: error.errors },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to respond to invitation" },
       { status: 500 }
     );
   }
 }
-*/

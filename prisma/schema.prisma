@@ -27,104 +27,109 @@ model user {
   reported_maintenance         maintenance_equipment_report[] @relation("ReportedBy")
   repaired_vehicle_maintenance maintenance_vehicle_report[]   @relation("VehicleRepairedBy")
   reported_vehicle_maintenance maintenance_vehicle_report[]   @relation("VehicleReportedBy")
-  // CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-  // sent_messages                message[]                      @relation("MessageCreatedBy")
+  sent_messages                message[]                      @relation("MessageCreatedBy")
   created_projects             project[]                      @relation("ProjectCreatedBy")
-  // CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-  // sent_invitations             room_invitation[]              @relation("InvitationSentBy")
-  // received_invitations         room_invitation[]              @relation("InvitationSentTo")
-  // room_memberships             room_member[]                  @relation("UserRoomMember")
-  // owned_rooms                  room[]                         @relation("RoomOwner")
+  sent_invitations             room_invitation[]              @relation("InvitationSentBy")
+  received_invitations         room_invitation[]              @relation("InvitationSentTo")
+  room_memberships             room_member[]                  @relation("UserRoomMember")
+  owned_rooms                  room[]                         @relation("RoomOwner")
   created_vehicles             vehicle[]                      @relation("VehicleCreatedBy")
 
   @@index([role])
   @@index([user_status])
   @@index([created_at])
+  @@index([is_online, last_seen])
+  @@index([username, user_status])
   @@map("users")
 }
 
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-// model room {
-//   id          String            @id @default(uuid()) @db.Uuid
-//   name        String
-//   type        room_type         @default(GROUP)
-//   description String?
-//   avatar_url  String?
-//   owner_id    String            @db.Uuid
-//   created_at  DateTime          @default(now())
-//   updated_at  DateTime          @updatedAt
-//   messages    message[]
-//   invitations room_invitation[]
-//   members     room_member[]
-//   owner       user              @relation("RoomOwner", fields: [owner_id], references: [id], onDelete: Cascade)
+model room {
+  id          String            @id @default(uuid()) @db.Uuid
+  name        String
+  type        room_type         @default(GROUP)
+  description String?
+  avatar_url  String?
+  owner_id    String            @db.Uuid
+  created_at  DateTime          @default(now())
+  updated_at  DateTime          @updatedAt
+  messages    message[]
+  invitations room_invitation[]
+  members     room_member[]
+  owner       user              @relation("RoomOwner", fields: [owner_id], references: [id], onDelete: Cascade)
 
-//   @@index([owner_id])
-//   @@index([type])
-//   @@index([created_at])
-//   @@map("rooms")
-// }
+  @@index([owner_id])
+  @@index([type])
+  @@index([created_at])
+  @@index([updated_at])
+  @@index([type, updated_at])
+  @@map("rooms")
+}
 
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-// model room_member {
-//   id        String    @id @default(uuid()) @db.Uuid
-//   room_id   String    @db.Uuid
-//   user_id   String    @db.Uuid
-//   joined_at DateTime  @default(now())
-//   last_read DateTime?
-//   room      room      @relation(fields: [room_id], references: [id], onDelete: Cascade)
-//   user      user      @relation("UserRoomMember", fields: [user_id], references: [id], onDelete: Cascade)
+model room_member {
+  id        String    @id @default(uuid()) @db.Uuid
+  room_id   String    @db.Uuid
+  user_id   String    @db.Uuid
+  joined_at DateTime  @default(now())
+  last_read DateTime?
+  room      room      @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  user      user      @relation("UserRoomMember", fields: [user_id], references: [id], onDelete: Cascade)
 
-//   @@unique([room_id, user_id])
-//   @@index([room_id])
-//   @@index([user_id])
-//   @@map("room_members")
-// }
+  @@unique([room_id, user_id])
+  @@index([room_id])
+  @@index([user_id])
+  @@index([user_id, last_read])
+  @@index([room_id, user_id, last_read])
+  @@map("room_members")
+}
 
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-// model message {
-//   id          String       @id @default(uuid()) @db.Uuid
-//   room_id     String       @db.Uuid
-//   sender_id   String       @db.Uuid
-//   content     String
-//   type        message_type @default(TEXT)
-//   file_url    String?
-//   reply_to_id String?      @db.Uuid
-//   edited_at   DateTime?
-//   created_at  DateTime     @default(now())
-//   updated_at  DateTime     @updatedAt
-//   reply_to    message?     @relation("MessageReply", fields: [reply_to_id], references: [id])
-//   replies     message[]    @relation("MessageReply")
-//   room        room         @relation(fields: [room_id], references: [id], onDelete: Cascade)
-//   sender      user         @relation("MessageCreatedBy", fields: [sender_id], references: [id], onDelete: Cascade)
+model message {
+  id          String       @id @default(uuid()) @db.Uuid
+  room_id     String       @db.Uuid
+  sender_id   String       @db.Uuid
+  content     String
+  type        message_type @default(TEXT)
+  file_url    String?
+  reply_to_id String?      @db.Uuid
+  edited_at   DateTime?
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+  reply_to    message?     @relation("MessageReply", fields: [reply_to_id], references: [id])
+  replies     message[]    @relation("MessageReply")
+  room        room         @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  sender      user         @relation("MessageCreatedBy", fields: [sender_id], references: [id], onDelete: Cascade)
 
-//   @@index([room_id])
-//   @@index([sender_id])
-//   @@index([created_at])
-//   @@index([reply_to_id])
-//   @@map("messages")
-// }
+  @@index([room_id])
+  @@index([sender_id])
+  @@index([created_at])
+  @@index([reply_to_id])
+  @@index([room_id, created_at])
+  @@index([room_id, created_at, sender_id])
+  @@index([sender_id, created_at])
+  @@map("messages")
+}
 
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-// model room_invitation {
-//   id           String            @id @default(uuid()) @db.Uuid
-//   room_id      String            @db.Uuid
-//   invited_by   String            @db.Uuid
-//   invited_user String            @db.Uuid
-//   status       invitation_status @default(PENDING)
-//   message      String?
-//   created_at   DateTime          @default(now())
-//   responded_at DateTime?
-//   inviter      user              @relation("InvitationSentBy", fields: [invited_by], references: [id], onDelete: Cascade)
-//   invitee      user              @relation("InvitationSentTo", fields: [invited_user], references: [id], onDelete: Cascade)
-//   room         room              @relation(fields: [room_id], references: [id], onDelete: Cascade)
+model room_invitation {
+  id           String            @id @default(uuid()) @db.Uuid
+  room_id      String            @db.Uuid
+  invited_by   String            @db.Uuid
+  invited_user String            @db.Uuid
+  status       invitation_status @default(PENDING)
+  message      String?
+  created_at   DateTime          @default(now())
+  responded_at DateTime?
+  inviter      user              @relation("InvitationSentBy", fields: [invited_by], references: [id], onDelete: Cascade)
+  invitee      user              @relation("InvitationSentTo", fields: [invited_user], references: [id], onDelete: Cascade)
+  room         room              @relation(fields: [room_id], references: [id], onDelete: Cascade)
 
-//   @@unique([room_id, invited_user])
-//   @@index([room_id])
-//   @@index([invited_user])
-//   @@index([invited_by])
-//   @@index([status])
-//   @@map("room_invitations")
-// }
+  @@unique([room_id, invited_user])
+  @@index([room_id])
+  @@index([invited_user])
+  @@index([invited_by])
+  @@index([status])
+  @@index([invited_user, status])
+  @@index([invited_user, status, created_at])
+  @@map("room_invitations")
+}
 
 model location {
   id                            String                         @id @default(uuid()) @db.Uuid
@@ -291,6 +296,7 @@ model maintenance_equipment_report {
   @@index([date_reported])
   @@index([date_repaired])
   @@index([created_at])
+  @@index([parts_replaced], type: Gin)
   @@map("maintenance_equipment_reports")
 }
 
@@ -327,6 +333,7 @@ model maintenance_vehicle_report {
   @@index([date_reported])
   @@index([date_repaired])
   @@index([created_at])
+  @@index([parts_replaced], type: Gin)
   @@map("maintenance_vehicle_reports")
 }
 
@@ -359,24 +366,21 @@ enum report_status {
   CANCELLED
 }
 
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-// enum room_type {
-//   DIRECT
-//   GROUP
-// }
+enum room_type {
+  DIRECT
+  GROUP
+}
 
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-// enum message_type {
-//   TEXT
-//   IMAGE
-//   FILE
-//   SYSTEM
-// }
+enum message_type {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+}
 
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-// enum invitation_status {
-//   PENDING
-//   ACCEPTED
-//   DECLINED
-//   CANCELLED
-// }
+enum invitation_status {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}

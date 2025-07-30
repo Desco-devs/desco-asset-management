@@ -19,16 +19,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import {
   useUpdateEquipmentMaintenanceReport,
   useEquipmentsWithReferenceData,
 } from "@/hooks/useEquipmentsQuery";
 import { useEquipmentsStore } from "@/stores/equipmentsStore";
 import { useEquipmentStore, selectActiveModal } from "@/stores/equipmentStore";
-import { Plus, Trash2, Settings, Clock, MapPin, Wrench, FileText, Camera, Upload, X } from "lucide-react";
+import { Plus, Trash2, Settings, Clock, MapPin, Wrench, FileText, Camera, Upload, X, Package, ClipboardCheck, ImageIcon, Loader2 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import { toast } from "sonner";
 
 export default function EditEquipmentMaintenanceReportModal() {
@@ -52,9 +52,9 @@ export default function EditEquipmentMaintenanceReportModal() {
     parts_replaced: [""] as string[],
     attachment_urls: [""] as string[],
   });
-  const [partsFiles, setPartsFiles] = useState<File[]>([]);
-  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [localAttachmentFiles, setLocalAttachmentFiles] = useState<File[]>([]);
   const [deletedAttachments, setDeletedAttachments] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'details' | 'parts' | 'attachments'>('details');
 
   // Populate form when selectedReport changes
   useEffect(() => {
@@ -98,9 +98,9 @@ export default function EditEquipmentMaintenanceReportModal() {
       parts_replaced: [""],
       attachment_urls: [""],
     });
-    setPartsFiles([]);
-    setAttachmentFiles([]);
+    setLocalAttachmentFiles([]);
     setDeletedAttachments([]);
+    setActiveTab('details');
   }, [setSelectedEquipmentMaintenanceReport, setActiveModal]);
 
   const handleInputChange = useCallback((field: string, value: string) => {
@@ -141,6 +141,25 @@ export default function EditEquipmentMaintenanceReportModal() {
         [field]: prev[field].filter((_, i) => i !== index),
       };
     });
+  }, []);
+
+  // Stable tab change handler
+  const handleTabChange = useCallback((tab: 'details' | 'parts' | 'attachments') => {
+    setActiveTab(tab);
+  }, []);
+
+  const addPartReplaced = useCallback(() => {
+    setFormData((prev) => ({
+      ...prev,
+      parts_replaced: [...prev.parts_replaced, ""],
+    }));
+  }, []);
+
+  const removePartReplaced = useCallback((index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      parts_replaced: prev.parts_replaced.filter((_, i) => i !== index),
+    }));
   }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -196,7 +215,7 @@ export default function EditEquipmentMaintenanceReportModal() {
       }
       
       // Add new attachment files
-      attachmentFiles.forEach((file, index) => {
+      localAttachmentFiles.forEach((file, index) => {
         if (file) {
           formDataToSend.append(`attachment_${index}`, file);
         }
@@ -225,7 +244,7 @@ export default function EditEquipmentMaintenanceReportModal() {
       console.error('Submit error:', error);
       toast.error(error instanceof Error ? error.message : "Failed to update maintenance report");
     }
-  }, [formData, selectedReport, updateMaintenanceReportMutation, handleClose, attachmentFiles, deletedAttachments]);
+  }, [formData, selectedReport, updateMaintenanceReportMutation, handleClose, localAttachmentFiles, deletedAttachments]);
 
   // Only render when this is the active modal and we have a report to edit
   const shouldShow = activeModal === 'maintenance-edit' && !!selectedReport;
@@ -246,51 +265,127 @@ export default function EditEquipmentMaintenanceReportModal() {
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-full">
-          <div className="flex-1 overflow-y-auto min-h-0 pr-2">
-            <div className="space-y-6">
-                {/* Issue Information Card */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="space-y-4">
+            {/* Tab Navigation - Always Horizontal */}
+            <div className="border-b mb-4">
+              <div className="flex gap-0 justify-center">
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('details')}
+                  className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 whitespace-nowrap ${
+                    activeTab === 'details'
+                      ? 'border-primary text-primary bg-primary/5'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                  }`}
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  Report Details
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('parts')}
+                  className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 whitespace-nowrap ${
+                    activeTab === 'parts'
+                      ? 'border-primary text-primary bg-primary/5'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                  }`}
+                >
+                  <Package className="h-4 w-4" />
+                  Parts Replaced
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('attachments')}
+                  className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 whitespace-nowrap ${
+                    activeTab === 'attachments'
+                      ? 'border-primary text-primary bg-primary/5'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
+                  }`}
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  Attachments & Images
+                </button>
+              </div>
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'details' && (
+              <div className="space-y-4 border-t pt-4">
                 <Card>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Settings className="h-5 w-5" />
-                      Issue Information
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <ClipboardCheck className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">Report Information</span>
                     </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Update the maintenance issue details and priority
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      Update maintenance report details and priority
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {/* Issue Description */}
-                    <div className="space-y-2">
-                      <Label htmlFor="issue_description">
-                        Issue Description *
-                      </Label>
-                      <Textarea
-                        id="issue_description"
-                        value={formData.issue_description}
-                        onChange={(e) =>
-                          handleInputChange("issue_description", e.target.value)
-                        }
-                        placeholder="Describe the issue or maintenance required..."
-                        required
-                        className="min-h-[100px]"
-                      />
+                    <div className="grid gap-4 grid-cols-1">
+                      <div className="space-y-2">
+                        <Label htmlFor="issue_description">
+                          Issue Description *
+                        </Label>
+                        <Textarea
+                          id="issue_description"
+                          value={formData.issue_description}
+                          onChange={(e) =>
+                            handleInputChange("issue_description", e.target.value)
+                          }
+                          placeholder="Describe the issue or maintenance required..."
+                          required
+                          rows={3}
+                          className="resize-none transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="inspection_details">Inspection Details</Label>
+                        <Textarea
+                          id="inspection_details"
+                          value={formData.inspection_details}
+                          onChange={(e) => handleInputChange("inspection_details", e.target.value)}
+                          rows={3}
+                          placeholder="Detail the inspection findings..."
+                          className="resize-none transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid gap-4 grid-cols-1">
+                      <div className="space-y-2">
+                        <Label htmlFor="action_taken">Action Taken</Label>
+                        <Textarea
+                          id="action_taken"
+                          value={formData.action_taken}
+                          onChange={(e) => handleInputChange("action_taken", e.target.value)}
+                          rows={3}
+                          placeholder="Describe the action taken or repairs made..."
+                          className="resize-none transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="remarks">Additional Remarks</Label>
+                        <Textarea
+                          id="remarks"
+                          value={formData.remarks}
+                          onChange={(e) => handleInputChange("remarks", e.target.value)}
+                          rows={3}
+                          placeholder="Any additional notes or observations..."
+                          className="resize-none transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
                     </div>
 
-                    {/* Priority and Status */}
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
                       <div className="space-y-2">
-                        <Label htmlFor="priority" className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          Priority
-                        </Label>
-                        <Select
-                          value={formData.priority}
-                          onValueChange={(value) => handleInputChange("priority", value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
+                        <Label>Priority</Label>
+                        <Select value={formData.priority} onValueChange={(value) => handleInputChange("priority", value)}>
+                          <SelectTrigger className="w-full transition-all duration-200 focus:ring-2 focus:ring-blue-500">
+                            <SelectValue placeholder="Select priority" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="LOW">Low</SelectItem>
@@ -299,18 +394,12 @@ export default function EditEquipmentMaintenanceReportModal() {
                           </SelectContent>
                         </Select>
                       </div>
-
+                      
                       <div className="space-y-2">
-                        <Label htmlFor="status" className="flex items-center gap-2">
-                          <Settings className="h-4 w-4" />
-                          Status
-                        </Label>
-                        <Select
-                          value={formData.status}
-                          onValueChange={(value) => handleInputChange("status", value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
+                        <Label>Status</Label>
+                        <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+                          <SelectTrigger className="w-full transition-all duration-200 focus:ring-2 focus:ring-blue-500">
+                            <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="REPORTED">Reported</SelectItem>
@@ -319,294 +408,187 @@ export default function EditEquipmentMaintenanceReportModal() {
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-
-                    {/* Downtime Hours and Location */}
-                    <div className="grid grid-cols-2 gap-6">
+                      
                       <div className="space-y-2">
-                        <Label htmlFor="downtime_hours" className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          Downtime Hours
-                        </Label>
+                        <Label htmlFor="downtime_hours">Downtime (Hours)</Label>
                         <Input
                           id="downtime_hours"
                           type="number"
+                          min="0"
                           step="0.1"
                           value={formData.downtime_hours}
-                          onChange={(e) =>
-                            handleInputChange("downtime_hours", e.target.value)
-                          }
+                          onChange={(e) => handleInputChange("downtime_hours", e.target.value)}
                           placeholder="0.0"
+                          className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
+                    </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="location_id" className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          Location
-                        </Label>
-                        <Select
-                          value={formData.location_id}
-                          onValueChange={(value) => handleInputChange("location_id", value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select location..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {locations.map((location) => (
-                              <SelectItem key={location.uid} value={location.uid}>
-                                {location.address}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    <div className="space-y-2">
+                      <Label>Location</Label>
+                      <Select value={formData.location_id} onValueChange={(value) => handleInputChange("location_id", value)}>
+                        <SelectTrigger className="w-full transition-all duration-200 focus:ring-2 focus:ring-blue-500">
+                          <SelectValue placeholder="Select location..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locations.map((location) => (
+                            <SelectItem key={location.uid} value={location.uid}>
+                              {location.address}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </CardContent>
                 </Card>
+              </div>
+            )}
 
-                {/* Technical Details Card */}
+            {/* Parts Replaced Tab */}
+            {activeTab === 'parts' && (
+              <div className="space-y-4 border-t pt-4">
                 <Card>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Wrench className="h-5 w-5" />
-                      Technical Details
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Package className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">Parts Replaced</span>
                     </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Update inspection findings and actions taken
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Inspection Details */}
-                    <div className="space-y-2">
-                      <Label htmlFor="inspection_details">Inspection Details</Label>
-                      <Textarea
-                        id="inspection_details"
-                        value={formData.inspection_details}
-                        onChange={(e) =>
-                          handleInputChange("inspection_details", e.target.value)
-                        }
-                        placeholder="Describe the inspection findings..."
-                        className="min-h-[100px]"
-                      />
-                    </div>
-
-                    {/* Action Taken */}
-                    <div className="space-y-2">
-                      <Label htmlFor="action_taken">Action Taken</Label>
-                      <Textarea
-                        id="action_taken"
-                        value={formData.action_taken}
-                        onChange={(e) =>
-                          handleInputChange("action_taken", e.target.value)
-                        }
-                        placeholder="Describe the actions taken..."
-                        className="min-h-[100px]"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Parts Replaced Card */}
-                <Card>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Wrench className="h-5 w-5" />
-                      Parts Replaced
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      List all parts that were replaced during maintenance
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      List the names and descriptions of parts that were replaced during maintenance
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {formData.parts_replaced.map((part, index) => (
-                      <div key={index} className="flex gap-2 items-center">
-                        <Input
-                          value={part}
-                          onChange={(e) => handleArrayChange("parts_replaced", index, e.target.value)}
-                          placeholder={`Part ${index + 1}...`}
-                          className="flex-1"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeArrayItem("parts_replaced", index)}
-                          className="px-2"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addArrayItem("parts_replaced")}
-                      className="w-full"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Part
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Attachments Card */}
-                <Card>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Camera className="h-5 w-5" />
-                      Attachments & Images
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Upload photos of work done, receipts, before/after images, and any related documents
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Existing Attachments */}
-                    {formData.attachment_urls.filter(url => url.trim() !== "").length > 0 && (
-                      <div className="space-y-3">
-                        <Label className="text-sm font-medium">Current Attachments</Label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                          {formData.attachment_urls
-                            .filter(url => url.trim() !== "")
-                            .map((url, index) => (
-                              <div key={index} className="relative group">
-                                <div className="aspect-square rounded-lg overflow-hidden border bg-muted">
-                                  {url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? (
-                                    <img
-                                      src={url}
-                                      alt={`Attachment ${index + 1}`}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        target.style.display = 'none';
-                                        const parent = target.parentElement;
-                                        if (parent) {
-                                          parent.innerHTML = `
-                                            <div class="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
-                                              <FileText size="32" />
-                                              <span class="text-xs text-center mt-2">Failed to load</span>
-                                            </div>
-                                          `;
-                                        }
-                                      }}
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
-                                      <FileText size={32} />
-                                      <span className="text-xs text-center mt-2">Document</span>
-                                    </div>
-                                  )}
-                                </div>
+                    {formData.parts_replaced.map((part, index) => {
+                      return (
+                        <div key={`part-input-${index}`} className="border rounded-lg">
+                          <div className="flex items-center justify-between p-3 px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">
+                                Part {index + 1}
+                                {part && ` - ${part.slice(0, 30)}${part.length > 30 ? '...' : ''}`}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {formData.parts_replaced.length > 1 && (
                                 <Button
                                   type="button"
-                                  variant="destructive"
+                                  variant="ghost"
                                   size="sm"
-                                  className="absolute -top-2 -right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => removeArrayItem("attachment_urls", index)}
+                                  onClick={() => removePartReplaced(index)}
+                                  className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
-                                {/* Show filename as tooltip */}
-                                <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity truncate">
-                                  {url.split('/').pop()?.split('_').pop() || 'File'}
-                                </div>
-                              </div>
-                            ))
-                          }
-                        </div>
-                      </div>
-                    )}
-
-                    {/* File Upload Section */}
-                    <div className="space-y-3">
-                      <Label className="text-sm font-medium">Upload New Files</Label>
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-                        💡 <strong>Tip:</strong> Upload work photos, receipts, before/after images, or any documentation related to this maintenance
-                      </div>
-                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
-                        <Input
-                          type="file"
-                          accept="image/*,application/pdf,.doc,.docx"
-                          multiple
-                          onChange={(e) => {
-                            const files = Array.from(e.target.files || []);
-                            setAttachmentFiles(files);
-                          }}
-                          className="w-full"
-                        />
-                        {attachmentFiles.length > 0 && (
-                          <div className="mt-3 space-y-2">
-                            {attachmentFiles.map((file, index) => (
-                              <div key={index} className="flex items-center gap-2 text-sm">
-                                <FileText className="h-4 w-4" />
-                                <span className="flex-1">{file.name}</span>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setAttachmentFiles(prev => prev.filter((_, i) => i !== index));
-                                  }}
-                                  className="px-2"
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ))}
+                              )}
+                            </div>
                           </div>
-                        )}
+                          <div className="space-y-3 border-t p-4">
+                            <Input
+                              value={part}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  parts_replaced: prev.parts_replaced.map((item, i) => 
+                                    i === index ? value : item
+                                  )
+                                }));
+                              }}
+                              placeholder="Part name or description..."
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex justify-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={addPartReplaced}
+                        className="flex items-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Another Part
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Attachments & Images Tab */}
+            {activeTab === 'attachments' && (
+              <div className="space-y-4 border-t pt-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <ImageIcon className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">Attachments & Images</span>
+                    </CardTitle>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      Upload photos and documents related to this maintenance work.
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="border rounded-lg">
+                      <div className="flex items-center gap-2 p-3 px-4 py-3">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">
+                          Upload Attachments
+                          {localAttachmentFiles[0] && ` - ${localAttachmentFiles[0].name.slice(0, 30)}${localAttachmentFiles[0].name.length > 30 ? '...' : ''}`}
+                        </span>
+                      </div>
+                      <div className="space-y-3 border-t p-4">
+                        <FileUploadSectionSimple
+                          label="Attachment"
+                          accept="image/*,application/pdf,.doc,.docx"
+                          onFileChange={(file) => {
+                            const newFiles = [...localAttachmentFiles];
+                            if (file) {
+                              newFiles[0] = file;
+                            } else {
+                              newFiles.splice(0, 1);
+                            }
+                            setLocalAttachmentFiles(newFiles);
+                          }}
+                          onKeepExistingChange={() => {}}
+                          selectedFile={localAttachmentFiles[0]}
+                          currentFileUrl={formData.attachment_urls[0] || null}
+                          required={false}
+                        />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-
-                    {/* Additional Remarks Card */}
-                    <Card>
-                      <CardHeader className="pb-4">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <FileText className="h-5 w-5" />
-                          Additional Remarks
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          Add any additional notes or comments
-                        </p>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <Label htmlFor="remarks">Remarks</Label>
-                          <Textarea
-                            id="remarks"
-                            value={formData.remarks}
-                            onChange={(e) => handleInputChange("remarks", e.target.value)}
-                            placeholder="Additional remarks or notes..."
-                            className="min-h-[100px]"
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-            </div>
+              </div>
+            )}
           </div>
-            
-          {/* Fixed Footer Outside Scroll Area */}
-          <DialogFooter className="flex-shrink-0 pt-4 border-t bg-background">
-            <div className="flex gap-2 w-full justify-end">
-              <Button type="button" variant="outline" onClick={handleClose} size="lg">
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={updateMaintenanceReportMutation.isPending}
-                size="lg"
-              >
-                {updateMaintenanceReportMutation.isPending
-                  ? "Updating..."
-                  : "Update Report"}
-              </Button>
-            </div>
-          </DialogFooter>
-        </form>
+        </div>
+        
+        {/* Desktop Action Buttons in Footer */}
+        <DialogFooter className="pt-4 border-t bg-background">
+          <div className="flex gap-2 w-full justify-end">
+            <Button type="button" variant="outline" onClick={handleClose} size="lg">
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={updateMaintenanceReportMutation.isPending}
+              size="lg"
+            >
+              {updateMaintenanceReportMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating Report...
+                </>
+              ) : (
+                "Update Report"
+              )}
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

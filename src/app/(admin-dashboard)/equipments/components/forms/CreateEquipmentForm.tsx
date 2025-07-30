@@ -6,7 +6,6 @@ import { useCreateEquipment } from "@/hooks/useEquipmentQuery";
 import { useUsers } from "@/hooks/useUsersQuery";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { Settings, Camera, FileText, Upload, CalendarIcon, User, Building2, Wrench, Hash, Shield, Loader2, ClipboardCheck, Package, ImageIcon, Plus, Trash2, ChevronDown, ChevronRight, X } from "lucide-react";
+import { Settings, Camera, FileText, Upload, CalendarIcon, User, Building2, Wrench, Hash, Shield, Loader2, ClipboardCheck, Package, ImageIcon, Plus, Trash2, X } from "lucide-react";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import PartsFolderManager, { type PartsStructure } from "./PartsFolderManager";
 import EquipmentFormErrorBoundary, { useErrorHandler } from "@/components/error-boundary/EquipmentFormErrorBoundary";
@@ -71,10 +70,6 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
   
   // Maintenance-specific state
   const [dateRepaired, setDateRepaired] = useState<Date | undefined>();
-  const [isPartsReplacedOpen, setIsPartsReplacedOpen] = useState(true);
-  const [openParts, setOpenParts] = useState<{ [key: number]: boolean }>({});
-  const [isAttachmentsOpen, setIsAttachmentsOpen] = useState(true);
-  const [openAttachments, setOpenAttachments] = useState<{ [key: number]: boolean }>({});
   
   // Form state for all fields
   const [formData, setFormData] = useState({
@@ -98,7 +93,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     remarks: '',
     inspectionDetails: '',
     actionTaken: '',
-    partsReplaced: [{ name: '', image: null }] as Array<{ name: string; image: File | null }>,
+    partsReplaced: [''] as string[],
     priority: 'MEDIUM',
     status: 'REPORTED',
     downtimeHours: '',
@@ -113,7 +108,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     pgpcInspection: null as File | null,
     originalReceipt: null as File | null,
     equipmentRegistration: null as File | null,
-    maintenanceAttachments: [null] as (File | null)[],
+    maintenanceAttachment: null as File | null,
   });
 
   // Parts structure state
@@ -128,15 +123,15 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
   };
   
   // Maintenance file handlers
-  const handleMaintenanceFileChange = (newFiles: File[]) => {
-    setFiles(prev => ({ ...prev, maintenanceAttachments: newFiles }));
+  const handleMaintenanceFileChange = (file: File | null) => {
+    setFiles(prev => ({ ...prev, maintenanceAttachment: file }));
   };
   
   // Parts management handlers
   const addPartReplaced = () => {
     setMaintenanceData(prev => ({
       ...prev,
-      partsReplaced: [...prev.partsReplaced, { name: '', image: null }]
+      partsReplaced: [...prev.partsReplaced, '']
     }));
   };
   
@@ -147,62 +142,6 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     }));
   };
   
-  const handlePartImageUpload = (index: number, file: File | null) => {
-    setMaintenanceData(prev => ({
-      ...prev,
-      partsReplaced: prev.partsReplaced.map((part, i) => 
-        i === index ? { ...part, image: file } : part
-      )
-    }));
-  };
-  
-  const togglePartOpen = (index: number) => {
-    setOpenParts(prev => ({ ...prev, [index]: !prev[index] }));
-  };
-  
-  const toggleAttachmentOpen = (index: number) => {
-    setOpenAttachments(prev => ({ ...prev, [index]: !prev[index] }));
-  };
-  
-  const addMaintenanceAttachment = () => {
-    const newIndex = files.maintenanceAttachments.length;
-    setFiles(prev => ({ 
-      ...prev, 
-      maintenanceAttachments: [...prev.maintenanceAttachments, null as any] 
-    }));
-    // Auto-open the new attachment
-    setOpenAttachments(prev => ({ ...prev, [newIndex]: true }));
-  };
-  
-  const removeMaintenanceAttachment = (index: number) => {
-    setFiles(prev => ({
-      ...prev,
-      maintenanceAttachments: prev.maintenanceAttachments.filter((_, i) => i !== index)
-    }));
-    // Remove from open state
-    setOpenAttachments(prev => {
-      const newState = { ...prev };
-      delete newState[index];
-      // Reindex remaining attachments
-      const reindexed: { [key: number]: boolean } = {};
-      Object.keys(newState).forEach(key => {
-        const keyNum = parseInt(key);
-        if (keyNum > index) {
-          reindexed[keyNum - 1] = newState[keyNum];
-        } else {
-          reindexed[keyNum] = newState[keyNum];
-        }
-      });
-      return reindexed;
-    });
-  };
-  
-  const handleSingleAttachmentChange = (index: number, file: File | null) => {
-    setFiles(prev => ({
-      ...prev,
-      maintenanceAttachments: prev.maintenanceAttachments.map((f, i) => i === index ? file : f)
-    }));
-  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -256,14 +195,9 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
 
     // Add all the files to formData
     Object.entries(files).forEach(([key, file]) => {
-      if (key === 'maintenanceAttachments' && Array.isArray(file)) {
-        // Handle maintenance attachments array
-        file.forEach((attachment, index) => {
-          if (attachment) {
-            formDataFromForm.append(`maintenanceAttachment_${index}`, attachment);
-          }
-        });
-      } else if (file && !Array.isArray(file)) {
+      if (key === 'maintenanceAttachment' && file) {
+        formDataFromForm.append('maintenanceAttachment', file);
+      } else if (file && key !== 'maintenanceAttachment') {
         formDataFromForm.append(key, file);
       }
     });
@@ -298,25 +232,17 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       maintenanceData.actionTaken.trim() !== '' ||
       maintenanceData.downtimeHours.trim() !== '' ||
       dateRepaired ||
-      maintenanceData.partsReplaced.some(part => part.name.trim() !== '' || part.image) ||
-      files.maintenanceAttachments.some(file => file !== null)
+      maintenanceData.partsReplaced.some(part => part.trim() !== '') ||
+      files.maintenanceAttachment !== null
     );
     
     if (hasMaintenanceData) {
-      // Add parts images to formData
-      maintenanceData.partsReplaced.forEach((part, index) => {
-        if (part.image) {
-          formDataFromForm.append(`partImage_${index}`, part.image);
-          formDataFromForm.append(`partImageName_${index}`, part.name);
-        }
-      });
-      
-      // Convert parts with images to just names for the JSON data
-      const partsForJson = maintenanceData.partsReplaced.map(part => part.name);
+      // Filter out empty parts
+      const filteredParts = maintenanceData.partsReplaced.filter(part => part.trim() !== '');
       
       formDataFromForm.append('maintenanceReport', JSON.stringify({
         ...maintenanceData,
-        partsReplaced: partsForJson,
+        partsReplaced: filteredParts,
         dateRepaired: dateRepaired ? format(dateRepaired, 'yyyy-MM-dd') : null
       }));
     }
@@ -345,14 +271,14 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
             pgpcInspection: null,
             originalReceipt: null,
             equipmentRegistration: null,
-            maintenanceAttachments: [null],
+            maintenanceAttachment: null,
           });
           setMaintenanceData({
             issueDescription: '',
             remarks: '',
             inspectionDetails: '',
             actionTaken: '',
-            partsReplaced: [{ name: '', image: null }],
+            partsReplaced: [''],
             priority: 'MEDIUM',
             status: 'REPORTED',
             downtimeHours: '',
@@ -1283,275 +1209,114 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
           </Card>
           
           {/* Parts Replaced Section */}
-          <Collapsible open={isPartsReplacedOpen} onOpenChange={setIsPartsReplacedOpen}>
-            <Card className={isMobile ? 'mx-0' : ''}>
-              <CollapsibleTrigger asChild>
-                <CardHeader className={`pb-3 ${isMobile ? 'px-4 py-3' : 'pb-4'} cursor-pointer hover:bg-muted/50 transition-colors`}>
-                  <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base'}`}>
-                    <Package className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">Parts Replaced</span>
-                    {isPartsReplacedOpen ? (
-                      <ChevronDown className="h-4 w-4 ml-auto" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 ml-auto" />
-                    )}
-                  </CardTitle>
-                  <p className={`text-muted-foreground mt-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                    Upload images and details of parts that were replaced during maintenance
-                  </p>
-                </CardHeader>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent className={`space-y-4 ${isMobile ? 'px-4 pb-4' : ''}`}>
-                  {maintenanceData.partsReplaced.map((part, index) => {
-                    const isPartOpen = openParts[index] ?? (index === 0); // First part open by default
-                    return (
-                      <Collapsible key={index} open={isPartOpen} onOpenChange={() => togglePartOpen(index)}>
-                        <div className={`border rounded-lg ${isMobile ? '' : ''}`}>
-                          <CollapsibleTrigger asChild>
-                            <div className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
-                              <div className="flex items-center gap-2">
-                                <Package className="h-4 w-4 text-muted-foreground" />
-                                <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
-                                  Part {index + 1}
-                                  {part.name && ` - ${part.name.slice(0, 30)}${part.name.length > 30 ? '...' : ''}`}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {maintenanceData.partsReplaced.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      removePartReplaced(index);
-                                    }}
-                                    className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                )}
-                                {isPartOpen ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </div>
-                            </div>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <div className={`space-y-3 ${isMobile ? 'p-3 pt-0' : 'p-4 pt-0'}`}>
-                              <EquipmentFormErrorBoundary fallback={
-                                <div className="p-2 border border-red-200 rounded bg-red-50">
-                                  <p className="text-xs text-red-600">Part image upload failed to load</p>
-                                </div>
-                              }>
-                                <FileUploadSectionSimple
-                                  label={`Part ${index + 1} Image`}
-                                  accept="image/*"
-                                  onFileChange={(file) => handlePartImageUpload(index, file)}
-                                  onKeepExistingChange={() => {}}
-                                  selectedFile={part.image}
-                                  required={false}
-                                />
-                              </EquipmentFormErrorBoundary>
-                              <Input
-                                value={part.name}
-                                onChange={(e) => {
-                                  setMaintenanceData(prev => ({
-                                    ...prev,
-                                    partsReplaced: prev.partsReplaced.map((p, i) => 
-                                      i === index ? { ...p, name: e.target.value } : p
-                                    )
-                                  }));
-                                }}
-                                placeholder="Part name or description..."
-                                className={`${isMobile ? 'h-10 text-sm' : ''}`}
-                              />
-                            </div>
-                          </CollapsibleContent>
-                        </div>
-                      </Collapsible>
-                    );
-                  })}
-                  <div className="flex justify-center">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => addPartReplaced()}
-                      className="flex items-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Another Part
-                    </Button>
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-          
-          {/* Attachments & Images Section */}
-          <Collapsible open={isAttachmentsOpen} onOpenChange={setIsAttachmentsOpen}>
-            <Card className={isMobile ? 'mx-0' : ''}>
-              <CollapsibleTrigger asChild>
-                <CardHeader className={`pb-3 ${isMobile ? 'px-4 py-3' : 'pb-4'} cursor-pointer hover:bg-muted/50 transition-colors`}>
-                  <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base'}`}>
-                    <ImageIcon className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">Attachments & Images</span>
-                    {isAttachmentsOpen ? (
-                      <ChevronDown className="h-4 w-4 ml-auto" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 ml-auto" />
-                    )}
-                  </CardTitle>
-                  <p className={`text-muted-foreground mt-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                    Upload photos and documents related to this maintenance work.
-                  </p>
-                </CardHeader>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent className={`space-y-4 ${isMobile ? 'px-4 pb-4' : ''}`}>
-                  {files.maintenanceAttachments.map((attachment, index) => {
-                    const isAttachmentOpen = openAttachments[index] ?? (index === 0); // First attachment open by default
-                    return (
-                      <Collapsible key={index} open={isAttachmentOpen} onOpenChange={() => toggleAttachmentOpen(index)}>
-                        <div className={`border rounded-lg ${isMobile ? '' : ''}`}>
-                          <CollapsibleTrigger asChild>
-                            <div className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
-                              <div className="flex items-center gap-2">
-                                <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                                <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
-                                  Attachment {index + 1}
-                                  {attachment && ` - ${attachment.name.slice(0, 30)}${attachment.name.length > 30 ? '...' : ''}`}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {files.maintenanceAttachments.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      removeMaintenanceAttachment(index);
-                                    }}
-                                    className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                )}
-                                {isAttachmentOpen ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </div>
-                            </div>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <div className={`space-y-3 ${isMobile ? 'p-3 pt-0' : 'p-4 pt-0'}`}>
-                              <EquipmentFormErrorBoundary fallback={
-                                <div className="p-2 border border-red-200 rounded bg-red-50">
-                                  <p className="text-xs text-red-600">Attachment upload failed to load</p>
-                                </div>
-                              }>
-                                <FileUploadSectionSimple
-                                  label={`Attachment ${index + 1}`}
-                                  accept="image/*,.pdf"
-                                  onFileChange={(file) => handleSingleAttachmentChange(index, file)}
-                                  onKeepExistingChange={() => {}}
-                                  selectedFile={attachment}
-                                  required={false}
-                                />
-                              </EquipmentFormErrorBoundary>
-                            </div>
-                          </CollapsibleContent>
-                        </div>
-                      </Collapsible>
-                    );
-                  })}
-                  <div className="flex justify-center">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => addMaintenanceAttachment()}
-                      className="flex items-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Another Attachment
-                    </Button>
-                  </div>
-                  
-                  {files.maintenanceAttachments.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <ImageIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <Label className={`font-medium ${isMobile ? 'text-sm' : 'text-sm'}`}>
-                      Uploaded Files ({files.maintenanceAttachments.length})
-                    </Label>
-                  </div>
-                  <div className={`bg-muted/30 rounded-lg ${isMobile ? 'p-3' : 'p-4'}`}>
-                    <div className="space-y-2">
-                      {files.maintenanceAttachments.map((file, index) => {
-                        if (!file) return null;
-                        const isImage = file.type?.startsWith('image/') || false;
-                        return (
-                          <div key={index} className={`flex items-center justify-between bg-background border rounded-md shadow-sm ${isMobile ? 'px-2 py-2 text-xs' : 'px-3 py-2 text-sm'}`}>
-                            <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
-                              {isImage ? (
-                                <ImageIcon className={`text-blue-500 flex-shrink-0 ${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
-                              ) : (
-                                <FileText className={`text-red-500 flex-shrink-0 ${isMobile ? 'h-3 w-3' : 'h-4 w-4'}`} />
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <span className={`truncate font-medium block ${isMobile ? 'text-xs' : ''}`}>{file.name}</span>
-                                {isMobile && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {(file.size / 1024 / 1024).toFixed(1)} MB
-                                  </span>
-                                )}
-                              </div>
-                              {!isMobile && (
-                                <span className="text-xs text-muted-foreground flex-shrink-0">
-                                  ({(file.size / 1024 / 1024).toFixed(1)} MB)
-                                </span>
-                              )}
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const newFiles = files.maintenanceAttachments.filter((_, i) => i !== index).filter(f => f !== null);
-                                handleMaintenanceFileChange(newFiles);
-                              }}
-                              className={`hover:bg-destructive hover:text-destructive-foreground flex-shrink-0 ${isMobile ? 'h-6 w-6 p-0' : 'h-6 w-6 p-0 ml-2'}`}
-                            >
-                              ×
-                            </Button>
-                          </div>
-                        );
-                      }).filter(Boolean)}
+          <Card className={isMobile ? 'mx-0' : ''}>
+            <CardHeader className={`pb-3 ${isMobile ? 'px-4 py-3' : 'pb-4'}`}>
+              <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base'}`}>
+                <Package className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Parts Replaced</span>
+              </CardTitle>
+              <p className={`text-muted-foreground mt-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                List the names and descriptions of parts that were replaced during maintenance
+              </p>
+            </CardHeader>
+            <CardContent className={`space-y-4 ${isMobile ? 'px-4 pb-4' : ''}`}>
+              {maintenanceData.partsReplaced.map((part, index) => {
+                return (
+                  <div key={`part-input-${index}`} className={`border rounded-lg ${isMobile ? '' : ''}`}>
+                    <div className={`flex items-center justify-between p-3 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
+                          Part {index + 1}
+                          {part && ` - ${part.slice(0, 30)}${part.length > 30 ? '...' : ''}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {maintenanceData.partsReplaced.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removePartReplaced(index)}
+                            className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`space-y-3 border-t ${isMobile ? 'p-3' : 'p-4'}`}>
+                      <Input
+                        value={part}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setMaintenanceData(prev => ({
+                            ...prev,
+                            partsReplaced: prev.partsReplaced.map((item, i) => 
+                              i === index ? value : item
+                            )
+                          }));
+                        }}
+                        placeholder="Part name or description..."
+                        className={`${isMobile ? 'h-10 text-sm' : ''}`}
+                      />
                     </div>
                   </div>
+                );
+              })}
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => addPartReplaced()}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Another Part
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Attachments & Images Section */}
+          <Card className={isMobile ? 'mx-0' : ''}>
+            <CardHeader className={`pb-3 ${isMobile ? 'px-4 py-3' : 'pb-4'}`}>
+              <CardTitle className={`flex items-center gap-2 ${isMobile ? 'text-sm' : 'text-base'}`}>
+                <ImageIcon className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">Attachments & Images</span>
+              </CardTitle>
+              <p className={`text-muted-foreground mt-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                Upload photos and documents related to this maintenance work.
+              </p>
+            </CardHeader>
+            <CardContent className={`space-y-4 ${isMobile ? 'px-4 pb-4' : ''}`}>
+              <div className={`border rounded-lg ${isMobile ? '' : ''}`}>
+                <div className={`flex items-center gap-2 p-3 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                  <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
+                    Upload Attachment
+                    {files.maintenanceAttachment && ` - ${files.maintenanceAttachment.name.slice(0, 30)}${files.maintenanceAttachment.name.length > 30 ? '...' : ''}`}
+                  </span>
                 </div>
-              )}
-              
-              {files.maintenanceAttachments.length === 0 && (
-                <div className={`text-center text-muted-foreground ${isMobile ? 'py-6' : 'py-8'}`}>
-                  <div className={`flex items-center justify-center gap-2 mb-2 ${isMobile ? 'gap-1' : 'gap-2'}`}>
-                    <ImageIcon className={`opacity-50 ${isMobile ? 'h-6 w-6' : 'h-8 w-8'}`} />
-                    <FileText className={`opacity-50 ${isMobile ? 'h-6 w-6' : 'h-8 w-8'}`} />
-                  </div>
-                  <p className={isMobile ? 'text-xs' : 'text-sm'}>No files uploaded yet</p>
-                  <p className={isMobile ? 'text-xs' : 'text-xs'}>Add photos and documents for this maintenance work</p>
+                <div className={`space-y-3 border-t ${isMobile ? 'p-3' : 'p-4'}`}>
+                  <EquipmentFormErrorBoundary fallback={
+                    <div className="p-2 border border-red-200 rounded bg-red-50">
+                      <p className="text-xs text-red-600">Attachment upload failed to load</p>
+                    </div>
+                  }>
+                    <FileUploadSectionSimple
+                      label="Attachment"
+                      accept="image/*,application/pdf,.doc,.docx"
+                      onFileChange={handleMaintenanceFileChange}
+                      onKeepExistingChange={() => {}}
+                      selectedFile={files.maintenanceAttachment}
+                      required={false}
+                    />
+                  </EquipmentFormErrorBoundary>
                 </div>
-              )}
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

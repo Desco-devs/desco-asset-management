@@ -80,7 +80,7 @@ export const useChatMutations = (currentUserId?: string) => {
     },
   });
 
-  // sendMessage functionality removed - now handled via Socket.io in useChatApp
+  // sendMessage functionality moved to useChatApp for better integration
 
   const markAsReadMutation = useMutation({
     mutationFn: async (roomId: string) => {
@@ -123,7 +123,7 @@ export const useChatMutations = (currentUserId?: string) => {
     isRespondingToInvitation: respondToInvitationMutation.isPending,
     invitationResponseError: respondToInvitationMutation.error,
 
-    // Send message functionality removed - now handled via Socket.io
+    // Send message functionality moved to useChatApp for better integration
 
     // Mark messages as read
     markAsRead: markAsReadMutation.mutate,

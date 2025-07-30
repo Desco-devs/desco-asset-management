@@ -1,21 +1,6 @@
-// CHAT APP TEMPORARILY DISABLED FOR PRODUCTION BUILD
-
-import { NextRequest, NextResponse } from "next/server";
-// import { prisma } from "@/lib/prisma";
-
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ roomId: string }> }
-) {
-  return NextResponse.json(
-    { error: "Chat app temporarily disabled" },
-    { status: 503 }
-  );
-}
-
-/*
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { authenticateRequest } from "@/lib/auth/api-auth";
 
 export async function POST(
   request: NextRequest,
@@ -23,12 +8,23 @@ export async function POST(
 ) {
   try {
     const { roomId } = await params;
-    const body = await request.json();
-    const { invitedUsers, inviterId, inviteUsername, inviteEmail } = body;
 
-    if (!roomId || !inviterId) {
+    // Authenticate user
+    const authResult = await authenticateRequest(request);
+    if (!authResult.success || !authResult.user) {
+      return authResult.response || NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const inviterId = authResult.user.id;
+    const body = await request.json();
+    const { invitedUsers, inviteUsername, inviteEmail } = body;
+
+    if (!roomId) {
       return NextResponse.json(
-        { error: "Missing roomId or inviterId" },
+        { error: "Missing roomId" },
         { status: 400 }
       );
     }
@@ -108,7 +104,7 @@ export async function POST(
       }
     }
 
-    // If inviting by email, find the user
+    // If inviting by email, find the user (assuming email is stored in username field)
     if (inviteEmail) {
       const userByEmail = await prisma.user.findFirst({
         where: {
@@ -119,7 +115,6 @@ export async function POST(
           username: true,
           full_name: true,
           user_profile: true,
-          // email: true,
         },
       });
 
@@ -190,26 +185,6 @@ export async function POST(
       invitations.push(invitation);
     }
 
-    // Send Socket.io notifications
-    if (global.io) {
-      // Notify invited users about new invitation
-      invitations.forEach((invitation) => {
-        global?.io?.to(`user:${invitation.invited_user}`).emit('invitation:received', {
-          room: invitation.room,
-          invitation,
-          inviter: invitation.inviter,
-        });
-      });
-
-      // Notify inviter and existing room members about users invited
-      const invitedUserIds = invitations.map(inv => inv.invited_user);
-      global.io.to(`user:${inviterId}`).emit('room:users_invited', {
-        roomId: roomId,
-        invitedUsers: invitedUserIds,
-        invitedBy: inviterId,
-      });
-    }
-
     return NextResponse.json({
       success: true,
       message: `Successfully invited ${invitations.length} user(s) to the room`,
@@ -224,4 +199,3 @@ export async function POST(
     );
   }
 }
-*/

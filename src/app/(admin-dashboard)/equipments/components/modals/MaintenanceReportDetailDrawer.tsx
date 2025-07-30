@@ -174,15 +174,13 @@ export default function MaintenanceReportDetailDrawer() {
 
   // Helper functions for counts
   const getPartsCount = () => {
-    return selectedReport?.parts_replaced?.length || 0;
+    return selectedReport?.parts_replaced?.filter(part => part && part.trim() !== "").length || 0;
   };
 
   const getAttachmentsCount = () => {
     if (!selectedReport?.attachment_urls) return 0;
-    const partsCount = selectedReport.parts_replaced?.length || 0;
-    // Only count standalone attachments (after parts images)
-    const standaloneAttachments = selectedReport.attachment_urls.slice(partsCount);
-    return standaloneAttachments.filter(url => url && url.trim() !== "").length;
+    // FIXED: All attachments are standalone - no part-specific attachments in current implementation
+    return selectedReport.attachment_urls.filter(url => url && url.trim() !== "").length;
   };
 
   // Image Viewer Component - EXACTLY like equipment modal
@@ -405,16 +403,10 @@ export default function MaintenanceReportDetailDrawer() {
             </p>
           </div>
           
-          {selectedReport.parts_replaced && selectedReport.parts_replaced.length > 0 ? (
+          
+          {selectedReport.parts_replaced && selectedReport.parts_replaced.filter(part => part && part.trim() !== "").length > 0 ? (
             <div className="space-y-4">
-              {selectedReport.parts_replaced.map((part, index) => {
-                // Debug logging
-                
-                // Check if there's an associated image for this part
-                const partImageUrl = selectedReport.attachment_urls?.[index];
-                const isImage = partImageUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(partImageUrl);
-                
-                
+              {selectedReport.parts_replaced.filter(part => part && part.trim() !== "").map((part, index) => {
                 return (
                   <div key={`${selectedReport.id}-part-${index}-${part}`} className="border rounded-lg p-4 space-y-3">
                     {/* Part Name - Full Width */}
@@ -423,52 +415,8 @@ export default function MaintenanceReportDetailDrawer() {
                       <span className="font-medium text-sm flex-1">{part}</span>
                     </div>
                     
-                    {/* Part Image - Clickable with image viewer */}
-                    {isImage && (
-                      <div className="space-y-2">
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                          <div className="relative w-full max-w-[200px] mx-auto group">
-                            <div 
-                              className="relative cursor-pointer"
-                              onClick={() => {
-                                setImageViewer({isOpen: true, url: partImageUrl, title: `Part: ${part}`});
-                              }}
-                            >
-                              <Image
-                                src={partImageUrl}
-                                alt={`Part: ${part}`}
-                                width={200}
-                                height={200}
-                                className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
-                                onError={(e) => {
-                                }}
-                              />
-                              <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
-                                <Eye className="h-6 w-6 text-white" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground text-center">Click to view full image</p>
-                      </div>
-                    )}
-                    
-                    {/* No image placeholder */}
-                    {!isImage && partImageUrl && (
-                      <div className="text-center py-4 bg-muted rounded">
-                        <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">Part reference file</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-2"
-                          onClick={() => window.open(partImageUrl, "_blank")}
-                        >
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          Open File
-                        </Button>
-                      </div>
-                    )}
+                    {/* FIXED: No part-specific images in current implementation */}
+                    {/* Parts are displayed as text only, images are shown in Attachments tab */}
                   </div>
                 );
               })}
@@ -498,20 +446,16 @@ export default function MaintenanceReportDetailDrawer() {
           {(() => {
             if (!selectedReport.attachment_urls) return null;
             
-            const partsCount = selectedReport.parts_replaced?.length || 0;
-            // Only show standalone attachments (after parts images)
-            const standaloneAttachments = selectedReport.attachment_urls
-              .slice(partsCount)
-              .filter(url => url && url.trim() !== "");
+            // FIXED: Show all attachments since none are part-specific in current implementation
+            const allAttachments = selectedReport.attachment_urls.filter(url => url && url.trim() !== "");
             
-            return standaloneAttachments.length > 0 ? (
+            return allAttachments.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {standaloneAttachments.map((url, attachmentIndex) => {
+                {allAttachments.map((url, attachmentIndex) => {
                   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
-                  const actualIndex = partsCount + attachmentIndex; // Original index in attachment_urls array
                   
                   return (
-                    <div key={`${selectedReport.id}-attachment-${actualIndex}-${url.split('/').pop()}`} className="border rounded-lg p-3">
+                    <div key={`${selectedReport.id}-attachment-${attachmentIndex}-${url.split('/').pop()}`} className="border rounded-lg p-3">
                     {isImage ? (
                       <div className="space-y-2">
                         <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
@@ -719,6 +663,15 @@ export default function MaintenanceReportDetailDrawer() {
               <div className="flex gap-2 w-full justify-end">
                 <Button variant="outline" onClick={handleClose} size="lg">
                   Close
+                </Button>
+                <Button 
+                  variant="default" 
+                  onClick={handleEdit}
+                  className="gap-2"
+                  size="lg"
+                >
+                  <Edit className="h-4 w-4" />
+                  Edit Report
                 </Button>
                 <Button 
                   variant="destructive" 

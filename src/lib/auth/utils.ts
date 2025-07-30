@@ -107,7 +107,7 @@ export function canAccessRoute(userRole: UserRole, routePath: string): boolean {
     return Boolean(userRole)
   }
 
-  // API routes are protected by RLS policies
+  // API routes require authentication
   if (routePath.startsWith('/api')) {
     return Boolean(userRole)
   }
