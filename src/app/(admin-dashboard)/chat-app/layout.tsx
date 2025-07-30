@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { SupabaseRealtimeProvider } from '@/context/SupabaseRealtimeContext';
 
 interface ChatAppLayoutProps {
   children: React.ReactNode;
@@ -9,8 +8,8 @@ interface ChatAppLayoutProps {
 
 export default function ChatAppLayout({ children }: ChatAppLayoutProps) {
   return (
-    <SupabaseRealtimeProvider>
+    <div className="h-full w-full">
       {children}
-    </SupabaseRealtimeProvider>
+    </div>
   );
 }

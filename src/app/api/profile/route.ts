@@ -25,10 +25,10 @@ export async function GET() {
         user_profile: true,
         role: true,
         user_status: true,
-        created_at: true,
-        updated_at: true,
         is_online: true,
         last_seen: true,
+        created_at: true,
+        updated_at: true,
       },
     });
 
@@ -98,10 +98,10 @@ export async function PUT(request: NextRequest) {
         user_profile: true,
         role: true,
         user_status: true,
-        created_at: true,
-        updated_at: true,
         is_online: true,
         last_seen: true,
+        created_at: true,
+        updated_at: true,
       },
     });
 

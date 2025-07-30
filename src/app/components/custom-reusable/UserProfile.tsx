@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -28,16 +28,23 @@ export default function UserProfile() {
   const { user, signOut } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // Generate initials from fullname, fallback to 'U' if no name
-  const initials = user?.full_name
-    ? user.full_name
-        .split(" ")
-        .map((n: string) => n[0])
-        .join("")
-        .toUpperCase()
-    : "U";
+  // Memoize initials to prevent re-computation on every render
+  const initials = useMemo(() => {
+    return user?.full_name
+      ? user.full_name
+          .split(" ")
+          .map((n: string) => n[0])
+          .join("")
+          .toUpperCase()
+      : "U";
+  }, [user?.full_name]);
 
-  async function handleLogout() {
+  // Memoize profile navigation handler
+  const handleProfileClick = useCallback(() => {
+    router.push('/profile');
+  }, [router]);
+
+  const handleLogout = useCallback(async () => {
     setLoggingOut(true);
     try {
       toast.loading("Logging out...", { id: "logout" });
@@ -62,7 +69,7 @@ export default function UserProfile() {
         router.replace("/login");
       }, 1000);
     }
-  }
+  }, [signOut, router]);
 
   if (!user) {
     // Optionally you can render null or a placeholder if user is not loaded yet
@@ -90,7 +97,7 @@ export default function UserProfile() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem onClick={() => router.push('/profile')}>
+          <DropdownMenuItem onClick={handleProfileClick}>
             <User className="mr-2 h-4 w-4" />
             <span>Profile</span>
           </DropdownMenuItem>

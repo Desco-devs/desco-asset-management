@@ -227,6 +227,8 @@ export const POST = withResourcePermission('users', 'create', async (request: Ne
         phone: true,
         role: true,
         user_status: true,
+        is_online: true,
+        last_seen: true,
         created_at: true,
         updated_at: true,
       },

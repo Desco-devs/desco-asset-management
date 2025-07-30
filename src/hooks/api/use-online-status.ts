@@ -1,90 +1,91 @@
-'use client'
+import { useEffect, useRef } from 'react';
 
-import { useMutation } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+const HEARTBEAT_INTERVAL = 30000; // 30 seconds
+const OFFLINE_GRACE_PERIOD = 2 * 60 * 1000; // 2 minutes
 
-interface UpdateOnlineStatusData {
-  is_online: boolean
-}
-
-async function updateOnlineStatus(data: UpdateOnlineStatusData) {
-  const response = await fetch('/api/users/online-status', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to update online status')
-  }
-
-  return response.json()
-}
-
-// Simple heartbeat function
-async function sendHeartbeat() {
-  try {
-    const response = await fetch('/api/users/online-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_online: true }),
-    })
-    return response.ok
-  } catch {
-    return false
-  }
-}
-
-export function useUpdateOnlineStatus() {
-  return useMutation({
-    mutationFn: updateOnlineStatus,
-    // Don't show toasts for online status updates - they happen frequently
-    onError: (error) => {
-      console.warn('Failed to update online status:', error)
-    },
-  })
-}
-
-// Heartbeat hook - sends periodic "I'm alive" signals
-export function useOnlineHeartbeat(isAuthenticated: boolean) {
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+export function useOnlineHeartbeat(userId?: string) {
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-      return
-    }
+    if (!userId) return;
 
-    // Send heartbeat every 2 minutes
-    intervalRef.current = setInterval(() => {
-      sendHeartbeat()
-    }, 2 * 60 * 1000)
+    const sendHeartbeat = async () => {
+      try {
+        await fetch('/api/users/online-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId,
+            status: 'online',
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to send heartbeat:', error);
+      }
+    };
 
     // Send initial heartbeat
-    sendHeartbeat()
+    sendHeartbeat();
+
+    // Set up interval for periodic heartbeats
+    intervalRef.current = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
 
     return () => {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
+        clearInterval(intervalRef.current);
       }
-    }
-  }, [isAuthenticated])
+    };
+  }, [userId]);
 }
 
-// Utility functions for easier usage
-export function useSetOnline() {
-  const mutation = useUpdateOnlineStatus()
-  
-  return () => mutation.mutate({ is_online: true })
-}
+export function useSetOffline(userId?: string) {
+  useEffect(() => {
+    if (!userId) return;
 
-export function useSetOffline() {
-  const mutation = useUpdateOnlineStatus()
-  
-  return () => mutation.mutate({ is_online: false })
+    const setOffline = async () => {
+      try {
+        await fetch('/api/users/online-status', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId,
+            status: 'offline',
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to set offline status:', error);
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      // Use navigator.sendBeacon for more reliable offline status
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/users/online-status', JSON.stringify({
+          userId,
+          status: 'offline',
+        }));
+      } else {
+        setOffline();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setOffline();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      setOffline();
+    };
+  }, [userId]);
 }

@@ -8,18 +8,25 @@ import { cn } from "@/lib/utils";
 import {
   Check,
   CheckCheck,
-  CheckIcon,
-  CheckLine,
   ChevronUp,
   Loader2,
-  LoaderIcon,
 } from "lucide-react";
-import { MessageWithRelations } from "@/types/chat-app";
+
+interface Message {
+  id: string;
+  content: string;
+  created_at: string;
+  sender: {
+    id: string;
+    username: string;
+    full_name: string;
+  };
+}
 
 interface MessagesListProps {
-  messages: MessageWithRelations[];
+  messages: Message[];
   currentUserId?: string;
-  roomId?: string; // Add roomId to detect room changes
+  roomId?: string;
   onLoadMore?: () => void;
   isLoading?: boolean;
   hasMoreMessages?: boolean;
@@ -97,6 +104,7 @@ const MessagesList = ({
     setShouldAutoScroll(true);
     setShowScrollToBottom(false);
   };
+
   return (
     <div className="relative h-full w-full">
       <ScrollArea
@@ -131,10 +139,7 @@ const MessagesList = ({
           )}
 
           {messages.map((msg) => {
-            const isMe = msg.sender_id === currentUserId;
-            const isPending = msg.pending;
-            const isFailed = msg.failed;
-            const isSent = msg.sent;
+            const isMe = msg.sender.id === currentUserId;
 
             return (
               <div
@@ -146,7 +151,6 @@ const MessagesList = ({
               >
                 {!isMe && (
                   <Avatar className="h-8 w-8 mt-1">
-                    <AvatarImage src={msg.sender.user_profile || undefined} />
                     <AvatarFallback className="text-xs bg-muted">
                       {msg.sender.full_name.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
@@ -164,29 +168,14 @@ const MessagesList = ({
                       "rounded-lg px-4 py-2 text-sm relative break-words",
                       isMe
                         ? "bg-chart-2 text-primary-foreground rounded-tr-2xl rounded-l-2xl rounded-br-none dark:text-accent-foreground"
-                        : "bg-chart-2/10 dark:bg-muted text-accent-foreground rounded-tl-2xl rounded-r-2xl rounded-bl-none",
-                      isPending && "opacity-70",
-                      isFailed &&
-                        "bg-destructive/20 border border-destructive/40"
+                        : "bg-chart-2/10 dark:bg-muted text-accent-foreground rounded-tl-2xl rounded-r-2xl rounded-bl-none"
                     )}
                   >
-                    {/* this is the message */}
                     <p>{msg.content}</p>
-                    {isPending && (
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-background rounded-full border-2 border-primary flex items-center justify-center">
-                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                      </div>
-                    )}
-                    {isFailed && (
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-background rounded-full border-2 border-destructive flex items-center justify-center">
-                        <span className="text-xs text-destructive">!</span>
-                      </div>
-                    )}
                   </div>
                   <div className="flex items-center space-x-2 px-1">
                     <div className="text-xs text-muted-foreground flex gap-1 flex-row-reverse items-center">
                       <span>
-                        {" "}
                         {new Date(msg.created_at).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -196,22 +185,7 @@ const MessagesList = ({
                         <p className="capitalize">{msg.sender.full_name}</p>
                       )}
                     </div>
-                    {isPending && (
-                      <span className="text-xs text-muted-foreground italic">
-                        Sending...
-                      </span>
-                    )}
-                    {isFailed && (
-                      <span className="text-xs text-destructive italic">
-                        Failed to send
-                      </span>
-                    )}
-                    {isSent && (
-                      <span className="text-xs text-green-600 animate-spin">
-                        <LoaderIcon className="w-4 h-4" />
-                      </span>
-                    )}
-                    {!isPending && !isFailed && !isSent && isMe && (
+                    {isMe && (
                       <span className="text-xs text-muted-foreground">
                         <CheckCheck className="w-4 h-4" />
                       </span>
@@ -221,12 +195,6 @@ const MessagesList = ({
               </div>
             );
           })}
-          {/* 
-          {isLoading && (
-            <div className="h-full w-full flex justify-center py-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-            </div>
-          )} */}
 
           {/* Invisible div to scroll to */}
           <div ref={messagesEndRef} />

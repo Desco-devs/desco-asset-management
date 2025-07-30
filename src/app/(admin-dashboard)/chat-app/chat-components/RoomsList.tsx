@@ -16,11 +16,38 @@ import {
   ChartBar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { InvitationStatus, RoomListItem, RoomType } from "@/types/chat-app";
-import PresenceIndicator from "./PresenceIndicator";
+
+interface Room {
+  id: string;
+  name: string;
+  type: 'DIRECT' | 'GROUP';
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+  lastMessage?: {
+    content: string;
+    sender_name: string;
+    created_at: string;
+  } | null;
+  is_owner: boolean;
+  member_count: number;
+  owner: {
+    id: string;
+    username: string;
+    full_name: string;
+  };
+  members: {
+    id: string;
+    user: {
+      id: string;
+      username: string;
+      full_name: string;
+    };
+  }[];
+}
 
 interface RoomsListProps {
-  rooms: RoomListItem[];
+  rooms: Room[];
   selectedRoom: string;
   onRoomSelect: (roomId: string) => void;
   onCreateRoom?: () => void;
@@ -43,17 +70,6 @@ const RoomsList = ({
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  // Helper function to get the other user ID in a direct message room
-  const getOtherUserId = (room: RoomListItem) => {
-    if (room.type === RoomType.DIRECT && room.members && currentUserId) {
-      const otherMember = room.members.find(
-        (member) => (member.user?.id || member.user_id) !== currentUserId
-      );
-      return otherMember?.user?.id || otherMember?.user_id || null;
-    }
-    return null;
-  };
 
   return (
     <div className="w-full h-full flex flex-col md:bg-muted bg-chart-2/10">
@@ -121,51 +137,22 @@ const RoomsList = ({
                   <div className="flex items-center space-x-3 w-full ">
                     <div className="relative">
                       <Avatar className="h-10 w-10">
-                        <AvatarImage src={room.avatar_url || undefined} />
                         <AvatarFallback className="text-sm">
                           {room.name.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      {room.invitation_status === InvitationStatus.PENDING ? (
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-background bg-orange-500 flex items-center justify-center">
-                          <Clock className="h-2 w-2 text-white" />
-                        </div>
-                      ) : room.type === RoomType.DIRECT ? (
-                        <div className="absolute -bottom-1 -right-1">
-                          <PresenceIndicator
-                            isOnline={(() => {
-                              const otherUserId = getOtherUserId(room);
-                              return otherUserId ? isUserOnline(otherUserId) : false;
-                            })()}
-                            size="md"
-                          />
-                        </div>
-                      ) : null}
                     </div>
 
                     <div className="flex-1 min-w-0 md:max-w-56 max-w-48 w-full">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1">
-                          {room.type === RoomType.GROUP && (
-                            // <Hash className="h-3 w-3 text-muted-foreground" />
+                          {room.type === 'GROUP' && (
                             <ChartBar className="w-4 h-4 min-w-4 min-h-4 max-w-4 max-h-4 text-chart-1 dark:text-white" />
                           )}
 
                           <p className="text-sm font-medium line-clamp-1 ">
                             {room.name}
                           </p>
-                        </div>
-                        <div className="">
-                          {room.invitation_status ===
-                            InvitationStatus.PENDING && (
-                            <Badge
-                              variant="secondary"
-                              className="text-xs ml-1 bg-chart-3 text-white"
-                            >
-                              <UserPlus className="h-3 w-3 mr-1" />
-                              Invitation
-                            </Badge>
-                          )}
                         </div>
                         <div
                           className={`${
@@ -184,32 +171,13 @@ const RoomsList = ({
                                 })
                               : ""}
                           </span>
-                          {room.unread_count > 0 &&
-                            selectedRoom !== room.id && (
-                              <Badge
-                                variant="default"
-                                className="h-5 min-w-5 px-1 text-xs"
-                              >
-                                {room.unread_count}
-                              </Badge>
-                            )}
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-1 truncate mt-1">
-                        {room.invitation_status === InvitationStatus.PENDING ? (
-                          room.invited_by ? (
-                            `Invited by ${room.invited_by.full_name}`
-                          ) : (
-                            "Pending invitation"
-                          )
-                        ) : (
-                          <>
-                            {room.type === RoomType.GROUP &&
-                              room.lastMessage &&
-                              `${room.lastMessage.sender_name}: `}
-                            {room.lastMessage?.content}
-                          </>
-                        )}
+                        {room.type === 'GROUP' &&
+                          room.lastMessage &&
+                          `${room.lastMessage.sender_name}: `}
+                        {room.lastMessage?.content}
                       </p>
                     </div>
                   </div>

@@ -20,10 +20,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
-  const setOffline = useSetOffline();
+  useSetOffline(user?.id);
 
   // Use heartbeat system for online status
-  useOnlineHeartbeat(!!user);
+  useOnlineHeartbeat(user?.id);
 
   const fetchUserProfile = useCallback(async (userId: string) => {
     console.log('🔄 fetchUserProfile: Starting for user:', userId);
@@ -113,8 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await fetchUserProfile(user.id);
           }
         } else if (event === 'SIGNED_OUT') {
-          // Set user offline before clearing state
-          setOffline();
           setSupabaseUser(null);
           setUserState(null);
         }
@@ -156,13 +154,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      // Set user offline before signing out and wait for it to complete
-      await new Promise<void>((resolve) => {
-        setOffline();
-        // Give a small delay to ensure the offline status is sent
-        setTimeout(resolve, 100);
-      });
-      
       // Clear user state first to prevent race conditions
       setUserState(null);
       setSupabaseUser(null);

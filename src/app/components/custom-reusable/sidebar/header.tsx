@@ -38,19 +38,18 @@ const Header = () => {
     hour12: true,
   }), []);
 
-  // Optimized time update function
-  const updateDateTime = useCallback(() => {
-    const now = new Date();
-    setCurrentDate(dateFormatter.format(now));
-    setCurrentTime(timeFormatter.format(now));
-  }, [dateFormatter, timeFormatter]);
-
   // Update time every second with cleanup
   useEffect(() => {
-    updateDateTime();
+    const updateDateTime = () => {
+      const now = new Date();
+      setCurrentDate(dateFormatter.format(now));
+      setCurrentTime(timeFormatter.format(now));
+    };
+
+    updateDateTime(); // Initial call
     const intervalId = setInterval(updateDateTime, 1000);
     return () => clearInterval(intervalId);
-  }, [updateDateTime]);
+  }, [dateFormatter, timeFormatter]);
 
   // Memoized breadcrumb calculation
   const { paths: breadcrumbPaths, currentPage } = useMemo(() => {
