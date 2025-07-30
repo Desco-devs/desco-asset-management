@@ -531,50 +531,21 @@ export default function EquipmentMaintenanceReportsEnhanced({
                   {/* Full edit interface with tabs */}
                   {isEditMode && isExpanded && reportFormData[report.id] && (
                     <div className="border-t">
-                      {/* Tab Navigation */}
-                      <div className="flex border-b bg-background overflow-x-auto">
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab(report.id, 'details')}
-                            className={`px-4 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
-                              getActiveTab(report.id) === 'details'
-                                ? 'border-primary text-primary bg-primary/5'
-                                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
-                            }`}
-                          >
-                            <Settings className="h-4 w-4" />
-                            Details
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab(report.id, 'parts')}
-                            className={`px-4 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
-                              getActiveTab(report.id) === 'parts'
-                                ? 'border-primary text-primary bg-primary/5'
-                                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
-                            }`}
-                          >
-                            <Wrench className="h-4 w-4" />
-                            Parts Replaced
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab(report.id, 'attachments')}
-                            className={`px-4 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
-                              getActiveTab(report.id) === 'attachments'
-                                ? 'border-primary text-primary bg-primary/5'
-                                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
-                            }`}
-                          >
-                            <Camera className="h-4 w-4" />
-                            Attachments & Images
-                          </button>
+                      {/* Header */}
+                      <div className="border-b bg-gray-50 p-4">
+                        <h3 className="text-lg font-semibold text-gray-900">Edit Maintenance Report</h3>
+                        <p className="text-sm text-gray-600">All sections are shown below - no tabs needed!</p>
                       </div>
 
                       {/* Tab Content */}
                       <div className="p-3 sm:p-4">
                           {/* Details Tab */}
-                          {getActiveTab(report.id) === 'details' && (
+                          <div className="mb-6">
+                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-blue-600">
+                              <Settings className="h-5 w-5" />
+                              Basic Details
+                            </h3>
+                            <div>
                             <div className="space-y-4">
                               <div className="space-y-2">
                                 <Label htmlFor={`issue_description_${report.id}`} className="text-sm font-medium">
@@ -692,16 +663,18 @@ export default function EquipmentMaintenanceReportsEnhanced({
                                 />
                               </div>
                             </div>
-                          )}
+                            </div>
+                          </div>
 
                           {/* Parts Tab */}
-                          {getActiveTab(report.id) === 'parts' && (
+                          <div className="mb-6">
+                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-green-600">
+                              <Wrench className="h-5 w-5" />
+                              Parts Replaced
+                            </h3>
+                            <div>
                             <div className="space-y-4">
-                              <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-medium flex items-center gap-2">
-                                  <Wrench className="h-4 w-4" />
-                                  Parts Replaced
-                                </h4>
+                              <div className="flex justify-end mb-3">
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -714,7 +687,7 @@ export default function EquipmentMaintenanceReportsEnhanced({
                               </div>
                               
                               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mb-4">
-                                💡 <strong>Tip:</strong> List the parts that were replaced during maintenance. For photos and documentation, use the "Attachments & Images" tab.
+                                🔧 <strong>Parts Replaced:</strong> List the specific parts that were replaced during this maintenance (text only).
                               </div>
                               
                               <div className="space-y-3">
@@ -751,16 +724,18 @@ export default function EquipmentMaintenanceReportsEnhanced({
                                 )}
                               </div>
                             </div>
-                          )}
+                            </div>
+                          </div>
 
                           {/* Attachments Tab */}
-                          {getActiveTab(report.id) === 'attachments' && (
+                          <div className="mb-6">
+                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-purple-600">
+                              <Camera className="h-5 w-5" />
+                              Attachments & Images
+                            </h3>
+                            <div>
                             <div className="space-y-4">
-                              <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-medium flex items-center gap-2">
-                                  <Camera className="h-4 w-4" />
-                                  Attachments & Images
-                                </h4>
+                              <div className="flex justify-end mb-3">
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -773,7 +748,7 @@ export default function EquipmentMaintenanceReportsEnhanced({
                               </div>
                               
                               <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800 mb-4">
-                                📸 <strong>Tip:</strong> Upload photos of work done, receipts, before/after images, or any documentation related to this maintenance.
+                                📸 <strong>Attachments:</strong> Upload photos of work done, receipts, before/after images, or any documentation.
                               </div>
                               
                               {/* Display existing attachments in a grid */}
@@ -878,7 +853,8 @@ export default function EquipmentMaintenanceReportsEnhanced({
                                 )}
                               </div>
                             </div>
-                          )}
+                            </div>
+                          </div>
                         </div>
 
                       {/* Save Button */}
