@@ -14,21 +14,35 @@ import {
   VehicleStatusChart,
   CombinedAssetStatusChart,
 } from "./AssetStatusChart";
-import { 
-  useEquipmentCounts, 
-  useVehicleCounts 
-} from "@/stores/dashboard-store";
+import { useDashboardData } from "@/hooks/useDashboardData";
+import { useSelectedTimeRange } from "@/stores/dashboardUIStore";
+
+interface ChartsSectionProps {
+  equipmentCounts?: {
+    OPERATIONAL: number;
+    NON_OPERATIONAL: number;
+  };
+  vehicleCounts?: {
+    OPERATIONAL: number;
+    NON_OPERATIONAL: number;
+  };
+  detailedData?: any;
+}
 
 export function ChartsSection() {
   const [chartsExpanded, setChartsExpanded] = useState(false);
-  const equipmentCounts = useEquipmentCounts();
-  const vehicleCounts = useVehicleCounts();
+  const selectedTimeRange = useSelectedTimeRange();
+  const { data } = useDashboardData(selectedTimeRange);
+  
+  // Provide defaults if data not loaded yet
+  const equipmentData = data?.equipmentCounts || { OPERATIONAL: 0, NON_OPERATIONAL: 0 };
+  const vehicleData = data?.vehicleCounts || { OPERATIONAL: 0, NON_OPERATIONAL: 0 };
 
   // Calculate summary stats for collapsed view
-  const totalEquipment = equipmentCounts.OPERATIONAL + equipmentCounts.NON_OPERATIONAL;
-  const totalVehicles = vehicleCounts.OPERATIONAL + vehicleCounts.NON_OPERATIONAL;
+  const totalEquipment = equipmentData.OPERATIONAL + equipmentData.NON_OPERATIONAL;
+  const totalVehicles = vehicleData.OPERATIONAL + vehicleData.NON_OPERATIONAL;
   const totalAssets = totalEquipment + totalVehicles;
-  const totalOperational = equipmentCounts.OPERATIONAL + vehicleCounts.OPERATIONAL;
+  const totalOperational = equipmentData.OPERATIONAL + vehicleData.OPERATIONAL;
   const operationalRate = totalAssets > 0 ? Math.round((totalOperational / totalAssets) * 100) : 0;
 
   return (

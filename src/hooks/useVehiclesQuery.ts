@@ -224,24 +224,105 @@ export function useCreateVehicle() {
   
   return useMutation({
     mutationFn: createVehicle,
-    onSuccess: (newVehicle) => {
-      // Optimistically add to cache immediately with deduplication
+    onMutate: async (newVehicleData) => {
+      // Cancel any outgoing refetches for vehicles data
+      await queryClient.cancelQueries({ queryKey: vehicleKeys.vehicles() });
+      
+      // Snapshot the previous value for rollback
+      const previousVehicles = queryClient.getQueryData<Vehicle[]>(vehicleKeys.vehicles());
+      
+      // Create optimistic vehicle object
+      const optimisticVehicle: Vehicle = {
+        id: `temp-${Date.now()}`, // Temporary ID
+        brand: newVehicleData.brand || '',
+        model: newVehicleData.model || '',
+        type: newVehicleData.type || '',
+        plate_number: newVehicleData.plate_number || '',
+        owner: newVehicleData.owner || '',
+        status: (newVehicleData.status as 'OPERATIONAL' | 'NON_OPERATIONAL') || 'OPERATIONAL',
+        inspection_date: newVehicleData.inspection_date || new Date().toISOString(),
+        expiry_date: newVehicleData.expiry_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        registration_expiry: newVehicleData.registration_expiry || null,
+        before: newVehicleData.before || 30,
+        remarks: newVehicleData.remarks || null,
+        created_at: new Date().toISOString(),
+        project: newVehicleData.project || {
+          id: '',
+          name: 'Loading...',
+          client: {
+            id: '',
+            name: 'Loading...',
+            location: {
+              id: '',
+              address: 'Loading...'
+            }
+          }
+        },
+        user: null,
+        // Optional fields for images and parts
+        front_img_url: null,
+        back_img_url: null,
+        side1_img_url: null,
+        side2_img_url: null,
+        original_receipt_url: null,
+        car_registration_url: null,
+        pgpc_inspection_image: null,
+        vehicle_parts: null,
+      };
+      
+      // Optimistically add the new vehicle to the cache
+      queryClient.setQueryData<Vehicle[]>(vehicleKeys.vehicles(), (oldData) => {
+        const newData = oldData ? [optimisticVehicle, ...oldData] : [optimisticVehicle];
+        return deduplicateVehicles(newData);
+      });
+      
+      // Show optimistic feedback to user
+      toast.success('Creating vehicle...', { 
+        id: 'creating-vehicle',
+        duration: 2000 
+      });
+      
+      // Return context for error rollback
+      return { previousVehicles, optimisticVehicle };
+    },
+    onSuccess: (newVehicle, variables, context) => {
+      // Replace optimistic vehicle with real vehicle data
       queryClient.setQueryData<Vehicle[]>(vehicleKeys.vehicles(), (oldData) => {
         if (!oldData) return [newVehicle];
         
-        // Check if vehicle already exists to prevent duplicates
-        const existingVehicle = oldData.find(vehicle => vehicle.id === newVehicle.id);
+        // Remove the optimistic vehicle and add the real one
+        const withoutOptimistic = oldData.filter(vehicle => 
+          vehicle.id !== context?.optimisticVehicle.id
+        );
+        
+        // Check if real vehicle already exists to prevent duplicates
+        const existingVehicle = withoutOptimistic.find(vehicle => vehicle.id === newVehicle.id);
         if (existingVehicle) {
           console.log('🔄 Vehicle already exists in cache during create, skipping duplicate');
-          return oldData;
+          return deduplicateVehicles(withoutOptimistic);
         }
         
-        console.log('✅ Adding new vehicle to cache:', newVehicle.id);
-        return deduplicateVehicles([newVehicle, ...oldData]);
+        console.log('✅ Replacing optimistic vehicle with real data:', newVehicle.id);
+        return deduplicateVehicles([newVehicle, ...withoutOptimistic]);
       });
-      // Toast moved to realtime listener to show for all vehicle creations
+      
+      // Invalidate related queries to ensure everything is up to date
+      queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: vehicleKeys.projects() });
+      
+      // Dismiss the optimistic toast and show success
+      toast.dismiss('creating-vehicle');
+      toast.success(`Vehicle "${newVehicle.brand} ${newVehicle.model}" created successfully!`);
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      // Rollback: restore previous vehicles data
+      if (context?.previousVehicles) {
+        queryClient.setQueryData<Vehicle[]>(vehicleKeys.vehicles(), context.previousVehicles);
+      }
+      
+      // Dismiss optimistic toast and show error
+      toast.dismiss('creating-vehicle');
       toast.error('Failed to create vehicle: ' + error.message);
     },
   });
@@ -252,8 +333,48 @@ export function useUpdateVehicle() {
   
   return useMutation({
     mutationFn: updateVehicle,
-    onSuccess: (updatedVehicle) => {
-      // Optimistically update in cache immediately
+    onMutate: async (updatedVehicleData) => {
+      // Cancel any outgoing refetches for vehicles data
+      await queryClient.cancelQueries({ queryKey: vehicleKeys.vehicles() });
+      
+      // Snapshot the previous value for rollback
+      const previousVehicles = queryClient.getQueryData<Vehicle[]>(vehicleKeys.vehicles());
+      
+      // Find the existing vehicle and create optimistic update
+      const vehicleId = updatedVehicleData.id;
+      if (vehicleId && previousVehicles) {
+        const existingVehicle = previousVehicles.find(v => v.id === vehicleId);
+        if (existingVehicle) {
+          // Create optimistic updated vehicle
+          const optimisticVehicle: Vehicle = {
+            ...existingVehicle,
+            ...updatedVehicleData,
+            // Ensure ID is preserved
+            id: vehicleId,
+          };
+          
+          // Optimistically update in cache
+          queryClient.setQueryData<Vehicle[]>(vehicleKeys.vehicles(), (oldData) => {
+            if (!oldData) return [optimisticVehicle];
+            const updated = oldData.map(vehicle => 
+              vehicle.id === vehicleId ? optimisticVehicle : vehicle
+            );
+            return deduplicateVehicles(updated);
+          });
+          
+          // Show optimistic feedback
+          toast.success('Updating vehicle...', { 
+            id: 'updating-vehicle',
+            duration: 2000 
+          });
+        }
+      }
+      
+      // Return context for error rollback
+      return { previousVehicles, vehicleId };
+    },
+    onSuccess: (updatedVehicle, variables, context) => {
+      // Replace optimistic update with real data
       queryClient.setQueryData<Vehicle[]>(vehicleKeys.vehicles(), (oldData) => {
         if (!oldData) return [updatedVehicle];
         const updated = oldData.map(vehicle => 
@@ -261,9 +382,23 @@ export function useUpdateVehicle() {
         );
         return deduplicateVehicles(updated);
       });
-      // Toast moved to realtime listener for unified notification system
+      
+      // Invalidate related queries if important fields changed
+      queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      
+      // Dismiss optimistic toast and show success
+      toast.dismiss('updating-vehicle');
+      toast.success(`Vehicle "${updatedVehicle.brand} ${updatedVehicle.model}" updated successfully!`);
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      // Rollback: restore previous vehicles data
+      if (context?.previousVehicles) {
+        queryClient.setQueryData<Vehicle[]>(vehicleKeys.vehicles(), context.previousVehicles);
+      }
+      
+      // Dismiss optimistic toast and show error
+      toast.dismiss('updating-vehicle');
       toast.error('Failed to update vehicle: ' + error.message);
     },
   });
@@ -383,20 +518,40 @@ export function useDeleteMaintenanceReport() {
 export function useSupabaseRealtime() {
   const queryClient = useQueryClient();
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
   
   // Simple duplicate prevention for individual toasts
   const processedEvents = useRef<Set<string>>(new Set());
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
     
     console.log('🔌 Setting up Supabase realtime subscriptions...');
 
-    // Comprehensive error handler to catch transformers.js and realtime errors
-    const originalConsoleError = console.error;
+    // Simple authentication check - allow all authenticated users
+    // Role-based filtering happens at the data level, not subscription level
+    const checkAuth = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) {
+        console.log('🚫 No authenticated user, skipping vehicle realtime subscription');
+        setIsConnected(false);
+        setConnectionError('Authentication required');
+        return false;
+      }
+      return true;
+    };
+
+    checkAuth().then(hasAuth => {
+      if (!hasAuth) return;
     
-    // Also override window.onerror to catch uncaught errors
-    const originalWindowError = window.onerror;
+
+      // Comprehensive error handler to catch transformers.js and realtime errors
+      const originalConsoleError = console.error;
+    
+      // Also override window.onerror to catch uncaught errors
+      const originalWindowError = window.onerror;
     
     // CRITICAL FIX: Patch Object.keys to prevent transformers.js crashes
     const originalObjectKeys = Object.keys;
@@ -564,6 +719,10 @@ export function useSupabaseRealtime() {
                 return deduplicateVehicles([vehicleData, ...oldData]);
               });
               
+              // Invalidate dashboard data to update statistics
+              queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
+              queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+              
               // Only show toast for vehicles created by other users (not user-initiated)
               // Skip toast to prevent duplicate with form success toast
               const eventKey = `insert-${vehicleData.id}`;
@@ -596,6 +755,10 @@ export function useSupabaseRealtime() {
                 return deduplicateVehicles(updated);
               });
               
+              // Invalidate dashboard data to update statistics if status changed
+              queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
+              queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+              
               // Skip update toast to prevent duplicates with form success toast
               const eventKey = `update-${vehicleData.id}`;
               if (!processedEvents.current.has(eventKey)) {
@@ -623,6 +786,10 @@ export function useSupabaseRealtime() {
                   return deduplicateVehicles(filtered);
                 });
                 
+                // Invalidate dashboard data to update statistics
+                queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
+                queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+                
                 // Skip delete toast to prevent duplicates with form success toast
                 const eventKey = `delete-${deletedVehicle.id}`;
                 if (!processedEvents.current.has(eventKey)) {
@@ -641,6 +808,36 @@ export function useSupabaseRealtime() {
       .subscribe((status) => {
         console.log('🚗 Vehicles subscription status:', status);
         setIsConnected(status === 'SUBSCRIBED');
+        
+        if (status === 'SUBSCRIBED') {
+          setConnectionError(null);
+          setReconnectAttempts(0);
+          console.log('✅ Vehicle real-time connection established');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setConnectionError('Connection failed');
+          setIsConnected(false);
+          
+          // Exponential backoff reconnection (max 5 attempts)
+          if (reconnectAttempts < 5) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+            console.warn(`🔄 Vehicle real-time connection failed, retrying in ${delay}ms (attempt ${reconnectAttempts + 1}/5)`);
+            
+            if (reconnectTimeoutRef.current) {
+              clearTimeout(reconnectTimeoutRef.current);
+            }
+            
+            reconnectTimeoutRef.current = setTimeout(() => {
+              setReconnectAttempts(prev => prev + 1);
+              // The useEffect will trigger reconnection due to dependency change
+            }, delay);
+          } else {
+            console.error('❌ Vehicle real-time connection failed after 5 attempts');
+            setConnectionError('Connection failed after multiple attempts');
+          }
+        } else if (status === 'CLOSED') {
+          setIsConnected(false);
+          console.log('🔌 Vehicle real-time connection closed');
+        }
       });
 
     // Maintenance reports realtime subscription
@@ -803,17 +1000,29 @@ export function useSupabaseRealtime() {
       window.onerror = originalWindowError;
       Object.keys = originalObjectKeys;
       
+      // Clear reconnection timeout
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      
       // Clear processed events
       processedEvents.current.clear();
       
+      // Unsubscribe from channels
       vehiclesChannel.unsubscribe();
       maintenanceChannel.unsubscribe();
       projectsChannel.unsubscribe();
+      
+      console.log('🧹 Vehicle real-time cleanup completed');
     };
-  }, [queryClient]);
+  }) // End of checkAuth then block
+  }, [queryClient, reconnectAttempts]);
 
   return {
     isConnected,
+    connectionError,
+    reconnectAttempts,
   };
 }
 

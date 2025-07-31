@@ -12,9 +12,9 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import {
-  useSupabaseRealtime,
   useVehiclesWithReferenceData,
 } from "@/hooks/useVehiclesQuery";
+import { useVehicleRealtimeSecure } from "@/hooks/useVehicleRealtimeSecure";
 import { 
   useVehiclesStore, 
   type Vehicle,
@@ -49,8 +49,8 @@ export default function VehiclesListModern() {
   const { vehicles, projects, maintenanceReports, isLoading, isError, error } =
     useVehiclesWithReferenceData();
 
-  // Supabase Realtime - Live updates
-  const { isConnected } = useSupabaseRealtime();
+  // Supabase Realtime - Live updates (secure with authentication, role-based access control, and error handling)
+  const { isConnected, connectionError, reconnectAttempts, userRole } = useVehicleRealtimeSecure();
 
   // Use store state with proper selectors
   const currentPage = useVehiclesStore(selectCurrentPage);

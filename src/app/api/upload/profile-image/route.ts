@@ -27,11 +27,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (5MB limit)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    // Dynamic file size limit based on mobile considerations
+    const maxSize = 10 * 1024 * 1024; // 10MB to allow for pre-compression on client
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: "File too large. Maximum size is 5MB." },
+        { error: "File too large. Maximum size is 10MB." },
         { status: 400 }
       );
     }

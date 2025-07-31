@@ -18,6 +18,7 @@ import { Settings, Camera, FileText, Upload, CalendarIcon, User, Building2, Car,
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import VehiclePartsFolderManager, { type PartsStructure } from "./VehiclePartsFolderManager";
 import { toast } from "sonner";
+import { useServerActionCache } from "@/hooks/useServerActionCache";
 
 // Submit button component that uses local loading state
 function SubmitButton({ isLoading }: { isLoading: boolean }) {
@@ -52,6 +53,9 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
   // Debug: Log projects data
   console.log('🔍 Projects in form:', projects);
   
+  // Real-time cache integration
+  const { invalidateVehicles } = useServerActionCache();
+  
   // Tab state for mobile
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'documents' | 'parts' | 'maintenance'>('details');
   
@@ -61,6 +65,7 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
   // Date picker states
   const [inspectionDateOpen, setInspectionDateOpen] = useState(false);
   const [expiryDateOpen, setExpiryDateOpen] = useState(false);
+  const [registrationExpiryDateOpen, setRegistrationExpiryDateOpen] = useState(false);
   const [dateRepairedOpen, setDateRepairedOpen] = useState(false);
   
   // Maintenance-specific state
@@ -79,6 +84,7 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
     before: '6',
     inspectionDate: new Date(),
     expiryDate: undefined as Date | undefined,
+    registrationExpiry: undefined as Date | undefined,
     // Text input fields
     brand: '',
     model: '',
@@ -160,6 +166,19 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
         return;
       }
       
+      // Date relationship validation
+      if (formData.expiryDate && formData.inspectionDate && formData.expiryDate <= formData.inspectionDate) {
+        toast.error("Next inspection due date must be after the last inspection date");
+        setActiveTab('details');
+        return;
+      }
+      
+      if (formData.registrationExpiry && formData.inspectionDate && formData.registrationExpiry <= formData.inspectionDate) {
+        toast.error("Registration expiry date should typically be after the inspection date");
+        setActiveTab('details');
+        return;
+      }
+      
       // Create FormData and manually add all values (don't rely on form elements)
       const formDataFromForm = new FormData();
       // Add all required text fields manually from state
@@ -213,6 +232,9 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
       if (formData.expiryDate) {
         formDataFromForm.append('expiryDate', format(formData.expiryDate, 'yyyy-MM-dd'));
       }
+      if (formData.registrationExpiry) {
+        formDataFromForm.append('registrationExpiry', format(formData.registrationExpiry, 'yyyy-MM-dd'));
+      }
       
       // Add maintenance report data
       formDataFromForm.append('maintenanceData', JSON.stringify(maintenanceData));
@@ -238,8 +260,27 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
       const result = await createVehicleAction(formDataFromForm);
       
       if (result.success) {
-        // Success - show single success toast and reset form manually
-        toast.success("Vehicle created successfully!");
+        // Success - show detailed success toast and reset form manually
+        const successMessage = `Vehicle "${formData.brand} ${formData.model}" created successfully!`;
+        let description = `Plate: ${formData.plateNumber}`;
+        
+        if (result.filesUploaded > 0) {
+          description += ` • ${result.filesUploaded} file(s) uploaded`;
+        }
+        if (result.partsUploaded > 0) {
+          description += ` • ${result.partsUploaded} part(s) documented`;
+        }
+        if (result.maintenanceReportCreated) {
+          description += ` • Maintenance report created`;
+        }
+        
+        toast.success(successMessage, {
+          description,
+          duration: 6000,
+        });
+        
+        // Trigger real-time cache invalidation for immediate UI updates
+        invalidateVehicles();
         
         // Reset form state manually only on success
         setFormData({
@@ -249,6 +290,7 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
           before: '6',
           inspectionDate: new Date(),
           expiryDate: undefined,
+          registrationExpiry: undefined,
           brand: '',
           model: '',
           plateNumber: '',
@@ -288,17 +330,34 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
           onSuccess();
         }
       } else {
-        // Handle different types of errors with appropriate toasts
+        // Handle different types of errors with appropriate toasts and better user guidance
         if (result.validationError) {
-          toast.error(result.error);
+          toast.error(result.error, {
+            description: "Please check your input and try again.",
+            duration: 5000,
+          });
+          // Switch to details tab if it's a validation error to help user fix it
+          setActiveTab('details');
         } else if (result.authError) {
-          toast.error(result.error);
+          toast.error("Authentication Issue", {
+            description: result.error,
+            duration: 6000,
+          });
         } else if (result.permissionError) {
-          toast.error(result.error);
+          toast.error("Permission Denied", {
+            description: result.error,
+            duration: 6000,
+          });
         } else if (result.dbError) {
-          toast.error(result.error);
+          toast.error("Database Error", {
+            description: result.error + " Please try again or contact support if the issue persists.",
+            duration: 8000,
+          });
         } else {
-          toast.error(result.error || "Failed to create vehicle");
+          toast.error("Creation Failed", {
+            description: result.error || "An unexpected error occurred while creating the vehicle.",
+            duration: 6000,
+          });
         }
       }
     } catch (error) {
@@ -309,19 +368,46 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
     }
   };
 
+  // Helper function to check if tab has content
+  const getTabContentCount = (tab: 'details' | 'photos' | 'documents' | 'parts' | 'maintenance') => {
+    switch (tab) {
+      case 'details':
+        const requiredFields = [formData.brand, formData.model, formData.plateNumber, formData.owner, formData.type, formData.projectId];
+        return requiredFields.filter(field => field?.trim()).length;
+      case 'photos':
+        return Object.values(files).slice(0, 4).filter(file => file).length; // First 4 are photos
+      case 'documents':
+        return Object.values(files).slice(4, 7).filter(file => file).length; // Next 3 are documents
+      case 'parts':
+        return (partsStructure.rootFiles?.length || 0) + (partsStructure.folders?.reduce((sum, folder) => sum + (folder.files?.length || 0), 0) || 0);
+      case 'maintenance':
+        return maintenanceData.issueDescription.trim() ? 1 : 0;
+      default:
+        return 0;
+    }
+  };
+
   // Tab content components
-  const renderTabButton = (tab: 'details' | 'photos' | 'documents' | 'parts' | 'maintenance', label: string, icon: React.ReactNode) => (
-    <Button
-      type="button"
-      variant={activeTab === tab ? 'default' : 'ghost'}
-      size="sm"
-      onClick={() => setActiveTab(tab)}
-      className="flex-1 flex items-center gap-2"
-    >
-      {icon}
-      <span className="hidden sm:inline">{label}</span>
-    </Button>
-  );
+  const renderTabButton = (tab: 'details' | 'photos' | 'documents' | 'parts' | 'maintenance', label: string, icon: React.ReactNode) => {
+    const contentCount = getTabContentCount(tab);
+    return (
+      <Button
+        type="button"
+        variant={activeTab === tab ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => setActiveTab(tab)}
+        className="flex-1 flex items-center gap-2 relative"
+      >
+        {icon}
+        <span className="hidden sm:inline">{label}</span>
+        {contentCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+            {contentCount > 9 ? '9+' : contentCount}
+          </span>
+        )}
+      </Button>
+    );
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -341,6 +427,9 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
       {formData.expiryDate && (
         <input type="hidden" name="expiryDate" value={format(formData.expiryDate, 'yyyy-MM-dd')} />
       )}
+      {formData.registrationExpiry && (
+        <input type="hidden" name="registrationExpiry" value={format(formData.registrationExpiry, 'yyyy-MM-dd')} />
+      )}
 
       {/* Tab Navigation - All Screen Sizes */}
       <div className={`w-full mb-6 ${isMobile ? 'grid grid-cols-5 bg-muted rounded-md p-1' : 'flex justify-center border-b'}`}>
@@ -357,7 +446,7 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
             <button
               type="button"
               onClick={() => setActiveTab('details')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 relative ${
                 activeTab === 'details'
                   ? 'border-primary text-primary bg-primary/5'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
@@ -365,11 +454,16 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
             >
               <Settings className="h-4 w-4" />
               Vehicle Details
+              {getTabContentCount('details') > 0 && (
+                <span className="bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
+                  {getTabContentCount('details') > 9 ? '9+' : getTabContentCount('details')}
+                </span>
+              )}
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('photos')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 relative ${
                 activeTab === 'photos'
                   ? 'border-primary text-primary bg-primary/5'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
@@ -377,11 +471,16 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
             >
               <Camera className="h-4 w-4" />
               Vehicle Images
+              {getTabContentCount('photos') > 0 && (
+                <span className="bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
+                  {getTabContentCount('photos')}
+                </span>
+              )}
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('documents')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 relative ${
                 activeTab === 'documents'
                   ? 'border-primary text-primary bg-primary/5'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
@@ -389,11 +488,16 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
             >
               <FileText className="h-4 w-4" />
               Documents
+              {getTabContentCount('documents') > 0 && (
+                <span className="bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
+                  {getTabContentCount('documents')}
+                </span>
+              )}
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('parts')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 relative ${
                 activeTab === 'parts'
                   ? 'border-primary text-primary bg-primary/5'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
@@ -401,11 +505,16 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
             >
               <Wrench className="h-4 w-4" />
               Parts Management
+              {getTabContentCount('parts') > 0 && (
+                <span className="bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
+                  {getTabContentCount('parts') > 9 ? '9+' : getTabContentCount('parts')}
+                </span>
+              )}
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('maintenance')}
-              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 ${
+              className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 border-b-2 relative ${
                 activeTab === 'maintenance'
                   ? 'border-primary text-primary bg-primary/5'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
@@ -413,6 +522,11 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
             >
               <ClipboardCheck className="h-4 w-4" />
               Maintenance Report
+              {getTabContentCount('maintenance') > 0 && (
+                <span className="bg-green-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center ml-2">
+                  ✓
+                </span>
+              )}
             </button>
           </>
         )}
@@ -493,10 +607,11 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
                     id="plateNumber"
                     name="plateNumber"
                     value={formData.plateNumber}
-                    onChange={(e) => setFormData(prev => ({ ...prev, plateNumber: e.target.value }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, plateNumber: e.target.value.toUpperCase() }))}
                     required
                     placeholder="e.g. ABC-1234"
                     className="font-mono transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                    style={{ textTransform: 'uppercase' }}
                   />
                 </div>
 
@@ -565,7 +680,7 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
               </p>
             </CardHeader>
             <CardContent>
-              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+              <div className={`grid gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
                 <div className="space-y-2">
                   <Label>Last Inspection Date *</Label>
                   <Popover open={inspectionDateOpen} onOpenChange={setInspectionDateOpen}>
@@ -664,6 +779,48 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
                       <SelectItem value="12">Annually</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Registration Expiry Date</Label>
+                  <Popover open={registrationExpiryDateOpen} onOpenChange={setRegistrationExpiryDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal transition-all duration-200 focus:ring-2 focus:ring-blue-500",
+                          !formData.registrationExpiry && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.registrationExpiry ? (
+                          format(formData.registrationExpiry, "PPP")
+                        ) : (
+                          <span>Pick registration expiry</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={formData.registrationExpiry}
+                        onSelect={(date) => {
+                          setFormData(prev => ({ ...prev, registrationExpiry: date }));
+                          setRegistrationExpiryDateOpen(false); // Auto-close after selection
+                        }}
+                        initialFocus
+                        captionLayout="dropdown-buttons"
+                        fromYear={1990}
+                        toYear={2050}
+                        classNames={{
+                          caption_dropdowns: "flex gap-2 justify-center",
+                          vhidden: "hidden",
+                          caption_label: "hidden"
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </CardContent>
@@ -1184,4 +1341,4 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
       </div>
     </form>
   );
-}
+};

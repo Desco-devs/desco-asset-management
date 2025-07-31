@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useRecentActivity } from "@/stores/dashboard-store";
+import { useDashboardData } from "@/hooks/useDashboardData";
 import { 
   Plus, 
   Edit, 
@@ -195,8 +195,23 @@ function ActivitySkeleton() {
   );
 }
 
+interface RecentActivityFeedProps {
+  activities?: Array<{
+    id: string;
+    type: string;
+    action: string;
+    description: string;
+    timestamp: string;
+    user: string;
+    status?: string;
+    priority?: string;
+  }>;
+}
+
 export function RecentActivityFeed() {
-  const activities = useRecentActivity();
+  const selectedTimeRange = 'month'; // Default to month for now
+  const { data } = useDashboardData(selectedTimeRange);
+  const activities = data?.recentActivity || [];
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);

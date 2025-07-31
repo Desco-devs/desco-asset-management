@@ -3,11 +3,8 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-import { 
-  useEquipmentCounts, 
-  useVehicleCounts, 
-  useSelectedAssetType 
-} from "@/stores/dashboard-store";
+import { useDashboardData } from "@/hooks/useDashboardData";
+import { useSelectedTimeRange } from "@/stores/dashboardUIStore";
 
 interface AssetStatusChartProps {
   type: 'equipment' | 'vehicles' | 'combined';
@@ -50,9 +47,11 @@ const CustomTooltip = ({ active, payload }: TooltipProps) => {
 };
 
 export function AssetStatusChart({ type, title, className }: AssetStatusChartProps) {
-  const equipmentCounts = useEquipmentCounts();
-  const vehicleCounts = useVehicleCounts();
-  const selectedAssetType = useSelectedAssetType();
+  const selectedTimeRange = useSelectedTimeRange();
+  const { data } = useDashboardData(selectedTimeRange);
+  
+  const equipmentCounts = data?.equipmentCounts || { OPERATIONAL: 0, NON_OPERATIONAL: 0 };
+  const vehicleCounts = data?.vehicleCounts || { OPERATIONAL: 0, NON_OPERATIONAL: 0 };
 
   // Determine which data to show based on type or selected filter
   const getChartData = () => {
@@ -74,20 +73,10 @@ export function AssetStatusChart({ type, title, className }: AssetStatusChartPro
         break;
       
       case 'combined':
-        // Show combined data or filtered data based on selectedAssetType
-        if (selectedAssetType === 'equipment') {
-          operational = equipmentCounts.OPERATIONAL;
-          nonOperational = equipmentCounts.NON_OPERATIONAL;
-          chartTitle = 'Equipment Status';
-        } else if (selectedAssetType === 'vehicles') {
-          operational = vehicleCounts.OPERATIONAL;
-          nonOperational = vehicleCounts.NON_OPERATIONAL;
-          chartTitle = 'Vehicle Status';
-        } else {
-          operational = equipmentCounts.OPERATIONAL + vehicleCounts.OPERATIONAL;
-          nonOperational = equipmentCounts.NON_OPERATIONAL + vehicleCounts.NON_OPERATIONAL;
-          chartTitle = 'Combined Assets Status';
-        }
+        // Show combined data
+        operational = equipmentCounts.OPERATIONAL + vehicleCounts.OPERATIONAL;
+        nonOperational = equipmentCounts.NON_OPERATIONAL + vehicleCounts.NON_OPERATIONAL;
+        chartTitle = chartTitle || 'Combined Assets Status';
         break;
     }
 
@@ -122,7 +111,7 @@ export function AssetStatusChart({ type, title, className }: AssetStatusChartPro
     };
   };
 
-  const { data, title: chartTitle, isEmpty } = getChartData();
+  const { data: chartData, title: chartTitle, isEmpty } = getChartData();
 
   if (isEmpty) {
     return (
@@ -152,7 +141,7 @@ export function AssetStatusChart({ type, title, className }: AssetStatusChartPro
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={data}
+                data={chartData}
                 cx="50%"
                 cy="50%"
                 innerRadius={40}
@@ -160,7 +149,7 @@ export function AssetStatusChart({ type, title, className }: AssetStatusChartPro
                 paddingAngle={2}
                 dataKey="value"
               >
-                {data.map((entry, index) => (
+                {chartData.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
                     fill={
@@ -189,13 +178,13 @@ export function AssetStatusChart({ type, title, className }: AssetStatusChartPro
         <div className="flex justify-between items-center mt-4 pt-4 border-t text-sm">
           <div className="text-center">
             <div className="font-semibold text-lg">
-              {data.reduce((sum, item) => sum + item.value, 0)}
+              {chartData.reduce((sum, item) => sum + item.value, 0)}
             </div>
             <div className="text-muted-foreground">Total</div>
           </div>
           <div className="text-center">
             <div className="font-semibold text-lg text-emerald-600">
-              {data.find(item => item.name === "Operational")?.percentage || 0}%
+              {chartData.find(item => item.name === "Operational")?.percentage || 0}%
             </div>
             <div className="text-muted-foreground">Operational</div>
           </div>

@@ -7,6 +7,7 @@ export interface Vehicle {
   inspectionDate: string
   before: number
   expiryDate: string
+  registrationExpiry?: string
   status: "OPERATIONAL" | "NON_OPERATIONAL"
   remarks?: string
   owner: string
@@ -42,6 +43,7 @@ export interface CreateVehicleData {
   inspectionDate: string
   before: number
   expiryDate: string
+  registrationExpiry?: string
   status: "OPERATIONAL" | "NON_OPERATIONAL"
   remarks?: string
   owner: string
@@ -57,6 +59,7 @@ export interface UpdateVehicleData {
   inspectionDate: string
   before: number
   expiryDate: string
+  registrationExpiry?: string
   status: "OPERATIONAL" | "NON_OPERATIONAL"
   remarks?: string
   owner: string

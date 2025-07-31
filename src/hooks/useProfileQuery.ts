@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/app/context/AuthContext";
+import { getOptimalCacheSettings, getAdaptiveRetryConfig, isSlowConnection } from "@/lib/network-utils";
 import type { 
   User, 
   ProfileUpdateData, 
@@ -43,22 +44,54 @@ async function updateProfile(data: ProfileUpdateData): Promise<User> {
   return response.json();
 }
 
-async function uploadProfileImage(file: File): Promise<string> {
+async function uploadProfileImage(
+  file: File, 
+  onProgress?: (progress: number) => void
+): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch('/api/upload/profile-image', {
-    method: 'POST',
-    body: formData,
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    
+    // Track upload progress
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) {
+        const progress = Math.round((event.loaded / event.total) * 100);
+        onProgress?.(progress);
+      }
+    });
+    
+    xhr.addEventListener('load', async () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const result: ProfileImageUploadResponse = JSON.parse(xhr.responseText);
+          resolve(result.url);
+        } catch (error) {
+          reject(new Error('Invalid response format'));
+        }
+      } else {
+        try {
+          const error = JSON.parse(xhr.responseText);
+          reject(new Error(error.error || 'Failed to upload image'));
+        } catch {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      }
+    });
+    
+    xhr.addEventListener('error', () => {
+      reject(new Error('Network error during upload'));
+    });
+    
+    xhr.addEventListener('timeout', () => {
+      reject(new Error('Upload timeout - please check your connection'));
+    });
+    
+    xhr.open('POST', '/api/upload/profile-image');
+    xhr.timeout = 60000; // 60 second timeout for mobile connections
+    xhr.send(formData);
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to upload image');
-  }
-
-  const result: ProfileImageUploadResponse = await response.json();
-  return result.url;
 }
 
 async function deleteProfileImage(): Promise<void> {
@@ -72,22 +105,39 @@ async function deleteProfileImage(): Promise<void> {
   }
 }
 
-// QUERIES - Following TanStack Query patterns
+// QUERIES - Following TanStack Query patterns with adaptive mobile optimizations
 export function useCurrentProfile() {
+  const cacheSettings = getOptimalCacheSettings();
+  const retryConfig = getAdaptiveRetryConfig();
+  
   return useQuery({
     queryKey: profileKeys.current(),
     queryFn: fetchCurrentProfile,
-    staleTime: 0, // Always fresh for realtime
-    gcTime: 1000 * 60 * 5, // 5 minutes
+    ...cacheSettings,
+    ...retryConfig,
+    // Additional mobile-specific optimizations
+    networkMode: 'offlineFirst', // Use cache when offline
+    meta: {
+      persist: true, // Persist this query for offline usage
+    },
   });
 }
 
 export function useProfile(userId: string) {
+  const cacheSettings = getOptimalCacheSettings();
+  const retryConfig = getAdaptiveRetryConfig();
+  
   return useQuery({
     queryKey: profileKeys.detail(userId),
     queryFn: () => fetchProfileById(userId),
     enabled: !!userId,
-    staleTime: 0,
+    // Longer cache times for other users' profiles (less critical)
+    staleTime: cacheSettings.staleTime * 2,
+    gcTime: cacheSettings.gcTime,
+    refetchOnWindowFocus: false,
+    retry: Math.max(1, retryConfig.retry - 1), // Fewer retries for non-critical data
+    retryDelay: retryConfig.retryDelay,
+    networkMode: 'offlineFirst',
   });
 }
 
@@ -159,8 +209,9 @@ export function useUploadProfileImage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: uploadProfileImage,
-    onMutate: async (file: File) => {
+    mutationFn: ({ file, onProgress }: { file: File; onProgress?: (progress: number) => void }) => 
+      uploadProfileImage(file, onProgress),
+    onMutate: async ({ file }: { file: File; onProgress?: (progress: number) => void }) => {
       // Cancel outgoing queries
       await queryClient.cancelQueries({ queryKey: profileKeys.current() });
       
@@ -183,7 +234,7 @@ export function useUploadProfileImage() {
       
       return { previousProfile, previewUrl };
     },
-    onError: (error, file, context) => {
+    onError: (error, { file }, context) => {
       // Clean up preview URL
       if (context?.previewUrl) {
         URL.revokeObjectURL(context.previewUrl);
@@ -196,7 +247,7 @@ export function useUploadProfileImage() {
       
       toast.error(`Failed to upload image: ${error.message}`);
     },
-    onSuccess: (imageUrl, file, context) => {
+    onSuccess: (imageUrl, { file }, context) => {
       // Clean up preview URL
       if (context?.previewUrl) {
         URL.revokeObjectURL(context.previewUrl);

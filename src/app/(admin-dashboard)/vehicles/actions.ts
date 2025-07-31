@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 
-// Helper to upload files to Supabase with folder structure
+// Helper to upload files to Supabase with organized folder structure (following equipment pattern)
 const uploadFileToSupabase = async (
   file: File,
   projectId: string,
@@ -19,22 +19,57 @@ const uploadFileToSupabase = async (
   const supabase = await createServerSupabaseClient();
   const timestamp = Date.now();
   const ext = file.name.split('.').pop();
-  const filename = `${prefix}_${timestamp}.${ext}`;
   
-  // Create human-readable folder structure
-  const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_');
+  // Generate descriptive filenames based on prefix
+  let baseFilename: string;
   
-  let humanReadablePath = '';
-  if (projectName && clientName && brand && model) {
-    const readableProject = sanitizeForPath(`${projectName}_${clientName}`);
-    const readableVehicle = sanitizeForPath(`${brand}_${model}_${plateNumber || 'Vehicle'}`);
-    humanReadablePath = `${readableProject}/${readableVehicle}`;
-  } else {
-    // Fallback to UUID structure
-    humanReadablePath = `${projectId}/${vehicleId}`;
+  switch (prefix) {
+    case 'front':
+      baseFilename = `front-view`;
+      break;
+    case 'back':
+      baseFilename = `back-view`;
+      break;
+    case 'side1':
+      baseFilename = `side1-view`;
+      break;
+    case 'side2':
+      baseFilename = `side2-view`;
+      break;
+    case 'receipt':
+      baseFilename = `original-receipt`;
+      break;
+    case 'registration':
+      baseFilename = `car-registration`;
+      break;
+    case 'pgpc_inspection':
+      baseFilename = `pgpc-inspection`;
+      break;
+    default:
+      baseFilename = prefix;
   }
   
-  const filepath = `vehicles/${humanReadablePath}/${filename}`;
+  // Get subfolder based on file type (following equipment pattern)
+  const getSubfolder = (prefix: string) => {
+    switch (prefix) {
+      case 'front':
+      case 'back':
+      case 'side1':
+      case 'side2':
+        return 'vehicle-images';
+      case 'receipt':
+      case 'registration':
+      case 'pgpc_inspection':
+        return 'vehicle-documents';
+      default:
+        return 'vehicle-files';
+    }
+  };
+  
+  const subfolder = getSubfolder(prefix);
+  const filename = `${baseFilename}-${timestamp}.${ext}`;
+  const filepath = `vehicle-${vehicleId}/${subfolder}/${filename}`;
+  
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { data: uploadData, error: uploadErr } = await supabase
@@ -80,17 +115,18 @@ export async function createVehicleAction(formData: FormData) {
     const status = formData.get("status") as string;
     const inspectionDate = formData.get("inspectionDate") as string;
     const expiryDate = formData.get("expiryDate") as string;
+    const registrationExpiry = formData.get("registrationExpiry") as string;
     const before = formData.get("before") as string;
     const remarks = formData.get("remarks") as string;
 
     // Basic validation with specific error messages
     const missingFields = [];
-    if (!brand) missingFields.push("Brand");
-    if (!model) missingFields.push("Model");
-    if (!type) missingFields.push("Vehicle Type");
-    if (!plateNumber) missingFields.push("Plate Number");
-    if (!owner) missingFields.push("Owner");
-    if (!projectId) missingFields.push("Project");
+    if (!brand?.trim()) missingFields.push("Brand");
+    if (!model?.trim()) missingFields.push("Model");
+    if (!type?.trim()) missingFields.push("Vehicle Type");
+    if (!plateNumber?.trim()) missingFields.push("Plate Number");
+    if (!owner?.trim()) missingFields.push("Owner");
+    if (!projectId?.trim()) missingFields.push("Project");
     
     if (missingFields.length > 0) {
       return {
@@ -100,7 +136,7 @@ export async function createVehicleAction(formData: FormData) {
       };
     }
 
-    // Additional validation
+    // Additional validation with enhanced error handling
     if (inspectionDate && isNaN(Date.parse(inspectionDate))) {
       return {
         success: false,
@@ -117,10 +153,27 @@ export async function createVehicleAction(formData: FormData) {
       };
     }
 
+    if (registrationExpiry && isNaN(Date.parse(registrationExpiry))) {
+      return {
+        success: false,
+        error: "Please enter a valid registration expiry date",
+        validationError: true
+      };
+    }
+
     if (before && (isNaN(parseInt(before)) || parseInt(before) < 0)) {
       return {
         success: false,
         error: "Days before expiry must be a valid positive number",
+        validationError: true
+      };
+    }
+
+    // Validate status enum
+    if (status && !['OPERATIONAL', 'NON_OPERATIONAL'].includes(status)) {
+      return {
+        success: false,
+        error: "Invalid status value. Must be OPERATIONAL or NON_OPERATIONAL",
         validationError: true
       };
     }
@@ -214,18 +267,33 @@ export async function createVehicleAction(formData: FormData) {
     // Create vehicle first (without files)
     let vehicle;
     try {
+      // Ensure we have valid dates
+      const parsedInspectionDate = inspectionDate ? new Date(inspectionDate) : new Date();
+      const parsedExpiryDate = expiryDate ? new Date(expiryDate) : null;
+      const parsedRegistrationExpiry = registrationExpiry ? new Date(registrationExpiry) : null;
+      
+      // Validate that expiry date is after inspection date if both are provided
+      if (parsedExpiryDate && parsedInspectionDate && parsedExpiryDate <= parsedInspectionDate) {
+        return {
+          success: false,
+          error: "Expiry date must be after the inspection date",
+          validationError: true
+        };
+      }
+      
       vehicle = await prisma.vehicle.create({
         data: {
-          brand,
-          model,
-          type,
-          plate_number: plateNumber,
-          owner,
+          brand: brand.trim(),
+          model: model.trim(),
+          type: type.trim(),
+          plate_number: plateNumber.trim().toUpperCase(),
+          owner: owner.trim(),
           status: status as "OPERATIONAL" | "NON_OPERATIONAL",
-          inspection_date: inspectionDate ? new Date(inspectionDate) : new Date(),
-          expiry_date: expiryDate ? new Date(expiryDate) : new Date(),
-          before: before ? parseInt(before) : 0,
-          remarks: remarks || null,
+          inspection_date: parsedInspectionDate,
+          expiry_date: parsedExpiryDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Default to 1 year from now
+          registration_expiry: parsedRegistrationExpiry,
+          before: before ? parseInt(before) : 30, // Default to 30 days before expiry
+          remarks: remarks?.trim() || null,
           project: { connect: { id: projectId } },
           user: { connect: { id: userProfile.id } },
         },
@@ -233,19 +301,59 @@ export async function createVehicleAction(formData: FormData) {
     } catch (dbError) {
       console.error("Database error creating vehicle:", dbError);
       
-      // Check for specific database errors
+      // Check for specific database errors with more detailed handling
       if (dbError instanceof Error) {
-        if (dbError.message.includes('Unique constraint')) {
+        const errorMessage = dbError.message.toLowerCase();
+        
+        if (errorMessage.includes('unique constraint') || errorMessage.includes('duplicate key')) {
+          if (errorMessage.includes('plate_number')) {
+            return {
+              success: false,
+              error: `A vehicle with plate number "${plateNumber}" already exists. Please use a different plate number.`,
+              validationError: true
+            };
+          }
           return {
             success: false,
-            error: "A vehicle with this plate number already exists in this project.",
+            error: "A vehicle with this information already exists.",
             validationError: true
           };
         }
-        if (dbError.message.includes('Foreign key constraint')) {
+        
+        if (errorMessage.includes('foreign key constraint') || errorMessage.includes('violates foreign key')) {
+          if (errorMessage.includes('project_id')) {
+            return {
+              success: false,
+              error: "Selected project is no longer available. Please refresh and try again.",
+              validationError: true
+            };
+          }
+          if (errorMessage.includes('created_by')) {
+            return {
+              success: false,
+              error: "User authentication issue. Please log out and log back in.",
+              authError: true
+            };
+          }
           return {
             success: false,
-            error: "Selected project is no longer available. Please refresh and try again.",
+            error: "Referenced data is no longer available. Please refresh and try again.",
+            validationError: true
+          };
+        }
+        
+        if (errorMessage.includes('not null constraint') || errorMessage.includes('null value')) {
+          return {
+            success: false,
+            error: "Missing required information. Please fill in all required fields and try again.",
+            validationError: true
+          };
+        }
+        
+        if (errorMessage.includes('check constraint') || errorMessage.includes('invalid input')) {
+          return {
+            success: false,
+            error: "Invalid data format. Please check your input and try again.",
             validationError: true
           };
         }
@@ -324,7 +432,7 @@ export async function createVehicleAction(formData: FormData) {
                 const timestamp = Date.now();
                 const ext = partName.split('.').pop();
                 const filename = `part_${i}_${timestamp}.${ext}`;
-                const filepath = `vehicles/${project.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}/${brand}_${model}_${plateNumber}/parts/root/${filename}`;
+                const filepath = `vehicle-${vehicle.id}/vehicle-parts/root/${filename}`;
                 const buffer = Buffer.from(await partFile.arrayBuffer());
 
                 const { data: uploadData, error: uploadErr } = await supabase
@@ -390,7 +498,7 @@ export async function createVehicleAction(formData: FormData) {
                     const ext = partName.split('.').pop();
                     const filename = `part_${folderIndex}_${fileIndex}_${timestamp}.${ext}`;
                     const sanitizedFolderName = folderName.replace(/[^a-zA-Z0-9_\-]/g, '_');
-                    const filepath = `vehicles/${project.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}/${brand}_${model}_${plateNumber}/parts/${sanitizedFolderName}/${filename}`;
+                    const filepath = `vehicle-${vehicle.id}/vehicle-parts/${sanitizedFolderName}/${filename}`;
                     const buffer = Buffer.from(await partFile.arrayBuffer());
 
                     const { data: uploadData, error: uploadErr } = await supabase
@@ -486,7 +594,7 @@ export async function createVehicleAction(formData: FormData) {
                 const timestamp = Date.now();
                 const ext = file.name.split('.').pop();
                 const filename = `maintenance_attachment_${i}_${timestamp}.${ext}`;
-                const filepath = `vehicles/${project.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}/${brand}_${model}_${plateNumber}/maintenance/${filename}`;
+                const filepath = `vehicle-${vehicle.id}/vehicle-maintenance/${filename}`;
                 const buffer = Buffer.from(await file.arrayBuffer());
 
                 const { data: uploadData, error: uploadErr } = await supabase
@@ -518,7 +626,7 @@ export async function createVehicleAction(formData: FormData) {
                   const timestamp = Date.now();
                   const ext = partImage.name.split('.').pop();
                   const filename = `part_${i}_${timestamp}.${ext}`;
-                  const filepath = `vehicles/${project.name.replace(/[^a-zA-Z0-9_\-]/g, '_')}/${brand}_${model}_${plateNumber}/maintenance/parts/${filename}`;
+                  const filepath = `vehicle-${vehicle.id}/vehicle-maintenance/parts/${filename}`;
                   const buffer = Buffer.from(await partImage.arrayBuffer());
 
                   const { data: uploadData, error: uploadErr } = await supabase
@@ -912,10 +1020,7 @@ export async function updateVehicleAction(formData: FormData) {
                 const timestamp = Date.now();
                 const ext = partName.split('.').pop() || 'unknown';
                 const filename = `part_${i}_${timestamp}.${ext}`;
-                const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_');
-                const readableProject = sanitizeForPath(`${project.name}_${project.client.name}`);
-                const readableVehicle = sanitizeForPath(`${brand}_${model}_${plateNumber || 'Vehicle'}`);
-                const filepath = `vehicles/${readableProject}/${readableVehicle}/parts/root/${filename}`;
+                const filepath = `vehicle-${vehicleId}/vehicle-parts/root/${filename}`;
                 const buffer = Buffer.from(await partFile.arrayBuffer());
 
                 const { data: uploadData, error: uploadErr } = await supabase
@@ -983,9 +1088,7 @@ export async function updateVehicleAction(formData: FormData) {
                     const filename = `part_${folderIndex}_${fileIndex}_${timestamp}.${ext}`;
                     const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, '_');
                     const sanitizedFolderName = sanitizeForPath(folderName);
-                    const readableProject = sanitizeForPath(`${project.name}_${project.client.name}`);
-                    const readableVehicle = sanitizeForPath(`${brand}_${model}_${plateNumber || 'Vehicle'}`);
-                    const filepath = `vehicles/${readableProject}/${readableVehicle}/parts/${sanitizedFolderName}/${filename}`;
+                    const filepath = `vehicle-${vehicleId}/vehicle-parts/${sanitizedFolderName}/${filename}`;
                     const buffer = Buffer.from(await partFile.arrayBuffer());
 
                     const { data: uploadData, error: uploadErr } = await supabase

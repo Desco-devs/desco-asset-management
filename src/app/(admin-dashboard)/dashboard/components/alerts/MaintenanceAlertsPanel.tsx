@@ -7,11 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  useMaintenanceAlerts, 
   useAlertsExpanded,
-  useDashboardStore,
-  useCriticalAlertsCount
-} from "@/stores/dashboard-store";
+  useDashboardUIStore
+} from "@/stores/dashboardUIStore";
+import { useDashboardData } from "@/hooks/useDashboardData";
 import { 
   AlertTriangle, 
   Wrench, 
@@ -160,11 +159,25 @@ function AlertSkeleton() {
   );
 }
 
+interface MaintenanceAlertsPanelProps {
+  alerts?: Array<{
+    id: string;
+    type: 'equipment' | 'vehicle';
+    name: string;
+    status: string;
+    priority: 'low' | 'medium' | 'high' | 'critical';
+    message: string;
+    alertType?: 'active_maintenance' | 'non_operational' | 'overdue' | 'insurance_expiry';
+  }>;
+}
+
 export function MaintenanceAlertsPanel() {
-  const alerts = useMaintenanceAlerts();
   const alertsExpanded = useAlertsExpanded();
-  const toggleAlertsExpanded = useDashboardStore(state => state.toggleAlertsExpanded);
-  const criticalAlertsCount = useCriticalAlertsCount();
+  const setAlertsExpanded = useDashboardUIStore(state => state.setAlertsExpanded);
+  const selectedTimeRange = 'month'; // Default to month for now
+  const { data } = useDashboardData(selectedTimeRange);
+  const alerts = data?.maintenanceAlerts || [];
+  const criticalAlertsCount = alerts.filter(alert => alert.priority === 'critical').length;
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -286,7 +299,7 @@ export function MaintenanceAlertsPanel() {
     <Card>
       <CardHeader 
         className="pb-3 cursor-pointer transition-colors hover:bg-muted/50 lg:cursor-default lg:hover:bg-transparent"
-        onClick={() => alerts.length > initialDisplayLimit && toggleAlertsExpanded()}
+        onClick={() => alerts.length > initialDisplayLimit && setAlertsExpanded(!alertsExpanded)}
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -311,7 +324,7 @@ export function MaintenanceAlertsPanel() {
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
-                toggleAlertsExpanded();
+                setAlertsExpanded(!alertsExpanded);
               }}
               className="h-8 w-8 p-0 touch-manipulation flex-shrink-0"
             >
@@ -385,7 +398,7 @@ export function MaintenanceAlertsPanel() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={toggleAlertsExpanded}
+                    onClick={() => setAlertsExpanded(!alertsExpanded)}
                     className="text-xs text-muted-foreground hover:text-foreground touch-manipulation min-h-[44px] px-4"
                   >
                     <ChevronDown className="h-4 w-4 mr-1" />

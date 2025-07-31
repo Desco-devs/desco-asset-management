@@ -446,7 +446,7 @@ export function transformMaintenanceAlerts(alertsData: any) {
       type: 'equipment',
       name: `${equipment.brand || 'Unknown'} ${equipment.model || ''}`.trim(),
       status: 'NON_OPERATIONAL',
-      priority: 'high',
+      priority: 'medium',
       message: `Equipment is non-operational and requires attention`,
       location: equipment.project?.client?.location?.address || 'Unknown location',
       lastUpdate: equipment.updated_at,
@@ -461,7 +461,7 @@ export function transformMaintenanceAlerts(alertsData: any) {
       type: 'vehicle',
       name: `${vehicle.brand || 'Unknown'} ${vehicle.model || ''} (${vehicle.plate_number || 'No plate'})`.trim(),
       status: 'NON_OPERATIONAL',
-      priority: 'high',
+      priority: 'medium',
       message: `Vehicle is non-operational and requires attention`,
       location: vehicle.project?.client?.location?.address || 'Unknown location',
       lastUpdate: vehicle.updated_at,
@@ -488,7 +488,7 @@ export function transformMaintenanceAlerts(alertsData: any) {
       type: 'vehicle',
       name: `${vehicle.brand || 'Unknown'} ${vehicle.model || ''} (${vehicle.plate_number || 'No plate'})`.trim(),
       status: 'OPERATIONAL',
-      priority: 'critical',
+      priority: 'high',
       message,
       location: vehicle.project?.client?.location?.address || 'Unknown location',
       inspectionDate: vehicle.inspection_date,
@@ -538,8 +538,10 @@ export function transformMaintenanceAlerts(alertsData: any) {
  */
 function getPriorityLevel(priority: string | null): 'low' | 'medium' | 'high' | 'critical' {
   switch (priority) {
-    case 'HIGH':
+    case 'CRITICAL':
       return 'critical';
+    case 'HIGH':
+      return 'high';
     case 'MEDIUM':
       return 'medium';
     case 'LOW':

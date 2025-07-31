@@ -3,10 +3,10 @@
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  useOverviewStats, 
   useSelectedTimeRange,
-  useDashboardStore
-} from "@/stores/dashboard-store";
+  useDashboardUIStore
+} from "@/stores/dashboardUIStore";
+import { useDashboardData } from "@/hooks/useDashboardData";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -79,10 +79,28 @@ function MetricCard({ title, value, icon, trend, subtitle, className }: MetricCa
   );
 }
 
+interface OverviewStatsGridProps {
+  overviewStats?: {
+    locations: number;
+    clients: number;
+    projects: number;
+    vehicles: { total: number; operational: number; nonOperational: number };
+    equipment: { total: number; operational: number; nonOperational: number };
+    maintenanceReports: { total: number; pending: number; inProgress: number };
+    growth: {
+      newClientsThisWeek: number;
+      newProjectsThisWeek: number;
+      newEquipmentThisWeek: number;
+      newVehiclesThisWeek: number;
+    };
+  };
+}
+
 export function OverviewStatsGrid() {
-  const overviewStats = useOverviewStats();
   const selectedTimeRange = useSelectedTimeRange();
-  const setSelectedTimeRange = useDashboardStore(state => state.setSelectedTimeRange);
+  const setSelectedTimeRange = useDashboardUIStore(state => state.setSelectedTimeRange);
+  const { data } = useDashboardData(selectedTimeRange);
+  const overviewStats = data?.overviewStats;
   
   // Mobile collapsible state
   const [businessExpanded, setBusinessExpanded] = useState(true);

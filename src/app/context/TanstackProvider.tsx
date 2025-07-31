@@ -2,7 +2,8 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
+import { setGlobalQueryClient } from "@/lib/realtime-cache";
 
 export default function TanstackProvider({
   children,
@@ -41,6 +42,17 @@ export default function TanstackProvider({
         },
       })
   );
+
+  // Set global query client for real-time cache integration
+  useEffect(() => {
+    setGlobalQueryClient(queryClient);
+    console.log('✅ Global query client set for real-time cache integration');
+    
+    // Cleanup on unmount
+    return () => {
+      setGlobalQueryClient(null);
+    };
+  }, [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

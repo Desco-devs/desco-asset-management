@@ -1,6 +1,11 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { RoomListItem, MessageWithRelations, ChatUser } from "@/types/chat-app";
+import { useChatMessages } from './useChatMessages';
+import { useChatRealtime } from './useChatRealtime';
+import { useChatPresence } from './useChatPresence';
+import { useChatTyping } from './useChatTyping';
+import { useChatConnection } from './useChatConnection';
 
 export const ROOMS_QUERY_KEYS = {
   rooms: (userId: string) => ["rooms", userId],
@@ -16,6 +21,26 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [invitationRoom, setInvitationRoom] = useState<RoomListItem | null>(null);
   const queryClient = useQueryClient();
+  
+  // Get current user data for real-time features
+  const { data: currentUser } = useQuery({
+    queryKey: ['current-user', userId],
+    queryFn: async (): Promise<ChatUser | undefined> => {
+      if (!userId) return undefined;
+      const response = await fetch(`/api/users/${userId}`);
+      if (!response.ok) return undefined;
+      const data = await response.json();
+      return data.user;
+    },
+    enabled: !!userId
+  });
+  
+  // Initialize real-time features
+  const realtimeStatus = useChatRealtime(userId);
+  const messageSystem = useChatMessages(currentUser);
+  const presenceSystem = useChatPresence(currentUser, selectedRoom || undefined);
+  const typingSystem = useChatTyping(currentUser);
+  const connectionSystem = useChatConnection(userId);
 
   // Fetch rooms - using existing Phase 1 infrastructure
   const { data: rooms = [], isLoading: isLoadingRooms, error } = useQuery({
@@ -81,23 +106,19 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     mutationKey: ['createRoom', userId],
   });
 
-  // Send message mutation - using existing Phase 1 infrastructure
+  // Enhanced send message with optimistic updates
   const sendMessageMutation = useMutation({
-    mutationFn: async (messageData: { roomId: string; content: string }) => {
-      const response = await fetch("/api/messages/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...messageData, senderId: userId }),
+    mutationFn: async (messageData: { roomId: string; content: string; type?: string; fileUrl?: string; replyToId?: string }) => {
+      // Use the new optimistic message system
+      return messageSystem.sendMessage({
+        roomId: messageData.roomId,
+        content: messageData.content,
+        type: (messageData.type as any) || 'TEXT',
+        fileUrl: messageData.fileUrl,
+        replyToId: messageData.replyToId
       });
-      if (!response.ok) {
-        throw new Error("Failed to send message");
-      }
-      return response.json();
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ROOMS_QUERY_KEYS.roomMessages(variables.roomId) });
-      queryClient.invalidateQueries({ queryKey: ROOMS_QUERY_KEYS.rooms(userId || "") });
-    },
+    // Success and error handling is now managed by useChatMessages
   });
 
   // Simplified invitation mutations (placeholders for Phase 1)
@@ -135,9 +156,42 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     return createRoomMutation.mutateAsync(roomData);
   }, [createRoomMutation]);
 
-  const handleSendMessage = useCallback(async (roomId: string, content: string) => {
-    return sendMessageMutation.mutateAsync({ roomId, content });
+  const handleSendMessage = useCallback(async (roomId: string, content: string, options?: { type?: string; fileUrl?: string; replyToId?: string }) => {
+    return sendMessageMutation.mutateAsync({ 
+      roomId, 
+      content,
+      type: options?.type,
+      fileUrl: options?.fileUrl,
+      replyToId: options?.replyToId
+    });
   }, [sendMessageMutation]);
+  
+  // Enhanced typing handler
+  const handleTyping = useCallback((roomId: string) => {
+    typingSystem.handleTyping(roomId);
+  }, [typingSystem]);
+  
+  // Get typing indicators for current room
+  const currentRoomTyping = selectedRoom ? typingSystem.getTypingText(selectedRoom) : '';
+  
+  // Get presence info for current room
+  const currentRoomPresence = selectedRoom ? presenceSystem.usersInCurrentRoom : [];
+  
+  // Enhanced room selection with presence update
+  const handleRoomSelectEnhanced = useCallback((roomId: string) => {
+    setSelectedRoom(roomId);
+    // Update presence to show user is in this room
+    presenceSystem.updatePresence(roomId);
+  }, [presenceSystem]);
+  
+  // Message retry handlers
+  const handleRetryMessage = useCallback(async (optimisticId: string) => {
+    return messageSystem.manualRetry(optimisticId);
+  }, [messageSystem]);
+  
+  const handleCancelMessage = useCallback((optimisticId: string) => {
+    messageSystem.cancelMessage(optimisticId);
+  }, [messageSystem]);
 
   const handleAcceptInvitation = useCallback(async (invitationId: string) => {
     return acceptInvitationMutation.mutateAsync(invitationId);
@@ -172,18 +226,39 @@ export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
     isRespondingToInvitation: acceptInvitationMutation.isPending || declineInvitationMutation.isPending,
     isSendingMessage: sendMessageMutation.isPending,
 
-    // Errors
+    // Errors (Enhanced)
     error,
     createRoomError: createRoomMutation.error,
     invitationResponseError: acceptInvitationMutation.error || declineInvitationMutation.error,
+    messageError: messageSystem.sendError,
+    connectionError: connectionSystem.hasError,
 
-    // Actions
-    handleRoomSelect,
+    // Actions (Enhanced)
+    handleRoomSelect: handleRoomSelectEnhanced,
     handleAcceptInvitation,
     handleDeclineInvitation,
     handleCreateRoom,
     handleSendMessage,
+    handleTyping,
+    handleRetryMessage,
+    handleCancelMessage,
     setInvitationRoom,
     loadMoreMessages,
+    
+    // Real-time features
+    realtimeStatus,
+    connectionStatus: connectionSystem,
+    presenceSystem,
+    typingSystem,
+    messageSystem,
+    
+    // Enhanced UI data
+    currentRoomTyping,
+    currentRoomPresence,
+    onlineUsers: presenceSystem.onlineUsers,
+    
+    // Connection info
+    isRealtimeConnected: realtimeStatus.isListening && connectionSystem.isConnected,
+    connectionQuality: connectionSystem.connectionQuality,
   };
 };
