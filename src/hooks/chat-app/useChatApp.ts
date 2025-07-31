@@ -14,26 +14,25 @@ export const ROOMS_QUERY_KEYS = {
 
 interface UseChatAppOptions {
   userId?: string;
+  currentUser?: any; // Accept the authenticated user directly
   enabled?: boolean;
 }
 
-export const useChatApp = ({ userId, enabled = true }: UseChatAppOptions) => {
+export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: UseChatAppOptions) => {
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [invitationRoom, setInvitationRoom] = useState<RoomListItem | null>(null);
   const queryClient = useQueryClient();
   
-  // Get current user data for real-time features
-  const { data: currentUser } = useQuery({
-    queryKey: ['current-user', userId],
-    queryFn: async (): Promise<ChatUser | undefined> => {
-      if (!userId) return undefined;
-      const response = await fetch(`/api/users/${userId}`);
-      if (!response.ok) return undefined;
-      const data = await response.json();
-      return data.user;
-    },
-    enabled: !!userId
-  });
+  // Convert the authenticated user to ChatUser format
+  const currentUser: ChatUser | null = authUser ? {
+    id: authUser.id,
+    username: authUser.username || authUser.email?.split('@')[0] || 'user',
+    email: authUser.email || '',
+    full_name: authUser.full_name || authUser.username || 'User',
+    user_profile: authUser.user_profile || null,
+    user_status: authUser.user_status || 'ACTIVE',
+    role: authUser.role || 'VIEWER'
+  } : null;
   
   // Initialize real-time features
   const realtimeStatus = useChatRealtime(userId);

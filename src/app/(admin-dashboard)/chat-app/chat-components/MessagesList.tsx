@@ -129,7 +129,9 @@ const MessagesList = ({
           )}
 
           {messages.map((msg) => {
-            const isMe = msg.sender.id === currentUserId;
+            // Safely handle cases where sender might be undefined
+            const sender = msg.sender || { id: msg.sender_id || '', full_name: 'Unknown User', username: '', user_profile: undefined };
+            const isMe = sender.id === currentUserId;
 
             return (
               <div
@@ -142,7 +144,7 @@ const MessagesList = ({
                 {!isMe && (
                   <Avatar className="h-8 w-8 mt-1">
                     <AvatarFallback className="text-xs bg-muted">
-                      {msg.sender.full_name.substring(0, 2).toUpperCase()}
+                      {sender.full_name.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -172,7 +174,7 @@ const MessagesList = ({
                         })}
                       </span>
                       {!isMe && (
-                        <p className="capitalize">{msg.sender.full_name}</p>
+                        <p className="capitalize">{sender.full_name}</p>
                       )}
                     </div>
                     {isMe && (

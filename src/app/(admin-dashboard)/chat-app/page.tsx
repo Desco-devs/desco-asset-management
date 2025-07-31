@@ -53,6 +53,7 @@ const ChatApp = () => {
     loadMoreMessages,
   } = useChatApp({
     userId: currentUserId,
+    currentUser: user, // Pass the authenticated user directly
     enabled: !authLoading && !!currentUserId,
   });
 

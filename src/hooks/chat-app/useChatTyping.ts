@@ -155,7 +155,7 @@ export function useChatTyping(currentUser?: ChatUser) {
     })
     
     console.log('⌨️ Started typing in room:', roomId)
-  }, [currentUser, isConnected])
+  }, [currentUser?.id, currentUser?.username, currentUser?.full_name, currentUser?.user_profile, isConnected])
 
   // Broadcast typing stop
   const stopTyping = useCallback((roomId: string) => {
@@ -186,7 +186,7 @@ export function useChatTyping(currentUser?: ChatUser) {
     })
     
     console.log('⌨️ Stopped typing in room:', roomId)
-  }, [currentUser, isConnected])
+  }, [currentUser?.id, currentUser?.username, currentUser?.full_name, currentUser?.user_profile, isConnected])
 
   // Throttled typing handler for input events
   const handleTyping = useCallback((roomId: string) => {
@@ -207,7 +207,7 @@ export function useChatTyping(currentUser?: ChatUser) {
     throttleTimeoutRef.current = setTimeout(() => {
       stopTyping(roomId)
     }, TYPING_TIMEOUT)
-  }, [currentUser, startTyping, stopTyping])
+  }, [currentUser?.id, startTyping, stopTyping])
 
   // Setup typing broadcast channel
   const setupTypingChannel = useCallback(() => {
@@ -249,7 +249,7 @@ export function useChatTyping(currentUser?: ChatUser) {
       })
     
     channelRef.current = channel
-  }, [currentUser, addTypingUser, removeTypingUser])
+  }, [currentUser?.id])
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -294,7 +294,7 @@ export function useChatTyping(currentUser?: ChatUser) {
     }
     
     return cleanup
-  }, [currentUser, setupTypingChannel, cleanup])
+  }, [currentUser?.id])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -302,7 +302,7 @@ export function useChatTyping(currentUser?: ChatUser) {
       stopAllTyping()
       cleanup()
     }
-  }, [cleanup, stopAllTyping])
+  }, [])
 
   return {
     // State

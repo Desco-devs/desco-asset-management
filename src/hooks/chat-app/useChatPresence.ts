@@ -77,7 +77,7 @@ export function useChatPresence(currentUser?: ChatUser, currentRoomId?: string) 
     } catch (error) {
       console.warn('[ChatPresence] Failed to update presence:', error)
     }
-  }, [currentUser])
+  }, [currentUser?.id, currentUser?.username, currentUser?.full_name, currentUser?.user_profile])
 
   // Setup presence tracking
   const setupPresence = useCallback(() => {
@@ -145,24 +145,13 @@ export function useChatPresence(currentUser?: ChatUser, currentRoomId?: string) 
         
         if (status === 'SUBSCRIBED') {
           setIsTracking(true)
-          // Track initial presence with current room
-          await updatePresence(currentRoomId)
-          
-          // Set up heartbeat to keep presence alive
-          if (heartbeatRef.current) {
-            clearInterval(heartbeatRef.current)
-          }
-          
-          heartbeatRef.current = setInterval(async () => {
-            await updatePresence(currentRoomId)
-          }, 60000) // Update every minute to keep presence fresh
         } else {
           setIsTracking(false)
         }
       })
 
     channelRef.current = channel
-  }, [currentUser, currentRoomId, updatePresence])
+  }, [currentUser?.id])
 
   // Cleanup presence
   const cleanup = useCallback(() => {
@@ -186,7 +175,7 @@ export function useChatPresence(currentUser?: ChatUser, currentRoomId?: string) 
     if (isTracking && currentUser) {
       updatePresence(currentRoomId)
     }
-  }, [currentRoomId, isTracking, currentUser, updatePresence])
+  }, [currentRoomId, isTracking, currentUser?.id, updatePresence])
 
   // Setup/cleanup presence tracking
   useEffect(() => {
@@ -197,7 +186,7 @@ export function useChatPresence(currentUser?: ChatUser, currentRoomId?: string) 
     }
 
     return cleanup
-  }, [currentUser, setupPresence, cleanup])
+  }, [currentUser?.id])
 
   // Cleanup on unmount
   useEffect(() => {
