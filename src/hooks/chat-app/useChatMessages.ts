@@ -46,7 +46,8 @@ export function useChatMessages(currentUser?: ChatUser) {
     options: SendMessageOptions,
     optimisticId: string
   ): OptimisticMessage => {
-    const now = new Date()
+    // Use ISO string to match server format and avoid timezone issues
+    const now = new Date().toISOString()
     
     return {
       id: optimisticId,

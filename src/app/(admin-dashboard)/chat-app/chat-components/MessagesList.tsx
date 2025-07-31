@@ -13,6 +13,57 @@ import {
 } from "lucide-react";
 import { MessageWithRelations } from "@/types/chat-app";
 
+// Custom hook to handle client-side time formatting and avoid hydration issues
+const useClientTime = (timestamp: string | Date, messageId: string) => {
+  const [formattedTime, setFormattedTime] = useState<string>('');
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    
+    const formatTime = () => {
+      try {
+        // Normalize timestamp to ensure consistent parsing
+        let normalizedTimestamp = timestamp;
+        if (typeof timestamp === 'string' && !timestamp.endsWith('Z') && !timestamp.includes('+')) {
+          // If it's a string without timezone info, assume it's UTC
+          normalizedTimestamp = timestamp + 'Z';
+        }
+        
+        const date = new Date(normalizedTimestamp);
+        
+        // Validate the date
+        if (isNaN(date.getTime())) {
+          console.error('Invalid date:', timestamp);
+          return '';
+        }
+        
+        const formatted = date.toLocaleTimeString('en-PH', {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: 'Asia/Manila',
+        });
+        
+        // Clean debug logging (remove in production)
+        // console.log(`🕐 Message ${messageId.substring(0, 8)}... timestamp debug:`, {
+        //   originalTimestamp: timestamp,
+        //   normalizedTimestamp,
+        //   formattedTime: formatted
+        // });
+        
+        return formatted;
+      } catch (error) {
+        console.error('Error formatting time:', error);
+        return '';
+      }
+    };
+
+    setFormattedTime(formatTime());
+  }, [timestamp, messageId]);
+
+  return isMounted ? formattedTime : '';
+};
+
 interface MessagesListProps {
   messages: MessageWithRelations[];
   currentUserId?: string;
@@ -135,6 +186,11 @@ const MessagesList = ({
             const sender = msg.sender || { id: msg.sender_id || '', full_name: 'Unknown User', username: '', user_profile: undefined };
             const isMe = sender.id === currentUserId;
 
+            // Use the custom hook for consistent time formatting
+            const MessageTimeDisplay = () => {
+              const timeDisplay = useClientTime(msg.created_at, msg.id);
+              return <span>{timeDisplay}</span>;
+            };
 
             return (
               <div
@@ -202,11 +258,7 @@ const MessagesList = ({
                     isMe ? "justify-end" : "justify-start"
                   )}>
                     <span className="text-xs text-muted-foreground">
-                      {new Date(msg.created_at).toLocaleTimeString('en-PH', {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        timeZone: 'Asia/Manila',
-                      })}
+                      <MessageTimeDisplay />
                     </span>
                     {isMe && (
                       <CheckCheck className="w-3 h-3 text-muted-foreground" />

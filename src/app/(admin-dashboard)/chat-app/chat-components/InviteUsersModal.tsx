@@ -43,7 +43,7 @@ const InviteUsersModal = ({
   isOpen,
   onClose,
   onInviteUsers,
-  users,
+  users = [],
   currentRoom,
   currentUserId,
   isLoading = false,
@@ -58,6 +58,11 @@ const InviteUsersModal = ({
 
   // Simple filtering (no room invitations check for Phase 1)
   const getFilteredUsers = () => {
+    // Ensure users is an array
+    if (!Array.isArray(users)) {
+      return [];
+    }
+
     const roomMemberIds =
       currentRoom.members?.map((member) => member.user?.id || member.user_id) ||
       [];
@@ -84,6 +89,11 @@ const InviteUsersModal = ({
 
   // Get suggested users for username search
   const getSuggestedUsers = () => {
+    // Ensure users is an array
+    if (!Array.isArray(users)) {
+      return [];
+    }
+
     const roomMemberIds =
       currentRoom.members?.map((member) => member.user?.id || member.user_id) ||
       [];
