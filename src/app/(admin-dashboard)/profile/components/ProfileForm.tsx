@@ -1,48 +1,120 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { User } from "@/types/auth";
-import { ProfileFormData } from "@/types/profile";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Save, Camera, Upload, X, Eye, AlertCircle } from "lucide-react";
 import { color } from "@/lib/color";
 import ImagePreviewModal from "@/app/components/custom-reusable/modal/PreviewImage";
-import { useUpdateProfileWithImage } from "@/hooks/useProfileQuery";
-import { 
-  useProfileFormState, 
-  useProfileImageState,
-  useSetFieldValue,
-  useSetFieldTouched,
-  useSetSelectedFile,
-  useClearImage,
-  useMarkAsClean
-} from "@/stores/profileStore";
 import { toast } from "sonner";
+
+// Simple validation functions
+const validateUsername = (value: string): string | null => {
+  if (!value.trim()) return 'Username is required';
+  if (value.length < 3) return 'Username must be at least 3 characters';
+  if (value.length > 50) return 'Username must be less than 50 characters';
+  if (!/^[a-zA-Z0-9_-]+$/.test(value)) return 'Username can only contain letters, numbers, hyphens, and underscores';
+  return null;
+};
+
+const validateFullName = (value: string): string | null => {
+  if (!value.trim()) return 'Full name is required';
+  if (value.length < 2) return 'Full name must be at least 2 characters';
+  if (value.length > 100) return 'Full name must be less than 100 characters';
+  return null;
+};
+
+const validatePhone = (value: string): string | null => {
+  if (!value) return null; // Phone is optional
+  const cleaned = value.replace(/[^\d+]/g, '');
+  if (cleaned.startsWith('+')) {
+    if (!/^\+\d{7,15}$/.test(cleaned)) return 'Please enter a valid phone number';
+  } else {
+    if (!/^\d{7,15}$/.test(cleaned)) return 'Please enter a valid phone number';
+  }
+  return null;
+};
 
 interface ProfileFormProps {
   user: User;
 }
 
-export function ProfileForm({ }: ProfileFormProps) {
+export function ProfileForm({ user }: ProfileFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
-  // State from store
-  const { formData, errors, touched, isDirty, isValid } = useProfileFormState();
-  const { selectedFile, previewUrl, isUploading } = useProfileImageState();
+  // Simple form state
+  const [formData, setFormData] = useState({
+    username: user.username,
+    full_name: user.full_name,
+    phone: user.phone || '',
+    user_profile: user.user_profile || '',
+  });
   
-  // Actions from store
-  const setFieldValue = useSetFieldValue();
-  const setFieldTouched = useSetFieldTouched();
-  const setSelectedFile = useSetSelectedFile();
-  const clearImage = useClearImage();
-  const markAsClean = useMarkAsClean();
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   
-  // Mutation for updating profile with custom onSuccess
-  const updateProfileMutation = useUpdateProfileWithImage();
+  // Initialize form data when user changes
+  useEffect(() => {
+    setFormData({
+      username: user.username,
+      full_name: user.full_name,
+      phone: user.phone || '',
+      user_profile: user.user_profile || '',
+    });
+  }, [user]);
+  
+  // Clean up preview URL when file changes
+  useEffect(() => {
+    if (selectedFile) {
+      const url = URL.createObjectURL(selectedFile);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [selectedFile]);
+  
+  // Simple validation
+  const validateField = (field: string, value: string) => {
+    let error: string | null = null;
+    
+    switch (field) {
+      case 'username':
+        error = validateUsername(value);
+        break;
+      case 'full_name':
+        error = validateFullName(value);
+        break;
+      case 'phone':
+        error = validatePhone(value);
+        break;
+    }
+    
+    setErrors(prev => ({
+      ...prev,
+      [field]: error || undefined
+    }));
+    
+    return error;
+  };
+  
+  const isValid = Object.values(errors).every(error => !error) && 
+                  formData.username.trim() && 
+                  formData.full_name.trim();
+  
+  const hasChanges = 
+    formData.username !== user.username ||
+    formData.full_name !== user.full_name ||
+    formData.phone !== (user.phone || '') ||
+    !!selectedFile;
   
   // Generate initials from full name
   const initials = formData.full_name
@@ -56,12 +128,14 @@ export function ProfileForm({ }: ProfileFormProps) {
   // Get current image to display (preview or current profile image)
   const currentImageUrl = previewUrl || formData.user_profile || null;
 
-  const handleFieldChange = (field: keyof ProfileFormData, value: string) => {
-    setFieldValue(field, value);
+  const handleFieldChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    validateField(field, value);
   };
 
-  const handleFieldBlur = (field: keyof ProfileFormData) => {
-    setFieldTouched(field, true);
+  const handleFieldBlur = (field: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    validateField(field, formData[field as keyof typeof formData]);
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,13 +156,12 @@ export function ProfileForm({ }: ProfileFormProps) {
       return;
     }
 
-    // Set selected file and create preview
     setSelectedFile(file);
   };
 
   const handleRemoveImage = () => {
-    clearImage();
-    setFieldValue('user_profile', '');
+    setSelectedFile(null);
+    setFormData(prev => ({ ...prev, user_profile: '' }));
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -96,6 +169,47 @@ export function ProfileForm({ }: ProfileFormProps) {
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
+  };
+
+  // Simple API call for updating profile
+  const updateProfile = async (profileData: any, imageFile?: File) => {
+    let imageUrl = profileData.user_profile;
+    
+    // Upload image first if provided
+    if (imageFile) {
+      const formData = new FormData();
+      formData.append('file', imageFile);
+      
+      const uploadResponse = await fetch('/api/upload/profile-image', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.json();
+        throw new Error(error.error || 'Failed to upload image');
+      }
+      
+      const uploadResult = await uploadResponse.json();
+      imageUrl = uploadResult.url;
+    }
+    
+    // Then update profile
+    const response = await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...profileData,
+        user_profile: imageUrl,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update profile');
+    }
+    
+    return response.json();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,6 +220,8 @@ export function ProfileForm({ }: ProfileFormProps) {
       return;
     }
 
+    setIsLoading(true);
+    
     try {
       const profileData = {
         username: formData.username,
@@ -114,195 +230,183 @@ export function ProfileForm({ }: ProfileFormProps) {
         user_profile: formData.user_profile || null,
       };
 
-      await updateProfileMutation.mutateAsync({
-        profileData,
-        imageFile: selectedFile || undefined,
-      });
+      await updateProfile(profileData, selectedFile || undefined);
       
-      // Clear selected file and mark form as clean after successful update
-      if (selectedFile) {
-        setSelectedFile(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
+      // Clear selected file after successful update
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
       
-      // Mark form as clean so user can make new changes
-      markAsClean();
+      toast.success('Profile updated successfully!');
       
-    } catch (error) {
-      // Error handling is done in the mutation
+      // Refresh the page to get updated data
+      window.location.reload();
+      
+    } catch (error: any) {
       console.error("Profile update error:", error);
+      toast.error(`Failed to update profile: ${error.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const isLoading = updateProfileMutation.isPending || isUploading;
-  const hasChanges = isDirty || !!selectedFile;
-
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Profile Avatar */}
-        <div className="flex items-center gap-4">
-          <div className="relative group">
-            <div 
-              className={`relative ${currentImageUrl ? 'cursor-pointer' : ''}`}
-              onClick={() => currentImageUrl && setShowImagePreview(true)}
-            >
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={currentImageUrl || undefined} alt={formData.full_name} />
-                <AvatarFallback className={`${color} text-lg`}>{initials}</AvatarFallback>
-              </Avatar>
-              {currentImageUrl && (
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-full">
-                  <Eye className="h-5 w-5 text-white" />
-                </div>
-              )}
-            </div>
-            {currentImageUrl && (
+      <div className="space-y-6">
+        {/* Profile Header - Clean and simple */}
+        <div className="text-center space-y-3">
+          <div 
+            className={`relative inline-block ${currentImageUrl ? 'cursor-pointer' : ''}`}
+            onClick={() => currentImageUrl && setShowImagePreview(true)}
+          >
+            <Avatar className="h-24 w-24 border-2 border-background shadow-md">
+              <AvatarImage src={currentImageUrl || undefined} alt={formData.full_name} />
+              <AvatarFallback className={`${color} text-2xl font-semibold`}>{initials}</AvatarFallback>
+            </Avatar>
+            {currentImageUrl && !selectedFile && (
               <Button
                 type="button"
                 variant="destructive"
                 size="icon"
-                className="absolute -top-2 -right-2 h-6 w-6 rounded-full z-10"
-                onClick={handleRemoveImage}
+                className="absolute -top-1 -right-1 h-6 w-6 rounded-full shadow-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveImage();
+                }}
                 disabled={isLoading}
               >
                 <X className="h-3 w-3" />
               </Button>
             )}
-          </div>
-          <div className="flex-1">
-            <Label>Profile Image</Label>
-            <div className="flex gap-2 mt-1">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={triggerFileInput}
-                disabled={isLoading}
-                className="flex-1"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                {selectedFile ? "Change Image" : "Select Image"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={triggerFileInput}
-                disabled={isLoading}
-              >
-                <Camera className="h-4 w-4" />
-              </Button>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/jpg,image/png,image/webp"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              {selectedFile 
-                ? `Selected: ${selectedFile.name} - Click 'Save Changes' to upload`
-                : "Select JPEG, PNG, or WebP images up to 5MB"
-              }
-            </p>
-          </div>
-        </div>
-
-        {/* Username */}
-        <div className="space-y-2">
-          <Label htmlFor="username" className="flex items-center gap-1">
-            Username
-            <span className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="username"
-            value={formData.username}
-            onChange={(e) => handleFieldChange("username", e.target.value)}
-            onBlur={() => handleFieldBlur("username")}
-            placeholder="Enter your username"
-            className={errors.username && touched.username ? "border-destructive" : ""}
-            disabled={isLoading}
-          />
-          {errors.username && touched.username && (
-            <div className="flex items-center gap-1 text-sm text-destructive">
-              <AlertCircle className="h-3 w-3" />
-              <span>{errors.username}</span>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">
-            This is your unique identifier. It must be unique across all users.
-          </p>
-        </div>
-
-        {/* Full Name */}
-        <div className="space-y-2">
-          <Label htmlFor="full_name" className="flex items-center gap-1">
-            Full Name
-            <span className="text-destructive">*</span>
-          </Label>
-          <Input
-            id="full_name"
-            value={formData.full_name}
-            onChange={(e) => handleFieldChange("full_name", e.target.value)}
-            onBlur={() => handleFieldBlur("full_name")}
-            placeholder="Enter your full name"
-            className={errors.full_name && touched.full_name ? "border-destructive" : ""}
-            disabled={isLoading}
-          />
-          {errors.full_name && touched.full_name && (
-            <div className="flex items-center gap-1 text-sm text-destructive">
-              <AlertCircle className="h-3 w-3" />
-              <span>{errors.full_name}</span>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Your display name as it appears throughout the application.
-          </p>
-        </div>
-
-        {/* Phone */}
-        <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
-          <Input
-            id="phone"
-            type="tel"
-            value={formData.phone}
-            onChange={(e) => handleFieldChange("phone", e.target.value)}
-            onBlur={() => handleFieldBlur("phone")}
-            placeholder="Enter your phone number"
-            className={errors.phone && touched.phone ? "border-destructive" : ""}
-            disabled={isLoading}
-          />
-          {errors.phone && touched.phone && (
-            <div className="flex items-center gap-1 text-sm text-destructive">
-              <AlertCircle className="h-3 w-3" />
-              <span>{errors.phone}</span>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Optional. Used for contact and notifications.
-          </p>
-        </div>
-
-        {/* Form Actions */}
-        <div className="flex items-center justify-between pt-6 border-t">
-          <div className="text-sm text-muted-foreground">
-            {hasChanges && (
-              <span className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-orange-500 rounded-full" />
-                Unsaved changes
-              </span>
+            {currentImageUrl && (
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/20 rounded-full">
+                <Eye className="h-4 w-4 text-white" />
+              </div>
             )}
           </div>
           
-          <div className="flex gap-3">
+          <div className="space-y-1">
+            <h2 className="text-xl font-semibold">{formData.full_name || 'Your Name'}</h2>
+            <p className="text-sm text-muted-foreground">@{formData.username}</p>
+            <div className="flex items-center justify-center gap-2">
+              <Badge variant={user.role === 'SUPERADMIN' ? 'default' : user.role === 'ADMIN' ? 'secondary' : 'outline'} className="text-xs">
+                {user.role}
+              </Badge>
+              <Badge variant={user.user_status === 'ACTIVE' ? 'default' : 'destructive'} className="text-xs">
+                {user.user_status}
+              </Badge>
+            </div>
+          </div>
+          
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={triggerFileInput}
+            disabled={isLoading}
+            className="text-xs"
+          >
+            <Camera className="mr-2 h-3 w-3" />
+            {selectedFile ? "Change Photo" : "Update Photo"}
+          </Button>
+          
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          
+          {selectedFile && (
+            <p className="text-xs text-muted-foreground">
+              {selectedFile.name} selected
+            </p>
+          )}
+        </div>
+
+        {/* Form Fields - Simplified */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Username */}
+          <div className="space-y-1.5">
+            <Label htmlFor="username" className="text-sm font-medium">
+              Username <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="username"
+              value={formData.username}
+              onChange={(e) => handleFieldChange("username", e.target.value)}
+              onBlur={() => handleFieldBlur("username")}
+              placeholder="Enter username"
+              className={`h-11 ${errors.username && touched.username ? "border-destructive" : ""}`}
+              disabled={isLoading}
+            />
+            {errors.username && touched.username && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                {errors.username}
+              </p>
+            )}
+          </div>
+
+          {/* Full Name */}
+          <div className="space-y-1.5">
+            <Label htmlFor="full_name" className="text-sm font-medium">
+              Full Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="full_name"
+              value={formData.full_name}
+              onChange={(e) => handleFieldChange("full_name", e.target.value)}
+              onBlur={() => handleFieldBlur("full_name")}
+              placeholder="Enter full name"
+              className={`h-11 ${errors.full_name && touched.full_name ? "border-destructive" : ""}`}
+              disabled={isLoading}
+            />
+            {errors.full_name && touched.full_name && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                {errors.full_name}
+              </p>
+            )}
+          </div>
+
+          {/* Phone */}
+          <div className="space-y-1.5">
+            <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              value={formData.phone}
+              onChange={(e) => handleFieldChange("phone", e.target.value)}
+              onBlur={() => handleFieldBlur("phone")}
+              placeholder="Enter phone number"
+              className={`h-11 ${errors.phone && touched.phone ? "border-destructive" : ""}`}
+              disabled={isLoading}
+            />
+            {errors.phone && touched.phone && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                {errors.phone}
+              </p>
+            )}
+          </div>
+
+          {/* Submit Button */}
+          <div className="pt-4 space-y-3">
+            {hasChanges && (
+              <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1">
+                <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
+                You have unsaved changes
+              </p>
+            )}
+            
             <Button 
               type="submit" 
               disabled={!hasChanges || !isValid || isLoading}
-              className="min-w-[120px]"
+              className="w-full h-11 font-medium"
+              size="lg"
             >
               {isLoading ? (
                 <>
@@ -317,8 +421,8 @@ export function ProfileForm({ }: ProfileFormProps) {
               )}
             </Button>
           </div>
-        </div>
-      </form>
+        </form>
+      </div>
 
       {/* Image Preview Modal */}
       {currentImageUrl && (
