@@ -16,6 +16,7 @@ import { MessageWithRelations } from "@/types/chat-app";
 interface MessagesListProps {
   messages: MessageWithRelations[];
   currentUserId?: string;
+  currentUser?: any;
   roomId?: string;
   onLoadMore?: () => void;
   isLoading?: boolean;
@@ -26,6 +27,7 @@ interface MessagesListProps {
 const MessagesList = ({
   messages,
   currentUserId,
+  currentUser,
   roomId,
   onLoadMore,
   isLoading,
@@ -102,7 +104,7 @@ const MessagesList = ({
         ref={scrollAreaRef}
         onScrollCapture={handleScroll}
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Load More Button for older messages */}
           {hasMoreMessages && (
             <div className="flex justify-center py-4">
@@ -133,54 +135,81 @@ const MessagesList = ({
             const sender = msg.sender || { id: msg.sender_id || '', full_name: 'Unknown User', username: '', user_profile: undefined };
             const isMe = sender.id === currentUserId;
 
+
             return (
               <div
                 key={msg.id}
                 className={cn(
-                  "flex items-end space-x-3 w-full sm:px-4",
-                  isMe && "flex-row-reverse space-x-reverse"
+                  "flex items-start gap-3 w-full px-2 sm:px-4 py-1",
+                  isMe && "flex-row-reverse"
                 )}
               >
-                {!isMe && (
-                  <Avatar className="h-8 w-8 mt-1">
-                    <AvatarFallback className="text-xs bg-muted">
-                      {sender.full_name.substring(0, 2).toUpperCase()}
+                {/* Avatar - always visible with consistent positioning */}
+                <div className="flex-shrink-0 mt-1">
+                  <Avatar className={cn(
+                    "h-8 w-8 ring-2 ring-background shadow-sm",
+                    isMe && "ring-primary/20"
+                  )}>
+                    <AvatarImage 
+                      src={isMe 
+                        ? currentUser?.user_profile || ""
+                        : sender.user_profile || ""
+                      } 
+                    />
+                    <AvatarFallback className={cn(
+                      "text-xs font-medium",
+                      isMe 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-muted text-muted-foreground"
+                    )}>
+                      {(isMe ? currentUser?.full_name || sender.full_name : sender.full_name)
+                        .substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                )}
+                </div>
 
+                {/* Message content with improved spacing */}
                 <div
                   className={cn(
-                    "flex flex-col space-y-1 max-w-[75%]  sm:max-w-xs lg:max-w-md",
+                    "flex flex-col gap-1 max-w-[70%] sm:max-w-sm lg:max-w-md min-w-0",
                     isMe && "items-end"
                   )}
                 >
+                  {/* Sender name for others (positioned above message) */}
+                  {!isMe && (
+                    <div className="px-2">
+                      <p className="text-xs font-medium text-muted-foreground capitalize">
+                        {sender.full_name}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Message bubble with improved styling */}
                   <div
                     className={cn(
-                      "rounded-lg px-4 py-2 text-sm relative break-words",
+                      "rounded-2xl px-4 py-2.5 text-sm break-words shadow-sm",
                       isMe
-                        ? "bg-chart-2 text-primary-foreground rounded-tr-2xl rounded-l-2xl rounded-br-none dark:text-accent-foreground"
-                        : "bg-chart-2/10 dark:bg-muted text-accent-foreground rounded-tl-2xl rounded-r-2xl rounded-bl-none"
+                        ? "bg-primary text-primary-foreground rounded-tr-md"
+                        : "bg-muted text-foreground rounded-tl-md"
                     )}
                   >
-                    <p>{msg.content}</p>
+                    <p className="leading-relaxed">{msg.content}</p>
                   </div>
-                  <div className="flex items-center space-x-2 px-1">
-                    <div className="text-xs text-muted-foreground flex gap-1 flex-row-reverse items-center">
-                      <span>
-                        {new Date(msg.created_at).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                      {!isMe && (
-                        <p className="capitalize">{sender.full_name}</p>
-                      )}
-                    </div>
+
+                  {/* Message metadata */}
+                  <div className={cn(
+                    "flex items-center gap-2 px-2",
+                    isMe ? "justify-end" : "justify-start"
+                  )}>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(msg.created_at).toLocaleTimeString('en-PH', {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        timeZone: 'Asia/Manila',
+                      })}
+                    </span>
                     {isMe && (
-                      <span className="text-xs text-muted-foreground">
-                        <CheckCheck className="w-4 h-4" />
-                      </span>
+                      <CheckCheck className="w-3 h-3 text-muted-foreground" />
                     )}
                   </div>
                 </div>

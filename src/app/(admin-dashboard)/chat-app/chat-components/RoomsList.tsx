@@ -137,9 +137,10 @@ const RoomsList = ({
                             {room.lastMessage?.created_at
                               ? new Date(
                                   room.lastMessage.created_at
-                                ).toLocaleTimeString([], {
+                                ).toLocaleTimeString('en-PH', {
                                   hour: "2-digit",
                                   minute: "2-digit",
+                                  timeZone: 'Asia/Manila',
                                 })
                               : ""}
                           </span>

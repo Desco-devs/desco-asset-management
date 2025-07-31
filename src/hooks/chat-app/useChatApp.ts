@@ -84,7 +84,7 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
     enabled: !!selectedRoom,
   });
 
-  // Create room mutation - using existing Phase 1 infrastructure
+  // Create room mutation with optimistic updates
   const createRoomMutation = useMutation({
     mutationFn: async (roomData: any) => {
       const response = await fetch("/api/rooms/create", {
@@ -98,7 +98,65 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
       }
       return response.json();
     },
-    onSuccess: () => {
+    onMutate: async (roomData) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ROOMS_QUERY_KEYS.rooms(userId || "") });
+
+      // Snapshot the previous value
+      const previousRooms = queryClient.getQueryData(ROOMS_QUERY_KEYS.rooms(userId || ""));
+
+      // Create optimistic room
+      const optimisticRoom: RoomListItem = {
+        id: `temp-${Date.now()}`, // Temporary ID
+        name: roomData.name,
+        description: roomData.description || '',
+        type: roomData.type,
+        owner_id: userId || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        room_members: [{
+          id: `temp-member-${Date.now()}`,
+          room_id: `temp-${Date.now()}`,
+          user_id: userId || '',
+          role: 'OWNER',
+          joined_at: new Date().toISOString(),
+          user: currentUser
+        }],
+        last_message: null,
+        unread_count: 0,
+        _count: { room_members: 1 }
+      };
+
+      // Optimistically update the cache
+      queryClient.setQueryData(ROOMS_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => [
+        optimisticRoom,
+        ...old
+      ]);
+
+      // Return context with previous value
+      return { previousRooms, optimisticRoom };
+    },
+    onError: (err, roomData, context) => {
+      // Rollback on error
+      if (context?.previousRooms) {
+        queryClient.setQueryData(ROOMS_QUERY_KEYS.rooms(userId || ""), context.previousRooms);
+      }
+    },
+    onSuccess: (data, variables, context) => {
+      // Replace optimistic room with real room
+      queryClient.setQueryData(ROOMS_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => {
+        return old.map(room => 
+          room.id === context?.optimisticRoom?.id ? data.room : room
+        );
+      });
+      
+      // Auto-select the newly created room
+      if (data.room?.id) {
+        setSelectedRoom(data.room.id);
+      }
+    },
+    onSettled: () => {
+      // Always refetch after mutation settles
       queryClient.invalidateQueries({ queryKey: ROOMS_QUERY_KEYS.rooms(userId || "") });
     },
     // Prevent multiple concurrent executions

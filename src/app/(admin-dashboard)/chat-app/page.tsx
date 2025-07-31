@@ -179,6 +179,7 @@ const ChatApp = () => {
                 <MessagesList
                   messages={messages}
                   currentUserId={currentUserId}
+                  currentUser={user}
                   roomId={selectedRoom || undefined}
                   isLoading={isLoadingMessages}
                   hasMoreMessages={hasMoreMessages}
