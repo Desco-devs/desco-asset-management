@@ -4,6 +4,48 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { prisma } from "@/lib/prisma";
 
+// Helper to extract storage path from a Supabase URL
+const extractFilePathFromUrl = (fileUrl: string): string | null => {
+  try {
+    const url = new URL(fileUrl);
+    const parts = url.pathname.split("/").filter(Boolean);
+    const idx = parts.findIndex((p) => p === "vehicles");
+    if (idx !== -1 && idx < parts.length - 1) {
+      return parts.slice(idx + 1).join("/");
+    }
+    return null;
+  } catch (err) {
+    return null;
+  }
+};
+
+// Delete a file from Supabase storage with improved error handling
+const deleteFileFromSupabase = async (
+  fileUrl: string,
+  tag: string
+): Promise<void> => {
+  if (!fileUrl || typeof fileUrl !== 'string' || fileUrl.trim() === '') {
+    throw new Error(`Invalid file URL provided for ${tag}`);
+  }
+  
+  const supabase = await createServerSupabaseClient();
+  const path = extractFilePathFromUrl(fileUrl);
+  
+  if (!path) { 
+    throw new Error(`Cannot parse storage path from URL for ${tag}: ${fileUrl}`);
+  }
+  
+  if (path.endsWith('/') || !path.includes('.')) {
+    throw new Error(`Invalid file path detected for ${tag} - appears to be a directory: ${path}`);
+  }
+  
+  const { error } = await supabase.storage.from("vehicles").remove([path]);
+  
+  if (error) {
+    throw new Error(`Failed to delete file from storage for ${tag}: ${error.message} (Path: ${path})`);
+  }
+};
+
 // Helper to upload files to Supabase with organized folder structure (following equipment pattern)
 const uploadFileToSupabase = async (
   file: File,
@@ -986,8 +1028,20 @@ export async function updateVehicleAction(formData: FormData) {
           // Continue with other files, don't fail the entire update
         }
       } else if (shouldRemove) {
-        // Mark field for removal (set to null)
+        // Delete existing file from storage and mark field for removal
         const fieldName = getFieldName(prefix);
+        const existingUrl = existingVehicle[fieldName as keyof typeof existingVehicle] as string;
+        
+        if (existingUrl && existingUrl.trim()) {
+          try {
+            await deleteFileFromSupabase(existingUrl, `${fieldName} (${prefix})`);
+            console.log(`✅ Successfully deleted file from storage: ${fieldName}`);
+          } catch (deleteError) {
+            console.error(`❌ Failed to delete ${fieldName} from storage:`, deleteError);
+            // Continue with update even if storage deletion fails
+          }
+        }
+        
         fileUploads[fieldName] = null;
       }
     }

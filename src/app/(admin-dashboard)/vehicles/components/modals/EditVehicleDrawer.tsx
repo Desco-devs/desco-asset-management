@@ -405,6 +405,22 @@ function EditVehicleDrawer() {
 
       // Always add parts structure (even if empty) to ensure deletions are processed
       formDataObj.append("partsStructure", JSON.stringify(partsStructure || { rootFiles: [], folders: [] }));
+      
+      // Add all parts files to formData with folder information (matching CreateVehicleForm pattern)
+      if (partsStructure) {
+        partsStructure.rootFiles.forEach((partFile, index) => {
+          formDataObj.append(`partsFile_root_${index}`, partFile.file);
+          formDataObj.append(`partsFile_root_${index}_name`, partFile.name);
+        });
+
+        partsStructure.folders.forEach((folder, folderIndex) => {
+          folder.files.forEach((partFile, fileIndex) => {
+            formDataObj.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
+            formDataObj.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
+            formDataObj.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
+          });
+        });
+      }
 
       console.log('📝 Submitting vehicle update with FormData');
       

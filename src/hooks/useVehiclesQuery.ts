@@ -79,7 +79,7 @@ async function updateVehicle({ id, ...vehicleData }: Partial<Vehicle> & { id: st
 }
 
 async function deleteVehicle(id: string): Promise<void> {
-  const response = await fetch(`/api/vehicles/${id}`, {
+  const response = await fetch(`/api/vehicles?vehicleId=${id}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
