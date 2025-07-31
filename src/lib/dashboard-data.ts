@@ -16,10 +16,10 @@ export async function fetchDashboardData(timeRange: string = 'month') {
   try {
     // Priority 1: Essential counts only (fast queries)
     const countsPromise = Promise.all([
-      fetchEquipmentCounts().catch(err => { return []; }),
-      fetchVehicleCounts().catch(err => { return []; }),
-      fetchLocationsTotalCount().catch(err => { return 0; }),
-      fetchClientsTotalCount().catch(err => { return 0; }),
+      fetchEquipmentCounts().catch(err => { console.warn('Equipment counts failed:', err); return []; }),
+      fetchVehicleCounts().catch(err => { console.warn('Vehicle counts failed:', err); return []; }),
+      fetchLocationsTotalCount().catch(err => { console.warn('Locations count failed:', err); return 0; }),
+      fetchClientsTotalCount().catch(err => { console.warn('Clients count failed:', err); return 0; }),
       fetchProjectsTotalCount().catch(err => { console.warn('Projects count failed:', err); return 0; }),
       fetchMaintenanceReportsTotalCount().catch(err => { console.warn('Maintenance count failed:', err); return 0; }),
       fetchMaintenanceReportsStatusCounts().catch(err => { console.warn('Maintenance status counts failed:', err); return []; }),
@@ -35,7 +35,7 @@ export async function fetchDashboardData(timeRange: string = 'month') {
       maintenanceReportsStatusCounts,
     ] = await Promise.race([
       countsPromise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Counts timeout')), 5000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Counts timeout')), 15000))
     ]) as any;
 
 
@@ -58,7 +58,7 @@ export async function fetchDashboardData(timeRange: string = 'month') {
       maintenanceReportsData,
     ] = await Promise.race([
       listsPromise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Lists timeout')), 8000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Lists timeout')), 20000))
     ]) as any;
 
 
@@ -90,20 +90,30 @@ export async function fetchDashboardData(timeRange: string = 'month') {
  * Fetch equipment status counts
  */
 async function fetchEquipmentCounts() {
-  return prisma.equipment.groupBy({
-    by: ["status"],
-    _count: { status: true },
-  });
+  try {
+    return await prisma.equipment.groupBy({
+      by: ["status"],
+      _count: { status: true },
+    });
+  } catch (error) {
+    console.error('Equipment counts query failed:', error);
+    return [];
+  }
 }
 
 /**
  * Fetch vehicle status counts
  */
 async function fetchVehicleCounts() {
-  return prisma.vehicle.groupBy({
-    by: ["status"],
-    _count: { status: true },
-  });
+  try {
+    return await prisma.vehicle.groupBy({
+      by: ["status"],
+      _count: { status: true },
+    });
+  } catch (error) {
+    console.error('Vehicle counts query failed:', error);
+    return [];
+  }
 }
 
 /**
@@ -344,43 +354,68 @@ async function fetchMaintenanceReportsSimple(): Promise<MaintenanceReportData[]>
  * Fetch total count of locations
  */
 async function fetchLocationsTotalCount(): Promise<number> {
-  return prisma.location.count();
+  try {
+    return await prisma.location.count();
+  } catch (error) {
+    console.error('Locations count query failed:', error);
+    return 0;
+  }
 }
 
 /**
  * Fetch total count of clients
  */
 async function fetchClientsTotalCount(): Promise<number> {
-  return prisma.client.count();
+  try {
+    return await prisma.client.count();
+  } catch (error) {
+    console.error('Clients count query failed:', error);
+    return 0;
+  }
 }
 
 /**
  * Fetch total count of projects
  */
 async function fetchProjectsTotalCount(): Promise<number> {
-  return prisma.project.count();
+  try {
+    return await prisma.project.count();
+  } catch (error) {
+    console.error('Projects count query failed:', error);
+    return 0;
+  }
 }
 
 /**
  * Fetch total count of maintenance reports
  */
 async function fetchMaintenanceReportsTotalCount(): Promise<number> {
-  return prisma.maintenance_equipment_report.count();
+  try {
+    return await prisma.maintenance_equipment_report.count();
+  } catch (error) {
+    console.error('Maintenance reports count query failed:', error);
+    return 0;
+  }
 }
 
 /**
  * Fetch maintenance reports status counts
  */
 export async function fetchMaintenanceReportsStatusCounts() {
-  return prisma.maintenance_equipment_report.groupBy({
-    by: ["status"],
-    _count: { status: true },
-    where: {
-      status: {
-        not: null,
+  try {
+    return await prisma.maintenance_equipment_report.groupBy({
+      by: ["status"],
+      _count: { status: true },
+      where: {
+        status: {
+          not: null,
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    console.error('Maintenance reports status counts query failed:', error);
+    return [];
+  }
 }
 
 /**
