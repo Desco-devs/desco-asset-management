@@ -31,10 +31,11 @@ const validateFullName = (value: string): string | null => {
 const validatePhone = (value: string): string | null => {
   if (!value) return null; // Phone is optional
   const cleaned = value.replace(/[^\d+]/g, '');
+  if (cleaned.length === 0) return null; // Empty after cleaning is ok
   if (cleaned.startsWith('+')) {
-    if (!/^\+\d{7,15}$/.test(cleaned)) return 'Please enter a valid phone number';
+    if (!/^\+\d{7,15}$/.test(cleaned)) return 'Phone must be + followed by 7-15 digits';
   } else {
-    if (!/^\d{7,15}$/.test(cleaned)) return 'Please enter a valid phone number';
+    if (!/^\d{7,15}$/.test(cleaned)) return 'Phone must be 7-15 digits only';
   }
   return null;
 };
@@ -142,6 +143,14 @@ export function ProfileForm({ user }: ProfileFormProps) {
   const handleFieldChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     validateField(field, value);
+  };
+
+  // Special handler for phone input to filter out non-numeric characters
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Allow only digits, plus sign, spaces, hyphens, and parentheses for formatting
+    const filtered = value.replace(/[^\d+\s\-()]/g, '');
+    handleFieldChange('phone', filtered);
   };
 
   const handleFieldBlur = (field: string) => {
@@ -473,9 +482,9 @@ export function ProfileForm({ user }: ProfileFormProps) {
                 id="phone"
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => handleFieldChange("phone", e.target.value)}
+                onChange={handlePhoneChange}
                 onBlur={() => handleFieldBlur("phone")}
-                placeholder="Enter phone number"
+                placeholder="Enter phone number (digits only)"
                 className={`h-11 ${errors.phone && touched.phone ? "border-destructive" : ""}`}
                 disabled={isLoading}
               />
@@ -491,10 +500,10 @@ export function ProfileForm({ user }: ProfileFormProps) {
             {/* Action Buttons */}
             <div className="pt-4 space-y-3">
               {hasChanges && (
-                <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1">
+                <div className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1">
                   <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                   You have unsaved changes
-                </p>
+                </div>
               )}
               
               <div className="flex flex-col sm:flex-row gap-2">
