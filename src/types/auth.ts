@@ -16,6 +16,7 @@ export interface User {
   user_status: UserStatus
   created_at: string
   updated_at: string
+  email?: string // Email from Supabase auth
   auth_user?: SupabaseUser
 }
 

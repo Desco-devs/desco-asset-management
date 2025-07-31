@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Loader2, Save, Camera, Upload, X, Eye, AlertCircle } from "lucide-react";
+import { Loader2, Save, Camera, Upload, X, Eye, AlertCircle, Edit, XIcon } from "lucide-react";
 import { color } from "@/lib/color";
 import ImagePreviewModal from "@/app/components/custom-reusable/modal/PreviewImage";
 import { toast } from "sonner";
@@ -47,9 +47,18 @@ export function ProfileForm({ user }: ProfileFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   
   // Simple form state
   const [formData, setFormData] = useState({
+    username: user.username,
+    full_name: user.full_name,
+    phone: user.phone || '',
+    user_profile: user.user_profile || '',
+  });
+  
+  // Store original data for cancel functionality
+  const [originalData, setOriginalData] = useState({
     username: user.username,
     full_name: user.full_name,
     phone: user.phone || '',
@@ -63,12 +72,14 @@ export function ProfileForm({ user }: ProfileFormProps) {
   
   // Initialize form data when user changes
   useEffect(() => {
-    setFormData({
+    const newData = {
       username: user.username,
       full_name: user.full_name,
       phone: user.phone || '',
       user_profile: user.user_profile || '',
-    });
+    };
+    setFormData(newData);
+    setOriginalData(newData);
   }, [user]);
   
   // Clean up preview URL when file changes
@@ -111,9 +122,9 @@ export function ProfileForm({ user }: ProfileFormProps) {
                   formData.full_name.trim();
   
   const hasChanges = 
-    formData.username !== user.username ||
-    formData.full_name !== user.full_name ||
-    formData.phone !== (user.phone || '') ||
+    formData.username !== originalData.username ||
+    formData.full_name !== originalData.full_name ||
+    formData.phone !== originalData.phone ||
     !!selectedFile;
   
   // Generate initials from full name
@@ -169,6 +180,25 @@ export function ProfileForm({ user }: ProfileFormProps) {
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleEditClick = () => {
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    // Reset form data to original values
+    setFormData(originalData);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setErrors({});
+    setTouched({});
+    setIsEditing(false);
+    
+    // Clear file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   // Simple API call for updating profile
@@ -232,11 +262,17 @@ export function ProfileForm({ user }: ProfileFormProps) {
 
       await updateProfile(profileData, selectedFile || undefined);
       
+      // Update original data with new values
+      setOriginalData(formData);
+      
       // Clear selected file after successful update
       setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+      
+      // Exit edit mode
+      setIsEditing(false);
       
       toast.success('Profile updated successfully!');
       
@@ -254,7 +290,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
   return (
     <>
       <div className="space-y-6">
-        {/* Profile Header - Clean and simple */}
+        {/* Profile Header */}
         <div className="text-center space-y-3">
           <div 
             className={`relative inline-block ${currentImageUrl ? 'cursor-pointer' : ''}`}
@@ -264,7 +300,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
               <AvatarImage src={currentImageUrl || undefined} alt={formData.full_name} />
               <AvatarFallback className={`${color} text-2xl font-semibold`}>{initials}</AvatarFallback>
             </Avatar>
-            {currentImageUrl && !selectedFile && (
+            {isEditing && currentImageUrl && !selectedFile && (
               <Button
                 type="button"
                 variant="destructive"
@@ -299,129 +335,203 @@ export function ProfileForm({ user }: ProfileFormProps) {
             </div>
           </div>
           
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={triggerFileInput}
-            disabled={isLoading}
-            className="text-xs"
-          >
-            <Camera className="mr-2 h-3 w-3" />
-            {selectedFile ? "Change Photo" : "Update Photo"}
-          </Button>
-          
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-          
-          {selectedFile && (
-            <p className="text-xs text-muted-foreground">
-              {selectedFile.name} selected
-            </p>
+          {/* Photo controls - only show in edit mode */}
+          {isEditing && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={triggerFileInput}
+                disabled={isLoading}
+                className="text-xs"
+              >
+                <Camera className="mr-2 h-3 w-3" />
+                {selectedFile ? "Change Photo" : "Update Photo"}
+              </Button>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              
+              {selectedFile && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedFile.name} selected
+                </p>
+              )}
+            </>
           )}
         </div>
 
-        {/* Form Fields - Simplified */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Username */}
-          <div className="space-y-1.5">
-            <Label htmlFor="username" className="text-sm font-medium">
-              Username <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="username"
-              value={formData.username}
-              onChange={(e) => handleFieldChange("username", e.target.value)}
-              onBlur={() => handleFieldBlur("username")}
-              placeholder="Enter username"
-              className={`h-11 ${errors.username && touched.username ? "border-destructive" : ""}`}
-              disabled={isLoading}
-            />
-            {errors.username && touched.username && (
-              <p className="text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {errors.username}
-              </p>
-            )}
-          </div>
+        {!isEditing ? (
+          /* VIEW MODE */
+          <div className="space-y-6">
+            {/* Profile Information Display */}
+            <div className="space-y-4">
+              <div className="grid gap-4">
+                {/* Username */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Username</Label>
+                  <div className="h-11 px-3 py-2 border border-input bg-muted/30 rounded-md flex items-center">
+                    <span className="text-sm">{formData.username}</span>
+                  </div>
+                </div>
 
-          {/* Full Name */}
-          <div className="space-y-1.5">
-            <Label htmlFor="full_name" className="text-sm font-medium">
-              Full Name <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="full_name"
-              value={formData.full_name}
-              onChange={(e) => handleFieldChange("full_name", e.target.value)}
-              onBlur={() => handleFieldBlur("full_name")}
-              placeholder="Enter full name"
-              className={`h-11 ${errors.full_name && touched.full_name ? "border-destructive" : ""}`}
-              disabled={isLoading}
-            />
-            {errors.full_name && touched.full_name && (
-              <p className="text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {errors.full_name}
-              </p>
-            )}
-          </div>
+                {/* Full Name */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Full Name</Label>
+                  <div className="h-11 px-3 py-2 border border-input bg-muted/30 rounded-md flex items-center">
+                    <span className="text-sm">{formData.full_name}</span>
+                  </div>
+                </div>
 
-          {/* Phone */}
-          <div className="space-y-1.5">
-            <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => handleFieldChange("phone", e.target.value)}
-              onBlur={() => handleFieldBlur("phone")}
-              placeholder="Enter phone number"
-              className={`h-11 ${errors.phone && touched.phone ? "border-destructive" : ""}`}
-              disabled={isLoading}
-            />
-            {errors.phone && touched.phone && (
-              <p className="text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {errors.phone}
-              </p>
-            )}
-          </div>
+                {/* Phone */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Phone Number</Label>
+                  <div className="h-11 px-3 py-2 border border-input bg-muted/30 rounded-md flex items-center">
+                    <span className="text-sm">{formData.phone || 'Not provided'}</span>
+                  </div>
+                </div>
 
-          {/* Submit Button */}
-          <div className="pt-4 space-y-3">
-            {hasChanges && (
-              <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1">
-                <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
-                You have unsaved changes
-              </p>
-            )}
-            
-            <Button 
-              type="submit" 
-              disabled={!hasChanges || !isValid || isLoading}
-              className="w-full h-11 font-medium"
-              size="lg"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
+                {/* Email (readonly) */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                  <div className="h-11 px-3 py-2 border border-input bg-muted/30 rounded-md flex items-center">
+                    <span className="text-sm">{user.email || 'Not provided'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Edit Button */}
+            <div className="pt-4">
+              <Button 
+                onClick={handleEditClick}
+                className="w-full h-11 font-medium"
+                size="lg"
+              >
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Profile
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* EDIT MODE */
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Username */}
+            <div className="space-y-1.5">
+              <Label htmlFor="username" className="text-sm font-medium">
+                Username <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="username"
+                value={formData.username}
+                onChange={(e) => handleFieldChange("username", e.target.value)}
+                onBlur={() => handleFieldBlur("username")}
+                placeholder="Enter username"
+                className={`h-11 ${errors.username && touched.username ? "border-destructive" : ""}`}
+                disabled={isLoading}
+              />
+              {errors.username && touched.username && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.username}
+                </p>
               )}
-            </Button>
-          </div>
-        </form>
+            </div>
+
+            {/* Full Name */}
+            <div className="space-y-1.5">
+              <Label htmlFor="full_name" className="text-sm font-medium">
+                Full Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="full_name"
+                value={formData.full_name}
+                onChange={(e) => handleFieldChange("full_name", e.target.value)}
+                onBlur={() => handleFieldBlur("full_name")}
+                placeholder="Enter full name"
+                className={`h-11 ${errors.full_name && touched.full_name ? "border-destructive" : ""}`}
+                disabled={isLoading}
+              />
+              {errors.full_name && touched.full_name && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.full_name}
+                </p>
+              )}
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-1.5">
+              <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleFieldChange("phone", e.target.value)}
+                onBlur={() => handleFieldBlur("phone")}
+                placeholder="Enter phone number"
+                className={`h-11 ${errors.phone && touched.phone ? "border-destructive" : ""}`}
+                disabled={isLoading}
+              />
+              {errors.phone && touched.phone && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  {errors.phone}
+                </p>
+              )}
+            </div>
+
+
+            {/* Action Buttons */}
+            <div className="pt-4 space-y-3">
+              {hasChanges && (
+                <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1">
+                  <div className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
+                  You have unsaved changes
+                </p>
+              )}
+              
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button 
+                  type="submit" 
+                  disabled={!hasChanges || !isValid || isLoading}
+                  className="flex-1 h-11 font-medium"
+                  size="lg"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+                
+                <Button 
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancelEdit}
+                  disabled={isLoading}
+                  className="flex-1 h-11 font-medium"
+                  size="lg"
+                >
+                  <XIcon className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* Image Preview Modal */}
