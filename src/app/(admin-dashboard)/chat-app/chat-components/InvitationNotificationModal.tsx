@@ -34,7 +34,7 @@ import { useChatInvitationsRealtime } from "@/hooks/chat-app/useChatInvitationsR
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import type { RoomInvitationWithRelations, ChatUser } from "@/types/chat-app";
-import { invitation_status } from "@prisma/client";
+import { InvitationStatus } from "@/types/chat-app";
 
 interface InvitationNotificationModalProps {
   isOpen: boolean;
@@ -67,8 +67,8 @@ const InvitationNotificationModal = ({
   useChatInvitationsRealtime(currentUser);
 
   // Get invitations data
-  const { data: receivedInvitations = [], isLoading: loadingReceived } = useReceivedInvitations(invitation_status.PENDING);
-  const { data: sentInvitations = [], isLoading: loadingSent } = useSentInvitations(invitation_status.PENDING);
+  const { data: receivedInvitations = [], isLoading: loadingReceived } = useReceivedInvitations(InvitationStatus.PENDING);
+  const { data: sentInvitations = [], isLoading: loadingSent } = useSentInvitations(InvitationStatus.PENDING);
 
   const handleAcceptInvitation = async (invitation: RoomInvitationWithRelations) => {
     try {

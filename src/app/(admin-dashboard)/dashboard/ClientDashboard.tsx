@@ -42,7 +42,7 @@ function DashboardSkeleton() {
 }
 
 function DashboardContent() {
-  const { data, isLoading, error } = useDashboardData();
+  const { data, isLoading, error } = useDashboardData('month');
 
   if (isLoading) {
     return <DashboardSkeleton />;

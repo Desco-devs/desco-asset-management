@@ -242,7 +242,6 @@ export function useCreateVehicle() {
         status: (newVehicleData.status as 'OPERATIONAL' | 'NON_OPERATIONAL') || 'OPERATIONAL',
         inspection_date: newVehicleData.inspection_date || new Date().toISOString(),
         expiry_date: newVehicleData.expiry_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-        registration_expiry: newVehicleData.registration_expiry || null,
         before: newVehicleData.before || 30,
         remarks: newVehicleData.remarks || null,
         created_at: new Date().toISOString(),

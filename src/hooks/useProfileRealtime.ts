@@ -200,9 +200,7 @@ export function useProfileRealtime(userId?: string) {
           config: {
             // Mobile-optimized settings
             presence: { key: userId || 'anonymous' },
-            broadcast: { self: false },
-            // Reduce heartbeat interval for mobile
-            heartbeat_interval: 30000, // 30s instead of default 15s
+            broadcast: { self: false }
           }
         })
         .on(
@@ -388,9 +386,7 @@ export function useUsersRealtime() {
 
     const channel = supabase
       .channel('users-realtime', {
-        config: {
-          heartbeat_interval: 30000, // Mobile-optimized heartbeat
-        }
+        config: {}
       })
       .on(
         'postgres_changes',
@@ -495,9 +491,7 @@ export function useCurrentUserStatusRealtime(currentUserId: string) {
 
     const channel = supabase
       .channel(`user-status-${currentUserId}`, {
-        config: {
-          heartbeat_interval: 45000, // Longer heartbeat for status updates
-        }
+        config: {}
       })
       .on(
         'postgres_changes',

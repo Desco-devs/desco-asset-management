@@ -120,7 +120,7 @@ function DashboardErrorBoundary({
 function DashboardContent() {
   const { isLoading, error, refetch, data, isFetching } = useDashboardData('month');
   // Simple manual refresh using refetch
-  const manualRefresh = refetch;
+  const manualRefresh = () => refetch();
 
   // Simplified connection state
   const isConnected = true; // Always assume connected for now

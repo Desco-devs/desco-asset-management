@@ -2,12 +2,12 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
-import { invitation_status } from '@prisma/client'
 import type { 
   RoomInvitationWithRelations, 
   SendInvitationData,
-  ChatUser 
+  ChatUser
 } from '@/types/chat-app'
+import { InvitationStatus, RoomType } from '@/types/chat-app'
 import { CHAT_QUERY_KEYS, INVITATIONS_QUERY_KEYS } from './queryKeys'
 
 /**
@@ -22,7 +22,7 @@ import { CHAT_QUERY_KEYS, INVITATIONS_QUERY_KEYS } from './queryKeys'
 // Fetch invitations for current user
 const fetchInvitations = async (
   type: 'sent' | 'received' = 'received',
-  status?: invitation_status
+  status?: InvitationStatus
 ): Promise<RoomInvitationWithRelations[]> => {
   const params = new URLSearchParams()
   params.set('type', type)
@@ -57,7 +57,7 @@ const sendInvitation = async (data: SendInvitationData): Promise<RoomInvitationW
 // Respond to invitation
 const respondToInvitation = async (
   invitationId: string, 
-  status: invitation_status.ACCEPTED | invitation_status.DECLINED
+  status: InvitationStatus.ACCEPTED | InvitationStatus.DECLINED
 ): Promise<RoomInvitationWithRelations> => {
   const response = await fetch(`/api/rooms/invitations/${invitationId}`, {
     method: 'PATCH',
@@ -93,7 +93,7 @@ export function useChatInvitations(currentUser?: ChatUser) {
   const queryClient = useQueryClient()
 
   // Get received invitations (pending by default)
-  const useReceivedInvitations = useCallback((status?: invitation_status) => {
+  const useReceivedInvitations = useCallback((status?: InvitationStatus) => {
     return useQuery({
       queryKey: INVITATIONS_QUERY_KEYS.invitations(currentUser?.id || '', 'received', status),
       queryFn: () => fetchInvitations('received', status),
@@ -103,7 +103,7 @@ export function useChatInvitations(currentUser?: ChatUser) {
   }, [currentUser?.id])
 
   // Get sent invitations
-  const useSentInvitations = useCallback((status?: invitation_status) => {
+  const useSentInvitations = useCallback((status?: InvitationStatus) => {
     return useQuery({
       queryKey: INVITATIONS_QUERY_KEYS.invitations(currentUser?.id || '', 'sent', status),
       queryFn: () => fetchInvitations('sent', status),
@@ -124,7 +124,7 @@ export function useChatInvitations(currentUser?: ChatUser) {
       })
 
       // Optimistic update - add to sent invitations
-      const sentKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'sent', invitation_status.PENDING)
+      const sentKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'sent', InvitationStatus.PENDING)
       const previous = queryClient.getQueryData(sentKey)
 
       const optimisticInvitation: RoomInvitationWithRelations = {
@@ -132,11 +132,11 @@ export function useChatInvitations(currentUser?: ChatUser) {
         room_id: data.room_id,
         invited_by: currentUser.id,
         invited_user: data.invited_user,
-        status: invitation_status.PENDING,
+        status: InvitationStatus.PENDING,
         message: data.message,
         created_at: new Date(),
-        responded_at: null,
-        room: { id: data.room_id, name: 'Loading...', type: 'GROUP' },
+        responded_at: undefined,
+        room: { id: data.room_id, name: 'Loading...', type: RoomType.GROUP },
         inviter: {
           id: currentUser.id,
           username: currentUser.username,
@@ -156,7 +156,7 @@ export function useChatInvitations(currentUser?: ChatUser) {
       if (!currentUser || !context) return
 
       // Rollback optimistic update
-      const sentKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'sent', invitation_status.PENDING)
+      const sentKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'sent', InvitationStatus.PENDING)
       if (context.previous) {
         queryClient.setQueryData(sentKey, context.previous)
       }
@@ -167,7 +167,7 @@ export function useChatInvitations(currentUser?: ChatUser) {
       if (!currentUser) return
 
       // Remove optimistic update and add real data
-      const sentKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'sent', invitation_status.PENDING)
+      const sentKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'sent', InvitationStatus.PENDING)
       queryClient.setQueryData(sentKey, (old: RoomInvitationWithRelations[] = []) => {
         const filtered = old.filter(inv => !inv.id.startsWith('optimistic_'))
         return [result, ...filtered]
@@ -182,18 +182,18 @@ export function useChatInvitations(currentUser?: ChatUser) {
 
   // Accept invitation mutation
   const acceptInvitationMutation = useMutation({
-    mutationFn: (invitationId: string) => respondToInvitation(invitationId, invitation_status.ACCEPTED),
+    mutationFn: (invitationId: string) => respondToInvitation(invitationId, InvitationStatus.ACCEPTED),
     onMutate: async (invitationId) => {
       if (!currentUser) return
 
       // Optimistically update invitation status
-      const receivedKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'received', invitation_status.PENDING)
+      const receivedKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'received', InvitationStatus.PENDING)
       const previous = queryClient.getQueryData(receivedKey)
 
       queryClient.setQueryData(receivedKey, (old: RoomInvitationWithRelations[] = []) =>
         old.map(inv => 
           inv.id === invitationId 
-            ? { ...inv, status: invitation_status.ACCEPTED, responded_at: new Date() }
+            ? { ...inv, status: InvitationStatus.ACCEPTED, responded_at: new Date() }
             : inv
         )
       )
@@ -204,7 +204,7 @@ export function useChatInvitations(currentUser?: ChatUser) {
       if (!currentUser || !context) return
 
       // Rollback
-      const receivedKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'received', invitation_status.PENDING)
+      const receivedKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'received', InvitationStatus.PENDING)
       if (context.previous) {
         queryClient.setQueryData(receivedKey, context.previous)
       }
@@ -226,17 +226,17 @@ export function useChatInvitations(currentUser?: ChatUser) {
 
   // Decline invitation mutation
   const declineInvitationMutation = useMutation({
-    mutationFn: (invitationId: string) => respondToInvitation(invitationId, invitation_status.DECLINED),
+    mutationFn: (invitationId: string) => respondToInvitation(invitationId, InvitationStatus.DECLINED),
     onMutate: async (invitationId) => {
       if (!currentUser) return
 
-      const receivedKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'received', invitation_status.PENDING)
+      const receivedKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'received', InvitationStatus.PENDING)
       const previous = queryClient.getQueryData(receivedKey)
 
       queryClient.setQueryData(receivedKey, (old: RoomInvitationWithRelations[] = []) =>
         old.map(inv => 
           inv.id === invitationId 
-            ? { ...inv, status: invitation_status.DECLINED, responded_at: new Date() }
+            ? { ...inv, status: InvitationStatus.DECLINED, responded_at: new Date() }
             : inv
         )
       )
@@ -246,7 +246,7 @@ export function useChatInvitations(currentUser?: ChatUser) {
     onError: (error, invitationId, context) => {
       if (!currentUser || !context) return
 
-      const receivedKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'received', invitation_status.PENDING)
+      const receivedKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'received', InvitationStatus.PENDING)
       if (context.previous) {
         queryClient.setQueryData(receivedKey, context.previous)
       }
@@ -268,7 +268,7 @@ export function useChatInvitations(currentUser?: ChatUser) {
     onMutate: async (invitationId) => {
       if (!currentUser) return
 
-      const sentKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'sent', invitation_status.PENDING)
+      const sentKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'sent', InvitationStatus.PENDING)
       const previous = queryClient.getQueryData(sentKey)
 
       queryClient.setQueryData(sentKey, (old: RoomInvitationWithRelations[] = []) =>
@@ -280,7 +280,7 @@ export function useChatInvitations(currentUser?: ChatUser) {
     onError: (error, invitationId, context) => {
       if (!currentUser || !context) return
 
-      const sentKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'sent', invitation_status.PENDING)
+      const sentKey = INVITATIONS_QUERY_KEYS.invitations(currentUser.id, 'sent', InvitationStatus.PENDING)
       if (context.previous) {
         queryClient.setQueryData(sentKey, context.previous)
       }
@@ -325,7 +325,7 @@ export function useChatInvitations(currentUser?: ChatUser) {
 export function useInvitationNotifications(currentUser?: ChatUser) {
   const { useReceivedInvitations } = useChatInvitations(currentUser)
   
-  const { data: pendingInvitations = [] } = useReceivedInvitations(invitation_status.PENDING)
+  const { data: pendingInvitations = [] } = useReceivedInvitations(InvitationStatus.PENDING)
   
   return {
     pendingCount: pendingInvitations.length,

@@ -45,13 +45,14 @@ export function useChatMessagesPagination(roomId?: string, currentUser?: ChatUse
   // Infinite query for loading older messages
   const infiniteQuery = useInfiniteQuery({
     queryKey: ['chat-messages-paginated', roomId],
-    queryFn: ({ pageParam }) => {
+    queryFn: ({ pageParam }: { pageParam: string | undefined }) => {
       if (!roomId) throw new Error('Room ID required')
       return fetchMessages(roomId, pageParam, 'older', 50)
     },
     getNextPageParam: (lastPage) => {
       return lastPage.has_more ? lastPage.next_cursor : undefined
     },
+    initialPageParam: undefined,
     enabled: !!roomId && !!currentUser,
     staleTime: 30000, // 30 seconds - messages don't change often
     refetchOnWindowFocus: false

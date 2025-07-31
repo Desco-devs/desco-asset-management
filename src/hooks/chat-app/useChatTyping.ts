@@ -242,9 +242,7 @@ export function useChatTyping(currentUser?: ChatUser) {
       .channel(`chat-typing-global`, {
         config: {
           broadcast: { self: false, ack: false }, // Don't receive our own typing events
-          presence: { key: currentUser.id },
-          heartbeat_interval: 15000, // 15s heartbeat - shorter for typing responsiveness
-          timeout: 30000 // 30s timeout
+          presence: { key: currentUser.id }
         }
       })
       .on('broadcast', { event: 'typing' }, (payload) => {

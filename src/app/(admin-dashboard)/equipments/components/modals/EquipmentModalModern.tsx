@@ -183,21 +183,22 @@ export default function EquipmentModalModern() {
     if (!selectedEquipmentFromStore) return null;
     
     // Always try to get the latest data from the equipments array first
-    const freshEquipment = equipments.find((e) => e.id === selectedEquipmentFromStore.id);
+    const freshEquipment = equipments.find((e) => e.id === selectedEquipmentFromStore.uid);
     if (freshEquipment) {
       return freshEquipment;
     }
     
     // Fallback to store data if not found in array (shouldn't happen after successful updates)
     return selectedEquipmentFromStore;
-  }, [selectedEquipmentFromStore?.id, equipments]);
+  }, [selectedEquipmentFromStore?.uid, equipments]);
 
   // Initialize equipment parts when entering edit mode
   useEffect(() => {
-    if (isGlobalEditMode && selectedEquipment?.equipment_parts) {
+    const equipmentParts = (selectedEquipment as any)?.equipment_parts || (selectedEquipment as any)?.equipmentParts;
+    if (isGlobalEditMode && equipmentParts) {
       // Parse the equipment_parts from the database format
       try {
-        let parsedParts: any = selectedEquipment.equipment_parts;
+        let parsedParts: any = equipmentParts;
         
         // Handle array with JSON string format
         if (Array.isArray(parsedParts) && parsedParts.length > 0 && typeof parsedParts[0] === 'string') {
@@ -245,29 +246,30 @@ export default function EquipmentModalModern() {
       // Clear state when exiting edit mode
       setPartsStructure({ rootFiles: [], folders: [] });
     }
-  }, [isGlobalEditMode, selectedEquipment?.equipment_parts]);
+  }, [isGlobalEditMode, (selectedEquipment as any)?.equipment_parts, (selectedEquipment as any)?.equipmentParts]);
 
   // Initialize form data when entering edit mode - using ref to prevent re-renders
   useEffect(() => {
-    if (isGlobalEditMode && selectedEquipment?.id) {
+    const equipmentId = (selectedEquipment as any)?.id || (selectedEquipment as any)?.uid;
+    if (isGlobalEditMode && equipmentId && selectedEquipment) {
       editFormDataRef.current = {
         brand: selectedEquipment.brand || '',
         model: selectedEquipment.model || '',
         type: selectedEquipment.type || '',
-        plate_number: selectedEquipment.plate_number || '',
+        plate_number: (selectedEquipment as any).plate_number || (selectedEquipment as any).plateNumber || '',
         owner: selectedEquipment.owner || '',
         status: selectedEquipment.status || 'OPERATIONAL',
         remarks: selectedEquipment.remarks || '',
-        project_id: selectedEquipment.project_id || '',
-        before: selectedEquipment.before || 6,
-        inspection_date: selectedEquipment.inspection_date ? new Date(selectedEquipment.inspection_date) : undefined,
-        registration_expiry: selectedEquipment.registration_expiry ? new Date(selectedEquipment.registration_expiry) : undefined,
-        insurance_expiration_date: selectedEquipment.insurance_expiration_date ? new Date(selectedEquipment.insurance_expiration_date) : undefined,
-        created_by: selectedEquipment.created_by || ''
+        project_id: (selectedEquipment as any).project_id || (selectedEquipment as any).project?.uid || '',
+        before: typeof selectedEquipment.before === 'string' ? parseInt(selectedEquipment.before) || 6 : selectedEquipment.before || 6,
+        inspection_date: (selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate ? new Date((selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate) : undefined,
+        registration_expiry: (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry ? new Date((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry) : undefined,
+        insurance_expiration_date: (selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate ? new Date((selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate) : undefined,
+        created_by: (selectedEquipment as any).created_by || (selectedEquipment as any).created_at || ''
       };
       forceUpdate({}); // Single re-render to update input values
     }
-  }, [isGlobalEditMode, selectedEquipment?.id]); // Only depend on ID to prevent constant re-renders
+  }, [isGlobalEditMode, (selectedEquipment as any)?.id, (selectedEquipment as any)?.uid]); // Only depend on ID to prevent constant re-renders
   
   // Update mutation - declared before callbacks that use it
   const updateEquipmentMutation = useUpdateEquipment();
@@ -359,8 +361,9 @@ export default function EquipmentModalModern() {
       const alwaysRequiredFields = ['brand', 'model', 'type', 'owner', 'project_id'];
       
       // Always add equipmentId first (required by API)
-      formData.append('equipmentId', selectedEquipment.id);
-      console.log('✅ Added equipmentId:', selectedEquipment.id);
+      const equipmentId = (selectedEquipment as any).id || (selectedEquipment as any).uid;
+      formData.append('equipmentId', equipmentId);
+      console.log('✅ Added equipmentId:', equipmentId);
       
       // Always add required fields to prevent "Missing required fields" error
       alwaysRequiredFields.forEach(fieldName => {
@@ -563,7 +566,7 @@ export default function EquipmentModalModern() {
       
       // Force synchronous update to prevent flicker
       flushSync(() => {
-        setSelectedEquipment(updatedEquipment);
+        setSelectedEquipment(updatedEquipment as any);
       });
       
       // Then clear the upload state
@@ -733,8 +736,9 @@ export default function EquipmentModalModern() {
   };
 
   const handleDelete = () => {
-    if (selectedEquipment && !selectedEquipment.id.startsWith('temp_')) {
-      setDeleteConfirmation({ isOpen: true, equipment: selectedEquipment });
+    const equipmentId = (selectedEquipment as any)?.id || (selectedEquipment as any)?.uid;
+    if (selectedEquipment && equipmentId && !equipmentId.startsWith('temp_')) {
+      setDeleteConfirmation({ isOpen: true, equipment: selectedEquipment as any });
       setIsModalOpen(false); // Close main modal to show delete confirmation
     }
   };
@@ -833,7 +837,7 @@ export default function EquipmentModalModern() {
     return null;
   }
 
-  const daysUntilExpiry = getDaysUntilExpiry(selectedEquipment.insurance_expiration_date);
+  const daysUntilExpiry = getDaysUntilExpiry((selectedEquipment as any)?.insurance_expiration_date || (selectedEquipment as any)?.insuranceExpirationDate);
 
   // Dynamic descriptions based on active tab
   const getTabDescription = () => {
@@ -865,12 +869,12 @@ export default function EquipmentModalModern() {
   // Inspection images
   const inspectionImages = [
     {
-      url: selectedEquipment.thirdparty_inspection_image,
+      url: (selectedEquipment as any).thirdparty_inspection_image || (selectedEquipment as any).thirdpartyInspectionImage,
       title: "Third-party Inspection",
       icon: Shield,
     },
     {
-      url: selectedEquipment.pgpc_inspection_image,
+      url: (selectedEquipment as any).pgpc_inspection_image || (selectedEquipment as any).pgpcInspectionImage,
       title: "PGPC Inspection",
       icon: Shield,
     },
@@ -879,12 +883,12 @@ export default function EquipmentModalModern() {
   // Equipment documents (PDFs and downloadable files)
   const documents = [
     {
-      url: selectedEquipment.original_receipt_url,
+      url: (selectedEquipment as any).original_receipt_url || (selectedEquipment as any).originalReceiptUrl,
       title: "Original Receipt",
       icon: Receipt,
     },
     {
-      url: selectedEquipment.equipment_registration_url,
+      url: (selectedEquipment as any).equipment_registration_url || (selectedEquipment as any).equipmentRegistrationUrl,
       title: "Equipment Registration",
       icon: FileText,
     },
@@ -896,20 +900,21 @@ export default function EquipmentModalModern() {
   // Simple helper functions for tab counts
   const getImagesCount = () => {
     let count = 0;
-    if (selectedEquipment?.image_url) count++;
-    if (selectedEquipment?.thirdparty_inspection_image) count++;
-    if (selectedEquipment?.pgpc_inspection_image) count++;
+    if ((selectedEquipment as any)?.image_url) count++;
+    if ((selectedEquipment as any)?.thirdparty_inspection_image || (selectedEquipment as any)?.thirdpartyInspectionImage) count++;
+    if ((selectedEquipment as any)?.pgpc_inspection_image || (selectedEquipment as any)?.pgpcInspectionImage) count++;
     return count;
   };
   const getDocumentsCount = () => {
     let count = 0;
-    if (selectedEquipment?.original_receipt_url) count++;
-    if (selectedEquipment?.equipment_registration_url) count++;
+    if ((selectedEquipment as any)?.original_receipt_url || (selectedEquipment as any)?.originalReceiptUrl) count++;
+    if ((selectedEquipment as any)?.equipment_registration_url || (selectedEquipment as any)?.equipmentRegistrationUrl) count++;
     return count;
   };
   // Helper function to count equipment parts for selected equipment - EXACTLY like VehicleModalModern
   const getEquipmentPartsCount = () => {
-    if (!selectedEquipment || !selectedEquipment.equipment_parts) return 0;
+    const equipmentParts = (selectedEquipment as any)?.equipment_parts || (selectedEquipment as any)?.equipmentParts;
+    if (!selectedEquipment || !equipmentParts) return 0;
     
     // Parse equipment parts data using the same logic as EquipmentPartsViewer
     const parsePartsData = (parts: any) => {
@@ -961,7 +966,7 @@ export default function EquipmentModalModern() {
       return { rootFiles: [], folders: [] };
     };
 
-    const parsedData = parsePartsData(selectedEquipment.equipment_parts);
+    const parsedData = parsePartsData(equipmentParts);
     
     // Count files in rootFiles array and recursively in folders
     let count = 0;
@@ -979,8 +984,9 @@ export default function EquipmentModalModern() {
     return count;
   };  
   const getMaintenanceReportsCount = () => {
-    if (!selectedEquipment?.id || !Array.isArray(maintenanceReports)) return 0;
-    return maintenanceReports.filter(report => report.equipment_id === selectedEquipment.id).length;
+    const equipmentId = (selectedEquipment as any)?.id || (selectedEquipment as any)?.uid;
+    if (!equipmentId || !Array.isArray(maintenanceReports)) return 0;
+    return maintenanceReports.filter(report => report.equipment_id === equipmentId).length;
   };
 
   // Tab content components - EXACTLY like CreateEquipmentForm
@@ -1393,13 +1399,13 @@ export default function EquipmentModalModern() {
                         <div className={`font-medium text-foreground ${isMobile ? 'text-sm' : ''}`}>{selectedEquipment.type}</div>
                       </div>
 
-                      {selectedEquipment.plate_number && (
+                      {((selectedEquipment as any).plate_number || (selectedEquipment as any).plateNumber) && (
                         <div className="space-y-2">
                           <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                             <Hash className="h-4 w-4" />
                             Plate/Serial Number
                           </Label>
-                          <div className={`font-medium text-foreground font-mono ${isMobile ? 'text-sm' : ''}`}>{selectedEquipment.plate_number}</div>
+                          <div className={`font-medium text-foreground font-mono ${isMobile ? 'text-sm' : ''}`}>{(selectedEquipment as any).plate_number || (selectedEquipment as any).plateNumber}</div>
                         </div>
                       )}
                     </div>
@@ -1441,10 +1447,10 @@ export default function EquipmentModalModern() {
                           {selectedEquipment.status}
                         </Badge>
 
-                        {selectedEquipment.plate_number && (
+                        {((selectedEquipment as any).plate_number || (selectedEquipment as any).plateNumber) && (
                           <Badge variant="outline" className="flex items-center gap-1">
                             <Hash className="h-3 w-3" />
-                            {selectedEquipment.plate_number}
+                            {(selectedEquipment as any).plate_number || (selectedEquipment as any).plateNumber}
                           </Badge>
                         )}
 
@@ -1498,24 +1504,24 @@ export default function EquipmentModalModern() {
                   <div className="space-y-4">
                     <div className={gridClassName3}>
                       {/* Registration Expires */}
-                      {selectedEquipment.registration_expiry && (
+                      {(selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry && (
                         <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Registration Expires:</Label>
                           <div className={`font-medium ${
                             (() => {
-                              if (!selectedEquipment.registration_expiry) return "text-foreground";
+                              if (!(selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry) return "text-foreground";
                               const now = new Date();
-                              const expiry = new Date(selectedEquipment.registration_expiry);
+                              const expiry = new Date((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry);
                               const diffTime = expiry.getTime() - now.getTime();
                               const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                               return diffDays <= 0 ? "text-red-600" : diffDays <= 30 ? "text-orange-600" : "text-foreground";
                             })()
                           }`}>
-                            {format(new Date(selectedEquipment.registration_expiry), "M/d/yyyy")}
+                            {format(new Date((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry), "M/d/yyyy")}
                             {(() => {
-                              if (!selectedEquipment.registration_expiry) return null;
+                              if (!(selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry) return null;
                               const now = new Date();
-                              const expiry = new Date(selectedEquipment.registration_expiry);
+                              const expiry = new Date((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry);
                               const diffTime = expiry.getTime() - now.getTime();
                               const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                               return diffDays <= 0 ? <span className="text-red-600 ml-2">(Expired)</span> : null;
@@ -1525,7 +1531,7 @@ export default function EquipmentModalModern() {
                       )}
 
                       {/* Insurance Expires */}
-                      {selectedEquipment.insurance_expiration_date && (
+                      {(selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate && (
                         <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Insurance Expires:</Label>
                           <div className={`font-medium ${
@@ -1535,7 +1541,7 @@ export default function EquipmentModalModern() {
                               ? "text-orange-600"
                               : "text-foreground"
                           }`}>
-                            {format(new Date(selectedEquipment.insurance_expiration_date), "M/d/yyyy")}
+                            {format(new Date((selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate), "M/d/yyyy")}
                             {daysUntilExpiry !== null && daysUntilExpiry <= 0 && (
                               <span className="text-red-600 ml-2">(Expired)</span>
                             )}
@@ -1544,22 +1550,22 @@ export default function EquipmentModalModern() {
                       )}
 
                       {/* Last Inspection */}
-                      {selectedEquipment.inspection_date && (
+                      {(selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate && (
                         <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Last Inspection:</Label>
                           <div className="font-medium text-foreground">
-                            {format(new Date(selectedEquipment.inspection_date), "M/d/yyyy")}
+                            {format(new Date((selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate), "M/d/yyyy")}
                           </div>
                         </div>
                       )}
 
                       {/* Next Inspection Due */}
-                      {selectedEquipment.inspection_date && selectedEquipment.before && (
+                      {(selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate && selectedEquipment.before && (
                         <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Next Inspection Due:</Label>
                           <div className="font-medium text-foreground">
                             {(() => {
-                              const lastInspection = new Date(selectedEquipment.inspection_date);
+                              const lastInspection = new Date((selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate);
                               const frequency = parseInt(selectedEquipment.before.toString());
                               const nextInspection = new Date(lastInspection);
                               nextInspection.setMonth(nextInspection.getMonth() + frequency);
@@ -1654,7 +1660,7 @@ export default function EquipmentModalModern() {
                     <FileUploadSectionSimple
                       label="Third-party Inspection"
                       accept="image/*"
-                      currentFileUrl={!removedFiles.has('thirdparty_inspection_image') ? selectedEquipment.thirdparty_inspection_image : null}
+                      currentFileUrl={!removedFiles.has('thirdparty_inspection_image') ? (selectedEquipment as any).thirdparty_inspection_image || (selectedEquipment as any).thirdpartyInspectionImage : null}
                       selectedFile={uploadedFiles['thirdparty_inspection_image'] || null}
                       onFileChange={(file) => handleFileSelect('thirdparty_inspection_image', file)}
                       onKeepExistingChange={() => {}}
@@ -1672,7 +1678,7 @@ export default function EquipmentModalModern() {
                     <FileUploadSectionSimple
                       label="PGPC Inspection"
                       accept="image/*"
-                      currentFileUrl={!removedFiles.has('pgpc_inspection_image') ? selectedEquipment.pgpc_inspection_image : null}
+                      currentFileUrl={!removedFiles.has('pgpc_inspection_image') ? (selectedEquipment as any).pgpc_inspection_image || (selectedEquipment as any).pgpcInspectionImage : null}
                       selectedFile={uploadedFiles['pgpc_inspection_image'] || null}
                       onFileChange={(file) => handleFileSelect('pgpc_inspection_image', file)}
                       onKeepExistingChange={() => {}}
@@ -1712,7 +1718,7 @@ export default function EquipmentModalModern() {
                   <FileUploadSectionSimple
                     label="Purchase Receipt"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    currentFileUrl={!removedFiles.has('original_receipt_url') ? selectedEquipment.original_receipt_url : null}
+                    currentFileUrl={!removedFiles.has('original_receipt_url') ? (selectedEquipment as any).original_receipt_url || (selectedEquipment as any).originalReceiptUrl : null}
                     selectedFile={uploadedFiles['original_receipt_url'] || null}
                     onFileChange={(file) => handleFileSelect('original_receipt_url', file)}
                     onKeepExistingChange={() => {}}
@@ -1730,7 +1736,7 @@ export default function EquipmentModalModern() {
                   <FileUploadSectionSimple
                     label="Registration Document"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    currentFileUrl={!removedFiles.has('equipment_registration_url') ? selectedEquipment.equipment_registration_url : null}
+                    currentFileUrl={!removedFiles.has('equipment_registration_url') ? (selectedEquipment as any).equipment_registration_url || (selectedEquipment as any).equipmentRegistrationUrl : null}
                     selectedFile={uploadedFiles['equipment_registration_url'] || null}
                     onFileChange={(file) => handleFileSelect('equipment_registration_url', file)}
                     onKeepExistingChange={() => {}}
@@ -1761,7 +1767,7 @@ export default function EquipmentModalModern() {
             {isGlobalEditMode ? (
               <div className={`${isMobile ? 'max-h-[45vh]' : 'max-h-[50vh]'} overflow-y-auto border rounded-lg p-4 bg-muted/20`}>
                 <PartsFolderManager 
-                  key={selectedEquipment?.id || 'edit'} 
+                  key={(selectedEquipment as any)?.id || (selectedEquipment as any)?.uid || 'edit'} 
                   onChange={setPartsStructure}
                   initialData={partsStructure}
                   onPartFileDelete={handlePartFileDelete}
@@ -1771,10 +1777,10 @@ export default function EquipmentModalModern() {
             ) : (
               <EquipmentPartsViewer 
                 equipmentParts={
-                  selectedEquipment.equipment_parts 
-                    ? typeof selectedEquipment.equipment_parts === 'string'
-                      ? JSON.parse(selectedEquipment.equipment_parts)
-                      : selectedEquipment.equipment_parts
+                  (selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts 
+                    ? typeof (selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts === 'string'
+                      ? JSON.parse((selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts)
+                      : (selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts
                     : { rootFiles: [], folders: [] }
                 }
                 isEditable={isGlobalEditMode}
@@ -1803,7 +1809,7 @@ export default function EquipmentModalModern() {
           <Card>
             <CardContent className="p-6">
               <EquipmentMaintenanceReportsEnhanced 
-                equipmentId={selectedEquipment.id}
+                equipmentId={(selectedEquipment as any).id || (selectedEquipment as any).uid}
               />
             </CardContent>
           </Card>
@@ -1873,7 +1879,7 @@ export default function EquipmentModalModern() {
                       type="button"
                       variant="destructive"
                       onClick={handleDelete}
-                      disabled={deleteEquipmentMutation.isPending || selectedEquipment?.id?.startsWith('temp_')}
+                      disabled={deleteEquipmentMutation.isPending || ((selectedEquipment as any)?.id || (selectedEquipment as any)?.uid)?.startsWith('temp_')}
                       className="flex-1"
                       size="lg"
                     >
@@ -2111,7 +2117,7 @@ export default function EquipmentModalModern() {
                 type="button"
                 variant="destructive"
                 onClick={handleDelete}
-                disabled={deleteEquipmentMutation.isPending || selectedEquipment?.id?.startsWith('temp_')}
+                disabled={deleteEquipmentMutation.isPending || ((selectedEquipment as any)?.id || (selectedEquipment as any)?.uid)?.startsWith('temp_')}
                 size="lg"
               >
                 {deleteEquipmentMutation.isPending ? (

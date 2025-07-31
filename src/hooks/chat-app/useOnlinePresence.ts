@@ -282,9 +282,7 @@ export function useOnlinePresence(currentUser?: ChatUser, activeRoomId?: string)
         .channel('online-presence-realtime', {
           config: {
             presence: {
-              key: currentUser.id,
-              heartbeat_interval: config.heartbeatInterval,
-              presence_ref_timeout: config.presenceTimeout
+              key: currentUser.id
             },
             broadcast: { self: false }
           }

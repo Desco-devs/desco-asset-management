@@ -23,6 +23,10 @@ function enrichMessageWithSenderData(message: any, queryClient: any): MessageWit
     room_id: message.room_id,
     sender_id: message.sender_id,
     content: message.content,
+    type: message.type,
+    file_url: message.file_url,
+    reply_to_id: message.reply_to_id,
+    edited_at: message.edited_at,
     created_at: message.created_at,
     updated_at: message.updated_at,
     sender: sender ? {
@@ -34,7 +38,7 @@ function enrichMessageWithSenderData(message: any, queryClient: any): MessageWit
       id: message.sender_id,
       username: 'Unknown',
       full_name: 'Unknown User',
-      user_profile: null,
+      user_profile: undefined,
     },
     room: {
       id: message.room_id,
@@ -297,9 +301,7 @@ export function useChatRealtime(userId?: string) {
         .channel(`chat-realtime-${userId}`, {
           config: {
             presence: { key: userId },
-            broadcast: { self: false },
-            // Optimized heartbeat for chat responsiveness
-            heartbeat_interval: 20000, // 20s
+            broadcast: { self: false }
           }
         })
         // Listen to messages table changes
@@ -311,7 +313,7 @@ export function useChatRealtime(userId?: string) {
             table: 'messages'
           },
           (payload) => {
-            console.log('💬 Message change detected:', payload.eventType, payload.new?.room_id)
+            console.log('💬 Message change detected:', payload.eventType, (payload.new as any)?.room_id)
             throttledInvalidate(payload, ['messages', 'rooms'])
           }
         )
@@ -324,7 +326,7 @@ export function useChatRealtime(userId?: string) {
             table: 'rooms'
           },
           (payload) => {
-            console.log('🏠 Room change detected:', payload.eventType, payload.new?.id)
+            console.log('🏠 Room change detected:', payload.eventType, (payload.new as any)?.id)
             throttledInvalidate(payload, ['rooms'])
           }
         )
@@ -337,7 +339,7 @@ export function useChatRealtime(userId?: string) {
             table: 'room_members'
           },
           (payload) => {
-            console.log('👥 Room member change detected:', payload.eventType, payload.new?.room_id)
+            console.log('👥 Room member change detected:', payload.eventType, (payload.new as any)?.room_id)
             throttledInvalidate(payload, ['rooms', 'room-members'])
           }
         )

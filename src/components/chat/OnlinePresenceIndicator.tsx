@@ -111,7 +111,7 @@ export function OnlinePresenceIndicator({
           <span className="text-sm text-muted-foreground">Online:</span>
           <div className="flex -space-x-2 overflow-hidden">
             {onlineUsers.slice(0, 5).map((user) => {
-              const indicator = createPresenceIndicator(user)
+              const indicator = createPresenceIndicator({...user, is_online: true})
               
               return (
                 <TooltipProvider key={user.user_id}>
@@ -199,7 +199,7 @@ export function UserOnlineStatus({
     )
   }
   
-  const indicator = user ? createPresenceIndicator(user) : null
+  const indicator = user ? createPresenceIndicator({...user, is_online: true}) : null
   
   return (
     <TooltipProvider>

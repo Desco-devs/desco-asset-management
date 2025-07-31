@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Equipment } from '@/types/equipment';
+import type { Equipment } from '@/stores/equipmentsStore';
 
 /**
  * Simple Equipment Store - UI State Only
@@ -223,7 +223,7 @@ export const useEquipmentStore = create<EquipmentUIState>()(
             equipment.model.toLowerCase().includes(query) ||
             equipment.type.toLowerCase().includes(query) ||
             equipment.owner.toLowerCase().includes(query) ||
-            (equipment.plate_number && equipment.plate_number.toLowerCase().includes(query)) ||
+            (equipment.plateNumber && equipment.plateNumber.toLowerCase().includes(query)) ||
             equipment.project.name.toLowerCase().includes(query) ||
             equipment.project.client.name.toLowerCase().includes(query) ||
             equipment.project.client.location.address.toLowerCase().includes(query)
@@ -257,12 +257,12 @@ export const useEquipmentStore = create<EquipmentUIState>()(
                 bValue = b.owner.toLowerCase();
                 break;
               case 'insuranceExpirationDate':
-                aValue = a.insurance_expiration_date ? new Date(a.insurance_expiration_date).getTime() : 0;
-                bValue = b.insurance_expiration_date ? new Date(b.insurance_expiration_date).getTime() : 0;
+                aValue = a.insuranceExpirationDate ? new Date(a.insuranceExpirationDate).getTime() : 0;
+                bValue = b.insuranceExpirationDate ? new Date(b.insuranceExpirationDate).getTime() : 0;
                 break;
               case 'registrationExpiry':
-                aValue = a.registration_expiry ? new Date(a.registration_expiry).getTime() : 0;
-                bValue = b.registration_expiry ? new Date(b.registration_expiry).getTime() : 0;
+                aValue = a.registrationExpiry ? new Date(a.registrationExpiry).getTime() : 0;
+                bValue = b.registrationExpiry ? new Date(b.registrationExpiry).getTime() : 0;
                 break;
               default:
                 return 0;

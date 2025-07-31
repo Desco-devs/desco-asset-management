@@ -91,10 +91,7 @@ export function useChatPresence(currentUser?: ChatUser, currentRoomId?: string) 
       .channel('chat-presence', {
         config: {
           presence: { 
-            key: currentUser.id,
-            // Track presence with a shorter timeout for chat responsiveness
-            heartbeat_interval: 15000, // 15s
-            presence_ref_timeout: 30000 // 30s timeout
+            key: currentUser.id
           }
         }
       })

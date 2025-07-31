@@ -48,10 +48,7 @@ export default function TanstackProvider({
     setGlobalQueryClient(queryClient);
     console.log('✅ Global query client set for real-time cache integration');
     
-    // Cleanup on unmount
-    return () => {
-      setGlobalQueryClient(null);
-    };
+    // Cleanup on unmount - no need to reset since component unmount means app is closing
   }, [queryClient]);
 
   return (

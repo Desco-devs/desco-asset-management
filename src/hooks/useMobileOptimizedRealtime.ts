@@ -236,9 +236,8 @@ export function useMobileRealtimeChannel(
 
       const newChannel = supabase.channel(channelName, {
         config: {
-          heartbeat_interval: heartbeatInterval,
           presence: { key: 'mobile-client' },
-          broadcast: { self: false },
+          broadcast: { self: false }
         }
       });
 

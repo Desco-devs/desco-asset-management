@@ -10,7 +10,7 @@ import {
   useAlertsExpanded,
   useDashboardUIStore
 } from "@/stores/dashboardUIStore";
-import { useDashboardData } from "@/hooks/useDashboardData";
+import { useMaintenanceAlerts } from "@/hooks/useDashboardData";
 import { 
   AlertTriangle, 
   Wrench, 
@@ -174,9 +174,7 @@ interface MaintenanceAlertsPanelProps {
 export function MaintenanceAlertsPanel() {
   const alertsExpanded = useAlertsExpanded();
   const setAlertsExpanded = useDashboardUIStore(state => state.setAlertsExpanded);
-  const selectedTimeRange = 'month'; // Default to month for now
-  const { data } = useDashboardData(selectedTimeRange);
-  const alerts = data?.maintenanceAlerts || [];
+  const { data: alerts = [] } = useMaintenanceAlerts();
   const criticalAlertsCount = alerts.filter(alert => alert.priority === 'critical').length;
   
   // Pagination state

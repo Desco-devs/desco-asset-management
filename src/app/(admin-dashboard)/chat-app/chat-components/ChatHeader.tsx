@@ -284,10 +284,9 @@ const ChatHeader = ({
         <InviteUsersModal
           isOpen={isInviteModalOpen}
           onClose={() => setIsInviteModalOpen(false)}
-          onInviteUsers={handleInviteUsers}
           users={users || []}
           currentRoom={currentRoom}
-          currentUserId={currentUserId}
+          currentUser={users?.find(user => user.id === currentUserId)}
         />
       )}
 

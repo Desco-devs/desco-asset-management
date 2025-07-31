@@ -93,7 +93,7 @@ export function useVehicleRealtime() {
         )
         .subscribe((status) => {
           console.log('🚗 Vehicle realtime subscription status:', status)
-          setConnectionStatus(status)
+          setConnectionStatus(status as 'CLOSED' | 'CONNECTING' | 'OPEN' | 'SUBSCRIBED')
         })
 
       return () => {

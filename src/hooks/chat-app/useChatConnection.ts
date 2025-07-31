@@ -162,8 +162,7 @@ export function useChatConnection(userId?: string) {
           .channel(`chat-connection-${userId}`, {
             config: {
               presence: { key: userId },
-              broadcast: { self: true, ack: true },
-              heartbeat_interval: 20000 // 20s for Supabase internal heartbeat
+              broadcast: { self: true, ack: true }
             }
           })
           .on('system', {}, (payload) => {

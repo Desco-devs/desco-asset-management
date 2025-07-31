@@ -103,16 +103,12 @@ export default function DashboardContainerModern() {
 
       {/* Overview Stats */}
       <Suspense fallback={<div>Loading stats...</div>}>
-        <OverviewStatsGrid overviewStats={dashboardData?.overviewStats} />
+        <OverviewStatsGrid />
       </Suspense>
 
       {/* Charts Section */}
       <Suspense fallback={<div>Loading charts...</div>}>
-        <ChartsSection 
-          equipmentCounts={dashboardData?.equipmentCounts}
-          vehicleCounts={dashboardData?.vehicleCounts}
-          detailedData={dashboardData?.detailedData}
-        />
+        <ChartsSection />
       </Suspense>
 
       {/* Activity and Maintenance Alerts */}

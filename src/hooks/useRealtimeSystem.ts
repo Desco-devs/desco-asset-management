@@ -99,7 +99,7 @@ export function useRealtimeSystem() {
       
       .subscribe()
 
-    return () => channel.unsubscribe()
+    return () => { channel.unsubscribe() }
   }, [queryClient])
 }
 

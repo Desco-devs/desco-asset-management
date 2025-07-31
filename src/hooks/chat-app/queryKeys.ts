@@ -13,7 +13,7 @@ export const CHAT_QUERY_KEYS = {
   
   // Invitation-related queries
   invitations: (userId: string, type?: 'sent' | 'received', status?: string) => 
-    ['chat-invitations', userId, type, status].filter(Boolean) as const,
+    ['chat-invitations', userId, type, status].filter(Boolean),
   invitation: (invitationId: string) => ['chat-invitation', invitationId] as const,
   
   // User-related queries

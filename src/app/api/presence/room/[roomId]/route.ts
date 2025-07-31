@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase'
 import { prisma } from '@/lib/prisma'
 
-interface RouteParams {
-  params: {
+interface RouteContext {
+  params: Promise<{
     roomId: string
-  }
+  }>
 }
 
 /**
@@ -14,10 +14,10 @@ interface RouteParams {
  */
 export async function GET(
   request: NextRequest,
-  { params }: RouteParams
+  { params }: RouteContext
 ) {
   try {
-    const { roomId } = params
+    const { roomId } = await params
     const { searchParams } = new URL(request.url)
     const includeDatabase = searchParams.get('includeDatabase') === 'true'
 
@@ -164,10 +164,10 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: RouteParams
+  { params }: RouteContext
 ) {
   try {
-    const { roomId } = params
+    const { roomId } = await params
     const body = await request.json()
     const { userId, action } = body // action: 'join' | 'leave'
 

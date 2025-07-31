@@ -264,10 +264,10 @@ export default function CreateVehicleForm({ projects, locations = [], onSuccess,
         const successMessage = `Vehicle "${formData.brand} ${formData.model}" created successfully!`;
         let description = `Plate: ${formData.plateNumber}`;
         
-        if (result.filesUploaded > 0) {
+        if (result.filesUploaded && result.filesUploaded > 0) {
           description += ` • ${result.filesUploaded} file(s) uploaded`;
         }
-        if (result.partsUploaded > 0) {
+        if (result.partsUploaded && result.partsUploaded > 0) {
           description += ` • ${result.partsUploaded} part(s) documented`;
         }
         if (result.maintenanceReportCreated) {

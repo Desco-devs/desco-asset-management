@@ -33,13 +33,13 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
   
   // Initialize real-time features
   const realtimeStatus = useChatRealtime(userId);
-  const messageSystem = useChatMessages(currentUser);
-  const presenceSystem = useChatPresence(currentUser, selectedRoom || undefined);
-  const typingSystem = useChatTyping(currentUser);
+  const messageSystem = useChatMessages(currentUser || undefined);
+  const presenceSystem = useChatPresence(currentUser || undefined, selectedRoom || undefined);
+  const typingSystem = useChatTyping(currentUser || undefined);
   const connectionSystem = useChatConnection(userId);
   
   // Initialize room membership real-time updates
-  useRoomMembershipRealtime(currentUser);
+  useRoomMembershipRealtime(currentUser || undefined);
 
   // Fetch rooms - using centralized query keys
   const { data: rooms = [], isLoading: isLoadingRooms, error } = useQuery({
@@ -112,19 +112,16 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
         description: roomData.description || '',
         type: roomData.type,
         owner_id: userId || '',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        room_members: [{
-          id: `temp-member-${Date.now()}`,
-          room_id: `temp-${Date.now()}`,
+        created_at: new Date(),
+        updated_at: new Date(),
+        members: [{
           user_id: userId || '',
-          role: 'OWNER',
-          joined_at: new Date().toISOString(),
-          user: currentUser
+          user: currentUser || undefined
         }],
-        last_message: null,
+        lastMessage: undefined,
         unread_count: 0,
-        _count: { room_members: 1 }
+        is_owner: true,
+        member_count: 1
       };
 
       // Optimistically update the cache

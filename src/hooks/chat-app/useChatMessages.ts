@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CHAT_QUERY_KEYS } from './queryKeys'
 import { useChatRealtime } from './useChatRealtime'
 import type { MessageWithRelations, SendMessageData, ChatUser } from '@/types/chat-app'
+import { MessageType, RoomType } from '@/types/chat-app'
 
 interface OptimisticMessage extends MessageWithRelations {
   optimistic_id: string
@@ -46,8 +47,8 @@ export function useChatMessages(currentUser?: ChatUser) {
     options: SendMessageOptions,
     optimisticId: string
   ): OptimisticMessage => {
-    // Use ISO string to match server format and avoid timezone issues
-    const now = new Date().toISOString()
+    // Use Date object for timestamps
+    const now = new Date()
     
     return {
       id: optimisticId,
@@ -55,7 +56,7 @@ export function useChatMessages(currentUser?: ChatUser) {
       room_id: options.roomId,
       sender_id: currentUser?.id || '',
       content: options.content,
-      type: options.type || 'TEXT',
+      type: (options.type as MessageType) || MessageType.TEXT,
       file_url: options.fileUrl,
       reply_to_id: options.replyToId,
       created_at: now,
@@ -70,7 +71,7 @@ export function useChatMessages(currentUser?: ChatUser) {
       room: {
         id: options.roomId,
         name: '', // Will be filled by real data
-        type: 'GROUP' // Default
+        type: RoomType.GROUP // Default
       },
       pending: true,
       failed: false,
@@ -165,7 +166,7 @@ export function useChatMessages(currentUser?: ChatUser) {
     return sendMessageMutation.mutateAsync({
       roomId: message.room_id,
       content: message.content,
-      type: message.type,
+      type: message.type as 'TEXT' | 'IMAGE' | 'FILE',
       fileUrl: message.file_url,
       replyToId: message.reply_to_id,
       optimisticId

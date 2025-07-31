@@ -25,7 +25,7 @@ const TypingIndicator = ({
 }: TypingIndicatorProps) => {
   const { typingUsers, typingText, isAnyoneTyping } = useRoomTyping(roomId, currentUser);
   const lastLogRef = useRef<string>('');
-  const logTimeoutRef = useRef<NodeJS.Timeout>();
+  const logTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Debounced debug logging and auto-scroll trigger
   useEffect(() => {

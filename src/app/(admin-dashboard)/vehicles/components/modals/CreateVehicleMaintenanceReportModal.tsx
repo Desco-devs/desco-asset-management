@@ -557,7 +557,7 @@ export default function CreateVehicleMaintenanceReportModal({
                     <SelectValue placeholder="Select user..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {usersData?.map((user) => (
+                    {usersData?.data?.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
                         {user.full_name}
                       </SelectItem>
