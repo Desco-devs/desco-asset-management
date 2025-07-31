@@ -11,20 +11,10 @@ import {
   ChevronUp,
   Loader2,
 } from "lucide-react";
-
-interface Message {
-  id: string;
-  content: string;
-  created_at: string;
-  sender: {
-    id: string;
-    username: string;
-    full_name: string;
-  };
-}
+import { MessageWithRelations } from "@/types/chat-app";
 
 interface MessagesListProps {
-  messages: Message[];
+  messages: MessageWithRelations[];
   currentUserId?: string;
   roomId?: string;
   onLoadMore?: () => void;

@@ -42,7 +42,7 @@ model user {
 }
 
 model room {
-  id         String    @id @default(uuid()) @db.Uuid
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name       String
   type       room_type @default(GROUP)
   owner_id   String    @db.Uuid
@@ -59,7 +59,7 @@ model room {
 }
 
 model room_member {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   room_id   String   @db.Uuid
   user_id   String   @db.Uuid
   joined_at DateTime @default(now())
@@ -73,7 +73,7 @@ model room_member {
 }
 
 model message {
-  id         String   @id @default(uuid()) @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   room_id    String   @db.Uuid
   sender_id  String   @db.Uuid
   content    String
@@ -205,10 +205,12 @@ model vehicle {
   created_at            DateTime                     @default(now())
   updated_at            DateTime                     @updatedAt
   created_by            String?                      @db.Uuid
+  registration_expiry   DateTime?
   maintenance_reports   maintenance_vehicle_report[]
   user                  user?                        @relation("VehicleCreatedBy", fields: [created_by], references: [id])
   project               project                      @relation(fields: [project_id], references: [id], onDelete: Cascade)
 
+  @@unique([plate_number, project_id], name: "unique_plate_per_project")
   @@index([project_id])
   @@index([created_by])
   @@index([status])
@@ -217,6 +219,7 @@ model vehicle {
   @@index([plate_number])
   @@index([inspection_date])
   @@index([expiry_date])
+  @@index([registration_expiry])
   @@index([created_at])
   @@map("vehicles")
 }

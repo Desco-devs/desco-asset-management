@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json(transformedRooms);
+    return NextResponse.json({ rooms: transformedRooms });
 
   } catch (error) {
     console.error("Error fetching rooms:", error);

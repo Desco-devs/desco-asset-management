@@ -1,179 +1,140 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import RoomsList from "./chat-components/RoomsList";
+import ChatHeader from "./chat-components/ChatHeader";
 import MessagesList from "./chat-components/MessagesList";
 import MessageInput from "./chat-components/MessageInput";
 import CreateRoomModal from "./chat-components/CreateRoomModal";
-import { createClient } from "@/lib/supabase";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
-
-interface Room {
-  id: string;
-  name: string;
-  type: 'DIRECT' | 'GROUP';
-  owner_id: string;
-  created_at: string;
-  updated_at: string;
-  lastMessage?: {
-    content: string;
-    sender_name: string;
-    created_at: string;
-  } | null;
-  is_owner: boolean;
-  member_count: number;
-  owner: {
-    id: string;
-    username: string;
-    full_name: string;
-  };
-  members: {
-    id: string;
-    user: {
-      id: string;
-      username: string;
-      full_name: string;
-    };
-  }[];
-}
-
-interface Message {
-  id: string;
-  content: string;
-  created_at: string;
-  sender: {
-    id: string;
-    username: string;
-    full_name: string;
-  };
-}
+import InvitationModal from "./chat-components/InvitationModal";
+import { useAuth } from "@/app/context/AuthContext";
+import { useChatApp } from "@/hooks/chat-app";
 
 const ChatApp = () => {
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [newMessage, setNewMessage] = useState('');
+  const { user, loading: authLoading } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = useState(false);
-  const [newRoomName, setNewRoomName] = useState('');
-  const supabase = createClient();
 
-  // Authentication setup
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (user && !error) {
-        setUser(user);
-        fetchRooms(user.id);
-      }
-      setAuthLoading(false);
-    };
+  const currentUserId = user?.id;
 
-    getUser();
+  // Use the combined chat app hook
+  const {
+    // State
+    selectedRoom,
+    invitationRoom,
+    messages,
+    currentRoom,
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          setUser(session.user);
-          fetchRooms(session.user.id);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setRooms([]);
-          setSelectedRoom(null);
-          setMessages([]);
-        }
-        setAuthLoading(false);
-      }
-    );
+    // Data
+    rooms,
+    users,
 
-    return () => subscription.unsubscribe();
-  }, [supabase]);
+    // Loading states
+    isLoading,
+    isLoadingMessages,
+    isLoadingMoreMessages,
+    hasMoreMessages,
+    isCreatingRoom,
+    isRespondingToInvitation,
+    isSendingMessage,
 
-  // Fetch rooms for user
-  const fetchRooms = async (userId: string) => {
+    // Errors
+    error,
+    createRoomError,
+    invitationResponseError,
+
+    // Actions
+    handleRoomSelect,
+    handleAcceptInvitation,
+    handleDeclineInvitation,
+    handleCreateRoom,
+    handleSendMessage,
+    setInvitationRoom,
+    loadMoreMessages,
+  } = useChatApp({
+    userId: currentUserId,
+    enabled: !authLoading && !!currentUserId,
+  });
+
+  const handleCreateRoomModal = () => {
+    setIsCreateRoomModalOpen(true);
+  };
+
+  const handleCreateRoomSubmit = async (roomData: {
+    name: string;
+    description?: string;
+    type: any;
+    invitedUsers: any[];
+    inviteUsername?: string;
+  }) => {
     try {
-      setIsLoading(true);
-      const response = await fetch(`/api/rooms/getall?userId=${userId}`);
-      const data = await response.json();
-      setRooms(data);
+      await handleCreateRoom(roomData);
+      console.log("Room creation submitted successfully");
+      setIsCreateRoomModalOpen(false);
     } catch (error) {
-      console.error('Error fetching rooms:', error);
-    } finally {
-      setIsLoading(false);
+      console.error("Error in handleCreateRoomSubmit:", error);
+      // Don't close modal if there's an error
     }
   };
 
-  // Fetch messages for selected room
-  const fetchMessages = async (roomId: string) => {
-    try {
-      const response = await fetch(`/api/messages/${roomId}`);
-      const data = await response.json();
-      setMessages(data.messages || []);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    }
+  const handleCall = () => {
+    console.log("Starting call in room:", currentRoom?.name);
   };
 
-  // Handle room selection
-  const handleRoomSelect = (room: Room) => {
-    setSelectedRoom(room);
-    fetchMessages(room.id);
+  const handleVideoCall = () => {
+    console.log("Starting video call in room:", currentRoom?.name);
   };
 
-
-  // Handle creating room
-  const handleCreateRoom = async () => {
-    if (!newRoomName.trim() || !user) return;
-
-    try {
-      const response = await fetch('/api/rooms/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: newRoomName,
-          type: 'GROUP',
-          ownerId: user.id,
-        }),
-      });
-
-      if (response.ok) {
-        setNewRoomName('');
-        setIsCreateRoomModalOpen(false);
-        fetchRooms(user.id); // Refresh rooms
-      }
-    } catch (error) {
-      console.error('Error creating room:', error);
-    }
+  const handleShowInfo = () => {
+    console.log("Show room info for:", currentRoom?.name);
   };
 
-  if (authLoading) {
+  const handleShowMore = () => {
+    console.log("Show more options for room:", currentRoom?.name);
+  };
+
+  const handleAttachFile = () => {
+    console.log("Attach file");
+  };
+
+  const handleEmojiPicker = () => {
+    console.log("Open emoji picker");
+  };
+
+  const handleDeleteRoom = async (roomId: string) => {
+    console.log("Delete room:", roomId);
+    // Placeholder for room deletion
+  };
+
+  const handleInviteUsersToRoom = async (inviteData: {
+    invitedUsers: any[];
+    inviteUsername?: string;
+    inviteEmail?: string;
+  }) => {
+    console.log("Invite users to room:", inviteData);
+    // Placeholder for user invitation
+  };
+
+  // Show loading if auth is still loading or we're fetching data
+  if (authLoading || isLoading || !currentUserId) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+      <div className="flex flex-row w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] bg-background items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  if (!user) {
+  // Show error state if there's an error
+  if (error) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+      <div className="flex flex-row w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] bg-background items-center justify-center">
         <div className="text-center">
-          <h3 className="text-lg font-medium text-muted-foreground mb-2">
-            Authentication Required
+          <h3 className="text-lg font-medium text-destructive mb-2">
+            Failed to load chat
           </h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Please sign in to access the chat application
+          <p className="text-sm text-muted-foreground">
+            {error.message || "An error occurred while loading the chat"}
           </p>
-          <button
-            onClick={() => window.location.href = '/auth/signin'}
-            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
-          >
-            Sign In
-          </button>
         </div>
       </div>
     );
@@ -185,76 +146,61 @@ const ChatApp = () => {
         <div className="h-full hidden md:flex md:w-80 border-r bg-card">
           <RoomsList
             rooms={rooms}
-            selectedRoom={selectedRoom?.id || ""}
-            onRoomSelect={(roomId) => {
-              const room = rooms.find(r => r.id === roomId);
-              if (room) handleRoomSelect(room);
-            }}
-            onCreateRoom={() => setIsCreateRoomModalOpen(true)}
-            currentUserId={user?.id}
-            isUserOnline={() => false}
-            onlineUserIds={[]}
+            selectedRoom={selectedRoom || ""}
+            onRoomSelect={handleRoomSelect}
+            onCreateRoom={handleCreateRoomModal}
+            currentUserId={currentUserId}
           />
         </div>
 
         <div className="h-full flex-1 flex flex-col min-w-0">
-          {selectedRoom ? (
-            <>
-              {/* Chat Header */}
-              <div className="border-b p-4">
-                <h3 className="font-semibold">{selectedRoom.name}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {selectedRoom.member_count} members
-                </p>
+          <ChatHeader
+            currentRoom={currentRoom}
+            rooms={rooms}
+            selectedRoom={selectedRoom || ""}
+            onRoomSelect={handleRoomSelect}
+            isMobileMenuOpen={isMobileMenuOpen}
+            setIsMobileMenuOpen={setIsMobileMenuOpen}
+            onCreateRoom={handleCreateRoomModal}
+            onCall={handleCall}
+            onVideoCall={handleVideoCall}
+            onShowInfo={handleShowInfo}
+            onShowMore={handleShowMore}
+            currentUserId={currentUserId}
+            users={users}
+            onDeleteRoom={handleDeleteRoom}
+            onInviteUsers={handleInviteUsersToRoom}
+          />
+
+          {currentRoom ? (
+            <div className="flex-1 flex flex-col min-h-0 w-full">
+              <div className="flex-1 overflow-hidden min-h-0">
+                <MessagesList
+                  messages={messages}
+                  currentUserId={currentUserId}
+                  roomId={selectedRoom || undefined}
+                  isLoading={isLoadingMessages}
+                  hasMoreMessages={hasMoreMessages}
+                  isLoadingMore={isLoadingMoreMessages}
+                  onLoadMore={() => {
+                    if (selectedRoom) {
+                      loadMoreMessages(selectedRoom);
+                    }
+                  }}
+                />
               </div>
 
-              <div className="flex-1 flex flex-col min-h-0 w-full">
-                <div className="flex-1 overflow-hidden min-h-0">
-                  <MessagesList
-                    messages={messages}
-                    currentUserId={user?.id}
-                    roomId={selectedRoom?.id || undefined}
-                    isLoading={false}
-                    hasMoreMessages={false}
-                    isLoadingMore={false}
-                    onLoadMore={() => {}}
-                  />
-                </div>
-
-                <div className="flex-shrink-0 border-t bg-background">
-                  <MessageInput
-                    roomName={selectedRoom.name}
-                    onSendMessage={async (message) => {
-                      if (!selectedRoom || !user) return;
-                      
-                      try {
-                        const response = await fetch('/api/messages/create', {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                          },
-                          body: JSON.stringify({
-                            roomId: selectedRoom.id,
-                            content: message,
-                            senderId: user.id,
-                          }),
-                        });
-
-                        if (response.ok) {
-                          fetchMessages(selectedRoom.id); // Refresh messages
-                        }
-                      } catch (error) {
-                        console.error('Error sending message:', error);
-                      }
-                    }}
-                    onAttachFile={() => console.log("Attach file")}
-                    onEmojiPicker={() => console.log("Open emoji picker")}
-                    placeholder={`Message ${selectedRoom.name}...`}
-                    disabled={false}
-                  />
-                </div>
+              <div className="flex-shrink-0 border-t bg-background">
+                <MessageInput
+                  roomName={currentRoom.name}
+                  onSendMessage={(message) => handleSendMessage(selectedRoom || "", message)}
+                  onAttachFile={handleAttachFile}
+                  onEmojiPicker={handleEmojiPicker}
+                  placeholder={`Message ${currentRoom.name}...`}
+                  disabled={isSendingMessage}
+                />
               </div>
-            </>
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center text-center">
               <div>
@@ -270,10 +216,18 @@ const ChatApp = () => {
                 </p>
                 {rooms.length === 0 && (
                   <button
-                    onClick={() => setIsCreateRoomModalOpen(true)}
+                    onClick={handleCreateRoomModal}
                     className="inline-flex items-center px-4 py-2 bg-chart-3 text-white rounded-md hover:bg-primary/90 transition-colors"
+                    disabled={isCreatingRoom}
                   >
-                    Create your first room
+                    {isCreatingRoom ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Creating...
+                      </>
+                    ) : (
+                      "Create your first room"
+                    )}
                   </button>
                 )}
               </div>
@@ -285,14 +239,36 @@ const ChatApp = () => {
       <CreateRoomModal
         isOpen={isCreateRoomModalOpen}
         onClose={() => setIsCreateRoomModalOpen(false)}
-        onCreateRoom={(roomData) => {
-          setNewRoomName(roomData.name);
-          handleCreateRoom();
-        }}
-        users={[]}
+        onCreateRoom={handleCreateRoomSubmit}
+        users={users}
         rooms={rooms}
-        currentUserId={user?.id}
+        currentUserId={currentUserId}
+        isCreating={isCreatingRoom}
       />
+
+      {invitationRoom && (
+        <InvitationModal
+          isOpen={!!invitationRoom}
+          onClose={() => setInvitationRoom(null)}
+          room={invitationRoom}
+          onAccept={handleAcceptInvitation}
+          onDecline={handleDeclineInvitation}
+          isLoading={isRespondingToInvitation}
+        />
+      )}
+
+      {/* Error notifications */}
+      {createRoomError && (
+        <div className="fixed bottom-4 right-4 bg-destructive text-destructive-foreground p-3 rounded-md shadow-lg">
+          Failed to create room: {createRoomError.message}
+        </div>
+      )}
+
+      {invitationResponseError && (
+        <div className="fixed bottom-4 right-4 bg-destructive text-destructive-foreground p-3 rounded-md shadow-lg">
+          Failed to respond to invitation: {invitationResponseError.message}
+        </div>
+      )}
     </div>
   );
 };

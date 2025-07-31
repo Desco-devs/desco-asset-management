@@ -16,38 +16,10 @@ import {
   ChartBar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface Room {
-  id: string;
-  name: string;
-  type: 'DIRECT' | 'GROUP';
-  owner_id: string;
-  created_at: string;
-  updated_at: string;
-  lastMessage?: {
-    content: string;
-    sender_name: string;
-    created_at: string;
-  } | null;
-  is_owner: boolean;
-  member_count: number;
-  owner: {
-    id: string;
-    username: string;
-    full_name: string;
-  };
-  members: {
-    id: string;
-    user: {
-      id: string;
-      username: string;
-      full_name: string;
-    };
-  }[];
-}
+import { RoomListItem } from "@/types/chat-app";
 
 interface RoomsListProps {
-  rooms: Room[];
+  rooms: RoomListItem[];
   selectedRoom: string;
   onRoomSelect: (roomId: string) => void;
   onCreateRoom?: () => void;

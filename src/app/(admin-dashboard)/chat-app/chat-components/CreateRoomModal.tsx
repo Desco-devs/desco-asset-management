@@ -26,6 +26,7 @@ interface CreateRoomModalProps {
   users: any[];
   rooms: any[];
   currentUserId?: string;
+  isCreating?: boolean;
 }
 
 const CreateRoomModal = ({
@@ -35,38 +36,51 @@ const CreateRoomModal = ({
   users,
   rooms,
   currentUserId,
+  isCreating = false,
 }: CreateRoomModalProps) => {
   const [roomName, setRoomName] = useState("");
   const [roomDescription, setRoomDescription] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleReset = () => {
     setRoomName("");
     setRoomDescription("");
+    setIsSubmitting(false);
   };
 
   const handleClose = () => {
+    if (isSubmitting || isCreating) return; // Prevent closing while creating
     handleReset();
     onClose();
   };
 
-  const handleCreate = () => {
-    if (!roomName.trim()) return;
+  const handleCreate = async () => {
+    if (!roomName.trim() || isSubmitting || isCreating) return;
 
-    const roomData = {
-      name: roomName,
-      description: roomDescription,
-      type: 'GROUP' as const,
-      invitedUsers: [],
-      inviteUsername: undefined,
-    };
+    setIsSubmitting(true);
+    
+    try {
+      const roomData = {
+        name: roomName,
+        description: roomDescription,
+        type: 'GROUP' as const,
+        invitedUsers: [],
+        inviteUsername: undefined,
+      };
 
-    onCreateRoom(roomData);
-    handleClose();
+      await onCreateRoom(roomData);
+      handleReset();
+      onClose();
+    } catch (error) {
+      setIsSubmitting(false);
+    }
   };
 
   const canProceed = () => {
-    return roomName.trim() !== "";
+    return roomName.trim() !== "" && !isSubmitting && !isCreating;
   };
+
+  const isLoading = isSubmitting || isCreating;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -88,6 +102,7 @@ const CreateRoomModal = ({
                 onChange={(e) => setRoomName(e.target.value)}
                 placeholder="Enter room name..."
                 className="mt-1"
+                disabled={isLoading}
               />
             </div>
             <div className="p-1 space-y-3">
@@ -99,6 +114,7 @@ const CreateRoomModal = ({
                 placeholder="What's this room about?"
                 className="mt-1"
                 rows={3}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -107,7 +123,7 @@ const CreateRoomModal = ({
         <div className="flex justify-between pt-4 border-t">
           <div></div>
           <div className="flex space-x-2">
-            <Button variant="outline" onClick={handleClose}>
+            <Button variant="outline" onClick={handleClose} disabled={isLoading}>
               Cancel
             </Button>
             <Button
@@ -115,7 +131,14 @@ const CreateRoomModal = ({
               onClick={handleCreate}
               disabled={!canProceed()}
             >
-              Create Room
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Creating...
+                </>
+              ) : (
+                "Create Room"
+              )}
             </Button>
           </div>
         </div>
