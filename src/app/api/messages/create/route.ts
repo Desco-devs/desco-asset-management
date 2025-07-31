@@ -26,8 +26,16 @@ export async function POST(request: NextRequest) {
             id: true,
             username: true,
             full_name: true,
+            user_profile: true,
           },
         },
+        room: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          }
+        }
       },
     });
 

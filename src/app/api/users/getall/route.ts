@@ -23,7 +23,30 @@ export async function GET() {
       }
     });
 
-    return NextResponse.json(users);
+    // Fetch email data from Supabase Auth for each user
+    const { createServiceRoleClient } = await import('@/lib/supabase-server')
+    const supabaseAdmin = createServiceRoleClient()
+    
+    // Add email to each user from Supabase Auth
+    const usersWithEmail = await Promise.all(
+      users.map(async (user: any) => {
+        try {
+          const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id)
+          return {
+            ...user,
+            email: authUser.user?.email || null
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch email for user ${user.id}:`, error)
+          return {
+            ...user,
+            email: null
+          }
+        }
+      })
+    )
+
+    return NextResponse.json({ users: usersWithEmail });
   } catch (error) {
     console.error('Error fetching users:', error);
     return NextResponse.json(

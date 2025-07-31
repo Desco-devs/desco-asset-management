@@ -31,6 +31,8 @@ model user {
   created_projects             project[]                      @relation("ProjectCreatedBy")
   room_memberships             room_member[]                  @relation("UserRoomMember")
   owned_rooms                  room[]                         @relation("RoomOwner")
+  sent_invitations             room_invitation[]              @relation("InvitationsSent")
+  received_invitations         room_invitation[]              @relation("InvitationsReceived")
   created_vehicles             vehicle[]                      @relation("VehicleCreatedBy")
 
   @@index([role])
@@ -42,15 +44,17 @@ model user {
 }
 
 model room {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name       String
-  type       room_type @default(GROUP)
-  owner_id   String    @db.Uuid
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  messages   message[]
-  members    room_member[]
-  owner      user      @relation("RoomOwner", fields: [owner_id], references: [id], onDelete: Cascade)
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  type        room_type         @default(GROUP)
+  owner_id    String            @db.Uuid
+  avatar_url  String?
+  created_at  DateTime          @default(now())
+  updated_at  DateTime          @updatedAt
+  messages    message[]
+  members     room_member[]
+  invitations room_invitation[]
+  owner       user              @relation("RoomOwner", fields: [owner_id], references: [id], onDelete: Cascade)
 
   @@index([owner_id])
   @@index([type])
@@ -86,6 +90,28 @@ model message {
   @@index([created_at])
   @@index([room_id, created_at])
   @@map("messages")
+}
+
+model room_invitation {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  room_id      String            @db.Uuid
+  invited_by   String            @db.Uuid
+  invited_user String            @db.Uuid
+  message      String?
+  status       invitation_status @default(PENDING)
+  created_at   DateTime          @default(now())
+  updated_at   DateTime          @updatedAt
+  room         room              @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  inviter      user              @relation("InvitationsSent", fields: [invited_by], references: [id], onDelete: Cascade)
+  invitee      user              @relation("InvitationsReceived", fields: [invited_user], references: [id], onDelete: Cascade)
+
+  @@unique([room_id, invited_user, status])
+  @@index([room_id])
+  @@index([invited_by])
+  @@index([invited_user])
+  @@index([status])
+  @@index([created_at])
+  @@map("room_invitations")
 }
 
 
@@ -330,5 +356,12 @@ enum report_status {
 enum room_type {
   DIRECT
   GROUP
+}
+
+enum invitation_status {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
 }
 

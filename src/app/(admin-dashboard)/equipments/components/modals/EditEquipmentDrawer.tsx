@@ -54,9 +54,8 @@ import { toast } from "sonner";
 import {
   selectIsMobile,
   selectSelectedEquipment,
-  useEquipmentsStore,
-  type Equipment,
-} from "@/stores/equipmentsStore";
+  useEquipmentStore,
+} from "@/stores/equipmentStore";
 
 // Submit button component that uses mutation state
 function SubmitButton({ isLoading }: { isLoading: boolean }) {
@@ -87,8 +86,8 @@ function EditEquipmentDrawer() {
   const { projects, equipments } = useEquipmentsWithReferenceData();
   
   // Client state from Zustand
-  const selectedEquipmentFromStore = useEquipmentsStore(selectSelectedEquipment);
-  const isMobile = useEquipmentsStore(selectIsMobile);
+  const selectedEquipmentFromStore = useEquipmentStore(selectSelectedEquipment);
+  const isMobile = useEquipmentStore(selectIsMobile);
   
   // CRITICAL FIX: Always use fresh server data to ensure synchronization
   // This ensures edit form always shows the latest data, same as view modal
@@ -101,7 +100,7 @@ function EditEquipmentDrawer() {
     setIsEditMode,
     setIsModalOpen,
     setSelectedEquipment,
-  } = useEquipmentsStore();
+  } = useEquipmentStore();
 
   // Mutations
   const updateEquipmentMutation = useUpdateEquipmentAction();
