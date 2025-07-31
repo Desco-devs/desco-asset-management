@@ -12,6 +12,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { MessageWithRelations } from "@/types/chat-app";
+import TypingIndicator from "./TypingIndicator";
 
 // Custom hook to handle client-side time formatting and avoid hydration issues
 const useClientTime = (timestamp: string | Date, messageId: string) => {
@@ -109,7 +110,18 @@ const MessagesList = ({
     const isInitialLoad =
       previousMessageCount.current === 0 && messages.length > 0;
 
-    if (shouldAutoScroll || isNewMessage || isInitialLoad || isRoomSwitch) {
+    // Check if the newest message is from another user (not current user)
+    const latestMessage = messages[messages.length - 1];
+    const isMessageFromOtherUser = latestMessage && latestMessage.sender?.id !== currentUserId;
+
+    // Auto-scroll conditions:
+    // 1. Room switch or initial load (always scroll)
+    // 2. New message from another user and user is near bottom
+    // 3. User manually wants to stay at bottom (shouldAutoScroll)
+    const shouldScroll = isRoomSwitch || isInitialLoad || 
+      (shouldAutoScroll && isNewMessage && isMessageFromOtherUser);
+
+    if (shouldScroll) {
       // Instant scroll for room switch and initial load, smooth for new messages only
       const behavior = isRoomSwitch || isInitialLoad ? "auto" : "smooth";
 
@@ -124,7 +136,7 @@ const MessagesList = ({
     }
 
     previousMessageCount.current = messages.length;
-  }, [messages, shouldAutoScroll, roomId]);
+  }, [messages, shouldAutoScroll, roomId, currentUserId]);
 
   // Handle scroll events to manage auto-scroll behavior
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
@@ -151,30 +163,32 @@ const MessagesList = ({
   return (
     <div className="relative h-full w-full">
       <ScrollArea
-        className="h-full w-full pt-2 sm:pt-6 px-2 sm:px-6"
+        className="h-full w-full pt-3 md:pt-4 px-3 md:px-4"
         ref={scrollAreaRef}
         onScrollCapture={handleScroll}
       >
-        <div className="space-y-3">
+        <div className="space-y-2 md:space-y-3 pb-4">
           {/* Load More Button for older messages */}
           {hasMoreMessages && (
-            <div className="flex justify-center py-4">
+            <div className="flex justify-center py-3 md:py-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onLoadMore}
                 disabled={isLoadingMore}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground rounded-full"
               >
                 {isLoadingMore ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Loading older messages...
+                    <span className="hidden sm:inline">Loading older messages...</span>
+                    <span className="sm:hidden">Loading...</span>
                   </>
                 ) : (
                   <>
                     <ChevronUp className="h-4 w-4 mr-2" />
-                    Load older messages
+                    <span className="hidden sm:inline">Load older messages</span>
+                    <span className="sm:hidden">Load more</span>
                   </>
                 )}
               </Button>
@@ -196,14 +210,14 @@ const MessagesList = ({
               <div
                 key={msg.id}
                 className={cn(
-                  "flex items-start gap-3 w-full px-2 sm:px-4 py-1",
+                  "flex items-start gap-2 md:gap-3 w-full py-1 md:py-1.5",
                   isMe && "flex-row-reverse"
                 )}
               >
-                {/* Avatar - always visible with consistent positioning */}
-                <div className="flex-shrink-0 mt-1">
+                {/* Avatar - smaller on mobile */}
+                <div className="flex-shrink-0 mt-0.5">
                   <Avatar className={cn(
-                    "h-8 w-8 ring-2 ring-background shadow-sm",
+                    "h-7 w-7 md:h-8 md:w-8 ring-1 md:ring-2 ring-background shadow-sm",
                     isMe && "ring-primary/20"
                   )}>
                     <AvatarImage 
@@ -224,28 +238,28 @@ const MessagesList = ({
                   </Avatar>
                 </div>
 
-                {/* Message content with improved spacing */}
+                {/* Message content with mobile-optimized spacing */}
                 <div
                   className={cn(
-                    "flex flex-col gap-1 max-w-[70%] sm:max-w-sm lg:max-w-md min-w-0",
+                    "flex flex-col gap-0.5 md:gap-1 max-w-[75%] md:max-w-[70%] lg:max-w-md min-w-0",
                     isMe && "items-end"
                   )}
                 >
                   {/* Sender name for others (positioned above message) */}
                   {!isMe && (
-                    <div className="px-2">
-                      <p className="text-xs font-medium text-muted-foreground capitalize">
+                    <div className="px-2 md:px-3">
+                      <p className="text-xs font-medium text-muted-foreground capitalize truncate">
                         {sender.full_name}
                       </p>
                     </div>
                   )}
 
-                  {/* Message bubble with improved styling */}
+                  {/* Message bubble with mobile-optimized styling */}
                   <div
                     className={cn(
-                      "rounded-2xl px-4 py-2.5 text-sm break-words shadow-sm",
+                      "rounded-2xl px-3 py-2 md:px-4 md:py-2.5 text-sm break-words shadow-sm transition-colors",
                       isMe
-                        ? "bg-primary text-primary-foreground rounded-tr-md"
+                        ? "bg-primary text-primary-foreground rounded-tr-md hover:bg-primary/90"
                         : "bg-muted text-foreground rounded-tl-md"
                     )}
                   >
@@ -268,6 +282,22 @@ const MessagesList = ({
               </div>
             );
           })}
+
+          {/* Typing Indicator */}
+          <TypingIndicator 
+            roomId={roomId} 
+            currentUser={currentUser}
+            className="mb-2"
+            onTypingChange={(isTyping) => {
+              // Only auto-scroll for typing indicators if user is near bottom
+              // This shows when someone else is typing
+              if (isTyping && shouldAutoScroll) {
+                setTimeout(() => {
+                  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                }, 300);
+              }
+            }}
+          />
 
           {/* Invisible div to scroll to */}
           <div ref={messagesEndRef} />

@@ -3,9 +3,55 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase'
-import { ROOMS_QUERY_KEYS } from './useChatApp'
+import { CHAT_QUERY_KEYS } from './queryKeys'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import type { MessageWithRelations } from '@/types/chat-app'
+import type { MessageWithRelations, ChatUser } from '@/types/chat-app'
+
+/**
+ * Helper function to enrich message data with sender information from cache
+ */
+function enrichMessageWithSenderData(message: any, queryClient: any): MessageWithRelations {
+  // Get users from cache
+  const users = queryClient.getQueryData(CHAT_QUERY_KEYS.users()) as ChatUser[] || []
+  
+  // Find the sender
+  const sender = users.find(user => user.id === message.sender_id)
+  
+  // Create enriched message with sender data
+  const enrichedMessage: MessageWithRelations = {
+    id: message.id,
+    room_id: message.room_id,
+    sender_id: message.sender_id,
+    content: message.content,
+    created_at: message.created_at,
+    updated_at: message.updated_at,
+    sender: sender ? {
+      id: sender.id,
+      username: sender.username,
+      full_name: sender.full_name,
+      user_profile: sender.user_profile,
+    } : {
+      id: message.sender_id,
+      username: 'Unknown',
+      full_name: 'Unknown User',
+      user_profile: null,
+    },
+    room: {
+      id: message.room_id,
+      name: 'Unknown Room',
+      type: 'GROUP' as any,
+    }
+  }
+  
+  console.log('🔄 Enriched message with sender data:', {
+    messageId: message.id,
+    senderId: message.sender_id,
+    senderFound: !!sender,
+    senderName: sender?.full_name || 'Unknown User'
+  })
+  
+  return enrichedMessage
+}
 
 /**
  * Network status for adaptive real-time behavior
@@ -138,7 +184,7 @@ export function useChatRealtime(userId?: string) {
 
   // Optimistic message update helper
   const updateMessageOptimistically = useCallback((message: MessageWithRelations, isConfirmed: boolean = false) => {
-    const roomMessagesKey = ROOMS_QUERY_KEYS.roomMessages(message.room_id)
+    const roomMessagesKey = CHAT_QUERY_KEYS.roomMessages(message.room_id)
     
     queryClient.setQueryData(roomMessagesKey, (oldMessages: MessageWithRelations[] = []) => {
       const existingIndex = oldMessages.findIndex(m => m.id === message.id)
@@ -167,7 +213,7 @@ export function useChatRealtime(userId?: string) {
 
   // Mark message as failed
   const markMessageFailed = useCallback((messageId: string, roomId: string) => {
-    const roomMessagesKey = ROOMS_QUERY_KEYS.roomMessages(roomId)
+    const roomMessagesKey = CHAT_QUERY_KEYS.roomMessages(roomId)
     
     queryClient.setQueryData(roomMessagesKey, (oldMessages: MessageWithRelations[] = []) => {
       return oldMessages.map(message => 
@@ -193,11 +239,13 @@ export function useChatRealtime(userId?: string) {
       if (payload.table === 'messages' && payload.new?.room_id) {
         // If this is a new message, confirm it was delivered
         if (payload.eventType === 'INSERT' && payload.new) {
-          updateMessageOptimistically(payload.new as MessageWithRelations, true)
+          // Enrich the message with sender data from the users cache
+          const enrichedMessage = enrichMessageWithSenderData(payload.new, queryClient)
+          updateMessageOptimistically(enrichedMessage, true)
         }
         
         queryClient.invalidateQueries({ 
-          queryKey: ROOMS_QUERY_KEYS.roomMessages(payload.new.room_id),
+          queryKey: CHAT_QUERY_KEYS.roomMessages(payload.new.room_id),
           exact: true
         })
       }
@@ -205,7 +253,7 @@ export function useChatRealtime(userId?: string) {
       // For rooms, invalidate user-specific room queries
       if (payload.table === 'rooms' && userId) {
         queryClient.invalidateQueries({ 
-          queryKey: ROOMS_QUERY_KEYS.rooms(userId),
+          queryKey: CHAT_QUERY_KEYS.rooms(userId),
           exact: true
         })
       }
@@ -214,14 +262,14 @@ export function useChatRealtime(userId?: string) {
       if (payload.table === 'room_members') {
         if (userId) {
           queryClient.invalidateQueries({ 
-            queryKey: ROOMS_QUERY_KEYS.rooms(userId),
+            queryKey: CHAT_QUERY_KEYS.rooms(userId),
             exact: true
           })
         }
         if (payload.new?.room_id || payload.old?.room_id) {
           const roomId = payload.new?.room_id || payload.old?.room_id
           queryClient.invalidateQueries({ 
-            queryKey: ROOMS_QUERY_KEYS.roomMessages(roomId),
+            queryKey: CHAT_QUERY_KEYS.roomMessages(roomId),
             exact: true
           })
         }

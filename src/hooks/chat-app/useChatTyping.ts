@@ -128,7 +128,14 @@ export function useChatTyping(currentUser?: ChatUser) {
 
   // Broadcast typing start (throttled)
   const startTyping = useCallback((roomId: string) => {
-    if (!channelRef.current || !currentUser || !isConnected) return
+    if (!channelRef.current || !currentUser || !isConnected) {
+      console.warn('⌨️ Cannot start typing - channel not ready:', { 
+        hasChannel: !!channelRef.current, 
+        hasUser: !!currentUser, 
+        isConnected 
+      })
+      return
+    }
     
     const key = `typing:${roomId}`
     if (isTypingRef.current[key]) return // Already typing
@@ -153,13 +160,18 @@ export function useChatTyping(currentUser?: ChatUser) {
     }).catch(error => {
       console.warn('[ChatTyping] Failed to send typing start:', error)
     })
-    
-    console.log('⌨️ Started typing in room:', roomId)
   }, [currentUser?.id, currentUser?.username, currentUser?.full_name, currentUser?.user_profile, isConnected])
 
   // Broadcast typing stop
   const stopTyping = useCallback((roomId: string) => {
-    if (!channelRef.current || !currentUser || !isConnected) return
+    if (!channelRef.current || !currentUser || !isConnected) {
+      console.warn('⌨️ Cannot stop typing - channel not ready:', { 
+        hasChannel: !!channelRef.current, 
+        hasUser: !!currentUser, 
+        isConnected 
+      })
+      return
+    }
     
     const key = `typing:${roomId}`
     if (!isTypingRef.current[key]) return // Not typing
@@ -184,13 +196,19 @@ export function useChatTyping(currentUser?: ChatUser) {
     }).catch(error => {
       console.warn('[ChatTyping] Failed to send typing stop:', error)
     })
-    
-    console.log('⌨️ Stopped typing in room:', roomId)
   }, [currentUser?.id, currentUser?.username, currentUser?.full_name, currentUser?.user_profile, isConnected])
 
   // Throttled typing handler for input events
   const handleTyping = useCallback((roomId: string) => {
-    if (!currentUser) return
+    if (!currentUser) {
+      console.warn('⌨️ No current user for typing')
+      return
+    }
+    
+    if (!isConnected) {
+      console.warn('⌨️ Cannot type - channel not connected')
+      return
+    }
     
     // Start typing immediately if not already typing
     const key = `typing:${roomId}`
@@ -207,9 +225,12 @@ export function useChatTyping(currentUser?: ChatUser) {
     throttleTimeoutRef.current = setTimeout(() => {
       stopTyping(roomId)
     }, TYPING_TIMEOUT)
-  }, [currentUser?.id, startTyping, stopTyping])
+  }, [currentUser?.id, startTyping, stopTyping, isConnected])
 
-  // Setup typing broadcast channel
+  // Forward declaration - will be used in setupTypingChannel
+  const reconnectTypingChannelRef = useRef<(() => void) | null>(null)
+
+  // Setup typing broadcast channel with reconnection
   const setupTypingChannel = useCallback(() => {
     if (!currentUser || channelRef.current) return
     
@@ -218,9 +239,12 @@ export function useChatTyping(currentUser?: ChatUser) {
     console.log('⌨️ Setting up typing indicators...')
     
     const channel = supabase
-      .channel('chat-typing', {
+      .channel(`chat-typing-global`, {
         config: {
-          broadcast: { self: false, ack: false } // Don't receive our own typing events
+          broadcast: { self: false, ack: false }, // Don't receive our own typing events
+          presence: { key: currentUser.id },
+          heartbeat_interval: 15000, // 15s heartbeat - shorter for typing responsiveness
+          timeout: 30000 // 30s timeout
         }
       })
       .on('broadcast', { event: 'typing' }, (payload) => {
@@ -243,13 +267,63 @@ export function useChatTyping(currentUser?: ChatUser) {
           removeTypingUser(data.room_id, data.user.user_id)
         }
       })
+      .on('system', {}, (payload) => {
+        console.log('⌨️ Typing system event:', payload)
+        if (payload.extension === 'broadcast') {
+          switch (payload.status) {
+            case 'SUBSCRIBED':
+              setIsConnected(true)
+              console.log('⌨️ Typing channel connected successfully')
+              break
+            case 'CHANNEL_ERROR':
+            case 'TIMED_OUT':
+              setIsConnected(false)
+              console.warn('⌨️ Typing channel error, reconnecting...', payload.status)
+              if (reconnectTypingChannelRef.current) {
+                reconnectTypingChannelRef.current()
+              }
+              break
+            case 'CLOSED':
+              setIsConnected(false)
+              console.log('⌨️ Typing channel closed')
+              break
+          }
+        }
+      })
       .subscribe((status) => {
         console.log('⌨️ Typing subscription status:', status)
-        setIsConnected(status === 'SUBSCRIBED')
+        if (status === 'SUBSCRIBED') {
+          setIsConnected(true)
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setIsConnected(false)
+          console.warn('⌨️ Typing subscription failed, will retry...', status)
+          if (reconnectTypingChannelRef.current) {
+            reconnectTypingChannelRef.current()
+          }
+        } else if (status === 'CLOSED') {
+          setIsConnected(false)
+        }
       })
     
     channelRef.current = channel
-  }, [currentUser?.id])
+  }, [currentUser?.id, addTypingUser, removeTypingUser])
+
+  // Create the actual reconnect function
+  const reconnectTypingChannel = useCallback(() => {
+    if (channelRef.current) {
+      channelRef.current.unsubscribe()
+      channelRef.current = null
+    }
+    // Small delay to avoid rapid reconnections
+    setTimeout(() => {
+      if (currentUser && !channelRef.current) {
+        setupTypingChannel()
+      }
+    }, 1000)
+  }, [currentUser, setupTypingChannel])
+
+  // Set the ref so it can be used in setupTypingChannel
+  reconnectTypingChannelRef.current = reconnectTypingChannel
 
   // Cleanup function
   const cleanup = useCallback(() => {

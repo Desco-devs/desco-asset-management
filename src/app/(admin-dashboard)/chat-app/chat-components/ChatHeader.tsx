@@ -26,9 +26,6 @@ import {
   Hash,
   MoreVertical,
   Menu,
-  Phone,
-  Video,
-  Info,
   Trash2,
   UserPlus,
   ChartBar,
@@ -37,8 +34,10 @@ import { cn } from "@/lib/utils";
 import { RoomListItem, RoomType, ChatUser } from "@/types/chat-app";
 import RoomsList from "./RoomsList";
 import InviteUsersModal from "./InviteUsersModal";
+import InvitationNotificationModal, { InvitationBell } from "./InvitationNotificationModal";
 import { DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { OnlineStatusDot, OnlineStatusText, OnlineCountBadge } from "./OnlinePresence";
 
 interface ChatHeaderProps {
   currentRoom?: RoomListItem;
@@ -48,10 +47,6 @@ interface ChatHeaderProps {
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (open: boolean) => void;
   onCreateRoom?: () => void;
-  onCall?: () => void;
-  onVideoCall?: () => void;
-  onShowInfo?: () => void;
-  onShowMore?: () => void;
   currentUserId?: string;
   users?: ChatUser[];
   onDeleteRoom?: (roomId: string) => void;
@@ -70,10 +65,6 @@ const ChatHeader = ({
   isMobileMenuOpen,
   setIsMobileMenuOpen,
   onCreateRoom,
-  onCall,
-  onVideoCall,
-  onShowInfo,
-  onShowMore,
   currentUserId,
   users = [],
   onDeleteRoom,
@@ -81,6 +72,7 @@ const ChatHeader = ({
 }: ChatHeaderProps) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isInvitationModalOpen, setIsInvitationModalOpen] = useState(false);
 
   // For direct messages, we need to determine the other user
   const getOtherUserId = () => {
@@ -94,12 +86,9 @@ const ChatHeader = ({
   };
 
   const otherUserId = getOtherUserId();
-  const isOnline = false; // Simplified - no real-time status for now
 
-  const getOnlineStatusText = () => {
-    if (!otherUserId || currentRoom?.type !== RoomType.DIRECT) return "";
-    return "Offline"; // Simplified
-  };
+  // Get current user for presence tracking
+  const currentUser = users?.find(user => user.id === currentUserId);
 
   const handleDeleteRoom = () => {
     if (currentRoom && onDeleteRoom) {
@@ -124,87 +113,106 @@ const ChatHeader = ({
     currentRoom?.owner_id === currentUserId || currentRoom?.is_owner === true;
 
   return (
-    <div className="flex w-full items-center justify-between py-2 border-b bg-background">
-      <div className="flex items-center gap-2 md:px-2 px-0 w-full">
-        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="sm" className="md:hidden block">
-              <Menu className="h-4 w-4" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-80 [&>button]:hidden">
-            <VisuallyHidden>
-              <DialogTitle>Room List</DialogTitle>
-            </VisuallyHidden>
-            <RoomsList
-              rooms={rooms}
-              selectedRoom={selectedRoom}
-              onRoomSelect={(roomId) => {
-                onRoomSelect(roomId);
-                setIsMobileMenuOpen(false);
-              }}
-              onCreateRoom={onCreateRoom}
-              currentUserId={currentUserId}
-            />
-          </SheetContent>
-        </Sheet>
+    <div className="flex w-full items-center justify-between py-2 md:py-3 px-2 md:px-4 border-b bg-background">
+      <div className="flex items-center gap-2 w-full min-w-0">
+        {/* Mobile: Back button when in chat, Menu when in room list */}
+        {currentRoom ? (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="md:hidden flex-shrink-0"
+            onClick={() => onRoomSelect('')} // Clear selection to go back to room list
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Button>
+        ) : (
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="sm" className="md:hidden flex-shrink-0">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-80 [&>button]:hidden">
+              <VisuallyHidden>
+                <DialogTitle>Room List</DialogTitle>
+              </VisuallyHidden>
+              <RoomsList
+                rooms={rooms}
+                selectedRoom={selectedRoom}
+                onRoomSelect={(roomId) => {
+                  onRoomSelect(roomId);
+                  setIsMobileMenuOpen(false);
+                }}
+                onCreateRoom={onCreateRoom}
+                currentUserId={currentUserId}
+                currentUser={currentUser}
+              />
+            </SheetContent>
+          </Sheet>
+        )}
 
-        <div className="relative sm:flex hidden">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={currentRoom?.avatar_url || ""} />
-            <AvatarFallback className="text-sm">
-              {currentRoom?.name.substring(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          {currentRoom?.type === RoomType.DIRECT && (
-            <div
-              className={cn(
-                "absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background",
-                isOnline ? "bg-green-500" : "bg-gray-400"
-              )}
-            />
-          )}
-        </div>
-
-        <div>
-          <div className="flex items-center gap-1 md:gap-2 md:max-w-56 lg:max-w-fit max-w-24 w-full">
-            {currentRoom?.type === RoomType.GROUP && (
-              <ChartBar className="w-3 h-3 min-w-3 min-h-3 max-w-3 max-h-3 text-muted-foreground" />
+        {/* Room Avatar - visible on all screen sizes when room is selected */}
+        {currentRoom && (
+          <div className="relative flex-shrink-0">
+            <Avatar className="h-8 w-8 md:h-9 md:w-9">
+              <AvatarImage src={currentRoom?.avatar_url || ""} />
+              <AvatarFallback className="text-sm">
+                {currentRoom?.name.substring(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            {currentRoom?.type === RoomType.DIRECT && otherUserId && (
+              <OnlineStatusDot
+                userId={otherUserId}
+                currentUser={currentUser}
+                className="absolute -bottom-1 -right-1"
+              />
             )}
-            <p className="font-medium text-base line-clamp-1">
-              {currentRoom?.name}
-            </p>
+          </div>
+        )}
+
+        {/* Room Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1 md:gap-2 w-full">
+            {currentRoom?.type === RoomType.GROUP && (
+              <ChartBar className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0 text-muted-foreground" />
+            )}
+            <h1 className="font-medium text-base md:text-lg line-clamp-1 truncate">
+              {currentRoom?.name || "Messages"}
+            </h1>
           </div>
           {currentRoom?.type === RoomType.GROUP && (
-            <p className="text-[10px] text-muted-foreground flex items-center">
-              <Users className="h-3 w-3 mr-1" />
-              {currentRoom.member_count}{" "}
-              {currentRoom.member_count !== 0 ? "member" : "members"}
-            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-xs text-muted-foreground flex items-center">
+                <Users className="h-3 w-3 mr-1" />
+                {currentRoom.member_count}{" "}
+                {currentRoom.member_count === 1 ? "member" : "members"}
+              </p>
+              {/* Show online count for group rooms */}
+              <OnlineCountBadge
+                currentUser={currentUser}
+                currentRoomId={currentRoom.id}
+                size="sm"
+              />
+            </div>
           )}
-          {currentRoom?.type === RoomType.DIRECT && (
-            <p
-              className={cn(
-                "text-xs",
-                isOnline ? "text-green-600" : "text-muted-foreground"
-              )}
-            >
-              {getOnlineStatusText()}
-            </p>
+          {currentRoom?.type === RoomType.DIRECT && otherUserId && (
+            <OnlineStatusText
+              userId={otherUserId}
+              currentUser={currentUser}
+              size="sm"
+            />
           )}
         </div>
       </div>
 
-      <div className="flex items-center space-x-2 px-2">
-        <Button variant="ghost" size="sm" onClick={onCall}>
-          <Phone className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onVideoCall}>
-          <Video className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onShowInfo}>
-          <Info className="h-4 w-4" />
-        </Button>
+      <div className="flex items-center space-x-1 md:space-x-2 flex-shrink-0">
+        {/* Invitation Bell - Always visible */}
+        <InvitationBell
+          currentUser={currentUser}
+          onClick={() => setIsInvitationModalOpen(true)}
+        />
 
         {/* Show dropdown menu based on room type and permissions */}
         {(currentRoom?.type === RoomType.DIRECT ||
@@ -282,6 +290,14 @@ const ChatHeader = ({
           currentUserId={currentUserId}
         />
       )}
+
+      {/* Invitation Notification Modal */}
+      <InvitationNotificationModal
+        isOpen={isInvitationModalOpen}
+        onClose={() => setIsInvitationModalOpen(false)}
+        currentUser={currentUser}
+        onRoomSelect={onRoomSelect}
+      />
     </div>
   );
 };

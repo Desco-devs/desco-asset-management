@@ -1,14 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { RoomListItem } from "@/types/chat-app";
-
-export const ROOMS_QUERY_KEYS = {
-  rooms: (userId: string) => ["rooms", userId],
-  roomMessages: (roomId: string) => ["room-messages", roomId],
-};
+import { CHAT_QUERY_KEYS, ROOMS_QUERY_KEYS } from './queryKeys';
 
 export const useRooms = (userId?: string) => {
   return useQuery({
-    queryKey: ROOMS_QUERY_KEYS.rooms(userId || ""),
+    queryKey: CHAT_QUERY_KEYS.rooms(userId || ""),
     queryFn: async (): Promise<RoomListItem[]> => {
       const response = await fetch(`/api/rooms/getall?userId=${userId}`);
       if (!response.ok) {

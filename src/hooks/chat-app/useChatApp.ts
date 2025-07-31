@@ -6,11 +6,8 @@ import { useChatRealtime } from './useChatRealtime';
 import { useChatPresence } from './useChatPresence';
 import { useChatTyping } from './useChatTyping';
 import { useChatConnection } from './useChatConnection';
-
-export const ROOMS_QUERY_KEYS = {
-  rooms: (userId: string) => ["rooms", userId],
-  roomMessages: (roomId: string) => ["room-messages", roomId],
-};
+import { useRoomMembershipRealtime } from './useRoomMembershipRealtime';
+import { CHAT_QUERY_KEYS, ROOMS_QUERY_KEYS } from './queryKeys';
 
 interface UseChatAppOptions {
   userId?: string;
@@ -40,10 +37,13 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
   const presenceSystem = useChatPresence(currentUser, selectedRoom || undefined);
   const typingSystem = useChatTyping(currentUser);
   const connectionSystem = useChatConnection(userId);
+  
+  // Initialize room membership real-time updates
+  useRoomMembershipRealtime(currentUser);
 
-  // Fetch rooms - using existing Phase 1 infrastructure
+  // Fetch rooms - using centralized query keys
   const { data: rooms = [], isLoading: isLoadingRooms, error } = useQuery({
-    queryKey: ROOMS_QUERY_KEYS.rooms(userId || ""),
+    queryKey: CHAT_QUERY_KEYS.rooms(userId || ""),
     queryFn: async (): Promise<RoomListItem[]> => {
       const response = await fetch(`/api/rooms/getall?userId=${userId}`);
       if (!response.ok) {
@@ -55,9 +55,9 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
     enabled: enabled && !!userId,
   });
 
-  // Fetch users - using existing Phase 1 infrastructure
+  // Fetch users - using centralized query keys
   const { data: users = [] } = useQuery({
-    queryKey: ["users"],
+    queryKey: CHAT_QUERY_KEYS.users(),
     queryFn: async (): Promise<ChatUser[]> => {
       const response = await fetch("/api/users/getall");
       if (!response.ok) {
@@ -69,9 +69,9 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
     enabled,
   });
 
-  // Fetch messages for selected room - using existing Phase 1 infrastructure
+  // Fetch messages for selected room - using centralized query keys
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
-    queryKey: ROOMS_QUERY_KEYS.roomMessages(selectedRoom || ""),
+    queryKey: CHAT_QUERY_KEYS.roomMessages(selectedRoom || ""),
     queryFn: async (): Promise<MessageWithRelations[]> => {
       if (!selectedRoom) return [];
       const response = await fetch(`/api/messages/${selectedRoom}`);
@@ -100,10 +100,10 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
     },
     onMutate: async (roomData) => {
       // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ROOMS_QUERY_KEYS.rooms(userId || "") });
+      await queryClient.cancelQueries({ queryKey: CHAT_QUERY_KEYS.rooms(userId || "") });
 
       // Snapshot the previous value
-      const previousRooms = queryClient.getQueryData(ROOMS_QUERY_KEYS.rooms(userId || ""));
+      const previousRooms = queryClient.getQueryData(CHAT_QUERY_KEYS.rooms(userId || ""));
 
       // Create optimistic room
       const optimisticRoom: RoomListItem = {
@@ -128,7 +128,7 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
       };
 
       // Optimistically update the cache
-      queryClient.setQueryData(ROOMS_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => [
+      queryClient.setQueryData(CHAT_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => [
         optimisticRoom,
         ...old
       ]);
@@ -139,12 +139,12 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
     onError: (err, roomData, context) => {
       // Rollback on error
       if (context?.previousRooms) {
-        queryClient.setQueryData(ROOMS_QUERY_KEYS.rooms(userId || ""), context.previousRooms);
+        queryClient.setQueryData(CHAT_QUERY_KEYS.rooms(userId || ""), context.previousRooms);
       }
     },
     onSuccess: (data, variables, context) => {
       // Replace optimistic room with real room
-      queryClient.setQueryData(ROOMS_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => {
+      queryClient.setQueryData(CHAT_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => {
         return old.map(room => 
           room.id === context?.optimisticRoom?.id ? data.room : room
         );
@@ -157,7 +157,7 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
     },
     onSettled: () => {
       // Always refetch after mutation settles
-      queryClient.invalidateQueries({ queryKey: ROOMS_QUERY_KEYS.rooms(userId || "") });
+      queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.rooms(userId || "") });
     },
     // Prevent multiple concurrent executions
     mutationKey: ['createRoom', userId],
@@ -178,26 +178,59 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
     // Success and error handling is now managed by useChatMessages
   });
 
-  // Simplified invitation mutations (placeholders for Phase 1)
+  // Real invitation mutations using the actual API
   const acceptInvitationMutation = useMutation({
     mutationFn: async (invitationId: string) => {
-      console.log("Accept invitation:", invitationId);
-      // Placeholder - will use existing Phase 1 infrastructure when ready
-      return { success: true };
+      const response = await fetch(`/api/rooms/invitations/${invitationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'ACCEPTED' })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to accept invitation');
+      }
+      
+      return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ROOMS_QUERY_KEYS.rooms(userId || "") });
+    onSuccess: (data) => {
+      // Immediately invalidate room queries to show the new room
+      queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.rooms(userId || "") });
+      
+      // Also invalidate invitation queries
+      queryClient.invalidateQueries({ 
+        queryKey: CHAT_QUERY_KEYS.invitations(userId || '', 'received', 'PENDING') 
+      });
+      
+      // Auto-select the joined room
+      if (data.invitation?.room_id) {
+        console.log('🎯 Auto-selecting joined room:', data.invitation.room_id);
+        setSelectedRoom(data.invitation.room_id);
+      }
     },
   });
 
   const declineInvitationMutation = useMutation({
     mutationFn: async (invitationId: string) => {
-      console.log("Decline invitation:", invitationId);
-      // Placeholder - will use existing Phase 1 infrastructure when ready
-      return { success: true };
+      const response = await fetch(`/api/rooms/invitations/${invitationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DECLINED' })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to decline invitation');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ROOMS_QUERY_KEYS.rooms(userId || "") });
+      // Just invalidate invitation queries for declined invitations
+      queryClient.invalidateQueries({ 
+        queryKey: CHAT_QUERY_KEYS.invitations(userId || '', 'received', 'PENDING') 
+      });
     },
   });
 

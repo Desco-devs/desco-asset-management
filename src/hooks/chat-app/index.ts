@@ -1,5 +1,6 @@
 // Core chat functionality
-export { useChatApp, ROOMS_QUERY_KEYS } from './useChatApp';
+export { useChatApp } from './useChatApp';
+export { CHAT_QUERY_KEYS, ROOMS_QUERY_KEYS, INVITATIONS_QUERY_KEYS } from './queryKeys';
 export { useRooms } from './useRooms';
 export { useRoomInvitations, ROOM_INVITATIONS_QUERY_KEYS } from './useRoomInvitations';
 

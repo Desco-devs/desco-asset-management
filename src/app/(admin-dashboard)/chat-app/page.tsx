@@ -7,6 +7,7 @@ import MessagesList from "./chat-components/MessagesList";
 import MessageInput from "./chat-components/MessageInput";
 import CreateRoomModal from "./chat-components/CreateRoomModal";
 import InvitationModal from "./chat-components/InvitationModal";
+import { ChatAppSkeleton } from "./chat-components/ChatSkeleton";
 import { useAuth } from "@/app/context/AuthContext";
 import { useChatApp } from "@/hooks/chat-app";
 
@@ -78,21 +79,6 @@ const ChatApp = () => {
     }
   };
 
-  const handleCall = () => {
-    console.log("Starting call in room:", currentRoom?.name);
-  };
-
-  const handleVideoCall = () => {
-    console.log("Starting video call in room:", currentRoom?.name);
-  };
-
-  const handleShowInfo = () => {
-    console.log("Show room info for:", currentRoom?.name);
-  };
-
-  const handleShowMore = () => {
-    console.log("Show more options for room:", currentRoom?.name);
-  };
 
   const handleAttachFile = () => {
     console.log("Attach file");
@@ -116,11 +102,11 @@ const ChatApp = () => {
     // Placeholder for user invitation
   };
 
-  // Show loading if auth is still loading or we're fetching data
+  // Show loading skeleton if auth is still loading or we're fetching data
   if (authLoading || isLoading || !currentUserId) {
     return (
-      <div className="flex flex-row w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] bg-background items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex flex-row w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] bg-background">
+        <ChatAppSkeleton />
       </div>
     );
   }
@@ -142,8 +128,9 @@ const ChatApp = () => {
   }
 
   return (
-    <div className="w-full h-full p-2 md:p-4 overflow-hidden">
-      <div className="flex flex-row w-full h-[89dvh] md:h-[85dvh] bg-background border border-chart-1/20 rounded-md overflow-hidden">
+    <div className="w-full h-full md:p-2 lg:p-4 overflow-hidden">
+      <div className="flex flex-row w-full h-[100dvh] md:h-[89dvh] lg:h-[85dvh] bg-background md:border md:border-chart-1/20 md:rounded-md overflow-hidden">
+        {/* Desktop Sidebar */}
         <div className="h-full hidden md:flex md:w-80 border-r bg-card">
           <RoomsList
             rooms={rooms}
@@ -151,9 +138,11 @@ const ChatApp = () => {
             onRoomSelect={handleRoomSelect}
             onCreateRoom={handleCreateRoomModal}
             currentUserId={currentUserId}
+            currentUser={user}
           />
         </div>
 
+        {/* Main Chat Area */}
         <div className="h-full flex-1 flex flex-col min-w-0">
           <ChatHeader
             currentRoom={currentRoom}
@@ -163,16 +152,27 @@ const ChatApp = () => {
             isMobileMenuOpen={isMobileMenuOpen}
             setIsMobileMenuOpen={setIsMobileMenuOpen}
             onCreateRoom={handleCreateRoomModal}
-            onCall={handleCall}
-            onVideoCall={handleVideoCall}
-            onShowInfo={handleShowInfo}
-            onShowMore={handleShowMore}
             currentUserId={currentUserId}
             users={users}
             onDeleteRoom={handleDeleteRoom}
             onInviteUsers={handleInviteUsersToRoom}
           />
 
+          {/* Mobile: Show room list when no room is selected */}
+          {!currentRoom && (
+            <div className="flex-1 md:hidden">
+              <RoomsList
+                rooms={rooms}
+                selectedRoom={selectedRoom || ""}
+                onRoomSelect={handleRoomSelect}
+                onCreateRoom={handleCreateRoomModal}
+                currentUserId={currentUserId}
+                currentUser={user}
+              />
+            </div>
+          )}
+
+          {/* Chat Content */}
           {currentRoom ? (
             <div className="flex-1 flex flex-col min-h-0 w-full">
               <div className="flex-1 overflow-hidden min-h-0">
@@ -195,16 +195,19 @@ const ChatApp = () => {
               <div className="flex-shrink-0 border-t bg-background">
                 <MessageInput
                   roomName={currentRoom.name}
+                  roomId={selectedRoom || undefined}
                   onSendMessage={(message) => handleSendMessage(selectedRoom || "", message)}
                   onAttachFile={handleAttachFile}
                   onEmojiPicker={handleEmojiPicker}
                   placeholder={`Message ${currentRoom.name}...`}
                   disabled={isSendingMessage}
+                  currentUser={user}
                 />
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-center">
+            /* Desktop Empty State */
+            <div className="flex-1 hidden md:flex items-center justify-center text-center">
               <div>
                 <h3 className="text-lg font-medium text-muted-foreground mb-2">
                   {rooms.length === 0

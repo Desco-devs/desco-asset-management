@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ROOMS_QUERY_KEYS } from './useChatApp'
+import { CHAT_QUERY_KEYS } from './queryKeys'
 import { useChatRealtime } from './useChatRealtime'
 import type { MessageWithRelations, SendMessageData, ChatUser } from '@/types/chat-app'
 
@@ -81,7 +81,7 @@ export function useChatMessages(currentUser?: ChatUser) {
 
   // Add optimistic message to UI immediately
   const addOptimisticMessage = useCallback((message: OptimisticMessage) => {
-    const roomMessagesKey = ROOMS_QUERY_KEYS.roomMessages(message.room_id)
+    const roomMessagesKey = CHAT_QUERY_KEYS.roomMessages(message.room_id)
     
     // Add to query cache for immediate UI update
     queryClient.setQueryData(roomMessagesKey, (oldMessages: MessageWithRelations[] = []) => {
@@ -117,7 +117,7 @@ export function useChatMessages(currentUser?: ChatUser) {
       const updated = { ...message, ...updates }
       
       // Update in query cache
-      const roomMessagesKey = ROOMS_QUERY_KEYS.roomMessages(message.room_id)
+      const roomMessagesKey = CHAT_QUERY_KEYS.roomMessages(message.room_id)
       queryClient.setQueryData(roomMessagesKey, (oldMessages: MessageWithRelations[] = []) => {
         return oldMessages.map(msg => 
           (msg as any).optimistic_id === optimisticId || msg.id === optimisticId
@@ -214,7 +214,7 @@ export function useChatMessages(currentUser?: ChatUser) {
       
       if (optimisticId) {
         // Replace optimistic message with real message
-        const roomMessagesKey = ROOMS_QUERY_KEYS.roomMessages(variables.roomId)
+        const roomMessagesKey = CHAT_QUERY_KEYS.roomMessages(variables.roomId)
         
         queryClient.setQueryData(roomMessagesKey, (oldMessages: MessageWithRelations[] = []) => {
           return oldMessages.map(msg => {
@@ -237,10 +237,10 @@ export function useChatMessages(currentUser?: ChatUser) {
       
       // Invalidate queries for real-time sync
       queryClient.invalidateQueries({ 
-        queryKey: ROOMS_QUERY_KEYS.roomMessages(variables.roomId) 
+        queryKey: CHAT_QUERY_KEYS.roomMessages(variables.roomId) 
       })
       queryClient.invalidateQueries({ 
-        queryKey: ROOMS_QUERY_KEYS.rooms(currentUser?.id || '') 
+        queryKey: CHAT_QUERY_KEYS.rooms(currentUser?.id || '') 
       })
     },
     onError: (error, variables) => {
@@ -300,7 +300,7 @@ export function useChatMessages(currentUser?: ChatUser) {
     if (!message) return
     
     // Remove from query cache
-    const roomMessagesKey = ROOMS_QUERY_KEYS.roomMessages(message.room_id)
+    const roomMessagesKey = CHAT_QUERY_KEYS.roomMessages(message.room_id)
     queryClient.setQueryData(roomMessagesKey, (oldMessages: MessageWithRelations[] = []) => {
       return oldMessages.filter(msg => 
         (msg as any).optimistic_id !== optimisticId && msg.id !== optimisticId

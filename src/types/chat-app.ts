@@ -288,6 +288,67 @@ export interface OnlineStatus {
   last_seen?: Date;
 }
 
+// Extended presence types for the new online presence system
+export interface PresenceUser {
+  user_id: string;
+  username: string;
+  full_name: string;
+  user_profile?: string;
+  last_seen: string;
+  room_id?: string;
+  is_online: boolean;
+}
+
+export interface PresenceData {
+  user_id: string;
+  username: string;
+  full_name: string;
+  user_profile?: string;
+  room_id?: string;
+  timestamp: string;
+}
+
+export interface PresenceState {
+  [userId: string]: {
+    user_id: string;
+    username: string;
+    full_name: string;
+    user_profile?: string;
+    online_at: string;
+    room_id?: string;
+  };
+}
+
+export interface PresenceStats {
+  totalOnline: number;
+  inCurrentRoom: number;
+  heartbeatInterval: number;
+  lastHeartbeat: Date;
+}
+
+export interface RoomPresenceInfo {
+  room_id: string;
+  users_in_room: PresenceUser[];
+  online_members: PresenceUser[];
+  counts: {
+    in_room: number;
+    online_members: number;
+    total_members: number;
+  };
+}
+
+export interface PresenceAnalytics {
+  total_registered_users: number;
+  currently_online_realtime: number;
+  currently_online_database: number;
+  recently_active: number;
+  rooms_with_activity: number;
+  total_rooms: number;
+  online_percentage: string;
+  engagement_rate: number;
+  average_session_minutes: number;
+}
+
 export interface ChatNotification {
   id: string;
   type: 'message' | 'invitation' | 'mention';
