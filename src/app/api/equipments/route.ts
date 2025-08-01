@@ -242,6 +242,88 @@ const uploadFileToSupabase = async (
   return { field: getFieldName(prefix), url: urlData.publicUrl };
 };
 
+// Retrieve parts files from Supabase storage for equipment viewing
+const retrievePartsFromStorage = async (equipmentId: string): Promise<{ rootFiles: any[], folders: any[] }> => {
+  try {
+    const partsDir = `equipment-${equipmentId}/parts-management`;
+    
+    // List all items in the parts directory
+    const { data: items, error } = await supabase.storage
+      .from("equipments")
+      .list(partsDir, { limit: 1000 });
+
+    if (error || !items) {
+      console.log(`ℹ️ No parts directory found for equipment ${equipmentId}`);
+      return { rootFiles: [], folders: [] };
+    }
+
+    const rootFiles: any[] = [];
+    const foldersMap: Record<string, any[]> = {};
+
+    // Process each item to determine if it's a root file or folder
+    for (const item of items) {
+      if (item.name === '.placeholder') continue; // Skip placeholder files
+      
+      // Check if it's a directory (folder)
+      if (item.metadata?.isDirectory || (item.name && !item.name.includes('.'))) {
+        // This is a folder, list its contents
+        const folderPath = `${partsDir}/${item.name}`;
+        const { data: folderItems, error: folderError } = await supabase.storage
+          .from("equipments")
+          .list(folderPath, { limit: 100 });
+
+        if (!folderError && folderItems) {
+          const folderFiles = folderItems
+            .filter(file => file.name !== '.placeholder')
+            .map(file => {
+              const { data: urlData } = supabase.storage
+                .from("equipments")
+                .getPublicUrl(`${folderPath}/${file.name}`);
+              
+              return {
+                id: `${item.name}_${file.name}`,
+                name: file.name.split('_').slice(1).join('_'), // Remove ID prefix
+                url: urlData.publicUrl,
+                type: file.name.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document',
+                uploadedAt: file.created_at || new Date().toISOString()
+              };
+            });
+          
+          if (folderFiles.length > 0) {
+            foldersMap[item.name] = folderFiles;
+          }
+        }
+      } else {
+        // This is a root file
+        const { data: urlData } = supabase.storage
+          .from("equipments")
+          .getPublicUrl(`${partsDir}/${item.name}`);
+        
+        rootFiles.push({
+          id: item.name,
+          name: item.name.split('_').slice(1).join('_'), // Remove ID prefix
+          url: urlData.publicUrl,
+          type: item.name.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document',
+          uploadedAt: item.created_at || new Date().toISOString()
+        });
+      }
+    }
+
+    // Convert folders map to array format
+    const folders = Object.entries(foldersMap).map(([name, files]) => ({
+      name: name.replace(/^root$/, 'Root'), // Clean up folder names
+      files
+    }));
+
+    console.log(`📦 Retrieved ${rootFiles.length} root files and ${folders.length} folders from storage for equipment ${equipmentId}`);
+    return { rootFiles, folders };
+
+  } catch (error) {
+    console.error('❌ Failed to retrieve parts from storage:', error);
+    return { rootFiles: [], folders: [] };
+  }
+};
+
 // Upload equipment part with unique identifier for tracking
 const uploadEquipmentPart = async (
   file: File,
@@ -411,11 +493,54 @@ export const GET = withResourcePermission(
 
       const equipment = await prisma.equipment.findMany(queryOptions);
 
+      // Enhance equipment data with parts information
+      const enhancedEquipment = await Promise.all(
+        equipment.map(async (eq) => {
+          let partsData: { rootFiles: any[], folders: any[] } = { rootFiles: [], folders: [] };
+          
+          // First, try to get parts from database metadata
+          if (eq.equipment_parts && eq.equipment_parts.length > 0) {
+            try {
+              const firstPart = eq.equipment_parts[0];
+              if (typeof firstPart === 'string' && firstPart.startsWith('{')) {
+                partsData = JSON.parse(firstPart);
+                console.log(`📖 Loaded parts metadata from database for equipment ${eq.id}`);
+              }
+            } catch (error) {
+              console.warn(`⚠️ Failed to parse parts metadata for equipment ${eq.id}, falling back to storage scan`);
+            }
+          }
+          
+          // If no metadata in database, try to retrieve from storage (fallback for existing equipment)
+          if (partsData.rootFiles.length === 0 && partsData.folders.length === 0) {
+            partsData = await retrievePartsFromStorage(eq.id);
+            
+            // If we found parts in storage, update the database for next time
+            if (partsData.rootFiles.length > 0 || partsData.folders.length > 0) {
+              try {
+                await prisma.equipment.update({
+                  where: { id: eq.id },
+                  data: { equipment_parts: [JSON.stringify(partsData)] }
+                });
+                console.log(`💾 Stored retrieved parts metadata in database for equipment ${eq.id}`);
+              } catch (updateError) {
+                console.warn(`⚠️ Failed to update parts metadata for equipment ${eq.id}:`, updateError);
+              }
+            }
+          }
+          
+          return {
+            ...eq,
+            parts_data: partsData
+          };
+        })
+      );
+
       // Get total count for pagination
       const total = await prisma.equipment.count({ where });
 
       return NextResponse.json({
-        data: equipment,
+        data: enhancedEquipment,
         total,
         user_role: user.role,
         permissions: {
@@ -599,6 +724,138 @@ export const POST = withResourcePermission(
       // Update equipment parts if provided
       if (equipmentParts.length > 0) {
         updateData.equipment_parts = equipmentParts;
+      }
+
+      // 4) CRITICAL FIX: Handle parts files upload (was missing!)
+      // Process root parts files
+      const partsUploadPromises: Promise<any>[] = [];
+      let rootFileIndex = 0;
+      
+      while (formData.get(`partsFile_root_${rootFileIndex}`)) {
+        const partFile = formData.get(`partsFile_root_${rootFileIndex}`) as File;
+        const partName = formData.get(`partsFile_root_${rootFileIndex}_name`) as string;
+        
+        if (partFile && partFile.size > 0) {
+          const fileId = `root_${rootFileIndex}_${Date.now()}`;
+          partsUploadPromises.push(
+            uploadEquipmentPart(
+              partFile,
+              projectId,
+              equipment.id,
+              fileId,
+              "root", // folder path for root files
+              projectName,
+              clientName,
+              brand,
+              model,
+              type
+            )
+          );
+        }
+        rootFileIndex++;
+      }
+      
+      // Process folder parts files
+      let folderIndex = 0;
+      let fileIndex = 0;
+      
+      while (formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`)) {
+        const partFile = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
+        const partName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string;
+        const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
+        
+        if (partFile && partFile.size > 0 && folderName) {
+          const fileId = `folder_${folderIndex}_${fileIndex}_${Date.now()}`;
+          partsUploadPromises.push(
+            uploadEquipmentPart(
+              partFile,
+              projectId,
+              equipment.id,
+              fileId,
+              folderName, // use actual folder name
+              projectName,
+              clientName,
+              brand,
+              model,
+              type
+            )
+          );
+        }
+        
+        fileIndex++;
+        // Check for next folder if no more files in current folder
+        if (!formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`)) {
+          folderIndex++;
+          fileIndex = 0;
+        }
+      }
+      
+      // Upload all parts files in parallel and store metadata in database
+      if (partsUploadPromises.length > 0) {
+        try {
+          const partsResults = await Promise.all(partsUploadPromises);
+          console.log(`📦 Successfully uploaded ${partsResults.length} parts files`);
+          
+          // CRITICAL FIX: Store parts file metadata in equipment_parts field
+          if (partsResults.length > 0) {
+            // Build parts structure with root files and folders
+            const partsStructure: {
+              rootFiles: any[],
+              folders: Record<string, any[]>
+            } = {
+              rootFiles: [],
+              folders: {}
+            };
+            
+            partsResults.forEach((partResult) => {
+              const partData = {
+                id: partResult.id,
+                name: partResult.name,
+                url: partResult.url,
+                type: partResult.type,
+                uploadedAt: new Date().toISOString()
+              };
+              
+              // Determine if this is a root file or folder file based on fileId pattern
+              if (partResult.id.startsWith('root_')) {
+                partsStructure.rootFiles.push(partData);
+              } else if (partResult.id.startsWith('folder_')) {
+                // Extract folder info from formData based on fileId pattern
+                const idParts = partResult.id.split('_');
+                const folderIndex = idParts[1];
+                const fileIndex = idParts[2];
+                
+                // Find the folder name from formData
+                const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
+                
+                if (folderName) {
+                  if (!partsStructure.folders[folderName]) {
+                    partsStructure.folders[folderName] = [];
+                  }
+                  partsStructure.folders[folderName].push(partData);
+                }
+              }
+            });
+            
+            // Convert folders object to array format for consistency
+            const foldersArray = Object.entries(partsStructure.folders).map(([name, files]) => ({
+              name,
+              files
+            }));
+            
+            const finalPartsStructure = {
+              rootFiles: partsStructure.rootFiles,
+              folders: foldersArray
+            };
+            
+            // Store the parts structure as JSON in equipment_parts field
+            updateData.equipment_parts = [JSON.stringify(finalPartsStructure)];
+            console.log(`📝 Storing parts metadata for ${partsResults.length} files in equipment_parts field`);
+          }
+        } catch (error) {
+          console.error('❌ Parts upload failed:', error);
+          // Continue processing - don't fail the entire request
+        }
       }
 
       // Update if we have any files
@@ -1021,31 +1278,159 @@ export const PUT = withResourcePermission(
         }
       }
 
-      // Handle equipment parts updates - simplified to match UI changes
-      const equipmentPartsData = formData.get('equipmentParts') as string;
+      // CRITICAL FIX: Handle parts files upload (was also missing in PUT!)
+      // Process root parts files
+      const partsUploadPromises: Promise<any>[] = [];
+      let rootFileIndex = 0;
       
-      if (equipmentPartsData) {
+      while (formData.get(`partsFile_root_${rootFileIndex}`)) {
+        const partFile = formData.get(`partsFile_root_${rootFileIndex}`) as File;
+        const partName = formData.get(`partsFile_root_${rootFileIndex}_name`) as string;
+        
+        if (partFile && partFile.size > 0) {
+          const fileId = `root_${rootFileIndex}_${Date.now()}`;
+          partsUploadPromises.push(
+            uploadEquipmentPart(
+              partFile,
+              projectId,
+              equipmentId,
+              fileId,
+              "root" // folder path for root files
+            )
+          );
+        }
+        rootFileIndex++;
+      }
+      
+      // Process folder parts files
+      let folderIndex = 0;
+      let fileIndex = 0;
+      
+      while (formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`)) {
+        const partFile = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
+        const partName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string;
+        const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
+        
+        if (partFile && partFile.size > 0 && folderName) {
+          const fileId = `folder_${folderIndex}_${fileIndex}_${Date.now()}`;
+          partsUploadPromises.push(
+            uploadEquipmentPart(
+              partFile,
+              projectId,
+              equipmentId,
+              fileId,
+              folderName // use actual folder name
+            )
+          );
+        }
+        
+        fileIndex++;
+        // Check for next folder if no more files in current folder
+        if (!formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`)) {
+          folderIndex++;
+          fileIndex = 0;
+        }
+      }
+      
+      // Upload all parts files in parallel and handle metadata
+      let newPartsUploaded = false;
+      if (partsUploadPromises.length > 0) {
         try {
-          const partsArray = JSON.parse(equipmentPartsData);
-          if (Array.isArray(partsArray)) {
-            // Filter and validate parts as strings
-            const equipmentParts = partsArray
-              .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
-              .map(part => part.trim())
-              .slice(0, 50); // Reasonable limit
+          const partsResults = await Promise.all(partsUploadPromises);
+          console.log(`📦 Successfully uploaded ${partsResults.length} parts files during update`);
+          
+          // Get existing parts structure from database
+          const currentEquipment = await prisma.equipment.findUnique({
+            where: { id: equipmentId },
+            select: { equipment_parts: true }
+          });
+          
+          // Parse existing parts structure
+          let existingPartsStructure: { rootFiles: any[], folders: any[] } = { rootFiles: [], folders: [] };
+          if (currentEquipment?.equipment_parts && currentEquipment.equipment_parts.length > 0) {
+            try {
+              const firstPart = currentEquipment.equipment_parts[0];
+              if (typeof firstPart === 'string' && firstPart.startsWith('{')) {
+                existingPartsStructure = JSON.parse(firstPart);
+              }
+            } catch (error) {
+              console.warn('Could not parse existing parts structure, starting fresh');
+            }
+          }
+          
+          // Add new uploaded parts to the structure
+          if (partsResults.length > 0) {
+            partsResults.forEach((partResult) => {
+              const partData = {
+                id: partResult.id,
+                name: partResult.name,
+                url: partResult.url,
+                type: partResult.type,
+                uploadedAt: new Date().toISOString()
+              };
+              
+              // Determine if this is a root file or folder file based on fileId pattern
+              if (partResult.id.startsWith('root_')) {
+                existingPartsStructure.rootFiles.push(partData);
+              } else if (partResult.id.startsWith('folder_')) {
+                // Extract folder info from formData based on fileId pattern
+                const idParts = partResult.id.split('_');
+                const folderIndex = idParts[1];
+                const fileIndex = idParts[2];
+                
+                // Find the folder name from formData
+                const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
+                
+                if (folderName) {
+                  // Find or create folder in existing structure
+                  let targetFolder = existingPartsStructure.folders.find((f: any) => f.name === folderName);
+                  if (!targetFolder) {
+                    targetFolder = { name: folderName, files: [] };
+                    existingPartsStructure.folders.push(targetFolder);
+                  }
+                  targetFolder.files.push(partData);
+                }
+              }
+            });
             
-            updateData.equipment_parts = equipmentParts;
+            // Store the updated parts structure
+            updateData.equipment_parts = [JSON.stringify(existingPartsStructure)];
+            newPartsUploaded = true;
+            console.log(`📝 Updated parts metadata for ${partsResults.length} new files in equipment_parts field`);
           }
         } catch (error) {
-          // If parsing fails, try to handle as comma-separated string
-          const equipmentParts = equipmentPartsData
-            .split(',')
-            .map(part => part.trim())
-            .filter(part => part.length > 0)
-            .slice(0, 50);
-          
-          if (equipmentParts.length > 0) {
-            updateData.equipment_parts = equipmentParts;
+          console.error('❌ Parts upload failed during update:', error);
+          // Continue processing - don't fail the entire request
+        }
+      }
+
+      // Handle equipment parts updates - only update if no new files were uploaded
+      if (!newPartsUploaded) {
+        const equipmentPartsData = formData.get('equipmentParts') as string;
+        
+        if (equipmentPartsData) {
+          try {
+            const partsArray = JSON.parse(equipmentPartsData);
+            if (Array.isArray(partsArray)) {
+              // Filter and validate parts as strings
+              const equipmentParts = partsArray
+                .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+                .map(part => part.trim())
+                .slice(0, 50); // Reasonable limit
+              
+              updateData.equipment_parts = equipmentParts;
+            }
+          } catch (error) {
+            // If parsing fails, try to handle as comma-separated string
+            const equipmentParts = equipmentPartsData
+              .split(',')
+              .map(part => part.trim())
+              .filter(part => part.length > 0)
+              .slice(0, 50);
+            
+            if (equipmentParts.length > 0) {
+              updateData.equipment_parts = equipmentParts;
+            }
           }
         }
       }

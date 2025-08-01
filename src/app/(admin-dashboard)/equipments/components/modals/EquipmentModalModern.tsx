@@ -27,7 +27,7 @@ import {
   useEquipments,
   useUpdateEquipment,
 } from "@/hooks/useEquipmentQuery";
-import { useEquipmentMaintenanceReports } from "@/hooks/useEquipmentsQuery";
+import { useEquipmentMaintenanceReports } from "@/hooks/useEquipmentQuery";
 import { useProjects } from "@/hooks/api/use-projects";
 import { useUsers } from "@/hooks/useUsersQuery";
 import {
@@ -38,7 +38,7 @@ import {
   selectActiveModal,
   useEquipmentStore,
 } from "@/stores/equipmentStore";
-import { useEquipmentsStore } from "@/stores/equipmentsStore";
+// Removed old equipmentsStore import
 import {
   Building2,
   CalendarDays,
@@ -104,7 +104,7 @@ export default function EquipmentModalModern() {
   const activeModal = useEquipmentStore(selectActiveModal);
 
   // Add maintenance report detail state for mutual exclusion
-  const isMaintenanceReportDetailOpen = useEquipmentsStore((state) => state.isMaintenanceReportDetailOpen);
+  const isMaintenanceReportDetailOpen = useEquipmentStore((state) => state.isMaintenanceReportDetailOpen);
 
   // Custom tab state - EXACTLY like CreateEquipmentForm with Images and Documents tabs
   const [activeTab, setActiveTab] = useState<'details' | 'images' | 'documents' | 'parts' | 'maintenance'>('details');
@@ -183,18 +183,18 @@ export default function EquipmentModalModern() {
     if (!selectedEquipmentFromStore) return null;
     
     // Always try to get the latest data from the equipments array first
-    const freshEquipment = equipments.find((e) => e.id === selectedEquipmentFromStore.uid);
+    const freshEquipment = equipments.find((e) => e.id === selectedEquipmentFromStore.id);
     if (freshEquipment) {
       return freshEquipment;
     }
     
     // Fallback to store data if not found in array (shouldn't happen after successful updates)
     return selectedEquipmentFromStore;
-  }, [selectedEquipmentFromStore?.uid, equipments]);
+  }, [selectedEquipmentFromStore?.id, equipments]);
 
   // Initialize equipment parts when entering edit mode
   useEffect(() => {
-    const equipmentParts = (selectedEquipment as any)?.equipment_parts || (selectedEquipment as any)?.equipmentParts;
+    const equipmentParts = (selectedEquipment as any)?.parts_data || (selectedEquipment as any)?.equipment_parts || (selectedEquipment as any)?.equipmentParts;
     if (isGlobalEditMode && equipmentParts) {
       // Parse the equipment_parts from the database format
       try {
@@ -256,30 +256,30 @@ export default function EquipmentModalModern() {
       // Clear state when exiting edit mode
       setPartsStructure({ rootFiles: [], folders: [] });
     }
-  }, [isGlobalEditMode, (selectedEquipment as any)?.equipment_parts, (selectedEquipment as any)?.equipmentParts]);
+  }, [isGlobalEditMode, (selectedEquipment as any)?.parts_data, (selectedEquipment as any)?.equipment_parts, (selectedEquipment as any)?.equipmentParts]);
 
   // Initialize form data when entering edit mode - using ref to prevent re-renders
   useEffect(() => {
-    const equipmentId = (selectedEquipment as any)?.id || (selectedEquipment as any)?.uid;
+    const equipmentId = (selectedEquipment as any)?.id || (selectedEquipment as any)?.id;
     if (isGlobalEditMode && equipmentId && selectedEquipment) {
       editFormDataRef.current = {
         brand: selectedEquipment.brand || '',
         model: selectedEquipment.model || '',
         type: selectedEquipment.type || '',
-        plate_number: (selectedEquipment as any).plate_number || (selectedEquipment as any).plateNumber || '',
+        plate_number: (selectedEquipment as any).plate_number || (selectedEquipment as any).plate_number || '',
         owner: selectedEquipment.owner || '',
         status: selectedEquipment.status || 'OPERATIONAL',
         remarks: selectedEquipment.remarks || '',
-        project_id: (selectedEquipment as any).project_id || (selectedEquipment as any).project?.uid || '',
+        project_id: (selectedEquipment as any).project_id || (selectedEquipment as any).project?.id || '',
         before: typeof selectedEquipment.before === 'string' ? parseInt(selectedEquipment.before) || 6 : selectedEquipment.before || 6,
         inspection_date: (selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate ? new Date((selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate) : undefined,
-        registration_expiry: (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry ? new Date((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry) : undefined,
-        insurance_expiration_date: (selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate ? new Date((selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate) : undefined,
+        registration_expiry: (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registration_expiry ? new Date((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registration_expiry) : undefined,
+        insurance_expiration_date: (selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insurance_expiration_date ? new Date((selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insurance_expiration_date) : undefined,
         created_by: (selectedEquipment as any).created_by || (selectedEquipment as any).created_at || ''
       };
       forceUpdate({}); // Single re-render to update input values
     }
-  }, [isGlobalEditMode, (selectedEquipment as any)?.id, (selectedEquipment as any)?.uid]); // Only depend on ID to prevent constant re-renders
+  }, [isGlobalEditMode, (selectedEquipment as any)?.id, (selectedEquipment as any)?.id]); // Only depend on ID to prevent constant re-renders
   
   // Update mutation - declared before callbacks that use it
   const updateEquipmentMutation = useUpdateEquipment();
@@ -371,7 +371,7 @@ export default function EquipmentModalModern() {
       const alwaysRequiredFields = ['brand', 'model', 'type', 'owner', 'project_id'];
       
       // Always add equipmentId first (required by API)
-      const equipmentId = (selectedEquipment as any).id || (selectedEquipment as any).uid;
+      const equipmentId = (selectedEquipment as any).id || (selectedEquipment as any).id;
       formData.append('equipmentId', equipmentId);
       console.log('✅ Added equipmentId:', equipmentId);
       
@@ -618,7 +618,7 @@ export default function EquipmentModalModern() {
     setSelectedMaintenanceReportForDetail,
     setSelectedEquipmentMaintenanceReport,
     setIsMaintenanceReportDetailOpen 
-  } = useEquipmentsStore();
+  } = useEquipmentStore();
 
   // Mutations
   const deleteEquipmentMutation = useDeleteEquipment();
@@ -756,7 +756,7 @@ export default function EquipmentModalModern() {
   };
 
   const handleDelete = () => {
-    const equipmentId = (selectedEquipment as any)?.id || (selectedEquipment as any)?.uid;
+    const equipmentId = (selectedEquipment as any)?.id || (selectedEquipment as any)?.id;
     if (selectedEquipment && equipmentId && !equipmentId.startsWith('temp_')) {
       setDeleteConfirmation({ isOpen: true, equipment: selectedEquipment as any });
       setIsModalOpen(false); // Close main modal to show delete confirmation
@@ -858,7 +858,7 @@ export default function EquipmentModalModern() {
     return null;
   }
 
-  const daysUntilExpiry = getDaysUntilExpiry((selectedEquipment as any)?.insurance_expiration_date || (selectedEquipment as any)?.insuranceExpirationDate);
+  const daysUntilExpiry = getDaysUntilExpiry((selectedEquipment as any)?.insurance_expiration_date || (selectedEquipment as any)?.insurance_expiration_date);
 
   // Dynamic descriptions based on active tab
   const getTabDescription = () => {
@@ -932,14 +932,37 @@ export default function EquipmentModalModern() {
     if ((selectedEquipment as any)?.equipment_registration_url || (selectedEquipment as any)?.equipmentRegistrationUrl) count++;
     return count;
   };
-  // Helper function to count equipment parts for selected equipment - EXACTLY like VehicleModalModern
+  // Helper function to count equipment parts for selected equipment - Enhanced with better logging
   const getEquipmentPartsCount = () => {
-    const equipmentParts = (selectedEquipment as any)?.equipment_parts || (selectedEquipment as any)?.equipmentParts;
-    if (!selectedEquipment || !equipmentParts) return 0;
+    const equipmentParts = (selectedEquipment as any)?.parts_data || (selectedEquipment as any)?.equipment_parts || (selectedEquipment as any)?.equipmentParts;
+    
+    console.log('🔍 [EquipmentModal] Counting parts for:', {
+      equipmentId: (selectedEquipment as any)?.id || (selectedEquipment as any)?.id,
+      hasPartsData: !!equipmentParts,
+      partsDataType: typeof equipmentParts,
+      partsData: equipmentParts
+    });
+    
+    if (!selectedEquipment || !equipmentParts) {
+      console.log('ℹ️ [EquipmentModal] No equipment or parts data, count = 0');
+      return 0;
+    }
     
     // Parse equipment parts data using the same logic as EquipmentPartsViewer
     const parsePartsData = (parts: any) => {
       if (!parts) return { rootFiles: [], folders: [] };
+
+      // Handle database format: array with JSON string (most common)
+      if (Array.isArray(parts) && parts.length > 0 && typeof parts[0] === 'string') {
+        try {
+          const parsed = JSON.parse(parts[0]);
+          if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
+            return parsed;
+          }
+        } catch (error) {
+          console.warn('⚠️ [EquipmentModal] Failed to parse array[0] as JSON:', error);
+        }
+      }
 
       // Handle string (JSON) format
       if (typeof parts === 'string') {
@@ -961,18 +984,17 @@ export default function EquipmentModalModern() {
         }
       }
 
-      // Handle array format - NEW: Check if first element is structured JSON (like EquipmentPartsViewer)
+      // Handle array format - Check if first element is structured JSON
       if (Array.isArray(parts)) {
         if (parts.length === 0) {
           return { rootFiles: [], folders: [] };
         }
 
-        // NEW: Check if first element contains structured data (JSON)
+        // Check if first element contains structured data (JSON)
         if (parts.length === 1 && typeof parts[0] === 'string') {
           try {
             const parsed = JSON.parse(parts[0]);
             if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
-              // This is the new structured format stored as JSON in array
               return parsed;
             }
           } catch (error) {
@@ -1002,10 +1024,17 @@ export default function EquipmentModalModern() {
       });
     }
     
+    console.log('✅ [EquipmentModal] Parts count calculated:', {
+      totalCount: count,
+      rootFilesCount: parsedData.rootFiles?.length || 0,
+      foldersCount: parsedData.folders?.length || 0,
+      parsedData: parsedData
+    });
+    
     return count;
   };  
   const getMaintenanceReportsCount = () => {
-    const equipmentId = (selectedEquipment as any)?.id || (selectedEquipment as any)?.uid;
+    const equipmentId = (selectedEquipment as any)?.id || (selectedEquipment as any)?.id;
     if (!equipmentId || !Array.isArray(maintenanceReports)) return 0;
     return maintenanceReports.filter(report => report.equipment_id === equipmentId).length;
   };
@@ -1420,13 +1449,13 @@ export default function EquipmentModalModern() {
                         <div className={`font-medium text-foreground ${isMobile ? 'text-sm' : ''}`}>{selectedEquipment.type}</div>
                       </div>
 
-                      {((selectedEquipment as any).plate_number || (selectedEquipment as any).plateNumber) && (
+                      {((selectedEquipment as any).plate_number || (selectedEquipment as any).plate_number) && (
                         <div className="space-y-2">
                           <Label className={`flex items-center gap-2 ${isMobile ? 'text-xs' : ''}`}>
                             <Hash className="h-4 w-4" />
                             Plate/Serial Number
                           </Label>
-                          <div className={`font-medium text-foreground font-mono ${isMobile ? 'text-sm' : ''}`}>{(selectedEquipment as any).plate_number || (selectedEquipment as any).plateNumber}</div>
+                          <div className={`font-medium text-foreground font-mono ${isMobile ? 'text-sm' : ''}`}>{(selectedEquipment as any).plate_number || (selectedEquipment as any).plate_number}</div>
                         </div>
                       )}
                     </div>
@@ -1468,10 +1497,10 @@ export default function EquipmentModalModern() {
                           {selectedEquipment.status}
                         </Badge>
 
-                        {((selectedEquipment as any).plate_number || (selectedEquipment as any).plateNumber) && (
+                        {((selectedEquipment as any).plate_number || (selectedEquipment as any).plate_number) && (
                           <Badge variant="outline" className="flex items-center gap-1">
                             <Hash className="h-3 w-3" />
-                            {(selectedEquipment as any).plate_number || (selectedEquipment as any).plateNumber}
+                            {(selectedEquipment as any).plate_number || (selectedEquipment as any).plate_number}
                           </Badge>
                         )}
 
@@ -1525,12 +1554,12 @@ export default function EquipmentModalModern() {
                   <div className="space-y-4">
                     <div className={gridClassName3}>
                       {/* Registration Expires */}
-                      {((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry) && (
+                      {((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registration_expiry) && (
                         <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Registration Expires:</Label>
                           <div className={`font-medium ${
                             (() => {
-                              const dateValue = (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry;
+                              const dateValue = (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registration_expiry;
                               if (!dateValue) return "text-foreground";
                               const now = new Date();
                               const expiry = new Date(dateValue);
@@ -1540,11 +1569,11 @@ export default function EquipmentModalModern() {
                             })()
                           }`}>
                             {(() => {
-                              const dateValue = (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry;
+                              const dateValue = (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registration_expiry;
                               return dateValue ? format(new Date(dateValue), "M/d/yyyy") : "N/A";
                             })()}
                             {(() => {
-                              const dateValue = (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry;
+                              const dateValue = (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registration_expiry;
                               if (!dateValue) return null;
                               const now = new Date();
                               const expiry = new Date(dateValue);
@@ -1557,7 +1586,7 @@ export default function EquipmentModalModern() {
                       )}
 
                       {/* Insurance Expires */}
-                      {((selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate) && (
+                      {((selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insurance_expiration_date) && (
                         <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Insurance Expires:</Label>
                           <div className={`font-medium ${
@@ -1568,7 +1597,7 @@ export default function EquipmentModalModern() {
                               : "text-foreground"
                           }`}>
                             {(() => {
-                              const dateValue = (selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate;
+                              const dateValue = (selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insurance_expiration_date;
                               return dateValue ? format(new Date(dateValue), "M/d/yyyy") : "N/A";
                             })()}
                             {daysUntilExpiry !== null && daysUntilExpiry <= 0 && (
@@ -1801,7 +1830,7 @@ export default function EquipmentModalModern() {
             {isGlobalEditMode ? (
               <div className={`${isMobile ? 'max-h-[45vh]' : 'max-h-[50vh]'} overflow-y-auto border rounded-lg p-4 bg-muted/20`}>
                 <PartsFolderManager 
-                  key={(selectedEquipment as any)?.id || (selectedEquipment as any)?.uid || 'edit'} 
+                  key={(selectedEquipment as any)?.id || (selectedEquipment as any)?.id || 'edit'} 
                   onChange={setPartsStructure}
                   initialData={partsStructure}
                   onPartFileDelete={handlePartFileDelete}
@@ -1809,30 +1838,48 @@ export default function EquipmentModalModern() {
                 />
               </div>
             ) : (
-              <EquipmentPartsViewer 
-                equipmentParts={(() => {
-                  const partsData = (selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts;
-                  
-                  if (!partsData) {
-                    return { rootFiles: [], folders: [] };
-                  }
-                  
-                  if (typeof partsData === 'string') {
-                    try {
-                      return JSON.parse(partsData);
-                    } catch (error) {
-                      console.warn('Failed to parse equipment parts JSON:', error);
+              <EquipmentFormErrorBoundary fallback={
+                <div className="p-4 border border-red-200 rounded-lg bg-red-50">
+                  <p className="text-sm text-red-600">Equipment Parts viewer failed to load</p>
+                  <p className="text-xs text-red-500 mt-1">There may be an issue with the parts data format</p>
+                </div>
+              }>
+                <EquipmentPartsViewer 
+                  equipmentParts={(() => {
+                    const partsData = (selectedEquipment as any).parts_data || (selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts;
+                    
+                    console.log('🔍 [EquipmentModal] Preparing parts data for viewer:', {
+                      equipmentId: (selectedEquipment as any)?.id || (selectedEquipment as any)?.id,
+                      hasData: !!partsData,
+                      dataType: typeof partsData,
+                      rawData: partsData
+                    });
+                    
+                    if (!partsData) {
+                      console.log('ℹ️ [EquipmentModal] No parts data, returning empty structure');
                       return { rootFiles: [], folders: [] };
                     }
-                  }
-                  
-                  return partsData;
-                })()}
-                isEditable={isGlobalEditMode}
-                onPartsChange={setPartsStructure}
-                onPartFileDelete={handlePartFileDelete}
-                onPartFolderDelete={handlePartFolderDelete}
-              />
+                    
+                    if (typeof partsData === 'string') {
+                      try {
+                        const parsed = JSON.parse(partsData);
+                        console.log('✅ [EquipmentModal] Successfully parsed string parts data:', parsed);
+                        return parsed;
+                      } catch (error) {
+                        console.warn('⚠️ [EquipmentModal] Failed to parse equipment parts JSON:', error);
+                        return { rootFiles: [], folders: [] };
+                      }
+                    }
+                    
+                    console.log('✅ [EquipmentModal] Using parts data as-is:', partsData);
+                    return partsData;
+                  })()}
+                  isEditable={isGlobalEditMode}
+                  onPartsChange={setPartsStructure}
+                  onPartFileDelete={handlePartFileDelete}
+                  onPartFolderDelete={handlePartFolderDelete}
+                />
+              </EquipmentFormErrorBoundary>
             )}
           </div>
         )}
@@ -1854,7 +1901,7 @@ export default function EquipmentModalModern() {
           <Card>
             <CardContent className="p-6">
               <EquipmentMaintenanceReportsEnhanced 
-                equipmentId={(selectedEquipment as any).id || (selectedEquipment as any).uid}
+                equipmentId={(selectedEquipment as any).id || (selectedEquipment as any).id}
               />
             </CardContent>
           </Card>
@@ -1924,7 +1971,7 @@ export default function EquipmentModalModern() {
                       type="button"
                       variant="destructive"
                       onClick={handleDelete}
-                      disabled={deleteEquipmentMutation.isPending || ((selectedEquipment as any)?.id || (selectedEquipment as any)?.uid)?.startsWith('temp_')}
+                      disabled={deleteEquipmentMutation.isPending || ((selectedEquipment as any)?.id || (selectedEquipment as any)?.id)?.startsWith('temp_')}
                       className="flex-1"
                       size="lg"
                     >
@@ -2162,7 +2209,7 @@ export default function EquipmentModalModern() {
                 type="button"
                 variant="destructive"
                 onClick={handleDelete}
-                disabled={deleteEquipmentMutation.isPending || ((selectedEquipment as any)?.id || (selectedEquipment as any)?.uid)?.startsWith('temp_')}
+                disabled={deleteEquipmentMutation.isPending || ((selectedEquipment as any)?.id || (selectedEquipment as any)?.id)?.startsWith('temp_')}
                 size="lg"
               >
                 {deleteEquipmentMutation.isPending ? (
