@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -44,6 +44,7 @@ interface EquipmentPartsViewerProps {
   onPartsChange?: (newParts: { rootFiles: any[]; folders: any[] }) => void;
   onPartFileDelete?: (fileId: string, fileName: string, folderPath?: string, fileUrl?: string) => void;
   onPartFolderDelete?: (folderPath: string, folderName: string) => void;
+  debug?: boolean; // Add debug mode for troubleshooting
 }
 
 interface ParsedFile {
@@ -71,7 +72,8 @@ export default function EquipmentPartsViewer({
   isEditable = false, 
   onPartsChange,
   onPartFileDelete,
-  onPartFolderDelete
+  onPartFolderDelete,
+  debug = false
 }: EquipmentPartsViewerProps) {
   // Collapsible states - same as PartsFolderManager
   const [isRootCollapsed, setIsRootCollapsed] = useState(false);
@@ -95,20 +97,80 @@ export default function EquipmentPartsViewer({
   const [newFolderName, setNewFolderName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Parse equipment parts data into folder structure - simplified approach
+  // Helper function to process and validate image URLs
+  const processImageUrl = (url: string): string => {
+    if (!url) return '';
+    
+    // Handle Supabase storage URLs - ensure they're properly formatted
+    if (url.includes('/storage/v1/object/public/')) {
+      // URL is already in public format, but ensure it includes a cache-busting parameter
+      return url.includes('?') ? url : `${url}?t=${Date.now()}`;
+    }
+    
+    // If URL is missing the public path, try to construct it
+    if (url.includes('supabase') && !url.includes('/storage/v1/object/public/')) {
+      // Try to extract the file path and construct proper public URL
+      const matches = url.match(/\/([^\/]+)\/(.+)$/);
+      if (matches) {
+        const bucket = matches[1];
+        const path = matches[2];
+        return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}?t=${Date.now()}`;
+      }
+    }
+    
+    // For blob URLs (newly uploaded files), return as is
+    if (url.startsWith('blob:')) {
+      return url;
+    }
+    
+    // Add cache-busting parameter for other URLs
+    return url.includes('?') ? url : `${url}?t=${Date.now()}`;
+  };
+
+  // Parse equipment parts data into folder structure - enhanced with better error handling
   const parsePartsData = (parts: string[] | { rootFiles: any[]; folders: any[] } | string | undefined): ParsedPartData => {
     if (!parts) {
+      console.log('🔍 [EquipmentPartsViewer] No parts data provided');
       return { rootFiles: [], folders: [] };
     }
+
+    console.log('🔍 [EquipmentPartsViewer] Parsing parts data:', { type: typeof parts, isArray: Array.isArray(parts), data: parts });
 
     // Handle database format: array with JSON string (most common)
     if (Array.isArray(parts) && parts.length > 0 && typeof parts[0] === 'string') {
       try {
         const parsed = JSON.parse(parts[0]);
+        console.log('✅ [EquipmentPartsViewer] Successfully parsed array[0] as JSON:', parsed);
         if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
-          return parsed;
+          return {
+            rootFiles: Array.isArray(parsed.rootFiles) ? parsed.rootFiles.map((file: any, index: number) => {
+              const processedUrl = processImageUrl(file.url || file.preview || '');
+              return {
+                id: file.id || `file-${index}-${Date.now()}`,
+                name: file.name || 'Unknown file',
+                url: processedUrl,
+                preview: processedUrl,
+                type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
+              };
+            }) : [],
+            folders: Array.isArray(parsed.folders) ? parsed.folders.map((folder: any, folderIndex: number) => ({
+              id: folder.id || `folder-${folderIndex}-${Date.now()}`,
+              name: folder.name || `Folder ${folderIndex + 1}`,
+              files: Array.isArray(folder.files) ? folder.files.map((file: any, fileIndex: number) => {
+                const processedUrl = processImageUrl(file.url || file.preview || '');
+                return {
+                  id: file.id || `file-${folderIndex}-${fileIndex}-${Date.now()}`,
+                  name: file.name || 'Unknown file',
+                  url: processedUrl,
+                  preview: processedUrl,
+                  type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
+                };
+              }) : []
+            })) : []
+          };
         }
-      } catch {
+      } catch (error) {
+        console.warn('⚠️ [EquipmentPartsViewer] Failed to parse array[0] as JSON:', error);
         // If JSON parse fails, fall through to legacy handling
       }
     }
@@ -117,20 +179,48 @@ export default function EquipmentPartsViewer({
     if (typeof parts === 'string') {
       try {
         const parsed = JSON.parse(parts);
+        console.log('✅ [EquipmentPartsViewer] Successfully parsed string as JSON:', parsed);
         if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
-          return parsed;
+          return {
+            rootFiles: Array.isArray(parsed.rootFiles) ? parsed.rootFiles.map((file: any, index: number) => {
+              const processedUrl = processImageUrl(file.url || file.preview || '');
+              return {
+                id: file.id || `file-${index}-${Date.now()}`,
+                name: file.name || 'Unknown file',
+                url: processedUrl,
+                preview: processedUrl,
+                type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
+              };
+            }) : [],
+            folders: Array.isArray(parsed.folders) ? parsed.folders.map((folder: any, folderIndex: number) => ({
+              id: folder.id || `folder-${folderIndex}-${Date.now()}`,
+              name: folder.name || `Folder ${folderIndex + 1}`,
+              files: Array.isArray(folder.files) ? folder.files.map((file: any, fileIndex: number) => {
+                const processedUrl = processImageUrl(file.url || file.preview || '');
+                return {
+                  id: file.id || `file-${folderIndex}-${fileIndex}-${Date.now()}`,
+                  name: file.name || 'Unknown file',
+                  url: processedUrl,
+                  preview: processedUrl,
+                  type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
+                };
+              }) : []
+            })) : []
+          };
         }
-      } catch {
+      } catch (error) {
+        console.warn('⚠️ [EquipmentPartsViewer] Failed to parse string as JSON, treating as URL:', error);
         // Not JSON, treat as single URL
         const fileName = parts.split('/').pop() || 'File';
-        const isImage = parts.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+        const processedUrl = processImageUrl(parts);
+        const isImage = processedUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
         
         return { 
           rootFiles: [{
             id: 'file-0',
             name: fileName,
-            url: parts,
-            preview: parts,
+            url: processedUrl,
+            preview: processedUrl,
             type: isImage ? 'image' : 'document'
           }], 
           folders: [] 
@@ -140,27 +230,56 @@ export default function EquipmentPartsViewer({
 
     // Handle object format (already parsed)
     if (typeof parts === 'object' && !Array.isArray(parts)) {
+      console.log('✅ [EquipmentPartsViewer] Parts data is already an object');
       if (parts.rootFiles && parts.folders) {
-        return parts;
+        return {
+          rootFiles: Array.isArray(parts.rootFiles) ? parts.rootFiles.map((file: any, index: number) => {
+            const processedUrl = processImageUrl(file.url || file.preview || '');
+            return {
+              id: file.id || `file-${index}-${Date.now()}`,
+              name: file.name || 'Unknown file',
+              url: processedUrl,
+              preview: processedUrl,
+              type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
+            };
+          }) : [],
+          folders: Array.isArray(parts.folders) ? parts.folders.map((folder: any, folderIndex: number) => ({
+            id: folder.id || `folder-${folderIndex}-${Date.now()}`,
+            name: folder.name || `Folder ${folderIndex + 1}`,
+            files: Array.isArray(folder.files) ? folder.files.map((file: any, fileIndex: number) => {
+              const processedUrl = processImageUrl(file.url || file.preview || '');
+              return {
+                id: file.id || `file-${folderIndex}-${fileIndex}-${Date.now()}`,
+                name: file.name || 'Unknown file',
+                url: processedUrl,
+                preview: processedUrl,
+                type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
+              };
+            }) : []
+          })) : []
+        };
       }
     }
 
     // Handle array format (legacy - URLs only)
     if (Array.isArray(parts)) {
       if (parts.length === 0) {
+        console.log('ℹ️ [EquipmentPartsViewer] Empty parts array');
         return { rootFiles: [], folders: [] };
       }
 
+      console.log('🔄 [EquipmentPartsViewer] Converting legacy URL array to new format');
       // Convert legacy URL array to new format
       const rootFiles: ParsedFile[] = parts.map((url, index) => {
         const fileName = url.split('/').pop() || `Part ${index + 1}`;
-        const isImage = url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
+        const processedUrl = processImageUrl(url);
+        const isImage = processedUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
         
         return {
           id: `file-${index}`,
           name: fileName,
-          url,
-          preview: url,
+          url: processedUrl,
+          preview: processedUrl,
           type: isImage ? 'image' : 'document',
         };
       });
@@ -169,6 +288,7 @@ export default function EquipmentPartsViewer({
     }
 
     // Fallback
+    console.warn('⚠️ [EquipmentPartsViewer] Unable to parse parts data, returning empty structure');
     return { rootFiles: [], folders: [] };
   };
 
@@ -333,6 +453,11 @@ export default function EquipmentPartsViewer({
     onRemove?: (fileId: string, folderId?: string) => void; 
   }) => {
     const [imageLoadError, setImageLoadError] = useState(false);
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageLoading, setImageLoading] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
+    
+    // Get the best available URL for the file
     const fileUrl = file.preview || file.url;
     
     // Helper function to check if a URL/file is actually an image by extension - FIXED LOGIC
@@ -340,7 +465,7 @@ export default function EquipmentPartsViewer({
       if (!url && !fileName) return false;
       const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
       
-      // Check file name extension
+      // Check file name extension first
       const fileExt = fileName.split('.').pop()?.toLowerCase();
       if (fileExt && imageExtensions.includes(fileExt)) return true;
       
@@ -356,7 +481,17 @@ export default function EquipmentPartsViewer({
       return false;
     };
     
-    const isImage = isActualImage(fileUrl, file.name) && !imageLoadError;
+    const isImage = isActualImage(fileUrl, file.name) && !imageLoadError && fileUrl;
+    
+    // Reset error state when URL changes
+    React.useEffect(() => {
+      if (fileUrl) {
+        setImageLoadError(false);
+        setImageLoaded(false);
+        setImageLoading(true);
+        setRetryCount(0); // Reset retry count on URL change
+      }
+    }, [fileUrl]);
     
     // For stored files, try to get file size from name or estimate
     const getFileDisplayInfo = (file: ParsedFile) => {
@@ -375,37 +510,86 @@ export default function EquipmentPartsViewer({
     };
 
     const handleClick = () => {
-      if (fileUrl && isImage && !imageLoadError) {
+      if (fileUrl && isImage && !imageLoadError && imageLoaded) {
         handleImageClick(fileUrl, file.name);
+      } else if (fileUrl && !isImage) {
+        // For non-images, try to open in new tab
+        window.open(fileUrl, '_blank');
       }
     };
     
-    const handleImageError = () => {
-      console.error('Image failed to load:', fileUrl);
-      setImageLoadError(true);
+    const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+      console.error('Image failed to load:', fileUrl, 'Retry count:', retryCount, e);
+      
+      // Try to retry loading the image up to 2 times
+      if (retryCount < 2 && fileUrl) {
+        setRetryCount(prev => prev + 1);
+        setImageLoading(true);
+        
+        // Add a small delay before retry
+        setTimeout(() => {
+          const img = e.currentTarget;
+          if (img) {
+            // Force reload with new cache-buster
+            const newUrl = fileUrl.includes('?') ? 
+              fileUrl.replace(/\?.*/, `?retry=${retryCount + 1}&t=${Date.now()}`) : 
+              `${fileUrl}?retry=${retryCount + 1}&t=${Date.now()}`;
+            img.src = newUrl;
+          }
+        }, 1000 * (retryCount + 1)); // Exponential backoff
+      } else {
+        setImageLoadError(true);
+        setImageLoading(false);
+        setImageLoaded(false);
+      }
     };
     
     const handleImageLoad = () => {
       console.log('Image loaded successfully:', fileUrl);
       setImageLoadError(false);
+      setImageLoading(false);
+      setImageLoaded(true);
     };
     
     return (
       <div 
-        className="relative group border rounded-lg p-2 bg-card hover:bg-muted/50 transition-colors cursor-pointer"
+        className={`relative group border rounded-lg p-2 bg-card transition-colors ${
+          ((isImage && imageLoaded && !imageLoadError) || (!isImage && fileUrl)) 
+            ? 'hover:bg-muted/50 cursor-pointer' 
+            : 'cursor-default'
+        }`}
         onClick={handleClick}
       >
         <div className="flex items-center gap-2">
           {isImage && fileUrl ? (
             <div className="relative group/image">
+              {imageLoading && (
+                <div className="w-10 h-10 flex items-center justify-center border rounded bg-muted animate-pulse">
+                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                </div>
+              )}
               <img
                 src={fileUrl}
                 alt={file.name}
-                className="w-10 h-10 object-cover rounded hover:opacity-80 transition-opacity"
+                className={`w-10 h-10 object-cover rounded hover:opacity-80 transition-opacity ${
+                  imageLoading ? 'opacity-0 absolute' : 'opacity-100'
+                }`}
+                onError={handleImageError}
+                onLoad={handleImageLoad}
+                style={{
+                  display: imageLoadError ? 'none' : 'block'
+                }}
               />
-              <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
-                <Eye className="h-3 w-3 text-white" />
-              </div>
+              {imageLoadError && (
+                <div className="w-10 h-10 flex items-center justify-center border rounded bg-red-50 border-red-200" title={`Failed to load image after ${retryCount} retries`}>
+                  <X className="h-4 w-4 text-red-500" />
+                </div>
+              )}
+              {imageLoaded && !imageLoadError && (
+                <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover/image:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">
+                  <Eye className="h-3 w-3 text-white" />
+                </div>
+              )}
             </div>
           ) : (
             <div className="w-10 h-10 flex items-center justify-center border rounded bg-muted">
@@ -419,11 +603,18 @@ export default function EquipmentPartsViewer({
             <p className="text-xs text-muted-foreground">
               {getFileDisplayInfo(file)}
             </p>
+            {debug && (
+              <p className="text-xs text-blue-600 font-mono truncate" title={fileUrl}>
+                URL: {fileUrl?.substring(0, 30)}...
+              </p>
+            )}
           </div>
-          {/* Click to view indicator - always visible for better UX */}
-          <div className="opacity-60 group-hover:opacity-100 transition-opacity">
-            <Eye className="h-4 w-4 text-muted-foreground" />
-          </div>
+          {/* Click to view indicator - only show for loaded images */}
+          {((isImage && imageLoaded && !imageLoadError) || (!isImage && fileUrl)) && (
+            <div className="opacity-60 group-hover:opacity-100 transition-opacity">
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            </div>
+          )}
           
           {/* Remove button - only show in edit mode */}
           {isEditable && onRemove && (
@@ -679,6 +870,29 @@ export default function EquipmentPartsViewer({
 
   return (
     <>
+      {debug && (
+        <Card className="mb-4 bg-blue-50 border-blue-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-blue-800">Debug Information</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-blue-700 space-y-1">
+            <p><strong>Data Type:</strong> {typeof equipmentParts} {Array.isArray(equipmentParts) ? '(Array)' : ''}</p>
+            <p><strong>Root Files:</strong> {displayData.rootFiles.length}</p>
+            <p><strong>Folders:</strong> {displayData.folders.length}</p>
+            <p><strong>Total Files:</strong> {displayData.rootFiles.length + displayData.folders.reduce((sum, f) => sum + f.files.length, 0)}</p>
+            {displayData.rootFiles.length > 0 && (
+              <div className="pt-2">
+                <p><strong>Sample Root File URLs:</strong></p>
+                {displayData.rootFiles.slice(0, 2).map((file, i) => (
+                  <p key={i} className="font-mono text-xs truncate" title={file.url}>
+                    {i + 1}. {file.url.substring(0, 60)}...
+                  </p>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
       <div className="space-y-6">
         {/* Root Files Section - Always show when any structure exists */}
         <Card>
@@ -892,7 +1106,7 @@ export default function EquipmentPartsViewer({
         )}
       </div>
 
-      {/* Image Viewer Modal - EXACT COPY from PartsFolderManager */}
+      {/* Image Viewer Modal - Enhanced with better error handling */}
       {showImageViewer && (
         <Dialog open={showImageViewer} onOpenChange={setShowImageViewer}>
           <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
@@ -901,15 +1115,30 @@ export default function EquipmentPartsViewer({
                 {viewerImageName}
               </DialogTitle>
             </DialogHeader>
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center min-h-[300px]">
               <img
                 src={viewerImageUrl}
                 alt={viewerImageName}
                 className="max-w-full max-h-[70vh] object-contain"
                 onClick={(e) => e.stopPropagation()}
-                onError={() => {
+                onError={(e) => {
                   console.error('Image failed to load in viewer:', viewerImageUrl);
-                  setShowImageViewer(false);
+                  // Replace with error message instead of closing modal
+                  const errorDiv = document.createElement('div');
+                  errorDiv.className = 'flex flex-col items-center justify-center text-center p-8';
+                  errorDiv.innerHTML = `
+                    <div class="text-red-500 mb-4">
+                      <svg class="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Failed to load image</h3>
+                    <p class="text-sm text-gray-500 mb-4">The image could not be loaded. It may have been deleted or there may be a connection issue.</p>
+                    <button onclick="window.open('${viewerImageUrl}', '_blank')" class="text-blue-600 hover:text-blue-500 text-sm">
+                      Try opening in new tab
+                    </button>
+                  `;
+                  e.currentTarget.parentNode?.replaceChild(errorDiv, e.currentTarget);
                 }}
                 onLoad={() => {
                   console.log('Image loaded successfully in viewer:', viewerImageUrl);
