@@ -1235,7 +1235,14 @@ export function useSupabaseRealtime() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // Track maintenance reports realtime connection status for debugging
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] Maintenance reports subscription active');
+        } else if (status === 'CLOSED') {
+          console.log('[Realtime] Maintenance reports subscription closed');
+        }
+      });
 
     // Projects realtime subscription (less frequent updates)
     const projectsChannel = supabase

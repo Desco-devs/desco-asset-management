@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,10 +41,12 @@ export default function EquipmentMaintenanceReportsEnhanced({
     setIsMaintenanceReportDetailOpen
   } = useEquipmentsStore();
 
-  // Filter reports for this specific equipment
-  const equipmentReports = Array.isArray(maintenanceReports)
-    ? maintenanceReports.filter((report) => report.equipment_id === equipmentId)
-    : [];
+  // Filter reports for this specific equipment (memoized for performance)
+  const equipmentReports = useMemo(() => {
+    return Array.isArray(maintenanceReports)
+      ? maintenanceReports.filter((report) => report.equipment_id === equipmentId)
+      : [];
+  }, [maintenanceReports, equipmentId]);
 
   const getStatusColor = (status?: string) => {
     switch (status) {

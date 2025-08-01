@@ -30,29 +30,5 @@ export function useEquipmentRealtime() {
   }, [queryClient])
 }
 
-export function useMaintenanceReportsRealtime() {
-  const queryClient = useQueryClient()
-
-  useEffect(() => {
-    const supabase = createClient()
-
-    const channel = supabase
-      .channel('maintenance-reports-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'maintenance_equipment_report',
-        },
-        () => {
-          // Just invalidate - let TanStack Query handle the rest
-          queryClient.invalidateQueries({ queryKey: ['maintenance-reports'] })
-          queryClient.invalidateQueries({ queryKey: ['equipments'] })
-        }
-      )
-      .subscribe()
-
-    return () => { channel.unsubscribe() }
-  }, [queryClient])
-}
+// Removed useMaintenanceReportsRealtime() - duplicate functionality
+// useEquipmentsQuery.ts already handles maintenance reports realtime with optimistic updates
