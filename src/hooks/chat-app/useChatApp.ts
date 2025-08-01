@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { RoomListItem, MessageWithRelations, ChatUser } from "@/types/chat-app";
 import { useChatMessages } from './useChatMessages';
@@ -7,6 +7,9 @@ import { useChatPresence } from './useChatPresence';
 import { useChatTyping } from './useChatTyping';
 import { useChatConnection } from './useChatConnection';
 import { useRoomMembershipRealtime } from './useRoomMembershipRealtime';
+import { useRoomListRealtime } from './useRoomListRealtime';
+import { useOptimisticUpdates } from './useOptimisticUpdates';
+import { useDataSynchronization } from './useDataSynchronization';
 import { CHAT_QUERY_KEYS, ROOMS_QUERY_KEYS } from './queryKeys';
 
 interface UseChatAppOptions {
@@ -20,6 +23,12 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
   const [invitationRoom, setInvitationRoom] = useState<RoomListItem | null>(null);
   const queryClient = useQueryClient();
   
+  // Enhanced error handling and memory management
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [lastError, setLastError] = useState<Error | null>(null);
+  const cleanupTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  const isUnmountedRef = useRef(false);
+  
   // Convert the authenticated user to ChatUser format
   const currentUser: ChatUser | null = authUser ? {
     id: authUser.id,
@@ -31,6 +40,10 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
     role: authUser.role || 'VIEWER'
   } : null;
   
+  // Initialize enhanced systems
+  const optimisticUpdates = useOptimisticUpdates(currentUser || undefined);
+  const dataSync = useDataSynchronization(currentUser || undefined);
+  
   // Initialize real-time features
   const realtimeStatus = useChatRealtime(userId);
   const messageSystem = useChatMessages(currentUser || undefined);
@@ -40,8 +53,11 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
   
   // Initialize room membership real-time updates
   useRoomMembershipRealtime(currentUser || undefined);
+  
+  // Initialize room list real-time updates for instant sidebar updates
+  useRoomListRealtime(currentUser || undefined);
 
-  // Fetch rooms - using centralized query keys
+  // Fetch rooms with optimized caching strategy
   const { data: rooms = [], isLoading: isLoadingRooms, error } = useQuery({
     queryKey: CHAT_QUERY_KEYS.rooms(userId || ""),
     queryFn: async (): Promise<RoomListItem[]> => {
@@ -53,9 +69,15 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
       return data.rooms || [];
     },
     enabled: enabled && !!userId,
+    staleTime: 30000, // 30 seconds - rooms don't change frequently
+    gcTime: 300000, // 5 minutes cache time
+    refetchOnWindowFocus: false, // Real-time handles updates
+    refetchOnMount: false, // Use cached data if available
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
-  // Fetch users - using centralized query keys
+  // Fetch users with optimized caching - users don't change often
   const { data: users = [] } = useQuery({
     queryKey: CHAT_QUERY_KEYS.users(),
     queryFn: async (): Promise<ChatUser[]> => {
@@ -67,9 +89,14 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
       return data.users || [];
     },
     enabled,
+    staleTime: 300000, // 5 minutes - users change infrequently
+    gcTime: 900000, // 15 minutes cache time
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 2,
   });
 
-  // Fetch messages for selected room - using centralized query keys
+  // Fetch messages for selected room with smart caching
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: CHAT_QUERY_KEYS.roomMessages(selectedRoom || ""),
     queryFn: async (): Promise<MessageWithRelations[]> => {
@@ -82,6 +109,13 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
       return data.messages || [];
     },
     enabled: !!selectedRoom,
+    staleTime: 10000, // 10 seconds - messages can change frequently
+    gcTime: 60000, // 1 minute cache time for messages
+    refetchOnWindowFocus: false, // Real-time handles new messages
+    refetchOnMount: false, // Use cached data
+    retry: 2,
+    retryDelay: 1000,
+    placeholderData: [], // Prevent loading state flicker when switching rooms
   });
 
   // Create room mutation with optimistic updates
@@ -99,21 +133,24 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
       return response.json();
     },
     onMutate: async (roomData) => {
-      // Cancel any outgoing refetches
+      // Cancel any outgoing refetches to prevent race conditions
       await queryClient.cancelQueries({ queryKey: CHAT_QUERY_KEYS.rooms(userId || "") });
 
-      // Snapshot the previous value
+      // Snapshot the previous value for rollback
       const previousRooms = queryClient.getQueryData(CHAT_QUERY_KEYS.rooms(userId || ""));
 
-      // Create optimistic room
+      // Create optimistic room with unique temporary ID
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const now = new Date();
+      
       const optimisticRoom: RoomListItem = {
-        id: `temp-${Date.now()}`, // Temporary ID
+        id: tempId, // Guaranteed unique temporary ID
         name: roomData.name,
         description: roomData.description || '',
         type: roomData.type,
         owner_id: userId || '',
-        created_at: new Date(),
-        updated_at: new Date(),
+        created_at: now,
+        updated_at: now,
         members: [{
           user_id: userId || '',
           user: currentUser || undefined
@@ -121,30 +158,68 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
         lastMessage: undefined,
         unread_count: 0,
         is_owner: true,
-        member_count: 1
-      };
+        member_count: 1,
+        // Add metadata to distinguish from real rooms
+        _isOptimistic: true,
+        _tempId: tempId
+      } as any;
 
-      // Optimistically update the cache
-      queryClient.setQueryData(CHAT_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => [
-        optimisticRoom,
-        ...old
-      ]);
+      // Optimistically update the cache with conflict prevention
+      queryClient.setQueryData(CHAT_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => {
+        // Filter out any existing optimistic rooms with same name to prevent duplicates
+        const filtered = old.filter(room => 
+          !(room as any)._isOptimistic || room.name !== roomData.name
+        );
+        
+        // Add new optimistic room at the top and sort
+        const updated = [optimisticRoom, ...filtered];
+        return updated.sort((a, b) => {
+          const aTime = new Date(a.updated_at || a.created_at || new Date()).getTime();
+          const bTime = new Date(b.updated_at || b.created_at || new Date()).getTime();
+          return bTime - aTime; // Most recent first
+        });
+      });
 
-      // Return context with previous value
-      return { previousRooms, optimisticRoom };
+      // Return context with previous value and temp ID
+      return { previousRooms, optimisticRoom, tempId };
     },
     onError: (err, roomData, context) => {
-      // Rollback on error
+      console.error('[CreateRoom] Optimistic update failed:', err);
+      
+      // Rollback on error with proper cleanup
       if (context?.previousRooms) {
         queryClient.setQueryData(CHAT_QUERY_KEYS.rooms(userId || ""), context.previousRooms);
+      } else {
+        // Fallback: remove optimistic room if we don't have previous state
+        if (context?.tempId) {
+          queryClient.setQueryData(CHAT_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => {
+            return old.filter(room => room.id !== context.tempId);
+          });
+        }
       }
     },
     onSuccess: (data, variables, context) => {
-      // Replace optimistic room with real room
+      // Replace optimistic room with real room data immediately
       queryClient.setQueryData(CHAT_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => {
-        return old.map(room => 
-          room.id === context?.optimisticRoom?.id ? data.room : room
-        );
+        return old.map(room => {
+          // Find optimistic room by temp ID or regular ID
+          if (room.id === context?.tempId || room.id === context?.optimisticRoom?.id) {
+            // Replace with real room data, preserving optimistic timestamp if close
+            return {
+              ...data.room,
+              // Keep optimistic created_at if it's within 2 seconds to prevent timestamp flicker
+              created_at: context?.optimisticRoom?.created_at && 
+                Math.abs(new Date(context.optimisticRoom.created_at).getTime() - new Date(data.room.created_at).getTime()) < 2000
+                ? context.optimisticRoom.created_at 
+                : data.room.created_at,
+              updated_at: data.room.updated_at,
+              // Remove optimistic flags
+              _isOptimistic: undefined,
+              _tempId: undefined
+            };
+          }
+          return room;
+        });
       });
       
       // Auto-select the newly created room
@@ -152,9 +227,14 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
         setSelectedRoom(data.room.id);
       }
     },
-    onSettled: () => {
-      // Always refetch after mutation settles
-      queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.rooms(userId || "") });
+    onSettled: (data, error, variables, context) => {
+      // Clean up any remaining optimistic rooms in case of edge cases
+      queryClient.setQueryData(CHAT_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => {
+        return old.filter(room => !(room as any)._isOptimistic);
+      });
+      
+      // Don't invalidate queries to prevent conflicts with real-time updates
+      // Real-time subscriptions will handle room list updates
     },
     // Prevent multiple concurrent executions
     mutationKey: ['createRoom', userId],
@@ -192,15 +272,26 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
       return response.json();
     },
     onSuccess: (data) => {
-      // Immediately invalidate room queries to show the new room
-      queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.rooms(userId || "") });
+      console.log('✅ Invitation accepted successfully:', data);
       
-      // Also invalidate invitation queries
-      queryClient.invalidateQueries({ 
-        queryKey: CHAT_QUERY_KEYS.invitations(userId || '', 'received', 'PENDING') 
-      });
+      // Use a small delay to allow real-time updates to process first
+      setTimeout(() => {
+        // Only invalidate if real-time hasn't updated the cache yet
+        const currentRooms = queryClient.getQueryData(CHAT_QUERY_KEYS.rooms(userId || "")) as RoomListItem[] || [];
+        const roomExists = data.invitation?.room_id && currentRooms.some(room => room.id === data.invitation.room_id);
+        
+        if (!roomExists) {
+          // Force refresh only if room doesn't exist in cache
+          queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.rooms(userId || "") });
+        }
+        
+        // Always invalidate invitation queries as they should be removed
+        queryClient.invalidateQueries({ 
+          queryKey: CHAT_QUERY_KEYS.invitations(userId || '', 'received', 'PENDING') 
+        });
+      }, 100); // Small delay to let real-time process
       
-      // Auto-select the joined room
+      // Auto-select the joined room immediately
       if (data.invitation?.room_id) {
         console.log('🎯 Auto-selecting joined room:', data.invitation.room_id);
         setSelectedRoom(data.invitation.room_id);
@@ -293,6 +384,67 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
     console.log("Load more messages for room:", roomId);
   }, []);
 
+  // Enhanced error handling
+  const handleError = useCallback((error: Error, context: string) => {
+    console.error(`[ChatApp] ${context}:`, error);
+    setLastError(error);
+    
+    // Reset error after 10 seconds
+    const timeout = setTimeout(() => {
+      if (!isUnmountedRef.current) {
+        setLastError(null);
+      }
+    }, 10000);
+    
+    cleanupTimeoutsRef.current.push(timeout);
+  }, []);
+
+  // Memory management and cleanup
+  useEffect(() => {
+    return () => {
+      isUnmountedRef.current = true;
+      
+      // Clear all timeouts
+      cleanupTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+      cleanupTimeoutsRef.current = [];
+      
+      // Cleanup systems
+      messageSystem.cleanup?.();
+      optimisticUpdates.cleanup?.();
+      dataSync.cleanup?.();
+      
+      // Clear any stale query data for memory management
+      if (selectedRoom) {
+        queryClient.removeQueries({ 
+          queryKey: CHAT_QUERY_KEYS.roomMessages(selectedRoom),
+          exact: false 
+        });
+      }
+    };
+  }, [selectedRoom, messageSystem, optimisticUpdates, dataSync, queryClient]);
+
+  // Connection retry logic
+  useEffect(() => {
+    if (connectionSystem.hasError && connectionAttempts < 3) {
+      const timeout = setTimeout(() => {
+        if (!isUnmountedRef.current) {
+          setConnectionAttempts(prev => prev + 1);
+          // Trigger reconnection attempt
+          connectionSystem.reconnect?.();
+        }
+      }, Math.pow(2, connectionAttempts) * 1000); // Exponential backoff
+      
+      cleanupTimeoutsRef.current.push(timeout);
+    }
+  }, [connectionSystem.hasError, connectionAttempts, connectionSystem]);
+
+  // Reset connection attempts on successful connection
+  useEffect(() => {
+    if (connectionSystem.isConnected && connectionAttempts > 0) {
+      setConnectionAttempts(0);
+    }
+  }, [connectionSystem.isConnected, connectionAttempts]);
+
   return {
     // State
     selectedRoom,
@@ -315,10 +467,12 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
 
     // Errors (Enhanced)
     error,
+    lastError,
     createRoomError: createRoomMutation.error,
     invitationResponseError: acceptInvitationMutation.error || declineInvitationMutation.error,
     messageError: messageSystem.sendError,
     connectionError: connectionSystem.hasError,
+    connectionAttempts,
 
     // Actions (Enhanced)
     handleRoomSelect: handleRoomSelectEnhanced,
@@ -338,6 +492,10 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
     presenceSystem,
     typingSystem,
     messageSystem,
+    
+    // Enhanced systems
+    optimisticUpdates,
+    dataSync,
     
     // Enhanced UI data
     currentRoomTyping,

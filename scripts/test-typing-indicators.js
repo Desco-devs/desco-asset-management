@@ -7,8 +7,25 @@
 
 const { createClient } = require('@supabase/supabase-js');
 
-// Load environment variables
-require('dotenv').config();
+// Load environment variables from .env
+const fs = require('fs');
+const path = require('path');
+
+function loadEnvFile() {
+  const envPath = path.join(__dirname, '..', '.env');
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envContent.split('\n').forEach(line => {
+      const [key, ...valueParts] = line.split('=');
+      if (key && valueParts.length > 0) {
+        const value = valueParts.join('=').replace(/^["']|["']$/g, ''); // Remove quotes
+        process.env[key.trim()] = value.trim();
+      }
+    });
+  }
+}
+
+loadEnvFile();
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -25,9 +42,10 @@ console.log('⌨️ Testing Typing Indicators...\n');
 // Test: Listen to typing events
 console.log('📡 Setting up typing indicators listener...');
 const typingChannel = supabase
-  .channel('chat-typing', {
+  .channel('chat-typing-global', {
     config: {
-      broadcast: { self: false } // Don't receive our own broadcasts
+      broadcast: { self: false, ack: false }, // Don't receive our own broadcasts
+      presence: { key: 'test-user-id' }
     }
   })
   .on('broadcast', { event: 'typing' }, (payload) => {

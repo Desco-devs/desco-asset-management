@@ -102,8 +102,23 @@ const ChatApp = () => {
     // Placeholder for user invitation
   };
 
-  // Show loading skeleton if auth is still loading or we're fetching data
-  if (authLoading || isLoading || !currentUserId) {
+  // Enhanced message sending wrapper for better UI feedback
+  const handleSendMessageWithFeedback = async (message: string) => {
+    if (!selectedRoom) {
+      throw new Error('No room selected');
+    }
+    
+    try {
+      return await handleSendMessage(selectedRoom, message);
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      throw error; // Re-throw to allow MessageInput to handle the error
+    }
+  };
+
+  // Show loading skeleton only for critical loading states (auth and user ID)
+  // Don't block for room/message loading to allow instant real-time updates
+  if (authLoading || !currentUserId) {
     return (
       <div className="flex flex-row w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] bg-background">
         <ChatAppSkeleton />
@@ -181,7 +196,7 @@ const ChatApp = () => {
                   currentUserId={currentUserId}
                   currentUser={user}
                   roomId={selectedRoom || undefined}
-                  isLoading={isLoadingMessages}
+                  isLoading={isLoadingMessages && messages.length === 0} // Only show loading for initial load
                   hasMoreMessages={hasMoreMessages}
                   isLoadingMore={isLoadingMoreMessages}
                   onLoadMore={() => {
@@ -196,7 +211,7 @@ const ChatApp = () => {
                 <MessageInput
                   roomName={currentRoom.name}
                   roomId={selectedRoom || undefined}
-                  onSendMessage={(message) => handleSendMessage(selectedRoom || "", message)}
+                  onSendMessage={handleSendMessageWithFeedback}
                   onAttachFile={handleAttachFile}
                   onEmojiPicker={handleEmojiPicker}
                   placeholder={`Message ${currentRoom.name}...`}

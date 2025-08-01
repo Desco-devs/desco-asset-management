@@ -4,6 +4,8 @@ import { useState, useCallback, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CHAT_QUERY_KEYS } from './queryKeys'
 import { useChatRealtime } from './useChatRealtime'
+import { useInstantMessages } from './useInstantMessages'
+import { useDataSynchronization } from './useDataSynchronization'
 import type { MessageWithRelations, SendMessageData, ChatUser } from '@/types/chat-app'
 import { MessageType, RoomType } from '@/types/chat-app'
 
@@ -18,7 +20,7 @@ interface OptimisticMessage extends MessageWithRelations {
 interface SendMessageOptions {
   roomId: string
   content: string
-  type?: 'TEXT' | 'IMAGE' | 'FILE'
+  type?: MessageType
   fileUrl?: string
   replyToId?: string
 }
@@ -35,12 +37,14 @@ interface SendMessageOptions {
 export function useChatMessages(currentUser?: ChatUser) {
   const queryClient = useQueryClient()
   const { updateMessageOptimistically, markMessageFailed } = useChatRealtime(currentUser?.id)
+  const instantMessages = useInstantMessages(currentUser)
+  const dataSync = useDataSynchronization(currentUser)
   
   const [pendingMessages, setPendingMessages] = useState<Record<string, OptimisticMessage>>({})
   const retryTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({})
   
   const MAX_RETRY_ATTEMPTS = 3
-  const RETRY_DELAYS = [1000, 3000, 5000] // 1s, 3s, 5s
+  const RETRY_DELAYS = [500, 1500, 3000] // Faster retries: 0.5s, 1.5s, 3s
 
   // Generate optimistic message
   const createOptimisticMessage = useCallback((
@@ -80,7 +84,7 @@ export function useChatMessages(currentUser?: ChatUser) {
     }
   }, [currentUser])
 
-  // Add optimistic message to UI immediately
+  // Add optimistic message to UI immediately with room list update
   const addOptimisticMessage = useCallback((message: OptimisticMessage) => {
     const roomMessagesKey = CHAT_QUERY_KEYS.roomMessages(message.room_id)
     
@@ -96,15 +100,39 @@ export function useChatMessages(currentUser?: ChatUser) {
         return oldMessages // Already exists
       }
       
-      return [...oldMessages, message]
+      // Sort messages by created_at to maintain order
+      const newMessages = [...oldMessages, message]
+      return newMessages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
     })
+    
+    // Immediately update room list with optimistic last message
+    queryClient.setQueriesData(
+      { queryKey: CHAT_QUERY_KEYS.rooms(currentUser?.id || '') },
+      (oldRooms: any) => {
+        if (!oldRooms) return oldRooms
+        return oldRooms.map((room: any) => {
+          if (room.id === message.room_id) {
+            return {
+              ...room,
+              lastMessage: {
+                content: message.content,
+                sender_name: message.sender.full_name,
+                created_at: message.created_at
+              },
+              updated_at: message.created_at
+            }
+          }
+          return room
+        })
+      }
+    )
     
     // Track in pending messages
     setPendingMessages(prev => ({
       ...prev,
       [message.optimistic_id]: message
     }))
-  }, [queryClient])
+  }, [queryClient, currentUser])
 
   // Update message status
   const updateMessageStatus = useCallback((
@@ -166,7 +194,7 @@ export function useChatMessages(currentUser?: ChatUser) {
     return sendMessageMutation.mutateAsync({
       roomId: message.room_id,
       content: message.content,
-      type: message.type as 'TEXT' | 'IMAGE' | 'FILE',
+      type: message.type,
       fileUrl: message.file_url,
       replyToId: message.reply_to_id,
       optimisticId
@@ -189,7 +217,7 @@ export function useChatMessages(currentUser?: ChatUser) {
 
   // Send message mutation with optimistic updates
   const sendMessageMutation = useMutation({
-    mutationFn: async (data: SendMessageOptions & { optimisticId?: string }) => {
+    mutationFn: async (data: SendMessageOptions & { optimisticId?: string; instantId?: string }) => {
       const response = await fetch('/api/messages/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -208,41 +236,51 @@ export function useChatMessages(currentUser?: ChatUser) {
         throw new Error(errorData.error || 'Failed to send message')
       }
       
-      return { ...await response.json(), optimisticId: data.optimisticId }
+      return { ...await response.json(), optimisticId: data.optimisticId, instantId: data.instantId }
     },
     onSuccess: (result, variables) => {
       const { optimisticId } = variables
       
       if (optimisticId) {
-        // Replace optimistic message with real message
-        const roomMessagesKey = CHAT_QUERY_KEYS.roomMessages(variables.roomId)
-        
-        queryClient.setQueryData(roomMessagesKey, (oldMessages: MessageWithRelations[] = []) => {
-          return oldMessages.map(msg => {
-            if ((msg as any).optimistic_id === optimisticId || msg.id === optimisticId) {
-              // Replace with real message data
-              return {
-                ...result.message,
-                pending: false,
-                sent: true,
-                failed: false
-              }
-            }
-            return msg
-          })
-        })
+        // Use data synchronization for conflict-free updates
+        dataSync.updateMessageCache(variables.roomId, {
+          ...result.message,
+          pending: false,
+          sent: true,
+          failed: false
+        }, 'api')
         
         // Clean up optimistic message
         removeOptimisticMessage(optimisticId)
       }
       
-      // Invalidate queries for real-time sync
-      queryClient.invalidateQueries({ 
-        queryKey: CHAT_QUERY_KEYS.roomMessages(variables.roomId) 
-      })
-      queryClient.invalidateQueries({ 
-        queryKey: CHAT_QUERY_KEYS.rooms(currentUser?.id || '') 
-      })
+      // Update room list with last message using data sync
+      if (currentUser && result.message) {
+        const roomUpdate: Partial<any> = {
+          id: variables.roomId,
+          lastMessage: {
+            id: result.message.id,
+            content: result.message.content,
+            type: result.message.type,
+            sender_name: result.message.sender?.full_name || currentUser.full_name,
+            created_at: result.message.created_at
+          },
+          updated_at: result.message.created_at
+        }
+        
+        // Update room cache smartly
+        queryClient.setQueryData(CHAT_QUERY_KEYS.rooms(currentUser.id), (oldRooms: any[] = []) => {
+          return oldRooms.map(room => 
+            room.id === variables.roomId 
+              ? { ...room, ...roomUpdate }
+              : room
+          ).sort((a, b) => {
+            const aTime = new Date(a.updated_at || a.created_at).getTime()
+            const bTime = new Date(b.updated_at || b.created_at).getTime()
+            return bTime - aTime
+          })
+        })
+      }
     },
     onError: (error, variables) => {
       const { optimisticId } = variables
@@ -265,30 +303,54 @@ export function useChatMessages(currentUser?: ChatUser) {
     }
   })
 
-  // Main send message function
+  // Enhanced send message function with instant display
   const sendMessage = useCallback(async (options: SendMessageOptions) => {
     if (!currentUser) {
       throw new Error('User not authenticated')
     }
     
-    // Generate optimistic ID
-    const optimisticId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    // Add message instantly to UI (zero delay)
+    const instantId = instantMessages.addInstantMessage(
+      options.roomId,
+      options.content,
+      {
+        type: options.type,
+        fileUrl: options.fileUrl,
+        replyToId: options.replyToId
+      }
+    )
     
-    // Create and add optimistic message
-    const optimisticMessage = createOptimisticMessage(options, optimisticId)
-    addOptimisticMessage(optimisticMessage)
+    if (!instantId) {
+      throw new Error('Failed to create instant message')
+    }
+    
+    // Generate optimistic ID for tracking
+    const optimisticId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     // Send actual message
     try {
-      await sendMessageMutation.mutateAsync({
+      const result = await sendMessageMutation.mutateAsync({
         ...options,
-        optimisticId
+        optimisticId,
+        instantId // Pass instant ID to link with real message
       })
+      
+      // Confirm instant message with real data
+      if (result?.message) {
+        instantMessages.confirmInstantMessage(
+          options.roomId,
+          instantId,
+          result.message
+        )
+      }
+      
+      return result
     } catch (error) {
-      // Error is handled in onError callback
+      // Mark instant message as failed
+      instantMessages.failInstantMessage(options.roomId, instantId, error as Error)
       throw error
     }
-  }, [currentUser, createOptimisticMessage, addOptimisticMessage, sendMessageMutation])
+  }, [currentUser, instantMessages, sendMessageMutation])
 
   // Manual retry function for UI
   const manualRetry = useCallback(async (optimisticId: string) => {
@@ -300,17 +362,12 @@ export function useChatMessages(currentUser?: ChatUser) {
     const message = pendingMessages[optimisticId]
     if (!message) return
     
-    // Remove from query cache
-    const roomMessagesKey = CHAT_QUERY_KEYS.roomMessages(message.room_id)
-    queryClient.setQueryData(roomMessagesKey, (oldMessages: MessageWithRelations[] = []) => {
-      return oldMessages.filter(msg => 
-        (msg as any).optimistic_id !== optimisticId && msg.id !== optimisticId
-      )
-    })
+    // Use data synchronization for clean removal
+    dataSync.removeMessageFromCache(message.room_id, optimisticId)
     
     // Clean up
     removeOptimisticMessage(optimisticId)
-  }, [pendingMessages, queryClient, removeOptimisticMessage])
+  }, [pendingMessages, dataSync, removeOptimisticMessage])
 
   // Get pending messages for a room
   const getPendingMessages = useCallback((roomId: string): OptimisticMessage[] => {
@@ -327,7 +384,10 @@ export function useChatMessages(currentUser?: ChatUser) {
     
     // Clear pending messages
     setPendingMessages({})
-  }, [])
+    
+    // Cleanup data synchronization
+    dataSync.cleanup()
+  }, [dataSync])
 
   return {
     // Actions

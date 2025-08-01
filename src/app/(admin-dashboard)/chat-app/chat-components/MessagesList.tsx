@@ -10,9 +10,15 @@ import {
   CheckCheck,
   ChevronUp,
   Loader2,
+  Clock,
+  AlertCircle,
+  RotateCcw,
+  X,
 } from "lucide-react";
 import { MessageWithRelations } from "@/types/chat-app";
 import TypingIndicator from "./TypingIndicator";
+import { useInstantMessages } from "@/hooks/chat-app/useInstantMessages";
+import { useChatMessages } from "@/hooks/chat-app/useChatMessages";
 
 // Custom hook to handle client-side time formatting and avoid hydration issues
 const useClientTime = (timestamp: string | Date, messageId: string) => {
@@ -88,64 +94,64 @@ const MessagesList = ({
 }: MessagesListProps) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const previousMessageCount = useRef(messages.length);
   const previousRoomId = useRef(roomId);
+  const previousMessageCount = useRef(messages.length);
+  
+  // Initialize instant messages and chat messages hooks
+  const instantMessages = useInstantMessages(currentUser);
+  const { manualRetry, cancelMessage, getPendingMessages } = useChatMessages(currentUser);
+  
+  // Get pending messages for current room
+  const pendingMessages = roomId ? getPendingMessages(roomId) : [];
 
-  // Reset scroll state when switching rooms
+  // Reset scroll state when switching rooms and auto-scroll for new messages
   useEffect(() => {
     if (roomId !== previousRoomId.current) {
-      setShouldAutoScroll(true);
       setShowScrollToBottom(false);
       previousRoomId.current = roomId;
-      previousMessageCount.current = 0; // Reset message count
+      // Auto-scroll to bottom when switching rooms
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+      }, 100);
     }
   }, [roomId]);
-
-  // Auto scroll to bottom when new messages arrive or component mounts
+  
+  // Auto-scroll for new messages (instant for current user's messages)
   useEffect(() => {
-    const isNewMessage = messages.length > previousMessageCount.current;
-    const isRoomSwitch = roomId !== previousRoomId.current;
-    const isInitialLoad =
-      previousMessageCount.current === 0 && messages.length > 0;
-
-    // Check if the newest message is from another user (not current user)
-    const latestMessage = messages[messages.length - 1];
-    const isMessageFromOtherUser = latestMessage && latestMessage.sender?.id !== currentUserId;
-
-    // Auto-scroll conditions:
-    // 1. Room switch or initial load (always scroll)
-    // 2. New message from another user and user is near bottom
-    // 3. User manually wants to stay at bottom (shouldAutoScroll)
-    const shouldScroll = isRoomSwitch || isInitialLoad || 
-      (shouldAutoScroll && isNewMessage && isMessageFromOtherUser);
-
-    if (shouldScroll) {
-      // Instant scroll for room switch and initial load, smooth for new messages only
-      const behavior = isRoomSwitch || isInitialLoad ? "auto" : "smooth";
-
-      // Use setTimeout to ensure DOM is ready for room switches
-      if (isRoomSwitch || isInitialLoad) {
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
-        }, 0);
-      } else {
-        messagesEndRef.current?.scrollIntoView({ behavior });
+    const messageCountChanged = messages.length !== previousMessageCount.current;
+    previousMessageCount.current = messages.length;
+    
+    if (messageCountChanged && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      const isMyMessage = lastMessage?.sender_id === currentUserId;
+      const element = scrollAreaRef.current;
+      
+      if (element) {
+        const { scrollTop, scrollHeight, clientHeight } = element;
+        const isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
+        
+        // Auto-scroll immediately for user's messages or if near bottom
+        if (isMyMessage || isNearBottom) {
+          messagesEndRef.current?.scrollIntoView({ 
+            behavior: isMyMessage ? 'instant' : 'smooth' 
+          });
+          setShowScrollToBottom(false);
+        } else {
+          // Show scroll button for other users' messages when not at bottom
+          setShowScrollToBottom(true);
+        }
       }
     }
+  }, [messages, currentUserId]);
 
-    previousMessageCount.current = messages.length;
-  }, [messages, shouldAutoScroll, roomId, currentUserId]);
-
-  // Handle scroll events to manage auto-scroll behavior
+  // Handle scroll events to manage scroll button visibility and load more messages
   const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const element = event.currentTarget;
     const { scrollTop, scrollHeight, clientHeight } = element;
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
     const isNearTop = scrollTop < 100;
 
-    setShouldAutoScroll(isNearBottom);
     setShowScrollToBottom(!isNearBottom && messages.length > 10);
 
     // Auto-load more messages when scrolling near the top
@@ -156,8 +162,60 @@ const MessagesList = ({
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    setShouldAutoScroll(true);
     setShowScrollToBottom(false);
+  };
+  
+  // Enhanced message status component
+  const MessageStatus = ({ message, isMe }: { message: any; isMe: boolean }) => {
+    if (!isMe) return null;
+    
+    const isInstant = message._instant;
+    const isPending = message._pending || message.pending;
+    const isFailed = message._failed || message.failed;
+    const tempId = message._tempId || message.optimistic_id;
+    
+    if (isFailed) {
+      return (
+        <div className="flex items-center gap-1 text-xs">
+          <AlertCircle className="w-3 h-3 text-destructive" />
+          <span className="text-destructive">Failed</span>
+          {tempId && (
+            <div className="flex gap-1 ml-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-4 w-4 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => manualRetry(tempId)}
+                title="Retry"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-4 w-4 p-0 text-muted-foreground hover:text-destructive"
+                onClick={() => cancelMessage(tempId)}
+                title="Cancel"
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    if (isPending || isInstant) {
+      return (
+        <div className="flex items-center gap-1">
+          <Clock className="w-3 h-3 text-muted-foreground animate-pulse" />
+          <span className="text-xs text-muted-foreground">Sending...</span>
+        </div>
+      );
+    }
+    
+    // Message sent successfully
+    return <CheckCheck className="w-3 h-3 text-primary" />;
   };
 
   return (
@@ -210,8 +268,12 @@ const MessagesList = ({
               <div
                 key={msg.id}
                 className={cn(
-                  "flex items-start gap-2 md:gap-3 w-full py-1 md:py-1.5",
-                  isMe && "flex-row-reverse"
+                  "flex items-start gap-2 md:gap-3 w-full py-1 md:py-1.5 transition-opacity duration-200",
+                  isMe && "flex-row-reverse",
+                  // Slight opacity for pending messages
+                  (msg as any)._pending && "opacity-75",
+                  // Red tint for failed messages
+                  (msg as any)._failed && "opacity-60"
                 )}
               >
                 {/* Avatar - smaller on mobile */}
@@ -266,7 +328,7 @@ const MessagesList = ({
                     <p className="leading-relaxed">{msg.content}</p>
                   </div>
 
-                  {/* Message metadata */}
+                  {/* Message metadata with enhanced status */}
                   <div className={cn(
                     "flex items-center gap-2 px-2",
                     isMe ? "justify-end" : "justify-start"
@@ -274,9 +336,7 @@ const MessagesList = ({
                     <span className="text-xs text-muted-foreground">
                       <MessageTimeDisplay />
                     </span>
-                    {isMe && (
-                      <CheckCheck className="w-3 h-3 text-muted-foreground" />
-                    )}
+                    <MessageStatus message={msg} isMe={isMe} />
                   </div>
                 </div>
               </div>
@@ -289,13 +349,7 @@ const MessagesList = ({
             currentUser={currentUser}
             className="mb-2"
             onTypingChange={(isTyping) => {
-              // Only auto-scroll for typing indicators if user is near bottom
-              // This shows when someone else is typing
-              if (isTyping && shouldAutoScroll) {
-                setTimeout(() => {
-                  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-                }, 300);
-              }
+              // Typing indicator callback - no auto-scroll behavior
             }}
           />
 
