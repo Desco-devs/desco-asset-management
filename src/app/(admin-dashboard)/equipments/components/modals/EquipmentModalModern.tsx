@@ -202,12 +202,22 @@ export default function EquipmentModalModern() {
         
         // Handle array with JSON string format
         if (Array.isArray(parsedParts) && parsedParts.length > 0 && typeof parsedParts[0] === 'string') {
-          parsedParts = JSON.parse(parsedParts[0]);
+          try {
+            parsedParts = JSON.parse(parsedParts[0]);
+          } catch (error) {
+            console.warn('Failed to parse equipment parts JSON from array:', error);
+            parsedParts = { rootFiles: [], folders: [] };
+          }
         }
         
         // Handle string format
         if (typeof parsedParts === 'string') {
-          parsedParts = JSON.parse(parsedParts);
+          try {
+            parsedParts = JSON.parse(parsedParts);
+          } catch (error) {
+            console.warn('Failed to parse equipment parts JSON from string:', error);
+            parsedParts = { rootFiles: [], folders: [] };
+          }
         }
         
         // Initialize parts structure if it exists
@@ -517,12 +527,22 @@ export default function EquipmentModalModern() {
           
           // Handle array with JSON string format
           if (Array.isArray(parsedParts) && parsedParts.length > 0 && typeof parsedParts[0] === 'string') {
-            parsedParts = JSON.parse(parsedParts[0]);
+            try {
+              parsedParts = JSON.parse(parsedParts[0]);
+            } catch (error) {
+              console.warn('Failed to parse equipment parts JSON from array:', error);
+              parsedParts = { rootFiles: [], folders: [] };
+            }
           }
           
           // Handle string format
           if (typeof parsedParts === 'string') {
-            parsedParts = JSON.parse(parsedParts);
+            try {
+              parsedParts = JSON.parse(parsedParts);
+            } catch (error) {
+              console.warn('Failed to parse equipment parts JSON from string:', error);
+              parsedParts = { rootFiles: [], folders: [] };
+            }
           }
           
           if (parsedParts && typeof parsedParts === 'object') {
@@ -1790,13 +1810,24 @@ export default function EquipmentModalModern() {
               </div>
             ) : (
               <EquipmentPartsViewer 
-                equipmentParts={
-                  (selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts 
-                    ? typeof (selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts === 'string'
-                      ? JSON.parse((selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts)
-                      : (selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts
-                    : { rootFiles: [], folders: [] }
-                }
+                equipmentParts={(() => {
+                  const partsData = (selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts;
+                  
+                  if (!partsData) {
+                    return { rootFiles: [], folders: [] };
+                  }
+                  
+                  if (typeof partsData === 'string') {
+                    try {
+                      return JSON.parse(partsData);
+                    } catch (error) {
+                      console.warn('Failed to parse equipment parts JSON:', error);
+                      return { rootFiles: [], folders: [] };
+                    }
+                  }
+                  
+                  return partsData;
+                })()}
                 isEditable={isGlobalEditMode}
                 onPartsChange={setPartsStructure}
                 onPartFileDelete={handlePartFileDelete}

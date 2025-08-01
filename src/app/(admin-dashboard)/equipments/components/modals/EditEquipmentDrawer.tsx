@@ -650,9 +650,19 @@ function EditEquipmentDrawer() {
         
         if (originalParts) {
           if (Array.isArray(originalParts) && originalParts.length > 0) {
-            originalStructure = JSON.parse(originalParts[0]);
+            try {
+              originalStructure = JSON.parse(originalParts[0]);
+            } catch (error) {
+              console.warn('Failed to parse equipment parts JSON from array:', error);
+              originalStructure = { rootFiles: [], folders: [] };
+            }
           } else if (typeof originalParts === 'string') {
-            originalStructure = JSON.parse(originalParts);
+            try {
+              originalStructure = JSON.parse(originalParts);
+            } catch (error) {
+              console.warn('Failed to parse equipment parts JSON from string:', error);
+              originalStructure = { rootFiles: [], folders: [] };
+            }
           } else {
             originalStructure = { rootFiles: [], folders: [] };
           }
