@@ -92,7 +92,7 @@ export default function EquipmentModalModern() {
   const equipments = equipmentsResponse || [];
   const { data: projectsData } = useProjects();
   const { data: maintenanceReports = [] } = useEquipmentMaintenanceReports();
-  const { data: usersData } = useUsers();
+  const { data: usersData, isLoading: usersLoading } = useUsers();
   const projects = projectsData?.data || [];
   const users = usersData?.data || [];
 
@@ -826,8 +826,9 @@ export default function EquipmentModalModern() {
   // Helper function to get user full name from ID
   const getUserFullName = (userId: string | null | undefined) => {
     if (!userId) return 'Unknown User';
+    if (usersLoading) return 'Loading...';
     const user = users.find(u => u.id === userId);
-    return user ? user.full_name : 'Unknown User';
+    return user ? user.full_name : userId; // Show UUID as fallback instead of 'Unknown User'
   };
 
   if (!selectedEquipment) return null;
@@ -1504,24 +1505,29 @@ export default function EquipmentModalModern() {
                   <div className="space-y-4">
                     <div className={gridClassName3}>
                       {/* Registration Expires */}
-                      {(selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry && (
+                      {((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry) && (
                         <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Registration Expires:</Label>
                           <div className={`font-medium ${
                             (() => {
-                              if (!(selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry) return "text-foreground";
+                              const dateValue = (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry;
+                              if (!dateValue) return "text-foreground";
                               const now = new Date();
-                              const expiry = new Date((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry);
+                              const expiry = new Date(dateValue);
                               const diffTime = expiry.getTime() - now.getTime();
                               const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                               return diffDays <= 0 ? "text-red-600" : diffDays <= 30 ? "text-orange-600" : "text-foreground";
                             })()
                           }`}>
-                            {format(new Date((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry), "M/d/yyyy")}
                             {(() => {
-                              if (!(selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry) return null;
+                              const dateValue = (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry;
+                              return dateValue ? format(new Date(dateValue), "M/d/yyyy") : "N/A";
+                            })()}
+                            {(() => {
+                              const dateValue = (selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry;
+                              if (!dateValue) return null;
                               const now = new Date();
-                              const expiry = new Date((selectedEquipment as any).registration_expiry || (selectedEquipment as any).registrationExpiry);
+                              const expiry = new Date(dateValue);
                               const diffTime = expiry.getTime() - now.getTime();
                               const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                               return diffDays <= 0 ? <span className="text-red-600 ml-2">(Expired)</span> : null;
@@ -1531,7 +1537,7 @@ export default function EquipmentModalModern() {
                       )}
 
                       {/* Insurance Expires */}
-                      {(selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate && (
+                      {((selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate) && (
                         <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Insurance Expires:</Label>
                           <div className={`font-medium ${
@@ -1541,7 +1547,10 @@ export default function EquipmentModalModern() {
                               ? "text-orange-600"
                               : "text-foreground"
                           }`}>
-                            {format(new Date((selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate), "M/d/yyyy")}
+                            {(() => {
+                              const dateValue = (selectedEquipment as any).insurance_expiration_date || (selectedEquipment as any).insuranceExpirationDate;
+                              return dateValue ? format(new Date(dateValue), "M/d/yyyy") : "N/A";
+                            })()}
                             {daysUntilExpiry !== null && daysUntilExpiry <= 0 && (
                               <span className="text-red-600 ml-2">(Expired)</span>
                             )}
@@ -1550,22 +1559,27 @@ export default function EquipmentModalModern() {
                       )}
 
                       {/* Last Inspection */}
-                      {(selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate && (
+                      {((selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate) && (
                         <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Last Inspection:</Label>
                           <div className="font-medium text-foreground">
-                            {format(new Date((selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate), "M/d/yyyy")}
+                            {(() => {
+                              const dateValue = (selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate;
+                              return dateValue ? format(new Date(dateValue), "M/d/yyyy") : "N/A";
+                            })()}
                           </div>
                         </div>
                       )}
 
                       {/* Next Inspection Due */}
-                      {(selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate && selectedEquipment.before && (
+                      {((selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate) && selectedEquipment.before && (
                         <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Next Inspection Due:</Label>
                           <div className="font-medium text-foreground">
                             {(() => {
-                              const lastInspection = new Date((selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate);
+                              const dateValue = (selectedEquipment as any).inspection_date || (selectedEquipment as any).inspectionDate;
+                              if (!dateValue) return "N/A";
+                              const lastInspection = new Date(dateValue);
                               const frequency = parseInt(selectedEquipment.before.toString());
                               const nextInspection = new Date(lastInspection);
                               nextInspection.setMonth(nextInspection.getMonth() + frequency);

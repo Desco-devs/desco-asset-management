@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { ChatUser, TypingIndicator } from '@/types/chat-app'
@@ -251,13 +251,7 @@ export function useChatTyping(currentUser?: ChatUser) {
         // Ignore our own typing events
         if (data.user.user_id === currentUser.id) return
         
-        // Validate required fields
-        if (!data.room_id || !data.user.user_id) {
-          console.warn('⌨️ Invalid typing event payload:', data)
-          return
-        }
-        
-        console.log('⌨️ Received typing event:', data.type, 'for room:', data.room_id, 'from:', data.user.full_name)
+        console.log('⌨️ Received typing event:', data.type, data.room_id, data.user.full_name)
         
         if (data.type === 'typing_start') {
           addTypingUser(data.room_id, {
@@ -403,59 +397,16 @@ export function useChatTyping(currentUser?: ChatUser) {
 }
 
 /**
- * Room-specific typing hook
- * 
- * Provides typing indicators for a specific room with optimized re-renders
+ * Simplified hook for a specific room
  */
 export function useRoomTyping(roomId?: string, currentUser?: ChatUser) {
-  const { 
-    getTypingUsers, 
-    getTypingText, 
-    isAnyoneTyping, 
-    handleTyping, 
-    startTyping,
-    stopTyping,
-    isConnected 
-  } = useChatTyping(currentUser)
-  
-  // Memoize room-specific values to prevent unnecessary re-renders
-  const roomTypingUsers = useMemo(() => {
-    return roomId ? getTypingUsers(roomId) : []
-  }, [roomId, getTypingUsers])
-  
-  const roomTypingText = useMemo(() => {
-    return roomId ? getTypingText(roomId) : ''
-  }, [roomId, getTypingText])
-  
-  const roomIsAnyoneTyping = useMemo(() => {
-    return roomId ? isAnyoneTyping(roomId) : false
-  }, [roomId, isAnyoneTyping])
-  
-  const roomHandleTyping = useCallback(() => {
-    if (roomId) {
-      handleTyping(roomId)
-    }
-  }, [roomId, handleTyping])
-  
-  const roomStartTyping = useCallback(() => {
-    if (roomId) {
-      startTyping(roomId)
-    }
-  }, [roomId, startTyping])
-  
-  const roomStopTyping = useCallback(() => {
-    if (roomId) {
-      stopTyping(roomId)
-    }
-  }, [roomId, stopTyping])
+  const { getTypingUsers, getTypingText, isAnyoneTyping, handleTyping, isConnected } = useChatTyping(currentUser)
   
   return {
-    typingUsers: roomTypingUsers,
-    typingText: roomTypingText,
-    isAnyoneTyping: roomIsAnyoneTyping,
-    handleTyping: roomHandleTyping,
-    startTyping: roomStartTyping,
-    stopTyping: roomStopTyping,
+    typingUsers: roomId ? getTypingUsers(roomId) : [],
+    typingText: roomId ? getTypingText(roomId) : '',
+    isAnyoneTyping: roomId ? isAnyoneTyping(roomId) : false,
+    handleTyping: roomId ? () => handleTyping(roomId) : () => {},
     isConnected
   }
 }

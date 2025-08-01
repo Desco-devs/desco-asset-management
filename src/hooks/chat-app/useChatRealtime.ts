@@ -100,34 +100,34 @@ function useNetworkStatus() {
 }
 
 /**
- * Adaptive throttling based on network conditions - optimized for chat
+ * Adaptive throttling based on network conditions
  */
 function useAdaptiveThrottling() {
-  const [throttleMs, setThrottleMs] = useState(100) // Much faster for chat
+  const [throttleMs, setThrottleMs] = useState(500) // Faster throttling for chat
   const { isOnline, connectionType } = useNetworkStatus()
 
   useEffect(() => {
     if (!isOnline) {
-      setThrottleMs(500) // 500ms when offline (reduced from 2s)
+      setThrottleMs(2000) // 2s when offline
       return
     }
 
-    // Aggressive throttling reduction for instant chat feel
+    // Adaptive throttling based on connection type - faster for chat
     switch (connectionType) {
       case 'slow-2g':
       case '2g':
-        setThrottleMs(300) // 300ms for slow connections (reduced from 1.5s)
+        setThrottleMs(1500) // 1.5s for slow connections
         break
       case '3g':
-        setThrottleMs(200) // 200ms for 3G (reduced from 1s)
+        setThrottleMs(1000) // 1s for 3G
         break
       case '4g':
       case '5g':
       case 'wifi':
-        setThrottleMs(50) // 50ms for fast connections (reduced from 500ms)
+        setThrottleMs(500) // 500ms for fast connections (chat needs to be responsive)
         break
       default:
-        setThrottleMs(100) // 100ms for unknown connections (reduced from 750ms)
+        setThrottleMs(750) // 750ms for unknown connections
     }
   }, [isOnline, connectionType])
 
@@ -162,39 +162,23 @@ export function useChatRealtime(userId?: string) {
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 5
 
-  // Immediate invalidation for messages, throttled for other updates
-  const intelligentInvalidate = useCallback((payload: any, queryKeys: string[]) => {
+  // Throttled invalidation function
+  const throttledInvalidate = useCallback((payload: any, queryKeys: string[]) => {
     const now = Date.now()
     const timeSinceLastUpdate = now - lastUpdateRef.current
-    const isMessageUpdate = payload.table === 'messages'
-    const isRoomUpdate = payload.table === 'rooms' || payload.table === 'room_members'
 
     // Clear any pending timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
     }
 
-    // Messages get immediate updates for instant feel
-    if (isMessageUpdate) {
-      performInvalidation(payload, queryKeys)
-      lastUpdateRef.current = now
-      return
-    }
-    
-    // Room updates also get faster processing
-    if (isRoomUpdate && timeSinceLastUpdate >= 50) {
-      performInvalidation(payload, queryKeys)
-      lastUpdateRef.current = now
-      return
-    }
-
-    // Other updates use minimal throttling
+    // If enough time has passed, invalidate immediately
     if (timeSinceLastUpdate >= throttleMs) {
       performInvalidation(payload, queryKeys)
       lastUpdateRef.current = now
     } else {
-      // Much shorter delay for non-message updates
-      const delay = Math.min(throttleMs - timeSinceLastUpdate, 100)
+      // Otherwise, schedule invalidation
+      const delay = throttleMs - timeSinceLastUpdate
       timeoutRef.current = setTimeout(() => {
         performInvalidation(payload, queryKeys)
         lastUpdateRef.current = Date.now()
@@ -244,77 +228,56 @@ export function useChatRealtime(userId?: string) {
     })
   }, [queryClient])
 
-  // Optimized invalidation logic with immediate room list updates
+  // Actual invalidation logic
   const performInvalidation = useCallback((payload: any, queryKeys: string[]) => {
     try {
-      // For messages, handle immediate updates
+      queryKeys.forEach(queryKey => {
+        queryClient.invalidateQueries({ 
+          queryKey: [queryKey],
+          exact: false,
+          refetchType: 'none' // Let components decide when to refetch
+        })
+      })
+
+      // For messages, handle optimistic updates and confirmation
       if (payload.table === 'messages' && payload.new?.room_id) {
-        const roomId = payload.new.room_id
-        
-        // If this is a new message, handle optimistic confirmation
+        // If this is a new message, confirm it was delivered
         if (payload.eventType === 'INSERT' && payload.new) {
           // Enrich the message with sender data from the users cache
           const enrichedMessage = enrichMessageWithSenderData(payload.new, queryClient)
           updateMessageOptimistically(enrichedMessage, true)
         }
         
-        // Immediately update room messages
         queryClient.invalidateQueries({ 
-          queryKey: CHAT_QUERY_KEYS.roomMessages(roomId),
-          exact: true,
-          refetchType: 'active' // Immediate refetch for active queries
+          queryKey: CHAT_QUERY_KEYS.roomMessages(payload.new.room_id),
+          exact: true
         })
-        
-        // Immediately update room list to show new last message
-        if (userId) {
-          queryClient.invalidateQueries({ 
-            queryKey: CHAT_QUERY_KEYS.rooms(userId),
-            exact: true,
-            refetchType: 'active' // Immediate refetch for room list
-          })
-        }
-        
-        return // Skip general invalidation for messages
       }
 
-      // For rooms, immediate updates
+      // For rooms, invalidate user-specific room queries
       if (payload.table === 'rooms' && userId) {
         queryClient.invalidateQueries({ 
           queryKey: CHAT_QUERY_KEYS.rooms(userId),
-          exact: true,
-          refetchType: 'active'
+          exact: true
         })
       }
 
-      // For room_members, immediate updates
+      // For room_members, invalidate both rooms and specific room messages
       if (payload.table === 'room_members') {
         if (userId) {
           queryClient.invalidateQueries({ 
             queryKey: CHAT_QUERY_KEYS.rooms(userId),
-            exact: true,
-            refetchType: 'active'
+            exact: true
           })
         }
         if (payload.new?.room_id || payload.old?.room_id) {
           const roomId = payload.new?.room_id || payload.old?.room_id
           queryClient.invalidateQueries({ 
             queryKey: CHAT_QUERY_KEYS.roomMessages(roomId),
-            exact: true,
-            refetchType: 'active'
+            exact: true
           })
         }
       }
-      
-      // General invalidation for other query keys (minimal throttling)
-      queryKeys.forEach(queryKey => {
-        if (queryKey !== 'messages' && queryKey !== 'rooms') {
-          queryClient.invalidateQueries({ 
-            queryKey: [queryKey],
-            exact: false,
-            refetchType: 'none'
-          })
-        }
-      })
     } catch (error) {
       console.warn('[ChatRealtime] Invalidation error:', error)
     }
@@ -351,7 +314,7 @@ export function useChatRealtime(userId?: string) {
           },
           (payload) => {
             console.log('💬 Message change detected:', payload.eventType, (payload.new as any)?.room_id)
-            intelligentInvalidate(payload, ['messages', 'rooms'])
+            throttledInvalidate(payload, ['messages', 'rooms'])
           }
         )
         // Listen to rooms table changes
@@ -364,7 +327,7 @@ export function useChatRealtime(userId?: string) {
           },
           (payload) => {
             console.log('🏠 Room change detected:', payload.eventType, (payload.new as any)?.id)
-            intelligentInvalidate(payload, ['rooms'])
+            throttledInvalidate(payload, ['rooms'])
           }
         )
         // Listen to room_members table changes
@@ -377,7 +340,7 @@ export function useChatRealtime(userId?: string) {
           },
           (payload) => {
             console.log('👥 Room member change detected:', payload.eventType, (payload.new as any)?.room_id)
-            intelligentInvalidate(payload, ['rooms', 'room-members'])
+            throttledInvalidate(payload, ['rooms', 'room-members'])
           }
         )
         .on('system', {}, (payload) => {
@@ -419,7 +382,7 @@ export function useChatRealtime(userId?: string) {
       setConnectionStatus('error')
       scheduleReconnect()
     }
-  }, [isOnline, userId, intelligentInvalidate])
+  }, [isOnline, userId, throttledInvalidate])
 
   // Reconnection with exponential backoff
   const scheduleReconnect = useCallback(() => {

@@ -3,9 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Paperclip, Smile, Loader2, CheckCircle } from "lucide-react";
+import { Send, Paperclip, Smile } from "lucide-react";
 import { useRoomTyping } from "@/hooks/chat-app/useChatTyping";
-import { cn } from "@/lib/utils";
 
 interface MessageInputProps {
   roomName?: string;
@@ -32,25 +31,14 @@ const MessageInput = ({
 }: MessageInputProps) => {
   const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [sendSuccess, setSendSuccess] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // Use typing hook for realtime typing indicators
   const { handleTyping } = useRoomTyping(roomId, currentUser);
 
-  const handleSendMessage = async () => {
-    if (message.trim() && !disabled && !isSending) {
-      const messageToSend = message.trim();
-      
-      // Immediate visual feedback
-      setIsSending(true);
-      setSendError(null);
-      setSendSuccess(false);
-      
-      // Clear input immediately for instant feedback
+  const handleSendMessage = () => {
+    if (message.trim() && !disabled) {
+      onSendMessage(message.trim());
       setMessage("");
       
       // Stop typing indicator when message is sent
@@ -63,27 +51,6 @@ const MessageInput = ({
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = null;
-      }
-      
-      try {
-        // Send message (this will be instant with the new system)
-        await onSendMessage(messageToSend);
-        
-        // Show success feedback briefly
-        setSendSuccess(true);
-        setTimeout(() => setSendSuccess(false), 1000);
-        
-        // Focus back to input for continued typing
-        inputRef.current?.focus();
-      } catch (error) {
-        // Show error and restore message
-        setSendError(error instanceof Error ? error.message : 'Failed to send message');
-        setMessage(messageToSend); // Restore message on error
-        
-        // Clear error after 3 seconds
-        setTimeout(() => setSendError(null), 3000);
-      } finally {
-        setIsSending(false);
       }
     }
   };
@@ -147,13 +114,6 @@ const MessageInput = ({
 
   return (
     <div className="p-3 md:p-4 bg-background border-t">
-      {/* Error message */}
-      {sendError && (
-        <div className="mb-2 p-2 bg-destructive/10 border border-destructive/20 rounded-md">
-          <p className="text-sm text-destructive">{sendError}</p>
-        </div>
-      )}
-      
       <div className="flex items-end space-x-2 md:space-x-3">
         {/* Attach File Button - Hidden on mobile */}
         <Button
@@ -169,17 +129,12 @@ const MessageInput = ({
         {/* Message Input Container */}
         <div className="flex-1 relative min-w-0">
           <Input
-            ref={inputRef}
             value={message}
             onChange={handleInputChange}
             placeholder={placeholder || `Message ${roomName}...`}
-            className={cn(
-              "pr-12 md:pr-16 py-2 md:py-2.5 text-sm md:text-base rounded-2xl border-input focus:border-primary transition-colors",
-              sendSuccess && "border-green-500 focus:border-green-500",
-              sendError && "border-destructive focus:border-destructive"
-            )}
+            className="pr-12 md:pr-16 py-2 md:py-2.5 text-sm md:text-base rounded-2xl border-input focus:border-primary"
             onKeyPress={handleKeyPress}
-            disabled={disabled || isSending}
+            disabled={disabled}
           />
           
           {/* Emoji Button - Inside input on mobile */}
@@ -196,26 +151,13 @@ const MessageInput = ({
           </div>
         </div>
 
-        {/* Send Button with enhanced states */}
+        {/* Send Button */}
         <Button
-          className={cn(
-            "flex-shrink-0 rounded-full p-2 md:p-2.5 h-10 w-10 md:h-11 md:w-11 transition-all duration-200",
-            sendSuccess 
-              ? "bg-green-500 hover:bg-green-600" 
-              : sendError
-              ? "bg-destructive hover:bg-destructive/90"
-              : "bg-chart-2 hover:bg-chart-2/90"
-          )}
+          className="bg-chart-2 hover:bg-chart-2/90 flex-shrink-0 rounded-full p-2 md:p-2.5 h-10 w-10 md:h-11 md:w-11"
           onClick={handleSendMessage}
-          disabled={!message.trim() || disabled || isSending}
+          disabled={!message.trim() || disabled}
         >
-          {isSending ? (
-            <Loader2 className="h-4 w-4 md:h-5 md:w-5 text-white animate-spin" />
-          ) : sendSuccess ? (
-            <CheckCircle className="h-4 w-4 md:h-5 md:w-5 text-white" />
-          ) : (
-            <Send className="h-4 w-4 md:h-5 md:w-5 text-white" />
-          )}
+          <Send className="h-4 w-4 md:h-5 md:w-5 text-white" />
         </Button>
       </div>
     </div>

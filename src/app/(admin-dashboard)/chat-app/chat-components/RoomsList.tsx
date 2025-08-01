@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,7 +18,6 @@ import {
 import { cn } from "@/lib/utils";
 import { RoomListItem, RoomType } from "@/types/chat-app";
 import { OnlineStatusDot } from "./OnlinePresence";
-import { useRoomListRealtime } from "@/hooks/chat-app/useRoomListRealtime";
 
 interface RoomsListProps {
   rooms: RoomListItem[];
@@ -42,41 +41,10 @@ const RoomsList = ({
   currentUser,
 }: RoomsListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Initialize real-time room list updates
-  const roomListRealtime = useRoomListRealtime(currentUser);
 
   const filteredRooms = rooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
-  // Enhanced time formatting with real-time updates
-  const formatMessageTime = (timestamp: Date | string) => {
-    try {
-      const date = new Date(timestamp);
-      const now = new Date();
-      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-      
-      if (diffInMinutes < 1) {
-        return 'Just now';
-      } else if (diffInMinutes < 60) {
-        return `${diffInMinutes}m ago`;
-      } else if (diffInMinutes < 1440) { // Less than 24 hours
-        return date.toLocaleTimeString('en-US', {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        });
-      } else {
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric'
-        });
-      }
-    } catch (error) {
-      return '';
-    }
-  };
 
   return (
     <div className="w-full h-full flex flex-col bg-background md:bg-muted">
@@ -139,18 +107,13 @@ const RoomsList = ({
                 : null;
               const otherUserId = otherUser?.user?.id || otherUser?.user_id;
 
-              const hasNewMessage = room.lastMessage && 
-                new Date(room.lastMessage.created_at).getTime() > Date.now() - (5 * 60 * 1000); // 5 minutes ago
-              
               return (
                 <Card
                   key={room.id}
                   className={cn(
                     "mb-2 cursor-pointer transition-all duration-200 hover:bg-accent/50 active:scale-[0.98] md:active:scale-100 p-0 border-l-4 border-l-transparent",
                     selectedRoom === room.id &&
-                      "bg-accent/70 border-l-primary shadow-sm",
-                    hasNewMessage && selectedRoom !== room.id &&
-                      "bg-primary/5 border-l-primary/30"
+                      "bg-accent/70 border-l-primary shadow-sm"
                   )}
                   onClick={() => onRoomSelect(room.id)}
                 >
@@ -185,7 +148,11 @@ const RoomsList = ({
                           </div>
                           {room.lastMessage?.created_at && (
                             <span className="text-xs text-muted-foreground whitespace-nowrap ml-2 flex-shrink-0">
-                              {formatMessageTime(room.lastMessage.created_at)}
+                              {new Date(room.lastMessage.created_at).toLocaleTimeString('en-US', {
+                                hour: "numeric",
+                                minute: "2-digit",
+                                hour12: true,
+                              })}
                             </span>
                           )}
                         </div>
