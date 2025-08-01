@@ -6,10 +6,9 @@ import { Button } from "@/components/ui/button";
 import {
   useEquipmentMaintenanceReports,
   useDeleteEquipmentMaintenanceReport,
-} from "@/hooks/useEquipmentsQuery";
+} from "@/hooks/useEquipmentQuery";
 import { useEquipmentStore, selectActiveModal } from "@/stores/equipmentStore";
-import { useEquipmentsStore } from "@/stores/equipmentsStore";
-import type { EquipmentMaintenanceReport } from "@/stores/equipmentsStore";
+import type { EquipmentMaintenanceReport } from "@/hooks/useEquipmentQuery";
 import {
   Calendar,
   Eye,
@@ -39,7 +38,7 @@ export default function EquipmentMaintenanceReportsEnhanced({
     setSelectedEquipmentMaintenanceReport,
     setSelectedMaintenanceReportForDetail,
     setIsMaintenanceReportDetailOpen
-  } = useEquipmentsStore();
+  } = useEquipmentStore();
 
   // Filter reports for this specific equipment (memoized for performance)
   const equipmentReports = useMemo(() => {
@@ -48,7 +47,7 @@ export default function EquipmentMaintenanceReportsEnhanced({
       : [];
   }, [maintenanceReports, equipmentId]);
 
-  const getStatusColor = (status?: string) => {
+  const getStatusColor = (status?: string | null) => {
     switch (status) {
       case "COMPLETED":
         return "bg-green-100 text-green-800 border-green-200";
@@ -60,7 +59,7 @@ export default function EquipmentMaintenanceReportsEnhanced({
     }
   };
 
-  const getPriorityColor = (priority?: string) => {
+  const getPriorityColor = (priority?: string | null) => {
     switch (priority) {
       case "CRITICAL":
       case "HIGH":

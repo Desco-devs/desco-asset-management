@@ -49,14 +49,14 @@ export function useRoomMembershipRealtime(currentUser?: ChatUser) {
       
       console.log('👥 Member added to room:', { room_id, user_id, member_name: member?.full_name })
       
-      // If current user was added to the room, invalidate their queries
+      // Only invalidate if current user was added to the room
+      // Don't invalidate for other users joining to avoid interference with optimistic updates
       if (user_id === currentUser.id) {
         console.log('✅ Current user joined room, invalidating queries')
-        invalidateRoomQueries(room_id)
-      } else {
-        // If someone else joined a room the current user is in, 
-        // we still need to update the room info (member count, etc.)
-        invalidateRoomQueries()
+        // Small delay to avoid race conditions with optimistic updates
+        setTimeout(() => {
+          invalidateRoomQueries(room_id)
+        }, 150)
       }
     }
 
@@ -73,11 +73,11 @@ export function useRoomMembershipRealtime(currentUser?: ChatUser) {
           queryKey: CHAT_QUERY_KEYS.roomMessages(room_id),
           exact: true
         })
-        invalidateRoomQueries()
-      } else {
-        // If someone else left, just update room info
-        invalidateRoomQueries()
+        setTimeout(() => {
+          invalidateRoomQueries()
+        }, 100)
       }
+      // Don't invalidate for other users leaving to avoid interference
     }
 
     // Helper function to handle invitation responses

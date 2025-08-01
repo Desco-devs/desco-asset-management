@@ -30,11 +30,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import {
   useUpdateEquipmentMaintenanceReport,
-  useEquipmentsWithReferenceData,
-} from "@/hooks/useEquipmentsQuery";
+  useEquipments,
+} from "@/hooks/useEquipmentQuery";
+import { useProjects } from "@/hooks/api/use-projects";
 import { useQueryClient } from "@tanstack/react-query";
-import { equipmentKeys } from "@/hooks/useEquipmentsQuery";
-import { useEquipmentsStore } from "@/stores/equipmentsStore";
+import { equipmentKeys } from "@/hooks/useEquipmentQuery";
 import { useEquipmentStore, selectIsMobile } from "@/stores/equipmentStore";
 import { Plus, Trash2, X, ClipboardCheck, Package, ImageIcon, Upload, MapPin, Calendar, Clock, Wrench, Loader2 } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
@@ -43,19 +43,26 @@ import { createClient } from "@/lib/supabase";
 
 export default function EditEquipmentMaintenanceReportDrawer() {
   // State from Zustand
-  const isOpen = useEquipmentsStore((state) => state.isEditMaintenanceReportDrawerOpen);
+  const isOpen = useEquipmentStore((state) => state.isEditMaintenanceReportDrawerOpen);
   const isMobile = useEquipmentStore(selectIsMobile);
-  const selectedReport = useEquipmentsStore((state) => state.selectedMaintenanceReportForEdit);
+  const selectedReport = useEquipmentStore((state) => state.selectedMaintenanceReportForEdit);
   const { 
     setIsEditMaintenanceReportDrawerOpen, 
     setSelectedMaintenanceReportForEdit,
     setIsMaintenanceReportDetailOpen,
     setSelectedMaintenanceReportForDetail,
     setIsModalOpen
-  } = useEquipmentsStore();
+  } = useEquipmentStore();
 
-  // Server state from TanStack Query
-  const { locations } = useEquipmentsWithReferenceData();
+  // Server state from TanStack Query (standardized approach)
+  const { data: equipments = [] } = useEquipments();
+  const { data: projects = [] } = useProjects();
+  // Extract locations from projects for backward compatibility
+  // Handle different return types from useProjects
+  const projectsArray = Array.isArray(projects) ? projects : (projects?.data || []);
+  const locations = projectsArray
+    .map(p => p.client?.location)
+    .filter((location): location is NonNullable<typeof location> => Boolean(location));
   const updateMaintenanceReportMutation = useUpdateEquipmentMaintenanceReport();
   const queryClient = useQueryClient();
 
@@ -97,7 +104,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
     if (selectedReport) {
       
       // Find the location to verify it exists
-      const selectedLocation = locations.find(loc => loc.uid === selectedReport.location_id);
+      const selectedLocation = locations.find(loc => loc.id === selectedReport.location_id);
       
       setFormData({
         issue_description: selectedReport.issue_description || "",
@@ -109,10 +116,10 @@ export default function EditEquipmentMaintenanceReportDrawer() {
         downtime_hours: selectedReport.downtime_hours?.toString() || "",
         location_id: selectedReport.location_id || "",
         parts_replaced: selectedReport.parts_replaced && selectedReport.parts_replaced.length > 0 
-          ? selectedReport.parts_replaced.filter(part => part && part.trim() !== "")
+          ? selectedReport.parts_replaced.filter((part: string) => part && part.trim() !== "")
           : [""], // Always have at least one empty part
         attachment_urls: selectedReport.attachment_urls && selectedReport.attachment_urls.length > 0 && selectedReport.parts_replaced
-          ? selectedReport.attachment_urls.slice(selectedReport.parts_replaced.length).filter(url => url && url.trim() !== "")
+          ? selectedReport.attachment_urls.slice(selectedReport.parts_replaced.length).filter((url: string) => url && url.trim() !== "")
           : [""], // Only attachment URLs after part images
       });
       
@@ -159,8 +166,10 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       setIsMaintenanceReportDetailOpen(true);
       
       // Invalidate queries to ensure fresh data everywhere
-      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipmentMaintenanceReports() });
-      queryClient.invalidateQueries({ queryKey: equipmentKeys.equipments() });
+      if (selectedReport?.equipment_id) {
+        queryClient.invalidateQueries({ queryKey: equipmentKeys.equipmentMaintenanceReports(selectedReport.equipment_id) });
+      }
+      queryClient.invalidateQueries({ queryKey: equipmentKeys.list() });
       
       // Close edit drawer (this will also close equipment modal via handleClose)
       setIsEditMaintenanceReportDrawerOpen(false);
@@ -358,28 +367,34 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       }
 
       // Step 4: Update the maintenance report with new data
-      const reportData = {
-        id: selectedReport.id,
-        equipment_id: selectedReport.equipment_id,
-        issue_description: formData.issue_description,
-        remarks: formData.remarks || undefined,
-        inspection_details: formData.inspection_details || undefined,
-        action_taken: formData.action_taken || undefined,
-        priority: formData.priority,
-        status: formData.status,
-        downtime_hours: formData.downtime_hours || undefined,
-        // location_id is required in schema, fallback to existing value if empty
-        location_id: formData.location_id || selectedReport.location_id,
-        parts_replaced: filteredPartsReplaced,
-        attachment_urls: attachmentUrls,
-        date_repaired: formData.status === "COMPLETED" && !selectedReport.date_repaired 
-          ? new Date().toISOString() 
-          : selectedReport.date_repaired,
-      };
+      // Create FormData for the update
+      const formDataToSend = new FormData();
+      
+      // Add basic form fields
+      formDataToSend.append('id', selectedReport.id);
+      formDataToSend.append('equipment_id', selectedReport.equipment_id);
+      formDataToSend.append('issue_description', formData.issue_description);
+      if (formData.remarks) formDataToSend.append('remarks', formData.remarks);
+      if (formData.inspection_details) formDataToSend.append('inspection_details', formData.inspection_details);
+      if (formData.action_taken) formDataToSend.append('action_taken', formData.action_taken);
+      formDataToSend.append('priority', formData.priority);
+      formDataToSend.append('status', formData.status);
+      if (formData.downtime_hours) formDataToSend.append('downtime_hours', formData.downtime_hours);
+      
+      // location_id is required in schema, fallback to existing value if empty
+      formDataToSend.append('location_id', formData.location_id || selectedReport.location_id || '');
+      
+      // Add arrays as JSON strings
+      formDataToSend.append('parts_replaced', JSON.stringify(filteredPartsReplaced));
+      formDataToSend.append('attachment_urls', JSON.stringify(attachmentUrls));
+      
+      // Add repair date
+      const repairDate = formData.status === "COMPLETED" && !selectedReport.date_repaired 
+        ? new Date().toISOString() 
+        : selectedReport.date_repaired;
+      if (repairDate) formDataToSend.append('date_repaired', repairDate);
 
-      // Debug: Log the data being sent
-
-      const updatedReport = await updateMaintenanceReportMutation.mutateAsync(reportData);
+      const updatedReport = await updateMaintenanceReportMutation.mutateAsync(formDataToSend);
       setIsSubmitting(false);
       handleSaveAndViewDetails(updatedReport);
     } catch (error) {
@@ -564,7 +579,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                           </SelectTrigger>
                           <SelectContent>
                             {locations.map((location) => (
-                              <SelectItem key={location.uid} value={location.uid}>
+                              <SelectItem key={location.id} value={location.id}>
                                 {location.address}
                               </SelectItem>
                             ))}
@@ -898,7 +913,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                       </SelectTrigger>
                       <SelectContent>
                         {locations.map((location) => (
-                          <SelectItem key={location.uid} value={location.uid}>
+                          <SelectItem key={location.id} value={location.id}>
                             {location.address}
                           </SelectItem>
                         ))}

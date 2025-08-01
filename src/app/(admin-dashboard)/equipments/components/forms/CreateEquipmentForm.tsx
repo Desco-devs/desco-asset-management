@@ -4,6 +4,8 @@ import { useState, useRef } from "react";
 import { format } from "date-fns";
 import { useCreateEquipment } from "@/hooks/useEquipmentQuery";
 import { useUsers } from "@/hooks/useUsersQuery";
+import { useEquipmentStore } from "@/stores/equipmentStore";
+import { useEquipmentRealtime } from "@/hooks/useEquipmentRealtime";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,7 +52,13 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
   // Error handling
   const { handleError } = useErrorHandler();
   
-  // Fast server action mutation hook
+  // Activate realtime for live updates
+  useEquipmentRealtime();
+  
+  // Equipment store for UI state management
+  const equipmentStore = useEquipmentStore();
+  
+  // Simple create hook following KISS principle
   const createEquipmentMutation = useCreateEquipment();
   
   // Fetch users for repaired by selection
@@ -59,7 +67,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
   // Form reference for resetting
   const formRef = useRef<HTMLFormElement>(null);
   
-  // Tab state for mobile
+  // Tab state for mobile (keep local for form-specific state)
   const [activeTab, setActiveTab] = useState<'details' | 'photos' | 'documents' | 'parts' | 'maintenance'>('details');
   
   // Date picker states
@@ -173,23 +181,29 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     }
     
     // Add parts structure data - EXACT COPY FROM VEHICLES
+    console.log('📦 [Form] Parts structure:', partsStructure);
     formDataFromForm.append('partsStructure', JSON.stringify(partsStructure));
     
     // Add all parts files to formData with folder information - EXACT COPY FROM VEHICLES
+    console.log('📦 [Form] Processing root files:', partsStructure.rootFiles.length);
     partsStructure.rootFiles.forEach((partFile, index) => {
       if (partFile.file) {
+        console.log(`📦 [Form] Adding root file ${index}:`, partFile.name);
         formDataFromForm.append(`partsFile_root_${index}`, partFile.file);
         formDataFromForm.append(`partsFile_root_${index}_name`, partFile.name);
       }
     });
 
+    console.log('📦 [Form] Processing folders:', partsStructure.folders.length);
     partsStructure.folders.forEach((folder, folderIndex) => {
+      console.log(`📦 [Form] Processing folder ${folderIndex} (${folder.name}):`, folder.files.length, 'files');
       folder.files.forEach((partFile, fileIndex) => {
         if (partFile.file) {
+          console.log(`📦 [Form] Adding folder file ${folderIndex}_${fileIndex}:`, partFile.name, 'to folder:', folder.name);
           formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
           formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
+          formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
         }
-        formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
       });
     });
 
@@ -295,6 +309,9 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
           if (formRef.current) {
             formRef.current.reset();
           }
+          
+          // Close create modal if using store
+          equipmentStore.setIsCreateModalOpen(false);
           
           if (onSuccess) {
             onSuccess();

@@ -264,8 +264,11 @@ const retrievePartsFromStorage = async (equipmentId: string): Promise<{ rootFile
     for (const item of items) {
       if (item.name === '.placeholder') continue; // Skip placeholder files
       
-      // Check if it's a directory (folder)
-      if (item.metadata?.isDirectory || (item.name && !item.name.includes('.'))) {
+      // Check if it's a directory (folder) - but exclude files that start with root_ prefix
+      const isRootFile = item.name.startsWith('root_') && item.name.includes('.');
+      const isDirectory = item.metadata?.isDirectory || (item.name && !item.name.includes('.') && !isRootFile);
+      
+      if (isDirectory) {
         // This is a folder, list its contents
         const folderPath = `${partsDir}/${item.name}`;
         const { data: folderItems, error: folderError } = await supabase.storage
@@ -294,7 +297,7 @@ const retrievePartsFromStorage = async (equipmentId: string): Promise<{ rootFile
           }
         }
       } else {
-        // This is a root file
+        // This is a root file (either has extension or starts with root_ prefix)
         const { data: urlData } = supabase.storage
           .from("equipments")
           .getPublicUrl(`${partsDir}/${item.name}`);
@@ -311,7 +314,7 @@ const retrievePartsFromStorage = async (equipmentId: string): Promise<{ rootFile
 
     // Convert folders map to array format
     const folders = Object.entries(foldersMap).map(([name, files]) => ({
-      name: name.replace(/^root$/, 'Root'), // Clean up folder names
+      name, // Keep original folder names - don't create artificial 'Root' folder
       files
     }));
 
@@ -342,9 +345,16 @@ const uploadEquipmentPart = async (
   const filename = `${fileId}_${sanitizedFileName}`;
 
   // NEW STRUCTURE: equipment-{equipmentId}/parts-management/{folderPath}/
-  const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
-  const sanitizedFolderPath = sanitizeForPath(folderPath);
-  const partsDir = `equipment-${equipmentId}/parts-management/${sanitizedFolderPath}`;
+  // For root files (folderPath === "root"), store directly in parts-management
+  let partsDir: string;
+  if (folderPath && folderPath.trim() !== "" && folderPath !== "root") {
+    const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
+    const sanitizedFolderPath = sanitizeForPath(folderPath);
+    partsDir = `equipment-${equipmentId}/parts-management/${sanitizedFolderPath}`;
+  } else {
+    // Root files go directly in parts-management (not in a "root" subfolder)
+    partsDir = `equipment-${equipmentId}/parts-management`;
+  }
   
   // Ensure directory exists before uploading
   await ensureDirectoryExists(partsDir);
@@ -375,9 +385,16 @@ const uploadEquipmentPart = async (
 // Delete individual part file by ID
 const deletePartFile = async (equipmentId: string, fileId: string, folderPath: string = "root"): Promise<void> => {
   try {
-    const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
-    const sanitizedFolderPath = sanitizeForPath(folderPath);
-    const partsDir = `equipment-${equipmentId}/parts-management/${sanitizedFolderPath}`;
+    // For root files (folderPath === "root"), look directly in parts-management
+    let partsDir: string;
+    if (folderPath && folderPath.trim() !== "" && folderPath !== "root") {
+      const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
+      const sanitizedFolderPath = sanitizeForPath(folderPath);
+      partsDir = `equipment-${equipmentId}/parts-management/${sanitizedFolderPath}`;
+    } else {
+      // Root files are directly in parts-management
+      partsDir = `equipment-${equipmentId}/parts-management`;
+    }
     
     // List files in the directory to find the one with our fileId
     const { data: files, error } = await supabase.storage
@@ -406,6 +423,12 @@ const deletePartFile = async (equipmentId: string, fileId: string, folderPath: s
 // CASCADE DELETE: Delete entire folder and all files within it
 const deletePartFolder = async (equipmentId: string, folderPath: string): Promise<void> => {
   try {
+    // Don't delete root folder - only delete actual named folders
+    if (folderPath === "root" || !folderPath || folderPath.trim() === "") {
+      console.warn("Cannot delete root folder - only individual files can be deleted from root");
+      return;
+    }
+    
     const sanitizeForPath = (str: string) => str.replace(/[^a-zA-Z0-9_\-]/g, "_");
     const sanitizedFolderPath = sanitizeForPath(folderPath);
     const partsDir = `equipment-${equipmentId}/parts-management/${sanitizedFolderPath}`;
@@ -743,7 +766,7 @@ export const POST = withResourcePermission(
               projectId,
               equipment.id,
               fileId,
-              "root", // folder path for root files
+              "", // empty folder path for root files - store directly in parts-management
               projectName,
               clientName,
               brand,
@@ -1295,7 +1318,7 @@ export const PUT = withResourcePermission(
               projectId,
               equipmentId,
               fileId,
-              "root" // folder path for root files
+              "" // empty folder path for root files - store directly in parts-management
             )
           );
         }

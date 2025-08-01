@@ -140,10 +140,21 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
       }
     },
     onSuccess: (data, variables, context) => {
-      // Replace optimistic room with real room
+      // Replace optimistic room with real room data
       queryClient.setQueryData(CHAT_QUERY_KEYS.rooms(userId || ""), (old: RoomListItem[] = []) => {
         return old.map(room => 
-          room.id === context?.optimisticRoom?.id ? data.room : room
+          room.id === context?.optimisticRoom?.id ? {
+            ...data.room,
+            // Ensure proper structure for RoomListItem
+            lastMessage: undefined,
+            unread_count: 0,
+            is_owner: true,
+            member_count: 1,
+            members: [{
+              user_id: userId || '',
+              user: currentUser || undefined
+            }]
+          } : room
         );
       });
       
@@ -153,8 +164,10 @@ export const useChatApp = ({ userId, currentUser: authUser, enabled = true }: Us
       }
     },
     onSettled: () => {
-      // Always refetch after mutation settles
-      queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.rooms(userId || "") });
+      // Delay the invalidation slightly to avoid race conditions with optimistic updates
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.rooms(userId || "") });
+      }, 100);
     },
     // Prevent multiple concurrent executions
     mutationKey: ['createRoom', userId],

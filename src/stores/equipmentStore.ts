@@ -1,202 +1,198 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Equipment } from '@/stores/equipmentsStore';
+import type { Equipment } from '@/types/equipment';
 
 /**
- * Simple Equipment Store - UI State Only
+ * Equipment UI Store - Following REALTIME_PATTERN.md
  * 
- * This store only handles UI state (modals, pagination, filters).
- * Data state is handled by TanStack Query + Supabase Realtime.
+ * SIMPLE & CLEAN - UI state only, no data management.
+ * TanStack Query handles all data fetching and caching.
  * 
- * SIMPLE & CLEAN - No complex data transformations or computed state.
+ * This store manages:
+ * - Modal states (create, view, edit)
+ * - Filters (not persisted - start fresh)
+ * - Pagination state
+ * - Selected equipment for modal
+ * - Simple filtering function
  */
 
 interface EquipmentUIState {
-  // Modal State - Unified Modal Management
-  selectedEquipment: Equipment | null;
+  // Modal state
   isModalOpen: boolean;
   isCreateModalOpen: boolean;
   isEditMode: boolean;
-  isExportModalOpen: boolean;
+  selectedEquipment: Equipment | null;
+  
+  // Maintenance modal state
   isMaintenanceModalOpen: boolean;
   
-  // Global Modal Coordination - Only ONE modal can be open at a time
-  activeModal: 'equipment' | 'maintenance-view' | 'maintenance-edit' | 'maintenance-create' | null;
+  // Export modal state
+  isExportModalOpen: boolean;
   
-  // Image Viewer
+  // Mobile UI state
+  isMobile: boolean;
+  
+  // Image viewer state
   viewerImage: { url: string; title: string } | null;
   
-  // Delete Confirmation
+  // Delete confirmation state
   deleteConfirmation: {
     isOpen: boolean;
     equipment: Equipment | null;
   };
   
-  // UI Preferences (persisted)
-  currentPage: number;
-  itemsPerPage: number;
-  isMobile: boolean;
-  
-  // Filters & Search (not persisted - start fresh each session)
+  // Active modal state for maintenance reports
+  activeModal: string | null;
+
+  // Maintenance report specific state (temporary bridge to old functionality)
+  selectedEquipmentMaintenanceReport: any | null;
+  selectedMaintenanceReportForDetail: any | null;
+  isMaintenanceReportDetailOpen: boolean;
+  selectedMaintenanceReportForEdit: any | null;
+  isEditMaintenanceReportDrawerOpen: boolean;
+
+  // Filters (not persisted - start fresh each session)
   searchQuery: string;
-  sortBy: string;
-  sortOrder: 'asc' | 'desc';
   filterStatus: 'all' | 'OPERATIONAL' | 'NON_OPERATIONAL';
-  filterProject: string;
   filterType: string;
   filterOwner: string;
+  filterProject: string;
   filterMaintenance: 'all' | 'has_issues' | 'no_issues';
   
+  // Sorting
+  sortBy: 'created_at' | 'brand' | 'status' | 'model' | 'owner' | 'type' | 'insuranceExpirationDate' | 'registrationExpiry' | '';
+  sortOrder: 'asc' | 'desc';
+  
+  // Pagination (currentPage and itemsPerPage persisted as per pattern)
+  currentPage: number;
+  itemsPerPage: number;
+
   // Actions
-  setSelectedEquipment: (equipment: Equipment | null) => void;
   setIsModalOpen: (open: boolean) => void;
   setIsCreateModalOpen: (open: boolean) => void;
   setIsEditMode: (isEdit: boolean) => void;
-  setIsExportModalOpen: (open: boolean) => void;
+  setSelectedEquipment: (equipment: Equipment | null) => void;
   setIsMaintenanceModalOpen: (open: boolean) => void;
-  
-  // Global Modal Coordination Actions
-  setActiveModal: (modal: 'equipment' | 'maintenance-view' | 'maintenance-edit' | 'maintenance-create' | null) => void;
-  closeAllModalsAndClearState: () => void;
+  setIsExportModalOpen: (open: boolean) => void;
+  setIsMobile: (mobile: boolean) => void;
   setViewerImage: (image: { url: string; title: string } | null) => void;
   setDeleteConfirmation: (state: { isOpen: boolean; equipment: Equipment | null }) => void;
-  setCurrentPage: (page: number) => void;
-  setItemsPerPage: (count: number) => void;
-  setIsMobile: (isMobile: boolean) => void;
+  setActiveModal: (modal: string | null) => void;
+  
+  // Maintenance report actions (temporary bridge)
+  setSelectedEquipmentMaintenanceReport: (report: any | null) => void;
+  setSelectedMaintenanceReportForDetail: (report: any | null) => void;
+  setIsMaintenanceReportDetailOpen: (open: boolean) => void;
+  setSelectedMaintenanceReportForEdit: (report: any | null) => void;
+  setIsEditMaintenanceReportDrawerOpen: (open: boolean) => void;
+  
   setSearchQuery: (query: string) => void;
-  setSortBy: (sortBy: string) => void;
-  setSortOrder: (order: 'asc' | 'desc') => void;
   setFilterStatus: (status: 'all' | 'OPERATIONAL' | 'NON_OPERATIONAL') => void;
-  setFilterProject: (projectId: string) => void;
   setFilterType: (type: string) => void;
   setFilterOwner: (owner: string) => void;
+  setFilterProject: (project: string) => void;
   setFilterMaintenance: (maintenance: 'all' | 'has_issues' | 'no_issues') => void;
-  
-  // Utility Functions
+  setSortBy: (sortBy: EquipmentUIState['sortBy']) => void;
+  setSortOrder: (order: EquipmentUIState['sortOrder']) => void;
+  setCurrentPage: (page: number) => void;
+  setItemsPerPage: (count: number) => void;
+
+  // Utility functions
+  getFilteredEquipments: (equipments: Equipment[]) => Equipment[];
+  getSortedEquipments: (equipments: Equipment[]) => Equipment[];
+  getPaginatedEquipments: (equipments: Equipment[]) => Equipment[];
+  getTotalPages: (equipments: Equipment[]) => number;
+  getEffectiveItemsPerPage: () => number;
   resetFilters: () => void;
   closeAllModals: () => void;
-  getFilteredEquipments: (equipments: Equipment[]) => Equipment[];
-  getEffectiveItemsPerPage: () => number;
 }
 
 export const useEquipmentStore = create<EquipmentUIState>()(
   persist(
     (set, get) => ({
-      // UI State (not persisted)
-      selectedEquipment: null,
+      // Modal state
       isModalOpen: false,
       isCreateModalOpen: false,
       isEditMode: false,
-      isExportModalOpen: false,
+      selectedEquipment: null,
+      
+      // Maintenance modal state
       isMaintenanceModalOpen: false,
-      activeModal: null,
+      
+      // Export modal state
+      isExportModalOpen: false,
+      
+      // Mobile UI state
+      isMobile: false,
+      
+      // Image viewer state
       viewerImage: null,
+      
+      // Delete confirmation state
       deleteConfirmation: {
         isOpen: false,
         equipment: null,
       },
       
-      // UI Preferences (persisted)
-      currentPage: 1,
-      itemsPerPage: 12,
-      isMobile: false,
-      
-      // Filters & Search (not persisted)
+      // Active modal state
+      activeModal: null,
+
+      // Maintenance report state (temporary bridge)
+      selectedEquipmentMaintenanceReport: null,
+      selectedMaintenanceReportForDetail: null,
+      isMaintenanceReportDetailOpen: false,
+      selectedMaintenanceReportForEdit: null,
+      isEditMaintenanceReportDrawerOpen: false,
+
+      // Filters (not persisted)
       searchQuery: '',
-      sortBy: '',
-      sortOrder: 'desc',
       filterStatus: 'all',
-      filterProject: 'all',
       filterType: 'all',
       filterOwner: 'all',
+      filterProject: 'all',
       filterMaintenance: 'all',
       
+      // Sorting
+      sortBy: '',
+      sortOrder: 'desc',
+      
+      // Pagination
+      currentPage: 1,
+      itemsPerPage: 12,
+
       // Actions
-      setSelectedEquipment: (equipment) => set({ selectedEquipment: equipment }),
       setIsModalOpen: (open) => set({ isModalOpen: open }),
       setIsCreateModalOpen: (open) => set({ isCreateModalOpen: open }),
       setIsEditMode: (isEdit) => set({ isEditMode: isEdit }),
-      setIsExportModalOpen: (open) => set({ isExportModalOpen: open }),
+      setSelectedEquipment: (equipment) => set({ selectedEquipment: equipment }),
       setIsMaintenanceModalOpen: (open) => set({ isMaintenanceModalOpen: open }),
-      
-      // Global Modal Coordination Actions
-      setActiveModal: (modal) => {
-        // When setting a new active modal, close all other modals
-        const newState: Partial<EquipmentUIState> = { activeModal: modal };
-        
-        // Close all other modals when a new one is activated
-        if (modal !== 'equipment') newState.isModalOpen = false;
-        if (modal !== 'maintenance-create') newState.isMaintenanceModalOpen = false;
-        if (modal !== null) {
-          newState.isExportModalOpen = false;
-          newState.viewerImage = null;
-          newState.deleteConfirmation = { isOpen: false, equipment: null };
-        }
-        
-        set(newState);
-      },
-      
-      closeAllModalsAndClearState: () => set({
-        isModalOpen: false,
-        isCreateModalOpen: false,
-        isExportModalOpen: false,
-        isMaintenanceModalOpen: false,
-        selectedEquipment: null,
-        isEditMode: false,
-        viewerImage: null,
-        deleteConfirmation: { isOpen: false, equipment: null },
-        activeModal: null,
-      }),
-      
+      setIsExportModalOpen: (open) => set({ isExportModalOpen: open }),
+      setIsMobile: (mobile) => set({ isMobile: mobile }),
       setViewerImage: (image) => set({ viewerImage: image }),
       setDeleteConfirmation: (state) => set({ deleteConfirmation: state }),
-      setCurrentPage: (page) => set({ currentPage: page }),
-      setItemsPerPage: (count) => set({ itemsPerPage: count, currentPage: 1 }),
-      setIsMobile: (isMobile) => set({ isMobile }),
+      setActiveModal: (modal) => set({ activeModal: modal }),
+      
+      // Maintenance report actions (temporary bridge)
+      setSelectedEquipmentMaintenanceReport: (report) => set({ selectedEquipmentMaintenanceReport: report }),
+      setSelectedMaintenanceReportForDetail: (report) => set({ selectedMaintenanceReportForDetail: report }),
+      setIsMaintenanceReportDetailOpen: (open) => set({ isMaintenanceReportDetailOpen: open }),
+      setSelectedMaintenanceReportForEdit: (report) => set({ selectedMaintenanceReportForEdit: report }),
+      setIsEditMaintenanceReportDrawerOpen: (open) => set({ isEditMaintenanceReportDrawerOpen: open }),
+      
       setSearchQuery: (query) => set({ searchQuery: query, currentPage: 1 }),
-      setSortBy: (sortBy) => set({ sortBy, currentPage: 1 }),
-      setSortOrder: (order) => set({ sortOrder: order }),
       setFilterStatus: (status) => set({ filterStatus: status, currentPage: 1 }),
-      setFilterProject: (projectId) => set({ filterProject: projectId, currentPage: 1 }),
       setFilterType: (type) => set({ filterType: type, currentPage: 1 }),
       setFilterOwner: (owner) => set({ filterOwner: owner, currentPage: 1 }),
+      setFilterProject: (project) => set({ filterProject: project, currentPage: 1 }),
       setFilterMaintenance: (maintenance) => set({ filterMaintenance: maintenance, currentPage: 1 }),
-      
-      // Utility Functions
-      resetFilters: () => set({
-        searchQuery: '',
-        sortBy: '',
-        sortOrder: 'desc',
-        filterStatus: 'all',
-        filterProject: 'all',
-        filterType: 'all',
-        filterOwner: 'all',
-        filterMaintenance: 'all',
-        currentPage: 1,
-      }),
-      
-      closeAllModals: () => set({
-        isModalOpen: false,
-        isCreateModalOpen: false,
-        isExportModalOpen: false,
-        isMaintenanceModalOpen: false,
-        selectedEquipment: null,
-        isEditMode: false,
-        viewerImage: null,
-        deleteConfirmation: { isOpen: false, equipment: null },
-        activeModal: null,
-      }),
-      
-      // Simple filtering function
+      setSortBy: (sortBy) => set({ sortBy: sortBy, currentPage: 1 }),
+      setSortOrder: (order) => set({ sortOrder: order }),
+      setCurrentPage: (page) => set({ currentPage: page }),
+      setItemsPerPage: (count) => set({ itemsPerPage: count, currentPage: 1 }),
+
+      // Simple filtering function that works with Equipment[] arrays
       getFilteredEquipments: (equipments: Equipment[]) => {
-        const { 
-          searchQuery, 
-          filterStatus, 
-          filterType, 
-          filterOwner,
-          sortBy,
-          sortOrder 
-        } = get();
+        const { searchQuery, filterStatus, filterType, filterOwner, filterProject, filterMaintenance } = get();
         
         let filtered = equipments;
         
@@ -215,101 +211,162 @@ export const useEquipmentStore = create<EquipmentUIState>()(
           filtered = filtered.filter(equipment => equipment.owner === filterOwner);
         }
         
-        // Filter by search query
+        // Filter by project
+        if (filterProject !== 'all') {
+          filtered = filtered.filter(equipment => equipment.project_id === filterProject);
+        }
+        
+        // Filter by maintenance status
+        if (filterMaintenance !== 'all') {
+          filtered = filtered.filter(equipment => {
+            const hasIssues = equipment.maintenance_reports && equipment.maintenance_reports.length > 0;
+            return filterMaintenance === 'has_issues' ? hasIssues : !hasIssues;
+          });
+        }
+        
+        // Filter by search query (brand, model, owner)
         if (searchQuery.trim()) {
           const query = searchQuery.toLowerCase();
-          filtered = filtered.filter(equipment => 
+          filtered = filtered.filter(equipment =>
             equipment.brand.toLowerCase().includes(query) ||
             equipment.model.toLowerCase().includes(query) ||
-            equipment.type.toLowerCase().includes(query) ||
             equipment.owner.toLowerCase().includes(query) ||
-            (equipment.plateNumber && equipment.plateNumber.toLowerCase().includes(query)) ||
+            (equipment.plate_number && equipment.plate_number.toLowerCase().includes(query)) ||
             equipment.project.name.toLowerCase().includes(query) ||
             equipment.project.client.name.toLowerCase().includes(query) ||
             equipment.project.client.location.address.toLowerCase().includes(query)
           );
         }
         
-        // Apply sorting
-        if (sortBy) {
-          filtered = [...filtered].sort((a, b) => {
-            let aValue: any, bValue: any;
-            
-            switch (sortBy) {
-              case 'brand':
-                aValue = a.brand.toLowerCase();
-                bValue = b.brand.toLowerCase();
-                break;
-              case 'model':
-                aValue = a.model.toLowerCase();
-                bValue = b.model.toLowerCase();
-                break;
-              case 'type':
-                aValue = a.type.toLowerCase();
-                bValue = b.type.toLowerCase();
-                break;
-              case 'status':
-                aValue = a.status;
-                bValue = b.status;
-                break;
-              case 'owner':
-                aValue = a.owner.toLowerCase();
-                bValue = b.owner.toLowerCase();
-                break;
-              case 'insuranceExpirationDate':
-                aValue = a.insuranceExpirationDate ? new Date(a.insuranceExpirationDate).getTime() : 0;
-                bValue = b.insuranceExpirationDate ? new Date(b.insuranceExpirationDate).getTime() : 0;
-                break;
-              case 'registrationExpiry':
-                aValue = a.registrationExpiry ? new Date(a.registrationExpiry).getTime() : 0;
-                bValue = b.registrationExpiry ? new Date(b.registrationExpiry).getTime() : 0;
-                break;
-              default:
-                return 0;
-            }
-            
-            if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-            if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-          });
-        }
-        
         return filtered;
       },
-      
-      getEffectiveItemsPerPage: () => {
-        const { isMobile, itemsPerPage } = get();
-        return isMobile ? 6 : itemsPerPage;
+
+      // Sorting function
+      getSortedEquipments: (equipments: Equipment[]) => {
+        const { sortBy, sortOrder } = get();
+        
+        if (!sortBy) return equipments;
+        
+        return [...equipments].sort((a, b) => {
+          let aValue: any, bValue: any;
+          
+          switch (sortBy) {
+            case 'brand':
+              aValue = a.brand.toLowerCase();
+              bValue = b.brand.toLowerCase();
+              break;
+            case 'model':
+              aValue = a.model.toLowerCase();
+              bValue = b.model.toLowerCase();
+              break;
+            case 'owner':
+              aValue = a.owner.toLowerCase();
+              bValue = b.owner.toLowerCase();
+              break;
+            case 'type':
+              aValue = a.type.toLowerCase();
+              bValue = b.type.toLowerCase();
+              break;
+            case 'status':
+              aValue = a.status;
+              bValue = b.status;
+              break;
+            case 'created_at':
+              aValue = new Date(a.created_at);
+              bValue = new Date(b.created_at);
+              break;
+            case 'insuranceExpirationDate':
+              aValue = a.insurance_expiration_date ? new Date(a.insurance_expiration_date) : new Date(0);
+              bValue = b.insurance_expiration_date ? new Date(b.insurance_expiration_date) : new Date(0);
+              break;
+            case 'registrationExpiry':
+              aValue = a.registration_expiry ? new Date(a.registration_expiry) : new Date(0);
+              bValue = b.registration_expiry ? new Date(b.registration_expiry) : new Date(0);
+              break;
+            default:
+              return 0;
+          }
+          
+          if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+          return 0;
+        });
       },
+
+      // Pagination function
+      getPaginatedEquipments: (equipments: Equipment[]) => {
+        const { currentPage, itemsPerPage } = get();
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return equipments.slice(startIndex, endIndex);
+      },
+
+      // Get total pages
+      getTotalPages: (equipments: Equipment[]) => {
+        const { itemsPerPage } = get();
+        return Math.ceil(equipments.length / itemsPerPage);
+      },
+
+      // Get effective items per page
+      getEffectiveItemsPerPage: () => {
+        const { itemsPerPage } = get();
+        return itemsPerPage;
+      },
+
+      // Reset all filters
+      resetFilters: () => set({
+        searchQuery: '',
+        filterStatus: 'all',
+        filterType: 'all',
+        filterOwner: 'all',
+        filterProject: 'all',
+        filterMaintenance: 'all',
+        currentPage: 1,
+      }),
+
+      // Close all modals
+      closeAllModals: () => set({
+        isModalOpen: false,
+        isCreateModalOpen: false,
+        isEditMode: false,
+        isMaintenanceModalOpen: false,
+        isExportModalOpen: false,
+        selectedEquipment: null,
+        activeModal: null,
+        viewerImage: null,
+        deleteConfirmation: {
+          isOpen: false,
+          equipment: null,
+        },
+      }),
     }),
     {
       name: 'equipment-ui-settings',
-      // Only persist UI preferences, not state or filters
+      // Only persist UI preferences (currentPage, itemsPerPage), not filters
       partialize: (state) => ({
+        currentPage: state.currentPage,
         itemsPerPage: state.itemsPerPage,
-        sortBy: state.sortBy,
-        sortOrder: state.sortOrder,
       }),
     }
   )
 );
 
 // Optimized selectors to prevent unnecessary re-renders
-export const selectSelectedEquipment = (state: EquipmentUIState) => state.selectedEquipment;
 export const selectIsModalOpen = (state: EquipmentUIState) => state.isModalOpen;
 export const selectIsCreateModalOpen = (state: EquipmentUIState) => state.isCreateModalOpen;
 export const selectIsEditMode = (state: EquipmentUIState) => state.isEditMode;
-export const selectIsExportModalOpen = (state: EquipmentUIState) => state.isExportModalOpen;
+export const selectSelectedEquipment = (state: EquipmentUIState) => state.selectedEquipment;
+export const selectIsMaintenanceModalOpen = (state: EquipmentUIState) => state.isMaintenanceModalOpen;
+export const selectIsMobile = (state: EquipmentUIState) => state.isMobile;
 export const selectViewerImage = (state: EquipmentUIState) => state.viewerImage;
 export const selectDeleteConfirmation = (state: EquipmentUIState) => state.deleteConfirmation;
-export const selectCurrentPage = (state: EquipmentUIState) => state.currentPage;
-export const selectIsMobile = (state: EquipmentUIState) => state.isMobile;
+export const selectActiveModal = (state: EquipmentUIState) => state.activeModal;
 export const selectSearchQuery = (state: EquipmentUIState) => state.searchQuery;
-export const selectSortBy = (state: EquipmentUIState) => state.sortBy;
-export const selectSortOrder = (state: EquipmentUIState) => state.sortOrder;
 export const selectFilterStatus = (state: EquipmentUIState) => state.filterStatus;
-export const selectFilterProject = (state: EquipmentUIState) => state.filterProject;
 export const selectFilterType = (state: EquipmentUIState) => state.filterType;
 export const selectFilterOwner = (state: EquipmentUIState) => state.filterOwner;
+export const selectFilterProject = (state: EquipmentUIState) => state.filterProject;
 export const selectFilterMaintenance = (state: EquipmentUIState) => state.filterMaintenance;
-export const selectActiveModal = (state: EquipmentUIState) => state.activeModal;
+export const selectSortBy = (state: EquipmentUIState) => state.sortBy;
+export const selectSortOrder = (state: EquipmentUIState) => state.sortOrder;
+export const selectCurrentPage = (state: EquipmentUIState) => state.currentPage;

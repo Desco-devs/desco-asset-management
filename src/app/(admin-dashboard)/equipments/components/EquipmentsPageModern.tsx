@@ -78,7 +78,7 @@ export default function EquipmentsPageModern() {
     if (!deleteConfirmation.equipment) return;
 
     try {
-      await deleteEquipmentMutation.mutateAsync(deleteConfirmation.equipment.uid);
+      await deleteEquipmentMutation.mutateAsync(deleteConfirmation.equipment.id);
       setDeleteConfirmation({ isOpen: false, equipment: null });
       closeAllModals(); // Clean slate - everything closed
     } catch (error) {
@@ -265,7 +265,7 @@ export default function EquipmentsPageModern() {
       {/* Maintenance Report Modals */}
       {selectedEquipment && (
         <>
-          <CreateEquipmentMaintenanceReportModal equipmentId={selectedEquipment.uid} />
+          <CreateEquipmentMaintenanceReportModal equipmentId={selectedEquipment.id} />
           <MaintenanceReportDetailDrawer />
           <EditEquipmentMaintenanceReportDrawer />
         </>

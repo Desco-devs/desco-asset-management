@@ -11,9 +11,10 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
-import { useEquipmentsWithReferenceData } from "@/hooks/useEquipmentsQuery";
+import { useEquipments } from "@/hooks/useEquipmentQuery";
+import { useProjects } from "@/hooks/api/use-projects";
 import { useEquipmentRealtime } from "@/hooks/useEquipmentRealtime";
-import type { Equipment } from "@/stores/equipmentsStore";
+import type { Equipment } from "@/types/equipment";
 import { 
   useEquipmentStore, 
   selectCurrentPage,
@@ -45,8 +46,9 @@ import LoadingSkeleton from "./ui/LoadingSkeleton";
 import ExportDialog from "./ExportDialog";
 
 export default function EquipmentsListModern() {
-  // TanStack Query - Server state
-  const { equipments, isLoading, isError, error } = useEquipmentsWithReferenceData();
+  // TanStack Query - Server state (standardized approach)
+  const { data: equipments = [], isLoading, isError, error } = useEquipments();
+  const { data: projects = [] } = useProjects();
 
   // Supabase Realtime - Live updates
   useEquipmentRealtime();
@@ -281,8 +283,8 @@ export default function EquipmentsListModern() {
                   <div className="space-y-1">
                     {projects?.map((project, index) => (
                       <SelectItem
-                        key={project.uid || `project-${index}`}
-                        value={`project-${project.uid}`}
+                        key={project.id || `project-${index}`}
+                        value={`project-${project.id}`}
                       >
                         {project.name}
                       </SelectItem>
@@ -659,12 +661,12 @@ export default function EquipmentsListModern() {
           </div>
         ) : (
           paginatedEquipments.map((equipment, index) => {
-            const daysUntilInsuranceExpiry = getDaysUntilExpiry(equipment.insuranceExpirationDate || undefined);
-            const daysUntilRegistrationExpiry = getDaysUntilExpiry(equipment.registrationExpiry || undefined);
+            const daysUntilInsuranceExpiry = getDaysUntilExpiry(equipment.insurance_expiration_date || undefined);
+            const daysUntilRegistrationExpiry = getDaysUntilExpiry(equipment.registration_expiry || undefined);
             
             return (
               <Card
-                key={equipment.uid || `equipment-${index}`}
+                key={equipment.id || `equipment-${index}`}
                 className="hover:shadow-lg transition-shadow cursor-pointer relative"
                 onClick={() => handleEquipmentClick(equipment)}
               >
@@ -696,13 +698,13 @@ export default function EquipmentsListModern() {
                           {equipment.status}
                         </Badge>
 
-                        {equipment.plateNumber && (
+                        {equipment.plate_number && (
                           <Badge
                             variant="outline"
                             className="flex items-center gap-1"
                           >
                             <Wrench className="h-3 w-3" />
-                            {equipment.plateNumber}
+                            {equipment.plate_number}
                           </Badge>
                         )}
 
@@ -795,7 +797,7 @@ export default function EquipmentsListModern() {
                         )[0] || "No location"}
                       </span>
                     </div>
-                    {equipment.registrationExpiry && (
+                    {equipment.registration_expiry && (
                       <div className="flex justify-between">
                         <span>Registration Expires:</span>
                         <span
@@ -807,11 +809,11 @@ export default function EquipmentsListModern() {
                               : ""
                           }`}
                         >
-                          {new Date(equipment.registrationExpiry).toLocaleDateString()}
+                          {new Date(equipment.registration_expiry).toLocaleDateString()}
                         </span>
                       </div>
                     )}
-                    {equipment.insuranceExpirationDate && (
+                    {equipment.insurance_expiration_date && (
                       <div className="flex justify-between">
                         <span>Insurance Expires:</span>
                         <span
@@ -823,7 +825,7 @@ export default function EquipmentsListModern() {
                               : ""
                           }`}
                         >
-                          {new Date(equipment.insuranceExpirationDate).toLocaleDateString()}
+                          {new Date(equipment.insurance_expiration_date).toLocaleDateString()}
                         </span>
                       </div>
                     )}
@@ -886,10 +888,10 @@ export default function EquipmentsListModern() {
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         equipments={equipments.map((e) => ({
-          id: e.uid,
+          id: e.id,
           brand: e.brand,
           model: e.model,
-          plate_number: e.plateNumber || undefined
+          plate_number: e.plate_number || undefined
         }))}
       />
     </div>

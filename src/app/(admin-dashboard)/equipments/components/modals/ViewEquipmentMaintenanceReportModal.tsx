@@ -11,9 +11,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { useEquipmentsStore } from "@/stores/equipmentsStore";
+// Removed old equipmentsStore import
 import { useEquipmentStore, selectActiveModal } from "@/stores/equipmentStore";
-import { useDeleteEquipmentMaintenanceReport } from "@/hooks/useEquipmentsQuery";
+import { useDeleteEquipmentMaintenanceReport } from "@/hooks/useEquipmentQuery";
 import {
   Calendar,
   Edit3,
@@ -27,14 +27,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
 export default function ViewEquipmentMaintenanceReportModal() {
-  const selectedReportForView = useEquipmentsStore((state) => state.selectedMaintenanceReportForDetail);
-  const isDetailOpen = useEquipmentsStore((state) => state.isMaintenanceReportDetailOpen);
+  const selectedReportForView = useEquipmentStore((state) => state.selectedMaintenanceReportForDetail);
+  const isDetailOpen = useEquipmentStore((state) => state.isMaintenanceReportDetailOpen);
   const activeModal = useEquipmentStore(selectActiveModal);
   const { 
     setSelectedMaintenanceReportForDetail,
     setSelectedEquipmentMaintenanceReport,
     setIsMaintenanceReportDetailOpen 
-  } = useEquipmentsStore();
+  } = useEquipmentStore();
   const { setIsMaintenanceModalOpen, setActiveModal, setIsModalOpen, setSelectedEquipment } = useEquipmentStore();
   const deleteMaintenanceReportMutation = useDeleteEquipmentMaintenanceReport();
 
@@ -247,7 +247,7 @@ export default function ViewEquipmentMaintenanceReportModal() {
                 </CardHeader>
                 <CardContent>
                   <ul className="list-disc list-inside text-sm space-y-1">
-                    {selectedReportForView.parts_replaced.map((part, index) => (
+                    {selectedReportForView.parts_replaced.map((part: string, index: number) => (
                       <li key={index}>{part}</li>
                     ))}
                   </ul>
@@ -266,7 +266,7 @@ export default function ViewEquipmentMaintenanceReportModal() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {selectedReportForView.attachment_urls.map((url, index) => (
+                    {selectedReportForView.attachment_urls.map((url: string, index: number) => (
                       <div 
                         key={index} 
                         className="group relative aspect-square rounded-lg overflow-hidden border-2 border-gray-200 bg-white hover:border-blue-300 transition-all cursor-pointer"

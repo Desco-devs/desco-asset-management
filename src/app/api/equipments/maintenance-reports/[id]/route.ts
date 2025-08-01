@@ -79,7 +79,7 @@ export async function PUT(
     
     let body: any = {};
     let filesToDelete: string[] = [];
-    let newAttachmentFiles: File[] = [];
+    const newAttachmentFiles: File[] = [];
     
     if (isFormData) {
       const formData = await request.formData();
@@ -202,7 +202,7 @@ export async function PUT(
     }
 
     // Handle new file uploads
-    let newAttachmentUrls: string[] = [];
+    const newAttachmentUrls: string[] = [];
     if (newAttachmentFiles.length > 0) {
       const supabase = createClient();
       const equipmentId = existingReport.equipment.id;

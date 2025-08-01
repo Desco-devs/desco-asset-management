@@ -52,10 +52,18 @@ export function FileUploadSectionSimple({
   
   // Preview initialization on component mount
   useEffect(() => {
+    console.log(`🔍 FileUploadSectionSimple[${label}] - Mount initialization:`, {
+      selectedFile: selectedFile ? selectedFile.name : null,
+      currentFileUrl,
+      hasCurrentFile: !!currentFileUrl
+    });
+    
     if (!selectedFile && currentFileUrl) {
       setPreview(currentFileUrl);
+      console.log(`✅ FileUploadSectionSimple[${label}] - Set preview to currentFileUrl:`, currentFileUrl);
     } else if (!selectedFile && !currentFileUrl) {
       setPreview(null);
+      console.log(`ℹ️ FileUploadSectionSimple[${label}] - No file data, preview set to null`);
     }
   }, []); // Run once on mount
 
@@ -85,14 +93,22 @@ export function FileUploadSectionSimple({
   
   // Separate effect for handling currentFileUrl (existing files)
   useEffect(() => {
+    console.log(`🔄 FileUploadSectionSimple[${label}] - currentFileUrl changed:`, {
+      selectedFile: selectedFile ? selectedFile.name : null,
+      currentFileUrl,
+      hasCurrentFile: !!currentFileUrl
+    });
+    
     if (!selectedFile) {
       if (currentFileUrl) {
         setPreview(currentFileUrl);
+        console.log(`✅ FileUploadSectionSimple[${label}] - Updated preview to currentFileUrl:`, currentFileUrl);
       } else {
         setPreview(null);
+        console.log(`ℹ️ FileUploadSectionSimple[${label}] - No currentFileUrl, preview set to null`);
       }
     }
-  }, [currentFileUrl, selectedFile]);
+  }, [currentFileUrl, selectedFile, label]);
 
   const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
@@ -219,8 +235,12 @@ export function FileUploadSectionSimple({
                     height={200}
                     className="w-full h-[200px] object-cover rounded hover:opacity-80 transition-opacity"
                     onError={(e) => {
-                      console.error('Image failed to load:', preview);
-                      setPreview(null);
+                      console.error(`❌ FileUploadSectionSimple[${label}] - Image failed to load:`, preview);
+                      // Don't clear preview immediately, let user see there's an issue
+                      // setPreview(null);
+                    }}
+                    onLoad={() => {
+                      console.log(`✅ FileUploadSectionSimple[${label}] - Image loaded successfully:`, preview);
                     }}
                   />
                   <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 opacity-0 transition-opacity bg-black/40 rounded">

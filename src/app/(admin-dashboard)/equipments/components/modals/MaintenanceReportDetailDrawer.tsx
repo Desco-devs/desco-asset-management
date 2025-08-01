@@ -18,9 +18,9 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { useEquipmentsStore } from "@/stores/equipmentsStore";
+// Removed old equipmentsStore import
 import { useEquipmentStore, selectIsMobile } from "@/stores/equipmentStore";
-import { useDeleteEquipmentMaintenanceReport } from "@/hooks/useEquipmentsQuery";
+import { useDeleteEquipmentMaintenanceReport } from "@/hooks/useEquipmentQuery";
 import {
   Calendar,
   Clock,
@@ -41,15 +41,15 @@ import Image from "next/image";
 export default function MaintenanceReportDetailDrawer() {
   // State from Zustand
   const isMobile = useEquipmentStore(selectIsMobile);
-  const selectedReport = useEquipmentsStore((state) => state.selectedMaintenanceReportForDetail);
-  const isOpen = useEquipmentsStore((state) => state.isMaintenanceReportDetailOpen);
+  const selectedReport = useEquipmentStore((state) => state.selectedMaintenanceReportForDetail);
+  const isOpen = useEquipmentStore((state) => state.isMaintenanceReportDetailOpen);
   const { 
     setIsMaintenanceReportDetailOpen, 
     setSelectedMaintenanceReportForDetail,
     setSelectedMaintenanceReportForEdit,
     setIsEditMaintenanceReportDrawerOpen,
     setIsModalOpen 
-  } = useEquipmentsStore();
+  } = useEquipmentStore();
 
   // Server state
   const deleteMaintenanceReportMutation = useDeleteEquipmentMaintenanceReport();
@@ -174,13 +174,13 @@ export default function MaintenanceReportDetailDrawer() {
 
   // Helper functions for counts
   const getPartsCount = () => {
-    return selectedReport?.parts_replaced?.filter(part => part && part.trim() !== "").length || 0;
+    return selectedReport?.parts_replaced?.filter((part: string) => part && part.trim() !== "").length || 0;
   };
 
   const getAttachmentsCount = () => {
     if (!selectedReport?.attachment_urls) return 0;
     // FIXED: All attachments are standalone - no part-specific attachments in current implementation
-    return selectedReport.attachment_urls.filter(url => url && url.trim() !== "").length;
+    return selectedReport.attachment_urls.filter((url: string) => url && url.trim() !== "").length;
   };
 
   // Image Viewer Component - EXACTLY like equipment modal
@@ -404,9 +404,9 @@ export default function MaintenanceReportDetailDrawer() {
           </div>
           
           
-          {selectedReport.parts_replaced && selectedReport.parts_replaced.filter(part => part && part.trim() !== "").length > 0 ? (
+          {selectedReport.parts_replaced && selectedReport.parts_replaced.filter((part: string) => part && part.trim() !== "").length > 0 ? (
             <div className="space-y-4">
-              {selectedReport.parts_replaced.filter(part => part && part.trim() !== "").map((part, index) => {
+              {selectedReport.parts_replaced.filter((part: string) => part && part.trim() !== "").map((part: string, index: number) => {
                 return (
                   <div key={`${selectedReport.id}-part-${index}-${part}`} className="border rounded-lg p-4 space-y-3">
                     {/* Part Name - Full Width */}
@@ -447,11 +447,11 @@ export default function MaintenanceReportDetailDrawer() {
             if (!selectedReport.attachment_urls) return null;
             
             // FIXED: Show all attachments since none are part-specific in current implementation
-            const allAttachments = selectedReport.attachment_urls.filter(url => url && url.trim() !== "");
+            const allAttachments = selectedReport.attachment_urls.filter((url: string) => url && url.trim() !== "");
             
             return allAttachments.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {allAttachments.map((url, attachmentIndex) => {
+                {allAttachments.map((url: string, attachmentIndex: number) => {
                   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
                   
                   return (

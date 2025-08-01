@@ -10,8 +10,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { CalendarIcon, Download, FileSpreadsheet, FileText } from "lucide-react";
 import { format } from "date-fns";
-import { useExportMaintenanceReports } from "@/hooks/useEquipmentsQuery";
-import type { ExportFilters } from "@/stores/equipmentsStore";
+import { useExportEquipmentMaintenanceReports } from "@/hooks/useEquipmentQuery";
+import type { ExportFilters } from "@/hooks/useEquipmentQuery";
 
 interface ExportDialogProps {
   isOpen: boolean;
@@ -30,7 +30,7 @@ export function ExportDialog({ isOpen, onClose, equipments = [] }: ExportDialogP
   const [startDate, setStartDate] = useState<Date>();
   const [endDate, setEndDate] = useState<Date>();
 
-  const exportMutation = useExportMaintenanceReports();
+  const exportMutation = useExportEquipmentMaintenanceReports();
 
   const handleExport = () => {
     const exportFilters: Partial<ExportFilters> = {

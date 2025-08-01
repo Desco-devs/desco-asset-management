@@ -21,9 +21,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   useUpdateEquipmentMaintenanceReport,
-  useEquipmentsWithReferenceData,
-} from "@/hooks/useEquipmentsQuery";
-import { useEquipmentsStore } from "@/stores/equipmentsStore";
+  useEquipments,
+} from "@/hooks/useEquipmentQuery";
+import { useProjects } from "@/hooks/api/use-projects";
 import { useEquipmentStore, selectActiveModal } from "@/stores/equipmentStore";
 import { Plus, Trash2, Settings, Clock, MapPin, Wrench, FileText, Camera, Upload, X, Package, ClipboardCheck, ImageIcon, Loader2 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
@@ -32,11 +32,19 @@ import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectio
 import { toast } from "sonner";
 
 export default function EditEquipmentMaintenanceReportModal() {
-  const selectedReport = useEquipmentsStore((state) => state.selectedEquipmentMaintenanceReport);
+  const selectedReport = useEquipmentStore((state) => state.selectedEquipmentMaintenanceReport);
   const activeModal = useEquipmentStore(selectActiveModal);
-  const { setSelectedEquipmentMaintenanceReport } = useEquipmentsStore();
+  const { setSelectedEquipmentMaintenanceReport } = useEquipmentStore();
   const { setActiveModal } = useEquipmentStore();
-  const { locations } = useEquipmentsWithReferenceData();
+  // Server state from TanStack Query (standardized approach)
+  const { data: equipments = [] } = useEquipments();
+  const { data: projects = [] } = useProjects();
+  // Extract locations from projects for backward compatibility
+  // Handle different return types from useProjects
+  const projectsArray = Array.isArray(projects) ? projects : (projects?.data || []);
+  const locations = projectsArray
+    .map(p => p.client?.location)
+    .filter((location): location is NonNullable<typeof location> => Boolean(location));
   const updateMaintenanceReportMutation = useUpdateEquipmentMaintenanceReport();
 
   // Form state
@@ -60,10 +68,10 @@ export default function EditEquipmentMaintenanceReportModal() {
   useEffect(() => {
     if (selectedReport) {
       const partsReplaced = selectedReport.parts_replaced?.length > 0 
-        ? selectedReport.parts_replaced.filter(part => part.trim() !== "") 
+        ? selectedReport.parts_replaced.filter((part: string) => part.trim() !== "") 
         : [];
       const attachmentUrls = selectedReport.attachment_urls?.length > 0 
-        ? selectedReport.attachment_urls.filter(url => url.trim() !== "") 
+        ? selectedReport.attachment_urls.filter((url: string) => url.trim() !== "") 
         : [];
 
       setFormData({
@@ -432,7 +440,7 @@ export default function EditEquipmentMaintenanceReportModal() {
                         </SelectTrigger>
                         <SelectContent>
                           {locations.map((location) => (
-                            <SelectItem key={location.uid} value={location.uid}>
+                            <SelectItem key={location.id} value={location.id}>
                               {location.address}
                             </SelectItem>
                           ))}

@@ -184,6 +184,8 @@ const uploadPartFileToSupabase = async (
   const filepath = `equipment-${equipmentId}/parts-management/${sanitizedFolderName}/${uniqueFileName}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
+  console.log(`📦 [Parts Upload] Uploading to: ${filepath}, Size: ${buffer.length} bytes`);
+
   const { data: uploadData, error: uploadErr } = await supabase
     .storage
     .from('equipments')
@@ -381,9 +383,11 @@ export async function createEquipmentAction(formData: FormData) {
 
     // Handle parts structure uploads - CRITICAL FIX: Support empty folders
     const partsStructureData = formData.get('partsStructure') as string;
+    console.log('📦 [Action] Received partsStructureData:', partsStructureData ? 'YES' : 'NO');
     let partsStructureWithUrls: { rootFiles: any[]; folders: any[] } | null = null;
     
     if (partsStructureData) {
+      console.log('📦 [Action] Parsing parts structure...');
       const partsStructure = JSON.parse(partsStructureData);
       
       // CRITICAL FIX: Initialize with existing structure to preserve empty folders
@@ -432,8 +436,12 @@ export async function createEquipmentAction(formData: FormData) {
         folderMap[folder.name] = folder;
       });
       
+      console.log(`📦 [Parts Processing] Processing folder files...`);
+      
       for (let folderIndex = 0; formData.get(`partsFile_folder_${folderIndex}_0`); folderIndex++) {
+        console.log(`📦 [Parts Processing] Processing folder ${folderIndex}`);
         for (let fileIndex = 0; formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`); fileIndex++) {
+          console.log(`📦 [Parts Processing] Processing file ${folderIndex}_${fileIndex}`);
           const file = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
           const fileName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string;
           const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;

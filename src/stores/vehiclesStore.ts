@@ -455,9 +455,9 @@ export const useVehiclesStore = create<VehiclesState>()(
               vehicle.plate_number.toLowerCase().includes(query) ||
               vehicle.owner.toLowerCase().includes(query) ||
               vehicle.type.toLowerCase().includes(query) ||
-              vehicle.project.name.toLowerCase().includes(query) ||
-              vehicle.project.client.name.toLowerCase().includes(query) ||
-              vehicle.project.client.location.address.toLowerCase().includes(query)
+              (vehicle.project?.name?.toLowerCase().includes(query)) ||
+              (vehicle.project?.client?.name?.toLowerCase().includes(query)) ||
+              (vehicle.project?.client?.location?.address?.toLowerCase().includes(query))
             );
           }
           

@@ -142,8 +142,33 @@ export default function EquipmentPartsViewer({
         const parsed = JSON.parse(parts[0]);
         console.log('✅ [EquipmentPartsViewer] Successfully parsed array[0] as JSON:', parsed);
         if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
+          // MIGRATION FIX: Check for legacy "Root" folder and merge with rootFiles
+          let rootFiles = Array.isArray(parsed.rootFiles) ? parsed.rootFiles : [];
+          let folders = Array.isArray(parsed.folders) ? parsed.folders : [];
+          
+          // Find and migrate any "Root" folder to rootFiles (case-insensitive)
+          const rootFolderIndex = folders.findIndex((folder: any) => 
+            folder.name && (folder.name.toLowerCase() === 'root' || folder.name === 'Root')
+          );
+          
+          if (rootFolderIndex !== -1) {
+            const rootFolder = folders[rootFolderIndex];
+            if (rootFolder.files && Array.isArray(rootFolder.files) && rootFolder.files.length > 0) {
+              // Merge Root folder files into rootFiles
+              console.log(`🔄 [EquipmentPartsViewer] MIGRATION: Found legacy "${rootFolder.name}" folder with ${rootFolder.files.length} files, moving to Root Files section`);
+              rootFiles = [...rootFiles, ...rootFolder.files];
+              // Remove the Root folder from folders array
+              folders = folders.filter((_: any, index: number) => index !== rootFolderIndex);
+              console.log('✅ [EquipmentPartsViewer] Successfully migrated legacy Root folder to rootFiles');
+            } else {
+              // Empty root folder, just remove it
+              folders = folders.filter((_: any, index: number) => index !== rootFolderIndex);
+              console.log('🗑️ [EquipmentPartsViewer] Removed empty legacy Root folder');
+            }
+          }
+          
           return {
-            rootFiles: Array.isArray(parsed.rootFiles) ? parsed.rootFiles.map((file: any, index: number) => {
+            rootFiles: rootFiles.map((file: any, index: number) => {
               const processedUrl = processImageUrl(file.url || file.preview || '');
               return {
                 id: file.id || `file-${index}-${Date.now()}`,
@@ -152,8 +177,8 @@ export default function EquipmentPartsViewer({
                 preview: processedUrl,
                 type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
               };
-            }) : [],
-            folders: Array.isArray(parsed.folders) ? parsed.folders.map((folder: any, folderIndex: number) => ({
+            }),
+            folders: folders.map((folder: any, folderIndex: number) => ({
               id: folder.id || `folder-${folderIndex}-${Date.now()}`,
               name: folder.name || `Folder ${folderIndex + 1}`,
               files: Array.isArray(folder.files) ? folder.files.map((file: any, fileIndex: number) => {
@@ -166,7 +191,7 @@ export default function EquipmentPartsViewer({
                   type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
                 };
               }) : []
-            })) : []
+            }))
           };
         }
       } catch (error) {
@@ -181,8 +206,33 @@ export default function EquipmentPartsViewer({
         const parsed = JSON.parse(parts);
         console.log('✅ [EquipmentPartsViewer] Successfully parsed string as JSON:', parsed);
         if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
+          // MIGRATION FIX: Check for legacy "Root" folder and merge with rootFiles
+          let rootFiles = Array.isArray(parsed.rootFiles) ? parsed.rootFiles : [];
+          let folders = Array.isArray(parsed.folders) ? parsed.folders : [];
+          
+          // Find and migrate any "Root" folder to rootFiles (case-insensitive)
+          const rootFolderIndex = folders.findIndex((folder: any) => 
+            folder.name && (folder.name.toLowerCase() === 'root' || folder.name === 'Root')
+          );
+          
+          if (rootFolderIndex !== -1) {
+            const rootFolder = folders[rootFolderIndex];
+            if (rootFolder.files && Array.isArray(rootFolder.files) && rootFolder.files.length > 0) {
+              // Merge Root folder files into rootFiles
+              console.log(`🔄 [EquipmentPartsViewer] MIGRATION: Found legacy "${rootFolder.name}" folder with ${rootFolder.files.length} files, moving to Root Files section`);
+              rootFiles = [...rootFiles, ...rootFolder.files];
+              // Remove the Root folder from folders array
+              folders = folders.filter((_: any, index: number) => index !== rootFolderIndex);
+              console.log('✅ [EquipmentPartsViewer] Successfully migrated legacy Root folder to rootFiles');
+            } else {
+              // Empty root folder, just remove it
+              folders = folders.filter((_: any, index: number) => index !== rootFolderIndex);
+              console.log('🗑️ [EquipmentPartsViewer] Removed empty legacy Root folder');
+            }
+          }
+          
           return {
-            rootFiles: Array.isArray(parsed.rootFiles) ? parsed.rootFiles.map((file: any, index: number) => {
+            rootFiles: rootFiles.map((file: any, index: number) => {
               const processedUrl = processImageUrl(file.url || file.preview || '');
               return {
                 id: file.id || `file-${index}-${Date.now()}`,
@@ -191,8 +241,8 @@ export default function EquipmentPartsViewer({
                 preview: processedUrl,
                 type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
               };
-            }) : [],
-            folders: Array.isArray(parsed.folders) ? parsed.folders.map((folder: any, folderIndex: number) => ({
+            }),
+            folders: folders.map((folder: any, folderIndex: number) => ({
               id: folder.id || `folder-${folderIndex}-${Date.now()}`,
               name: folder.name || `Folder ${folderIndex + 1}`,
               files: Array.isArray(folder.files) ? folder.files.map((file: any, fileIndex: number) => {
@@ -205,7 +255,7 @@ export default function EquipmentPartsViewer({
                   type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
                 };
               }) : []
-            })) : []
+            }))
           };
         }
       } catch (error) {
@@ -232,8 +282,28 @@ export default function EquipmentPartsViewer({
     if (typeof parts === 'object' && !Array.isArray(parts)) {
       console.log('✅ [EquipmentPartsViewer] Parts data is already an object');
       if (parts.rootFiles && parts.folders) {
+        // MIGRATION FIX: Check for legacy "Root" folder and merge with rootFiles
+        let rootFiles = Array.isArray(parts.rootFiles) ? parts.rootFiles : [];
+        let folders = Array.isArray(parts.folders) ? parts.folders : [];
+        
+        // Find and migrate any "Root" folder to rootFiles
+        const rootFolderIndex = folders.findIndex((folder: any) => 
+          folder.name === 'Root' || folder.name === 'root'
+        );
+        
+        if (rootFolderIndex !== -1) {
+          const rootFolder = folders[rootFolderIndex];
+          if (rootFolder.files && Array.isArray(rootFolder.files)) {
+            // Merge Root folder files into rootFiles
+            rootFiles = [...rootFiles, ...rootFolder.files];
+            // Remove the Root folder from folders array
+            folders = folders.filter((_: any, index: number) => index !== rootFolderIndex);
+            console.log('🔄 [EquipmentPartsViewer] Migrated legacy "Root" folder to rootFiles');
+          }
+        }
+        
         return {
-          rootFiles: Array.isArray(parts.rootFiles) ? parts.rootFiles.map((file: any, index: number) => {
+          rootFiles: rootFiles.map((file: any, index: number) => {
             const processedUrl = processImageUrl(file.url || file.preview || '');
             return {
               id: file.id || `file-${index}-${Date.now()}`,
@@ -242,8 +312,8 @@ export default function EquipmentPartsViewer({
               preview: processedUrl,
               type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
             };
-          }) : [],
-          folders: Array.isArray(parts.folders) ? parts.folders.map((folder: any, folderIndex: number) => ({
+          }),
+          folders: folders.map((folder: any, folderIndex: number) => ({
             id: folder.id || `folder-${folderIndex}-${Date.now()}`,
             name: folder.name || `Folder ${folderIndex + 1}`,
             files: Array.isArray(folder.files) ? folder.files.map((file: any, fileIndex: number) => {
@@ -256,7 +326,7 @@ export default function EquipmentPartsViewer({
                 type: file.type || (processedUrl?.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'document')
               };
             }) : []
-          })) : []
+          }))
         };
       }
     }
@@ -1122,7 +1192,6 @@ export default function EquipmentPartsViewer({
                 className="max-w-full max-h-[70vh] object-contain"
                 onClick={(e) => e.stopPropagation()}
                 onError={(e) => {
-                  console.error('Image failed to load in viewer:', viewerImageUrl);
                   // Replace with error message instead of closing modal
                   const errorDiv = document.createElement('div');
                   errorDiv.className = 'flex flex-col items-center justify-center text-center p-8';
@@ -1139,9 +1208,6 @@ export default function EquipmentPartsViewer({
                     </button>
                   `;
                   e.currentTarget.parentNode?.replaceChild(errorDiv, e.currentTarget);
-                }}
-                onLoad={() => {
-                  console.log('Image loaded successfully in viewer:', viewerImageUrl);
                 }}
               />
             </div>

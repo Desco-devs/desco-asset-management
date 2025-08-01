@@ -29,9 +29,10 @@ import {
 } from "@/components/ui/drawer";
 import {
   useCreateEquipmentMaintenanceReport,
-  useEquipmentsWithReferenceData,
   equipmentKeys,
-} from "@/hooks/useEquipmentsQuery";
+} from "@/hooks/useEquipmentQuery";
+import { useEquipments } from "@/hooks/useEquipmentQuery";
+import { useProjects } from "@/hooks/api/use-projects";
 import { useEquipmentStore, selectIsMobile } from "@/stores/equipmentStore";
 import { 
   useMaintenanceReportStore,
@@ -78,8 +79,15 @@ export default function CreateEquipmentMaintenanceReportModal({
   // Only get resetForm for cleanup - no reactive subscriptions
   const { resetForm } = useMaintenanceReportStore();
 
-  // Server state from TanStack Query
-  const { locations } = useEquipmentsWithReferenceData();
+  // Server state from TanStack Query (standardized approach)
+  const { data: equipments = [] } = useEquipments();
+  const { data: projects = [] } = useProjects();
+  // Extract locations from projects for backward compatibility
+  // Handle different return types from useProjects
+  const projectsArray = Array.isArray(projects) ? projects : (projects?.data || []);
+  const locations = projectsArray
+    .map(p => p.client?.location)
+    .filter((location): location is NonNullable<typeof location> => Boolean(location));
   const { data: usersData } = useUsers();
   const createMaintenanceReportMutation = useCreateEquipmentMaintenanceReport();
   const queryClient = useQueryClient();
@@ -232,25 +240,30 @@ export default function CreateEquipmentMaintenanceReportModal({
       (url) => url.trim() !== ""
     );
 
-    // Create report first without file URLs
-    const reportData = {
-      equipment_id: equipmentId,
-      issue_description: currentFormData.issue_description,
-      remarks: currentFormData.remarks || undefined,
-      inspection_details: currentFormData.inspection_details || undefined,
-      action_taken: currentFormData.action_taken || undefined,
-      priority: currentFormData.priority as any,
-      status: currentFormData.status as any,
-      downtime_hours: currentFormData.downtime_hours || undefined,
-      location_id: currentFormData.location_id || undefined,
-      parts_replaced: processedParts,
-      attachment_urls: filteredAttachmentUrls, // Only manual URLs for now
-      date_reported: new Date().toISOString(),
-      date_repaired: dateRepaired ? dateRepaired.toISOString() : undefined,
-    };
+    // Create FormData for the report
+    const formDataToSend = new FormData();
+    
+    // Add basic form fields
+    formDataToSend.append('equipment_id', equipmentId);
+    formDataToSend.append('issue_description', currentFormData.issue_description);
+    if (currentFormData.remarks) formDataToSend.append('remarks', currentFormData.remarks);
+    if (currentFormData.inspection_details) formDataToSend.append('inspection_details', currentFormData.inspection_details);
+    if (currentFormData.action_taken) formDataToSend.append('action_taken', currentFormData.action_taken);
+    formDataToSend.append('priority', currentFormData.priority);
+    formDataToSend.append('status', currentFormData.status);
+    if (currentFormData.downtime_hours) formDataToSend.append('downtime_hours', currentFormData.downtime_hours);
+    if (currentFormData.location_id) formDataToSend.append('location_id', currentFormData.location_id);
+    
+    // Add arrays as JSON strings
+    formDataToSend.append('parts_replaced', JSON.stringify(processedParts));
+    formDataToSend.append('attachment_urls', JSON.stringify(filteredAttachmentUrls));
+    
+    // Add date fields
+    formDataToSend.append('date_reported', new Date().toISOString());
+    if (dateRepaired) formDataToSend.append('date_repaired', dateRepaired.toISOString());
 
     // Create the report and get the ID
-    const createdReport = await createMaintenanceReportMutation.mutateAsync(reportData);
+    const createdReport = await createMaintenanceReportMutation.mutateAsync(formDataToSend);
     const reportId = createdReport.id;
 
     // Step 2: Upload files with the report ID
@@ -308,14 +321,14 @@ export default function CreateEquipmentMaintenanceReportModal({
           // CRITICAL FIX: Invalidate the cache to ensure fresh data is displayed
           console.log('Invalidating maintenance reports cache after file upload');
           await queryClient.invalidateQueries({ 
-            queryKey: equipmentKeys.equipmentMaintenanceReports() 
+            queryKey: equipmentKeys.equipmentMaintenanceReports(equipmentId) 
           });
         }
       } else {
         // Even if no files were uploaded, invalidate cache to ensure fresh data
         console.log('Invalidating maintenance reports cache after report creation');
         await queryClient.invalidateQueries({ 
-          queryKey: equipmentKeys.equipmentMaintenanceReports() 
+          queryKey: equipmentKeys.equipmentMaintenanceReports(equipmentId) 
         });
       }
       handleClose();
@@ -553,7 +566,7 @@ export default function CreateEquipmentMaintenanceReportModal({
                   </SelectTrigger>
                   <SelectContent>
                     {locations.map((location) => (
-                      <SelectItem key={location.uid} value={location.uid}>
+                      <SelectItem key={location.id} value={location.id}>
                         {location.address}
                       </SelectItem>
                     ))}

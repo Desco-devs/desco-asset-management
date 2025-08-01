@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect, useMemo, memo, useCallback } from "react";
 import { format } from "date-fns";
-import { useUpdateEquipmentAction, useEquipmentsWithReferenceData } from "@/hooks/useEquipmentsQuery";
+import { useUpdateEquipment, useEquipments } from "@/hooks/useEquipmentQuery";
+import { useProjects } from "@/hooks/api/use-projects";
+import { useEquipmentRealtime } from "@/hooks/useEquipmentRealtime";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -82,8 +84,14 @@ function SubmitButton({ isLoading }: { isLoading: boolean }) {
 
 function EditEquipmentDrawer() {
   
-  // Server state from TanStack Query
-  const { projects, equipments } = useEquipmentsWithReferenceData();
+  // Activate realtime for live updates
+  useEquipmentRealtime();
+  
+  // Server state from TanStack Query (standardized approach)
+  const { data: equipments = [] } = useEquipments();
+  const { data: projects = [] } = useProjects();
+  // Handle different return types from useProjects
+  const projectsArray = Array.isArray(projects) ? projects : (projects?.data || []);
   
   // Client state from Zustand
   const selectedEquipmentFromStore = useEquipmentStore(selectSelectedEquipment);
@@ -92,7 +100,7 @@ function EditEquipmentDrawer() {
   // CRITICAL FIX: Always use fresh server data to ensure synchronization
   // This ensures edit form always shows the latest data, same as view modal
   const selectedEquipment = selectedEquipmentFromStore
-    ? equipments.find((e) => e.uid === selectedEquipmentFromStore.uid) || selectedEquipmentFromStore
+    ? equipments.find((e) => e.id === selectedEquipmentFromStore.id) || selectedEquipmentFromStore
     : null;
   
   // Actions
@@ -102,8 +110,8 @@ function EditEquipmentDrawer() {
     setSelectedEquipment,
   } = useEquipmentStore();
 
-  // Mutations
-  const updateEquipmentMutation = useUpdateEquipmentAction();
+  // Mutations (standardized approach)
+  const updateEquipmentMutation = useUpdateEquipment();
   
   // Form reference for resetting
   const formRef = useRef<HTMLFormElement>(null);
@@ -186,14 +194,14 @@ function EditEquipmentDrawer() {
       const newFormData = {
         brand: selectedEquipment.brand || '',
         model: selectedEquipment.model || '',
-        plateNumber: selectedEquipment.plateNumber || '',
+        plateNumber: selectedEquipment.plate_number || '',
         owner: selectedEquipment.owner || '',
         type: selectedEquipment.type || '',
-        projectId: selectedEquipment.project?.uid || '',
+        projectId: selectedEquipment.project?.id || '',
         status: selectedEquipment.status || 'OPERATIONAL',
         before: selectedEquipment.before?.toString() || '6',
-        inspectionDate: selectedEquipment.inspectionDate ? new Date(selectedEquipment.inspectionDate) : new Date(),
-        insuranceExpirationDate: selectedEquipment.insuranceExpirationDate ? new Date(selectedEquipment.insuranceExpirationDate) : undefined,
+        inspectionDate: selectedEquipment.inspection_date ? new Date(selectedEquipment.inspection_date) : new Date(),
+        insuranceExpirationDate: selectedEquipment.insurance_expiration_date ? new Date(selectedEquipment.insurance_expiration_date) : undefined,
         remarks: selectedEquipment.remarks || ''
       };
       
@@ -202,7 +210,7 @@ function EditEquipmentDrawer() {
 
       // Initialize parts structure - CRITICAL FIX: Handle database format properly (array with JSON string)
       try {
-        const rawParts = selectedEquipment.equipmentParts;
+        const rawParts = selectedEquipment.equipment_parts;
         let parsedParts: PartsStructure;
         
         
@@ -437,23 +445,23 @@ function EditEquipmentDrawer() {
     let count = 0;
     // Count existing images that aren't removed
     if (selectedEquipment?.image_url && !removedFiles.equipmentImage) count++;
-    if (selectedEquipment?.thirdpartyInspectionImage && !removedFiles.thirdpartyInspection) count++;
-    if (selectedEquipment?.pgpcInspectionImage && !removedFiles.pgpcInspection) count++;
+    if (selectedEquipment?.thirdparty_inspection_image && !removedFiles.thirdpartyInspection) count++;
+    if (selectedEquipment?.pgpc_inspection_image && !removedFiles.pgpcInspection) count++;
     // Count new files
     if (files.equipmentImage) count++;
     if (files.thirdpartyInspection) count++;
     if (files.pgpcInspection) count++;
     return count;
-  }, [selectedEquipment?.image_url, selectedEquipment?.thirdpartyInspectionImage, selectedEquipment?.pgpcInspectionImage, removedFiles, files]);
+  }, [selectedEquipment?.image_url, selectedEquipment?.thirdparty_inspection_image, selectedEquipment?.pgpc_inspection_image, removedFiles, files]);
 
   const getDocumentsCount = useCallback(() => {
     let count = 0;
-    if (selectedEquipment?.originalReceiptUrl && !removedFiles.originalReceipt) count++;
-    if (selectedEquipment?.equipmentRegistrationUrl && !removedFiles.equipmentRegistration) count++;
+    if (selectedEquipment?.original_receipt_url && !removedFiles.originalReceipt) count++;
+    if (selectedEquipment?.equipment_registration_url && !removedFiles.equipmentRegistration) count++;
     if (files.originalReceipt) count++;
     if (files.equipmentRegistration) count++;
     return count;
-  }, [selectedEquipment?.originalReceiptUrl, selectedEquipment?.equipmentRegistrationUrl, removedFiles, files]);
+  }, [selectedEquipment?.original_receipt_url, selectedEquipment?.equipment_registration_url, removedFiles, files]);
 
   const getEquipmentPartsCount = useCallback(() => {
     // Only count actual files, not empty folders/structures
@@ -537,7 +545,7 @@ function EditEquipmentDrawer() {
     }
     
     // Add equipment ID for update
-    formDataFromForm.append('equipmentId', selectedEquipment.uid);
+    formDataFromForm.append('equipmentId', selectedEquipment.id);
     
     // Add all the files to formData
     Object.entries(files).forEach(([key, file]) => {
@@ -645,7 +653,7 @@ function EditEquipmentDrawer() {
     const hasPartsStructureChanges = (() => {
       try {
         // Get original parts structure for comparison
-        const originalParts = selectedEquipment.equipmentParts;
+        const originalParts = selectedEquipment.equipment_parts;
         let originalStructure = { rootFiles: [], folders: [] };
         
         if (originalParts) {
@@ -957,8 +965,8 @@ function EditEquipmentDrawer() {
                         <SelectValue placeholder="Select a project" />
                       </SelectTrigger>
                       <SelectContent>
-                        {projects.map((project) => (
-                          <SelectItem key={project.uid} value={project.uid}>
+                        {projectsArray.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
                             {project.name}
                           </SelectItem>
                         ))}
@@ -1139,9 +1147,9 @@ function EditEquipmentDrawer() {
                   )}
                   
                   {/* Third-party Inspection */}
-                  {selectedEquipment.thirdpartyInspectionImage && !removedFiles.thirdpartyInspection && !files.thirdpartyInspection ? (
+                  {selectedEquipment.thirdparty_inspection_image && !removedFiles.thirdpartyInspection && !files.thirdpartyInspection ? (
                     <ImageDisplayWithRemove
-                      url={selectedEquipment.thirdpartyInspectionImage}
+                      url={selectedEquipment.thirdparty_inspection_image}
                       label="Third-party Inspection"
                       description="Third-party Inspection"
                       onRemove={handleThirdpartyInspectionRemove}
@@ -1153,14 +1161,14 @@ function EditEquipmentDrawer() {
                       onFileChange={handleThirdpartyInspectionChange}
                       onKeepExistingChange={() => {}}
                       accept="image/*"
-                      currentFileUrl={!removedFiles.thirdpartyInspection ? selectedEquipment.thirdpartyInspectionImage : undefined}
+                      currentFileUrl={!removedFiles.thirdpartyInspection ? selectedEquipment.thirdparty_inspection_image : undefined}
                     />
                   )}
                   
                   {/* PGPC Inspection */}
-                  {selectedEquipment.pgpcInspectionImage && !removedFiles.pgpcInspection && !files.pgpcInspection ? (
+                  {selectedEquipment.pgpc_inspection_image && !removedFiles.pgpcInspection && !files.pgpcInspection ? (
                     <ImageDisplayWithRemove
-                      url={selectedEquipment.pgpcInspectionImage}
+                      url={selectedEquipment.pgpc_inspection_image}
                       label="PGPC Inspection"
                       description="PGPC Inspection"
                       onRemove={handlePgpcInspectionRemove}
@@ -1172,7 +1180,7 @@ function EditEquipmentDrawer() {
                       onFileChange={handlePgpcInspectionChange}
                       onKeepExistingChange={() => {}}
                       accept="image/*"
-                      currentFileUrl={!removedFiles.pgpcInspection ? selectedEquipment.pgpcInspectionImage : undefined}
+                      currentFileUrl={!removedFiles.pgpcInspection ? selectedEquipment.pgpc_inspection_image : undefined}
                     />
                   )}
                 </div>
@@ -1201,9 +1209,9 @@ function EditEquipmentDrawer() {
               <div className="space-y-4">
                 <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
                   {/* Original Receipt (OR) */}
-                  {selectedEquipment.originalReceiptUrl && !removedFiles.originalReceipt && !files.originalReceipt ? (
+                  {selectedEquipment.original_receipt_url && !removedFiles.originalReceipt && !files.originalReceipt ? (
                     <ImageDisplayWithRemove
-                      url={selectedEquipment.originalReceiptUrl}
+                      url={selectedEquipment.original_receipt_url}
                       label="Original Receipt (OR)"
                       description="Proof of purchase document"
                       onRemove={handleOriginalReceiptRemove}
@@ -1215,15 +1223,15 @@ function EditEquipmentDrawer() {
                       onFileChange={handleOriginalReceiptChange}
                       onKeepExistingChange={() => {}}
                       accept=".pdf,image/*"
-                      currentFileUrl={!removedFiles.originalReceipt ? selectedEquipment.originalReceiptUrl : undefined}
+                      currentFileUrl={!removedFiles.originalReceipt ? selectedEquipment.original_receipt_url : undefined}
                       hideChangeButton={true}
                     />
                   )}
                   
                   {/* Equipment Registration */}
-                  {selectedEquipment.equipmentRegistrationUrl && !removedFiles.equipmentRegistration && !files.equipmentRegistration ? (
+                  {selectedEquipment.equipment_registration_url && !removedFiles.equipmentRegistration && !files.equipmentRegistration ? (
                     <ImageDisplayWithRemove
-                      url={selectedEquipment.equipmentRegistrationUrl}
+                      url={selectedEquipment.equipment_registration_url}
                       label="Equipment Registration"
                       description="Official equipment registration certificate"
                       onRemove={handleEquipmentRegistrationRemove}
@@ -1235,7 +1243,7 @@ function EditEquipmentDrawer() {
                       onFileChange={handleEquipmentRegistrationChange}
                       onKeepExistingChange={() => {}}
                       accept=".pdf,image/*"
-                      currentFileUrl={!removedFiles.equipmentRegistration ? selectedEquipment.equipmentRegistrationUrl : undefined}
+                      currentFileUrl={!removedFiles.equipmentRegistration ? selectedEquipment.equipment_registration_url : undefined}
                       hideChangeButton={true}
                     />
                   )}
@@ -1263,7 +1271,7 @@ function EditEquipmentDrawer() {
               {/* 🔧 FOOTER VISIBILITY FIX: Constrained container to prevent buttons from being pushed out of view */}
               <div className={`${isMobile ? 'max-h-[45vh]' : 'max-h-[50vh]'} overflow-y-auto border rounded-lg p-4 bg-muted/20`}>
                 <PartsFolderManager 
-                  key={selectedEquipment?.uid || 'new'} // Force re-mount when equipment changes
+                  key={selectedEquipment?.id || 'new'} // Force re-mount when equipment changes
                   onChange={setPartsStructure}
                   initialData={partsStructure}
                 />

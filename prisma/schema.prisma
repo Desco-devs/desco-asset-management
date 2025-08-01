@@ -29,10 +29,10 @@ model user {
   reported_vehicle_maintenance maintenance_vehicle_report[]   @relation("VehicleReportedBy")
   sent_messages                message[]                      @relation("MessageCreatedBy")
   created_projects             project[]                      @relation("ProjectCreatedBy")
-  room_memberships             room_member[]                  @relation("UserRoomMember")
-  owned_rooms                  room[]                         @relation("RoomOwner")
   sent_invitations             room_invitation[]              @relation("InvitationsSent")
   received_invitations         room_invitation[]              @relation("InvitationsReceived")
+  room_memberships             room_member[]                  @relation("UserRoomMember")
+  owned_rooms                  room[]                         @relation("RoomOwner")
   created_vehicles             vehicle[]                      @relation("VehicleCreatedBy")
 
   @@index([role])
@@ -48,17 +48,18 @@ model room {
   name        String
   type        room_type         @default(GROUP)
   owner_id    String            @db.Uuid
-  avatar_url  String?
   created_at  DateTime          @default(now())
   updated_at  DateTime          @updatedAt
+  avatar_url  String?
   messages    message[]
-  members     room_member[]
   invitations room_invitation[]
+  members     room_member[]
   owner       user              @relation("RoomOwner", fields: [owner_id], references: [id], onDelete: Cascade)
 
   @@index([owner_id])
   @@index([type])
   @@index([created_at])
+  @@index([owner_id], map: "idx_rooms_owner_id")
   @@map("rooms")
 }
 
@@ -73,6 +74,8 @@ model room_member {
   @@unique([room_id, user_id])
   @@index([room_id])
   @@index([user_id])
+  @@index([room_id], map: "idx_room_members_room_id")
+  @@index([user_id], map: "idx_room_members_user_id")
   @@map("room_members")
 }
 
@@ -89,6 +92,7 @@ model message {
   @@index([sender_id])
   @@index([created_at])
   @@index([room_id, created_at])
+  @@index([room_id], map: "idx_messages_room_id")
   @@map("messages")
 }
 
@@ -101,9 +105,9 @@ model room_invitation {
   status       invitation_status @default(PENDING)
   created_at   DateTime          @default(now())
   updated_at   DateTime          @updatedAt
-  room         room              @relation(fields: [room_id], references: [id], onDelete: Cascade)
   inviter      user              @relation("InvitationsSent", fields: [invited_by], references: [id], onDelete: Cascade)
   invitee      user              @relation("InvitationsReceived", fields: [invited_user], references: [id], onDelete: Cascade)
+  room         room              @relation(fields: [room_id], references: [id], onDelete: Cascade)
 
   @@unique([room_id, invited_user, status])
   @@index([room_id])
@@ -113,7 +117,6 @@ model room_invitation {
   @@index([created_at])
   @@map("room_invitations")
 }
-
 
 model location {
   id                            String                         @id @default(uuid()) @db.Uuid
@@ -174,7 +177,6 @@ model equipment {
   model                       String
   type                        String
   insurance_expiration_date   DateTime?                      @default(now())
-  registration_expiry         DateTime?
   before                      Int?
   status                      status
   remarks                     String?
@@ -191,6 +193,7 @@ model equipment {
   created_at                  DateTime                       @default(now())
   updated_at                  DateTime                       @updatedAt
   created_by                  String?                        @db.Uuid
+  registration_expiry         DateTime?
   user                        user?                          @relation("EquipmentCreatedBy", fields: [created_by], references: [id])
   project                     project                        @relation(fields: [project_id], references: [id], onDelete: Cascade)
   maintenance_reports         maintenance_equipment_report[]
@@ -226,11 +229,11 @@ model vehicle {
   original_receipt_url  String?
   car_registration_url  String?
   pgpc_inspection_image String?
-  vehicle_parts         String[]
   project_id            String                       @db.Uuid
   created_at            DateTime                     @default(now())
   updated_at            DateTime                     @updatedAt
   created_by            String?                      @db.Uuid
+  vehicle_parts         String[]
   registration_expiry   DateTime?
   maintenance_reports   maintenance_vehicle_report[]
   user                  user?                        @relation("VehicleCreatedBy", fields: [created_by], references: [id])
@@ -364,4 +367,3 @@ enum invitation_status {
   DECLINED
   CANCELLED
 }
-
