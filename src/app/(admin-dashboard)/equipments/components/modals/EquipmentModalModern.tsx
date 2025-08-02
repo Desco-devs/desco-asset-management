@@ -369,21 +369,7 @@ export default function EquipmentModalModern() {
       const hasFileChanges = Object.keys(uploadedFiles).length > 0 || removedFiles.size > 0;
       const hasPartsChanges = isGlobalEditMode || deletedParts.files.length > 0 || deletedParts.folders.length > 0; // Parts changes are tracked by edit mode state and deletions
       
-      console.log('🔍 Save Changes Debug:', {
-        hasFormChanges,
-        hasFileChanges, 
-        hasPartsChanges,
-        dirtyFieldsCount: dirtyFields.size,
-        uploadedFilesCount: Object.keys(uploadedFiles).length,
-        removedFilesCount: removedFiles.size,
-        deletedPartsFilesCount: deletedParts.files.length,
-        deletedPartsFoldersCount: deletedParts.folders.length,
-        dirtyFields: Array.from(dirtyFields),
-        uploadedFileKeys: Object.keys(uploadedFiles),
-        removedFileKeys: Array.from(removedFiles),
-        deletedPartsFiles: deletedParts.files,
-        deletedPartsFolders: deletedParts.folders
-      });
+      // Save changes debug information
       
       if (!hasFormChanges && !hasFileChanges && !hasPartsChanges) {
         toast.info('No changes to save');
@@ -396,7 +382,7 @@ export default function EquipmentModalModern() {
       // Always add equipmentId first (required by API)
       const equipmentId = (selectedEquipment as any).id || (selectedEquipment as any).id;
       formData.append('equipmentId', equipmentId);
-      console.log('✅ Added equipmentId:', equipmentId);
+      // Added equipmentId
       
       // Always add required fields to prevent "Missing required fields" error
       alwaysRequiredFields.forEach(fieldName => {
@@ -407,7 +393,7 @@ export default function EquipmentModalModern() {
           } else {
             formData.append(fieldName, value.toString());
           }
-          console.log(`✅ Added required field ${fieldName}:`, value);
+          // Added required field
         } else {
           console.warn(`⚠️ Required field ${fieldName} is missing or null:`, value);
         }
@@ -444,7 +430,7 @@ export default function EquipmentModalModern() {
       // Send removed files to API with validation - UPDATED to handle both images and documents
       if (removedFiles.size > 0) {
         const removedFilesArray = Array.from(removedFiles);
-        console.log(`📄 Sending removal request for fields:`, removedFilesArray);
+        // Sending removal request for fields
         
         // Separate image and document removals for the API
         const validImageFields = ['image_url', 'thirdparty_inspection_image', 'pgpc_inspection_image'];
@@ -463,13 +449,13 @@ export default function EquipmentModalModern() {
         // Send image removals (existing API)
         if (imageRemovals.length > 0) {
           formData.append('removedImages', JSON.stringify(imageRemovals));
-          console.log(`✅ Valid image removals to process:`, imageRemovals);
+          // Valid image removals to process
         }
         
         // Send document removals (new - same format as images for consistency)
         if (documentRemovals.length > 0) {
           formData.append('removedDocuments', JSON.stringify(documentRemovals));
-          console.log(`✅ Valid document removals to process:`, documentRemovals);
+          // Valid document removals to process
         }
       }
       
@@ -527,10 +513,10 @@ export default function EquipmentModalModern() {
               // CRITICAL FIX: Use server-expected naming pattern partsFile_root_${index}
               const serverExpectedName = `partsFile_root_${rootFileCounter}`;
               formData.append(serverExpectedName, partFile.file);
-              console.log(`📁 Added root parts file ${serverExpectedName}: ${partFile.name} (original name: ${partFile.name})`);
+              // Added root parts file
               rootFileCounter++;
             } else {
-              console.log(`🚫 Skipping deleted root file: ${partFile.name} (marked for deletion)`);
+              // Skipping deleted root file
             }
           }
         });
@@ -552,10 +538,10 @@ export default function EquipmentModalModern() {
                 const serverExpectedName = `partsFile_folder_${folderIndex}_${folderFileCounter}`;
                 formData.append(serverExpectedName, partFile.file);
                 formData.append(`${serverExpectedName}_folder`, folder.name);
-                console.log(`📁 Added folder parts file ${serverExpectedName}: ${partFile.name} in folder: ${folder.name}`);
+                // Added folder parts file
                 folderFileCounter++;
               } else {
-                console.log(`🚫 Skipping deleted folder file: ${partFile.name} in folder: ${folder.name} (marked for deletion)`);
+                // Skipping deleted folder file
               }
             }
           });
@@ -564,12 +550,7 @@ export default function EquipmentModalModern() {
       
       const updatedEquipment = await smartUpdateEquipmentMutation.mutateAsync(formData);
       
-      console.log('🔄 Updating selectedEquipment with fresh server data:', updatedEquipment);
-      console.log('📸 New image URLs:', {
-        image_url: updatedEquipment.image_url,
-        thirdparty_inspection_image: updatedEquipment.thirdparty_inspection_image,
-        pgpc_inspection_image: updatedEquipment.pgpc_inspection_image
-      });
+      // Updating selectedEquipment with fresh server data
       
       // CRITICAL FIX: Update parts structure with fresh server data to prevent duplicates
       if (updatedEquipment.equipment_parts && isGlobalEditMode) {
@@ -617,7 +598,7 @@ export default function EquipmentModalModern() {
               })) : []
             };
             
-            console.log('🔄 Updating partsStructure with server data (no deduplication needed):', updatedPartsStructure);
+            // Updating partsStructure with server data
             
             // Clean up old blob URLs before updating with server data
             cleanupBlobUrls(partsStructure);
@@ -632,8 +613,7 @@ export default function EquipmentModalModern() {
       
       // ANTI-FLICKER FIX: Update selectedEquipment first, then clear state synchronously
       // This prevents the preview from briefly showing old URLs
-      console.log('🔄 BEFORE setSelectedEquipment - Current:', selectedEquipment?.image_url);
-      console.log('🔄 BEFORE setSelectedEquipment - New:', updatedEquipment.image_url);
+      // Before setSelectedEquipment - Current vs New
       
       // Force synchronous update to prevent flicker
       flushSync(() => {
@@ -647,8 +627,8 @@ export default function EquipmentModalModern() {
       setDeletedParts({ files: [], folders: [] }); // Clear parts deletions after successful save
       setDirtyFields(new Set()); // Clear dirty state after successful save
       
-      console.log('✅ Updated selectedEquipment synchronously and cleared upload state');
-      console.log('🧹 Anti-flicker sync update completed');
+      // Updated selectedEquipment synchronously and cleared upload state
+      // Anti-flicker sync update completed
       // Note: Success toast is handled by useUpdateEquipment hook
     } catch (error) {
       console.error('Failed to update equipment:', error);
@@ -679,7 +659,7 @@ export default function EquipmentModalModern() {
   // IMPROVED: Modal state cleanup with logging
   useEffect(() => {
     if (!isModalOpen) {
-      console.log('🔄 Resetting modal state - modal closed');
+      // Resetting modal state - modal closed
       setActiveTab("details");
       // Reset global edit mode when modal closes
       setIsGlobalEditMode(false);
@@ -767,7 +747,7 @@ export default function EquipmentModalModern() {
 
   // Safety cleanup function
   const resetFileStates = useCallback(() => {
-    console.log('🔄 Resetting file states manually');
+    // Resetting file states manually
     
     // Clean up blob URLs before resetting parts structure
     cleanupBlobUrls(partsStructure);
@@ -785,7 +765,7 @@ export default function EquipmentModalModern() {
 
 
   const handleClose = () => {
-    console.log('🚪 Closing modal - cleaning up all states');
+    // Closing modal - cleaning up all states
     setIsModalOpen(false);
     setSelectedEquipment(null);
     setIsEditMode(false);
@@ -818,7 +798,7 @@ export default function EquipmentModalModern() {
 
   // IMPROVED: File handlers with better validation and logging - UPDATED to support documents
   const handleFileSelect = useCallback((fieldName: string, file: File | null) => {
-    console.log(`📁 File selection for ${fieldName}:`, file ? `NEW FILE: ${file.name}` : 'REMOVE EXISTING');
+    // File selection for field
     
     // Validate fieldName to prevent issues - UPDATED to include document fields
     const validFieldNames = [
@@ -845,7 +825,7 @@ export default function EquipmentModalModern() {
       setRemovedFiles(prev => {
         const updated = new Set(prev);
         updated.delete(fieldName);
-        console.log(`✅ Restored ${fieldName} from removal list`);
+        // Restored from removal list
         return updated;
       });
     } else {
@@ -857,7 +837,7 @@ export default function EquipmentModalModern() {
       });
       setRemovedFiles(prev => {
         const updated = new Set([...prev, fieldName]);
-        console.log(`🗑️ Added ${fieldName} to removal list. Total removals:`, updated.size);
+        // Added to removal list
         return updated;
       });
     }
@@ -990,13 +970,7 @@ export default function EquipmentModalModern() {
       const count = (partsStructure.rootFiles?.length || 0) + 
                    (partsStructure.folders?.reduce((acc, folder) => acc + (folder.files?.length || 0), 0) || 0);
       
-      console.log('🔍 [EquipmentModal] Using live partsStructure count:', {
-        mode: 'edit',
-        totalCount: count,
-        rootFilesCount: partsStructure.rootFiles?.length || 0,
-        foldersCount: partsStructure.folders?.length || 0,
-        partsStructure
-      });
+      // Using live partsStructure count
       
       return count;
     }
@@ -1004,16 +978,10 @@ export default function EquipmentModalModern() {
     // Fallback to equipment data for view mode
     const equipmentParts = (selectedEquipment as any)?.parts_data || (selectedEquipment as any)?.equipment_parts || (selectedEquipment as any)?.equipmentParts;
     
-    console.log('🔍 [EquipmentModal] Counting parts for:', {
-      mode: 'view',
-      equipmentId: (selectedEquipment as any)?.id || (selectedEquipment as any)?.id,
-      hasPartsData: !!equipmentParts,
-      partsDataType: typeof equipmentParts,
-      partsData: equipmentParts
-    });
+    // Counting parts for equipment
     
     if (!selectedEquipment || !equipmentParts) {
-      console.log('ℹ️ [EquipmentModal] No equipment or parts data, count = 0');
+      // No equipment or parts data, count = 0
       return 0;
     }
     
@@ -1093,12 +1061,7 @@ export default function EquipmentModalModern() {
       });
     }
     
-    console.log('✅ [EquipmentModal] Parts count calculated:', {
-      totalCount: count,
-      rootFilesCount: parsedData.rootFiles?.length || 0,
-      foldersCount: parsedData.folders?.length || 0,
-      parsedData: parsedData
-    });
+    // Parts count calculated
     
     return count;
   };  
@@ -1772,7 +1735,7 @@ export default function EquipmentModalModern() {
                       accept="image/*"
                       currentFileUrl={(() => {
                         const url = !removedFiles.has('image_url') ? selectedEquipment.image_url : null;
-                        console.log('🖼️ [Equipment Image View] currentFileUrl:', url, 'readOnly:', !isGlobalEditMode);
+                        // Equipment Image View file URL loaded
                         return url;
                       })()}
                       selectedFile={uploadedFiles['image_url'] || null}
@@ -2038,7 +2001,7 @@ export default function EquipmentModalModern() {
                       type="button"
                       variant="outline"
                       onClick={() => {
-                        console.log('❌ Cancel button clicked - resetting states');
+                        // Cancel button clicked - resetting states
                         // Check if there are unsaved changes
                         if (dirtyFields.size > 0 || Object.keys(uploadedFiles).length > 0 || removedFiles.size > 0 || deletedParts.files.length > 0 || deletedParts.folders.length > 0) {
                           const confirmCancel = window.confirm(
@@ -2115,7 +2078,7 @@ export default function EquipmentModalModern() {
                       type="button"
                       variant="outline"
                       onClick={() => {
-                        console.log('❌ Cancel button clicked - resetting states');
+                        // Cancel button clicked - resetting states
                         // Check if there are unsaved changes
                         if (dirtyFields.size > 0 || Object.keys(uploadedFiles).length > 0 || removedFiles.size > 0 || deletedParts.files.length > 0 || deletedParts.folders.length > 0) {
                           const confirmCancel = window.confirm(
