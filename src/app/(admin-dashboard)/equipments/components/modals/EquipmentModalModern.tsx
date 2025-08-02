@@ -26,6 +26,7 @@ import {
   useDeleteEquipment,
   useEquipments,
   useUpdateEquipment,
+  useSmartUpdateEquipment,
 } from "@/hooks/useEquipmentQuery";
 import { useEquipmentMaintenanceReports } from "@/hooks/useEquipmentQuery";
 import { useProjects } from "@/hooks/api/use-projects";
@@ -72,7 +73,7 @@ import {
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import EditEquipmentModalModern from "./EditEquipmentModalModern";
 import EquipmentMaintenanceReportsEnhanced from "../EquipmentMaintenanceReportsEnhanced";
-import EquipmentPartsViewer from "../EquipmentPartsViewer";
+import EquipmentPartsViewerSimple from "../EquipmentPartsViewerSimple";
 import PartsFolderManager from "../forms/PartsFolderManager";
 import type { PartsStructure } from "../forms/PartsFolderManager";
 import { Input } from "@/components/ui/input";
@@ -85,6 +86,15 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
 import EquipmentFormErrorBoundary from "@/components/error-boundary/EquipmentFormErrorBoundary";
+
+// Helper function to generate unique IDs for file uploads
+const generateUniqueId = () => {
+  // Use crypto.randomUUID() in browser environment, or fallback to timestamp + random
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
 
 export default function EquipmentModalModern() {
   // Server state from TanStack Query
@@ -223,23 +233,35 @@ export default function EquipmentModalModern() {
         // Initialize parts structure if it exists
         if (parsedParts && typeof parsedParts === 'object') {
           const initialData: PartsStructure = {
-            rootFiles: Array.isArray(parsedParts.rootFiles) ? parsedParts.rootFiles.map((file: any) => ({
-              id: file.id || `file-${Date.now()}-${Math.random()}`,
-              name: file.name || 'Unknown file',
-              url: file.url || file.preview,
-              preview: file.preview || file.url, // CRITICAL FIX: Ensure preview is always set
-              type: file.type || (file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document')
-            })) : [],
-            folders: Array.isArray(parsedParts.folders) ? parsedParts.folders.map((folder: any) => ({
-              id: folder.id || `folder-${Date.now()}-${Math.random()}`,
-              name: folder.name,
-              files: Array.isArray(folder.files) ? folder.files.map((file: any) => ({
+            rootFiles: Array.isArray(parsedParts.rootFiles) ? parsedParts.rootFiles
+              .map((file: any) => ({
                 id: file.id || `file-${Date.now()}-${Math.random()}`,
                 name: file.name || 'Unknown file',
                 url: file.url || file.preview,
                 preview: file.preview || file.url, // CRITICAL FIX: Ensure preview is always set
                 type: file.type || (file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document')
-              })) : [],
+              }))
+              // CRITICAL FIX: Filter out files that were previously marked for deletion to prevent stale references
+              .filter((file: any) => !deletedParts.files.some(deletedFile => 
+                deletedFile.fileId === file.id || 
+                deletedFile.fileName === file.name
+              )) : [],
+            folders: Array.isArray(parsedParts.folders) ? parsedParts.folders.map((folder: any) => ({
+              id: folder.id || `folder-${Date.now()}-${Math.random()}`,
+              name: folder.name,
+              files: Array.isArray(folder.files) ? folder.files
+                .map((file: any) => ({
+                  id: file.id || `file-${Date.now()}-${Math.random()}`,
+                  name: file.name || 'Unknown file',
+                  url: file.url || file.preview,
+                  preview: file.preview || file.url, // CRITICAL FIX: Ensure preview is always set
+                  type: file.type || (file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 'image' : 'document')
+                }))
+                // CRITICAL FIX: Filter out files that were previously marked for deletion to prevent stale references
+                .filter((file: any) => !deletedParts.files.some(deletedFile => 
+                  deletedFile.fileId === file.id || 
+                  (deletedFile.fileName === file.name && deletedFile.folderPath === folder.name)
+                )) : [],
               created_at: new Date(folder.created_at || Date.now())
             })) : []
           };
@@ -283,6 +305,7 @@ export default function EquipmentModalModern() {
   
   // Update mutation - declared before callbacks that use it
   const updateEquipmentMutation = useUpdateEquipment();
+  const smartUpdateEquipmentMutation = useSmartUpdateEquipment();
 
   // CRITICAL FIX: Update form data via ref without causing re-renders
   const handleFieldChange = useCallback((field: string, value: any) => {
@@ -489,29 +512,57 @@ export default function EquipmentModalModern() {
         // CRITICAL FIX: Extract and append actual File objects from partsStructure
         // This is what was missing - the API expects partsFile_* FormData entries
         
-        // Add root files to FormData
+        // Add root files to FormData - use server-expected naming pattern
+        // CRITICAL FIX: Filter out files that were marked for deletion to prevent stale references
+        let rootFileCounter = 0;
         partsStructure.rootFiles.forEach((partFile, index) => {
           if (partFile.file && partFile.file.size > 0) {
-            formData.append(`partsFile_root_${index}`, partFile.file);
-            formData.append(`partsFile_root_${index}_name`, partFile.name);
-            console.log(`📁 Added root parts file ${index}: ${partFile.name}`);
+            // Check if this file was marked for deletion - prevent stale file references
+            const isDeleted = deletedParts.files.some(deletedFile => 
+              deletedFile.fileId === partFile.id || 
+              deletedFile.fileName === partFile.name
+            );
+            
+            if (!isDeleted) {
+              // CRITICAL FIX: Use server-expected naming pattern partsFile_root_${index}
+              const serverExpectedName = `partsFile_root_${rootFileCounter}`;
+              formData.append(serverExpectedName, partFile.file);
+              console.log(`📁 Added root parts file ${serverExpectedName}: ${partFile.name} (original name: ${partFile.name})`);
+              rootFileCounter++;
+            } else {
+              console.log(`🚫 Skipping deleted root file: ${partFile.name} (marked for deletion)`);
+            }
           }
         });
         
-        // Add folder files to FormData
+        // Add folder files to FormData - use server-expected naming pattern  
+        // CRITICAL FIX: Filter out files that were marked for deletion to prevent stale references
+        let folderFileCounter = 0;
         partsStructure.folders.forEach((folder, folderIndex) => {
           folder.files.forEach((partFile, fileIndex) => {
             if (partFile.file && partFile.file.size > 0) {
-              formData.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
-              formData.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
-              formData.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
-              console.log(`📁 Added folder parts file ${folderIndex}/${fileIndex}: ${partFile.name} in folder: ${folder.name}`);
+              // Check if this file was marked for deletion - prevent stale file references
+              const isDeleted = deletedParts.files.some(deletedFile => 
+                deletedFile.fileId === partFile.id || 
+                (deletedFile.fileName === partFile.name && deletedFile.folderPath === folder.name)
+              );
+              
+              if (!isDeleted) {
+                // CRITICAL FIX: Use server-expected naming pattern partsFile_folder_${folderIndex}_${fileIndex}
+                const serverExpectedName = `partsFile_folder_${folderIndex}_${folderFileCounter}`;
+                formData.append(serverExpectedName, partFile.file);
+                formData.append(`${serverExpectedName}_folder`, folder.name);
+                console.log(`📁 Added folder parts file ${serverExpectedName}: ${partFile.name} in folder: ${folder.name}`);
+                folderFileCounter++;
+              } else {
+                console.log(`🚫 Skipping deleted folder file: ${partFile.name} in folder: ${folder.name} (marked for deletion)`);
+              }
             }
           });
         });
       }
       
-      const updatedEquipment = await updateEquipmentMutation.mutateAsync(formData);
+      const updatedEquipment = await smartUpdateEquipmentMutation.mutateAsync(formData);
       
       console.log('🔄 Updating selectedEquipment with fresh server data:', updatedEquipment);
       console.log('📸 New image URLs:', {
@@ -603,7 +654,7 @@ export default function EquipmentModalModern() {
       console.error('Failed to update equipment:', error);
       toast.error('Failed to update equipment. Please try again.');
     }
-  }, [selectedEquipment, updateEquipmentMutation, setIsGlobalEditMode, isGlobalEditMode, partsStructure, dirtyFields, deletedParts]); // Added dirtyFields and deletedParts dependencies
+  }, [selectedEquipment, smartUpdateEquipmentMutation, setIsGlobalEditMode, isGlobalEditMode, partsStructure, dirtyFields, deletedParts]); // Updated to use smart mutation
 
   // Actions
   const {
@@ -934,9 +985,27 @@ export default function EquipmentModalModern() {
   };
   // Helper function to count equipment parts for selected equipment - Enhanced with better logging
   const getEquipmentPartsCount = () => {
+    // CRITICAL FIX: Use live partsStructure in edit mode for real-time count updates
+    if (isGlobalEditMode && partsStructure) {
+      const count = (partsStructure.rootFiles?.length || 0) + 
+                   (partsStructure.folders?.reduce((acc, folder) => acc + (folder.files?.length || 0), 0) || 0);
+      
+      console.log('🔍 [EquipmentModal] Using live partsStructure count:', {
+        mode: 'edit',
+        totalCount: count,
+        rootFilesCount: partsStructure.rootFiles?.length || 0,
+        foldersCount: partsStructure.folders?.length || 0,
+        partsStructure
+      });
+      
+      return count;
+    }
+
+    // Fallback to equipment data for view mode
     const equipmentParts = (selectedEquipment as any)?.parts_data || (selectedEquipment as any)?.equipment_parts || (selectedEquipment as any)?.equipmentParts;
     
     console.log('🔍 [EquipmentModal] Counting parts for:', {
+      mode: 'view',
       equipmentId: (selectedEquipment as any)?.id || (selectedEquipment as any)?.id,
       hasPartsData: !!equipmentParts,
       partsDataType: typeof equipmentParts,
@@ -1830,7 +1899,7 @@ export default function EquipmentModalModern() {
             {isGlobalEditMode ? (
               <div className={`${isMobile ? 'max-h-[45vh]' : 'max-h-[50vh]'} overflow-y-auto border rounded-lg p-4 bg-muted/20`}>
                 <PartsFolderManager 
-                  key={(selectedEquipment as any)?.id || (selectedEquipment as any)?.id || 'edit'} 
+                  key={`${(selectedEquipment as any)?.id || (selectedEquipment as any)?.id}-${isGlobalEditMode ? 'edit' : 'view'}`} 
                   onChange={setPartsStructure}
                   initialData={partsStructure}
                   onPartFileDelete={handlePartFileDelete}
@@ -1844,40 +1913,11 @@ export default function EquipmentModalModern() {
                   <p className="text-xs text-red-500 mt-1">There may be an issue with the parts data format</p>
                 </div>
               }>
-                <EquipmentPartsViewer 
+                <EquipmentPartsViewerSimple 
                   equipmentParts={(() => {
                     const partsData = (selectedEquipment as any).parts_data || (selectedEquipment as any).equipment_parts || (selectedEquipment as any).equipmentParts;
-                    
-                    console.log('🔍 [EquipmentModal] Preparing parts data for viewer:', {
-                      equipmentId: (selectedEquipment as any)?.id || (selectedEquipment as any)?.id,
-                      hasData: !!partsData,
-                      dataType: typeof partsData,
-                      rawData: partsData
-                    });
-                    
-                    if (!partsData) {
-                      console.log('ℹ️ [EquipmentModal] No parts data, returning empty structure');
-                      return { rootFiles: [], folders: [] };
-                    }
-                    
-                    if (typeof partsData === 'string') {
-                      try {
-                        const parsed = JSON.parse(partsData);
-                        console.log('✅ [EquipmentModal] Successfully parsed string parts data:', parsed);
-                        return parsed;
-                      } catch (error) {
-                        console.warn('⚠️ [EquipmentModal] Failed to parse equipment parts JSON:', error);
-                        return { rootFiles: [], folders: [] };
-                      }
-                    }
-                    
-                    console.log('✅ [EquipmentModal] Using parts data as-is:', partsData);
                     return partsData;
                   })()}
-                  isEditable={isGlobalEditMode}
-                  onPartsChange={setPartsStructure}
-                  onPartFileDelete={handlePartFileDelete}
-                  onPartFolderDelete={handlePartFolderDelete}
                 />
               </EquipmentFormErrorBoundary>
             )}
@@ -2019,11 +2059,11 @@ export default function EquipmentModalModern() {
                     <Button
                       type="button"
                       onClick={handleSaveChanges}
-                      disabled={updateEquipmentMutation.isPending}
+                      disabled={smartUpdateEquipmentMutation.isPending}
                       className="flex-1"
                       size="lg"
                     >
-                      {updateEquipmentMutation.isPending ? (
+                      {smartUpdateEquipmentMutation.isPending ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       ) : (
                         <Save className="h-4 w-4 mr-2" />
@@ -2095,11 +2135,11 @@ export default function EquipmentModalModern() {
                     <Button
                       type="button"
                       onClick={handleSaveChanges}
-                      disabled={updateEquipmentMutation.isPending}
+                      disabled={smartUpdateEquipmentMutation.isPending}
                       size="sm"
                       className="flex items-center gap-2"
                     >
-                      {updateEquipmentMutation.isPending ? (
+                      {smartUpdateEquipmentMutation.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Save className="h-4 w-4" />

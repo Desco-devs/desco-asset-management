@@ -18,6 +18,25 @@ export interface ExportFilters {
 // Export maintenance report type
 export type EquipmentMaintenanceReport = MaintenanceReport;
 
+// Helper to determine if FormData contains only parts updates
+export function isPartsOnlyUpdate(formData: FormData): boolean {
+  const entries = Array.from(formData.entries());
+  const partsRelatedKeys = ['partsStructure', 'deleteParts', 'filesToDelete'];
+  const partsFileKeys = entries.filter(([key]) => key.startsWith('partsFile_'));
+  
+  // Check if all entries are parts-related
+  const allEntriesArePartsRelated = entries.every(([key]) => 
+    partsRelatedKeys.includes(key) || 
+    key.startsWith('partsFile_') ||
+    key === 'equipmentId' // equipmentId is always needed
+  );
+  
+  // Must have parts structure or parts files to be considered a parts update
+  const hasPartsData = formData.has('partsStructure') || partsFileKeys.length > 0;
+  
+  return hasPartsData && allEntriesArePartsRelated;
+}
+
 // Query Keys
 export const equipmentKeys = {
   all: ['equipments'] as const,
@@ -75,6 +94,21 @@ async function deleteEquipment(id: string): Promise<void> {
     const error = await response.json();
     throw new Error(error.error || 'Failed to delete equipment');
   }
+}
+
+// Equipment Parts API Functions
+async function updateEquipmentParts(equipmentId: string, formData: FormData): Promise<Equipment> {
+  const response = await fetch(`/api/equipments/${equipmentId}/parts`, {
+    method: 'PATCH',
+    body: formData, // FormData for file uploads and parts structure
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update equipment parts');
+  }
+  
+  return response.json();
 }
 
 // Maintenance Report API Functions
@@ -349,6 +383,93 @@ export function useDeleteEquipment() {
       toast.success('Equipment deleted successfully!');
       // Realtime will handle the cache update
     },
+  });
+}
+
+/**
+ * Update equipment parts with immediate cache invalidation
+ * Uses dedicated parts API endpoint for optimal performance
+ */
+export function useUpdateEquipmentParts() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ equipmentId, formData }: { equipmentId: string; formData: FormData }) => 
+      updateEquipmentParts(equipmentId, formData),
+    onMutate: async ({ equipmentId }) => {
+      // Cancel outgoing refetches for immediate consistency
+      await queryClient.cancelQueries({ queryKey: equipmentKeys.list() });
+      
+      // Snapshot previous value for rollback
+      const previousEquipments = queryClient.getQueryData<Equipment[]>(equipmentKeys.list());
+      
+      return { previousEquipments };
+    },
+    onError: (error, { equipmentId }, context) => {
+      // Rollback on error
+      if (context?.previousEquipments) {
+        queryClient.setQueryData(equipmentKeys.list(), context.previousEquipments);
+      }
+      toast.error(`Failed to update equipment parts: ${error.message}`);
+    },
+    onSuccess: (updatedEquipment, { equipmentId }) => {
+      console.log('✅ Equipment parts updated successfully, updating cache with server response');
+      console.log('🔧 Updated parts data:', updatedEquipment.equipment_parts);
+      
+      // Immediately update cache with the actual server response
+      queryClient.setQueryData<Equipment[]>(
+        equipmentKeys.list(),
+        (old) => {
+          if (!old) return [updatedEquipment];
+          return old.map((equipment) => 
+            equipment.id === updatedEquipment.id ? updatedEquipment : equipment
+          );
+        }
+      );
+      
+      // Don't invalidate queries immediately - let real-time handle additional updates
+      // This prevents race conditions between server response and real-time sync
+      
+      // Only invalidate dashboard data to update counts
+      queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
+      
+      toast.success('Equipment parts updated successfully!');
+    },
+  });
+}
+
+/**
+ * Smart equipment update hook that automatically chooses the optimal API endpoint
+ * Uses parts-specific endpoint for parts-only updates, general endpoint for mixed updates
+ */
+export function useSmartUpdateEquipment() {
+  const updateEquipmentMutation = useUpdateEquipment();
+  const updatePartsMutation = useUpdateEquipmentParts();
+  
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      const equipmentId = formData.get('equipmentId') as string;
+      if (!equipmentId) {
+        throw new Error('Equipment ID is required');
+      }
+      
+      // Determine if this is a parts-only update
+      if (isPartsOnlyUpdate(formData)) {
+        console.log('🔧 Detected parts-only update, using dedicated parts endpoint');
+        return updatePartsMutation.mutateAsync({ equipmentId, formData });
+      } else {
+        console.log('📝 Detected mixed update, using general equipment endpoint');
+        return updateEquipmentMutation.mutateAsync(formData);
+      }
+    },
+    onError: (error) => {
+      // Individual mutations handle their own error states
+      console.error('Smart equipment update failed:', error);
+    },
+    onSuccess: (result) => {
+      // Individual mutations handle their own success states
+      console.log('✅ Smart equipment update completed');
+    }
   });
 }
 

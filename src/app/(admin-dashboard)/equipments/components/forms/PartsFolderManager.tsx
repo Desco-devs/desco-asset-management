@@ -94,16 +94,19 @@ export default function PartsFolderManager({
   const rootFileInputRef = useRef<HTMLInputElement>(null);
   const folderFileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
-  // Update parts structure when initialData changes (for edit mode)
+  // Initialize parts structure ONLY once when component mounts (for edit mode)
+  const [isInitialized, setIsInitialized] = useState(false);
+  
   useEffect(() => {
-    if (initialData) {
+    if (initialData && !isInitialized) {
       const safeData = {
         rootFiles: Array.isArray(initialData.rootFiles) ? initialData.rootFiles : [],
         folders: Array.isArray(initialData.folders) ? initialData.folders : []
       };
       setPartsStructure(safeData);
+      setIsInitialized(true);
     }
-  }, [initialData]);
+  }, [initialData, isInitialized]);
 
   // Helper function to generate unique IDs
   const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -296,15 +299,22 @@ export default function PartsFolderManager({
   };
 
   const removeFile = (fileId: string, folderId?: string) => {
+    console.log(`🗑️ Removing file ${fileId} from ${folderId ? `folder ${folderId}` : 'root'}`);
+    
     if (folderId) {
       // Remove from folder
       const folder = partsStructure.folders.find(f => f.id === folderId);
       if (folder) {
         const fileToRemove = folder.files.find(f => f.id === fileId);
         
-        // Track deletion of existing files (those with URLs but no File object)
-        if (fileToRemove && (fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
-          onPartFileDelete(fileToRemove.id, fileToRemove.name, folder.name, fileToRemove.url || fileToRemove.preview);
+        if (fileToRemove) {
+          console.log(`📁 Found file to remove: ${fileToRemove.name}, has URL: ${!!(fileToRemove.url || fileToRemove.preview)}, has file object: ${!!fileToRemove.file}`);
+          
+          // Track deletion of existing files (those with URLs but no File object)
+          if ((fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
+            console.log(`🔗 Tracking deletion of existing file: ${fileToRemove.name}`);
+            onPartFileDelete(fileToRemove.id, fileToRemove.name, folder.name, fileToRemove.url || fileToRemove.preview);
+          }
         }
       }
       
@@ -317,13 +327,19 @@ export default function PartsFolderManager({
         ),
       };
       updatePartsStructure(newStructure);
+      console.log(`✅ Updated folder structure, remaining files in folder: ${newStructure.folders.find(f => f.id === folderId)?.files.length || 0}`);
     } else {
       // Remove from root
       const fileToRemove = partsStructure.rootFiles.find(f => f.id === fileId);
       
-      // Track deletion of existing files (those with URLs but no File object)
-      if (fileToRemove && (fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
-        onPartFileDelete(fileToRemove.id, fileToRemove.name, 'root', fileToRemove.url || fileToRemove.preview);
+      if (fileToRemove) {
+        console.log(`🗂️ Found root file to remove: ${fileToRemove.name}, has URL: ${!!(fileToRemove.url || fileToRemove.preview)}, has file object: ${!!fileToRemove.file}`);
+        
+        // Track deletion of existing files (those with URLs but no File object)
+        if ((fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
+          console.log(`🔗 Tracking deletion of existing root file: ${fileToRemove.name}`);
+          onPartFileDelete(fileToRemove.id, fileToRemove.name, 'root', fileToRemove.url || fileToRemove.preview);
+        }
       }
       
       const newStructure = {
@@ -331,6 +347,7 @@ export default function PartsFolderManager({
         rootFiles: partsStructure.rootFiles.filter((f) => f.id !== fileId),
       };
       updatePartsStructure(newStructure);
+      console.log(`✅ Updated root structure, remaining root files: ${newStructure.rootFiles.length}`);
     }
   };
 
