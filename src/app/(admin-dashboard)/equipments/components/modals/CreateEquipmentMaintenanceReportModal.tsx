@@ -42,6 +42,7 @@ import {
   selectAttachmentFiles
 } from "@/stores/maintenanceReportStore";
 import { useUsers } from "@/hooks/useUsersQuery";
+import { useUserRole } from "@/hooks/auth";
 import { 
   Plus, 
   Trash2, 
@@ -89,6 +90,7 @@ export default function CreateEquipmentMaintenanceReportModal({
     .map(p => p.client?.location)
     .filter((location): location is NonNullable<typeof location> => Boolean(location));
   const { data: usersData } = useUsers();
+  const { userId, userRole, isLoading: isUserLoading } = useUserRole();
   const createMaintenanceReportMutation = useCreateEquipmentMaintenanceReport();
   const queryClient = useQueryClient();
 
@@ -116,8 +118,8 @@ export default function CreateEquipmentMaintenanceReportModal({
       // Reset loading state
       setIsSubmitting(false);
       
-      // Reset all local file states
-      setLocalAttachmentFiles([]);
+      // Reset all local file states - initialize with empty array matching attachment_urls length
+      setLocalAttachmentFiles([null as any]); // Start with one null entry to match initial attachment_urls
       
       
       // Reset date state
@@ -160,15 +162,14 @@ export default function CreateEquipmentMaintenanceReportModal({
   const [dateRepairedOpen, setDateRepairedOpen] = useState(false);
   const [dateRepaired, setDateRepaired] = useState<Date | undefined>();
   
-  // Local file state - NO store subscriptions
-  const [localAttachmentFiles, setLocalAttachmentFiles] = useState<File[]>([]);
+  // Local file state - NO store subscriptions - support multiple files with nullable entries
+  const [localAttachmentFiles, setLocalAttachmentFiles] = useState<(File | null)[]>([]);
 
-  // Debug logging to track re-renders and focus issues
-  console.log('CreateEquipmentMaintenanceReportModal render - activeTab:', activeTab, 'isOpen:', isOpen);
+  // Component render tracking
 
   // Stable tab change handler
   const handleTabChange = useCallback((tab: 'details' | 'parts' | 'attachments') => {
-    console.log('Tab changed to:', tab);
+    // Tab changed
     setActiveTab(tab);
   }, []);
 
@@ -182,16 +183,37 @@ export default function CreateEquipmentMaintenanceReportModal({
     // Modal should stay closed after cleanup
   }, [setIsMaintenanceModalOpen, resetForm]);
 
-  // File upload handlers - use local state
+  // File upload handlers - use local state with proper array management
   const handleAttachmentUpload = useCallback((index: number, file: File | null) => {
-    const newFiles = [...localAttachmentFiles];
-    if (file) {
+    setLocalAttachmentFiles(prev => {
+      const newFiles = [...prev];
+      // Ensure the array has enough slots
+      while (newFiles.length <= index) {
+        newFiles.push(null);
+      }
+      // Set the file at the specific index
       newFiles[index] = file;
-    } else {
-      newFiles.splice(index, 1);
-    }
-    setLocalAttachmentFiles(newFiles);
-  }, [localAttachmentFiles]);
+      return newFiles;
+    });
+  }, []);
+
+  const addAttachment = useCallback(() => {
+    formDataRef.current = { 
+      ...formDataRef.current, 
+      attachment_urls: [...formDataRef.current.attachment_urls, ''] 
+    };
+    // Also add to local files array to maintain sync
+    setLocalAttachmentFiles(prev => [...prev, null]);
+  }, []);
+
+  const removeAttachment = useCallback((index: number) => {
+    formDataRef.current = { 
+      ...formDataRef.current, 
+      attachment_urls: formDataRef.current.attachment_urls.filter((_, i) => i !== index)
+    };
+    // Also remove from local files array to maintain sync
+    setLocalAttachmentFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
   // Add/remove handlers for parts - NO store sync
   const addPartReplaced = useCallback(() => {
@@ -207,6 +229,7 @@ export default function CreateEquipmentMaintenanceReportModal({
       parts_replaced: formDataRef.current.parts_replaced.filter((_, i) => i !== index)
     };
   }, []);
+
 
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -261,6 +284,10 @@ export default function CreateEquipmentMaintenanceReportModal({
     // Add date fields
     formDataToSend.append('date_reported', new Date().toISOString());
     if (dateRepaired) formDataToSend.append('date_repaired', dateRepaired.toISOString());
+    
+    // Add user fields
+    if (userId) formDataToSend.append('reported_by', userId);
+    if (currentFormData.repaired_by) formDataToSend.append('repaired_by', currentFormData.repaired_by);
 
     // Create the report and get the ID
     const createdReport = await createMaintenanceReportMutation.mutateAsync(formDataToSend);
@@ -269,8 +296,7 @@ export default function CreateEquipmentMaintenanceReportModal({
     // Step 2: Upload files with the report ID
     const uploadedAttachmentUrls: string[] = [];
 
-    console.log('Starting file uploads for report:', reportId);
-    console.log('Local attachment files:', localAttachmentFiles);
+    // Starting file uploads for report
 
     try {
       // Upload attachment files only
@@ -280,7 +306,7 @@ export default function CreateEquipmentMaintenanceReportModal({
         const file = allFiles[i];
         if (file) {
           const folderPath = `equipment-${equipmentId}/maintenance-reports/${reportId}/attachments`;
-          console.log('Uploading file:', file.name, 'to folder:', folderPath);
+          // Uploading file to folder
           
           const formDataUpload = new FormData();
           formDataUpload.append('file', file);
@@ -294,7 +320,7 @@ export default function CreateEquipmentMaintenanceReportModal({
           if (uploadResponse.ok) {
             const result = await uploadResponse.json();
             uploadedAttachmentUrls.push(result.url);
-            console.log('File uploaded successfully:', result);
+            // File uploaded successfully
           } else {
             console.error('File upload failed:', uploadResponse.status, await uploadResponse.text());
           }
@@ -319,14 +345,14 @@ export default function CreateEquipmentMaintenanceReportModal({
 
         if (updateResponse.ok) {
           // CRITICAL FIX: Invalidate the cache to ensure fresh data is displayed
-          console.log('Invalidating maintenance reports cache after file upload');
+          // Invalidating maintenance reports cache after file upload
           await queryClient.invalidateQueries({ 
             queryKey: equipmentKeys.equipmentMaintenanceReports(equipmentId) 
           });
         }
       } else {
         // Even if no files were uploaded, invalidate cache to ensure fresh data
-        console.log('Invalidating maintenance reports cache after report creation');
+        // Invalidating maintenance reports cache after report creation
         await queryClient.invalidateQueries({ 
           queryKey: equipmentKeys.equipmentMaintenanceReports(equipmentId) 
         });
@@ -339,7 +365,7 @@ export default function CreateEquipmentMaintenanceReportModal({
     }
   }, [equipmentId, createMaintenanceReportMutation, handleClose, localAttachmentFiles, dateRepaired]);
 
-  console.log('CreateEquipmentMaintenanceReportModal - isOpen:', isOpen, 'equipmentId:', equipmentId);
+  // Modal state tracking
   
   if (!isOpen) return null;
 
@@ -731,24 +757,54 @@ export default function CreateEquipmentMaintenanceReportModal({
               </p>
             </CardHeader>
             <CardContent className={`space-y-4 ${isMobile ? 'px-4 pb-4' : ''}`}>
-              <div className={`border rounded-lg ${isMobile ? '' : ''}`}>
-                <div className={`flex items-center gap-2 p-3 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
-                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                  <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
-                    Upload Attachments
-                    {localAttachmentFiles[0] && ` - ${localAttachmentFiles[0].name.slice(0, 30)}${localAttachmentFiles[0].name.length > 30 ? '...' : ''}`}
-                  </span>
-                </div>
-                <div className={`space-y-3 border-t ${isMobile ? 'p-3' : 'p-4'}`}>
-                  <FileUploadSectionSimple
-                    label="Attachment"
-                    accept="image/*,application/pdf,.doc,.docx"
-                    onFileChange={(file) => handleAttachmentUpload(0, file)}
-                    onKeepExistingChange={() => {}}
-                    selectedFile={localAttachmentFiles[0]}
-                    required={false}
-                  />
-                </div>
+              {formDataRef.current.attachment_urls.map((attachmentUrl, index) => {
+                return (
+                  <div key={`attachment-input-${index}`} className={`border rounded-lg ${isMobile ? '' : ''}`}>
+                    <div className={`flex items-center justify-between p-3 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
+                      <div className="flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
+                          Attachment {index + 1}
+                          {localAttachmentFiles[index] && ` - ${localAttachmentFiles[index]!.name.slice(0, 30)}${localAttachmentFiles[index]!.name.length > 30 ? '...' : ''}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {formDataRef.current.attachment_urls.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeAttachment(index)}
+                            className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`space-y-3 border-t ${isMobile ? 'p-3' : 'p-4'}`}>
+                      <FileUploadSectionSimple
+                        label={localAttachmentFiles[index]?.name || `Attachment ${index + 1}`}
+                        accept="image/*,application/pdf,.doc,.docx"
+                        onFileChange={(file) => handleAttachmentUpload(index, file)}
+                        onKeepExistingChange={() => {}}
+                        selectedFile={localAttachmentFiles[index]}
+                        required={false}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addAttachment}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Another Attachment
+                </Button>
               </div>
             </CardContent>
           </Card>

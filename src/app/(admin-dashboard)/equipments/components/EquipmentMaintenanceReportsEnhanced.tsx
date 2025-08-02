@@ -40,11 +40,32 @@ export default function EquipmentMaintenanceReportsEnhanced({
     setIsMaintenanceReportDetailOpen
   } = useEquipmentStore();
 
+  // Helper function to deduplicate maintenance reports in component
+  const deduplicateReports = (reports: EquipmentMaintenanceReport[]) => {
+    const seen = new Set<string>();
+    return reports.filter(report => {
+      if (seen.has(report.id)) {
+        console.warn('🚨 Duplicate equipment maintenance report found and removed in component:', report.id);
+        return false;
+      }
+      seen.add(report.id);
+      return true;
+    });
+  };
+
   // Filter reports for this specific equipment (memoized for performance)
   const equipmentReports = useMemo(() => {
-    return Array.isArray(maintenanceReports)
-      ? maintenanceReports.filter((report) => report.equipment_id === equipmentId)
-      : [];
+    if (!Array.isArray(maintenanceReports)) return [];
+    
+    const filtered = maintenanceReports.filter((report) => report.equipment_id === equipmentId);
+    const deduplicated = deduplicateReports(filtered);
+    
+    // Log if duplicates were found after filtering
+    if (filtered.length !== deduplicated.length) {
+      console.warn(`🔍 Found ${filtered.length - deduplicated.length} duplicate maintenance reports for equipment ${equipmentId}`);
+    }
+    
+    return deduplicated;
   }, [maintenanceReports, equipmentId]);
 
   const getStatusColor = (status?: string | null) => {

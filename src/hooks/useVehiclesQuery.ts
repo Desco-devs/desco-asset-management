@@ -432,15 +432,37 @@ export function useDeleteVehicle() {
 
 // Helper function to deduplicate maintenance reports array
 function deduplicateMaintenanceReports(reports: MaintenanceReport[]): MaintenanceReport[] {
-  const seen = new Set();
-  return reports.filter(report => {
+  if (!Array.isArray(reports)) {
+    console.warn('🚨 Non-array maintenance reports data received, returning empty array');
+    return [];
+  }
+  
+  const seen = new Set<string>();
+  const duplicateIds = new Set<string>();
+  
+  const deduplicated = reports.filter(report => {
+    // Validate report structure
+    if (!report || typeof report !== 'object' || !report.id) {
+      console.warn('🚨 Invalid vehicle maintenance report structure found:', report);
+      return false;
+    }
+    
     if (seen.has(report.id)) {
-      console.warn('🚨 Duplicate maintenance report found and removed:', report.id);
+      duplicateIds.add(report.id);
+      console.warn('🚨 Duplicate vehicle maintenance report found and removed:', report.id);
       return false;
     }
     seen.add(report.id);
     return true;
   });
+  
+  // Log summary if duplicates were found
+  if (duplicateIds.size > 0) {
+    console.warn(`🔥 Vehicle maintenance reports deduplication summary: ${duplicateIds.size} duplicate IDs removed from ${reports.length} total reports`);
+    console.warn('🔍 Duplicate IDs:', Array.from(duplicateIds));
+  }
+  
+  return deduplicated;
 }
 
 // Maintenance Report Mutations
@@ -450,19 +472,20 @@ export function useCreateMaintenanceReport() {
   return useMutation({
     mutationFn: createMaintenanceReport,
     onSuccess: (newReport) => {
-      // Optimistically add to cache immediately
+      // Optimistically add to cache immediately with enhanced duplicate prevention
       queryClient.setQueryData<MaintenanceReport[]>(vehicleKeys.maintenanceReports(), (oldData) => {
         if (!oldData) return [newReport];
         
         // Check if report already exists to prevent duplicates
         const existingReport = oldData.find(report => report.id === newReport.id);
         if (existingReport) {
-          console.log('🔄 Maintenance report already exists in cache during create, skipping duplicate');
+          console.log('🔄 Vehicle maintenance report already exists in cache during create, skipping duplicate:', newReport.id);
           return oldData;
         }
         
-        console.log('✅ Adding new maintenance report to cache:', newReport.id);
-        return deduplicateMaintenanceReports([newReport, ...oldData]);
+        console.log('✅ Adding new vehicle maintenance report to cache:', newReport.id);
+        const updatedData = [newReport, ...oldData];
+        return deduplicateMaintenanceReports(updatedData);
       });
       toast.success('Maintenance report created successfully!');
     },
@@ -478,12 +501,15 @@ export function useUpdateMaintenanceReport() {
   return useMutation({
     mutationFn: updateMaintenanceReport,
     onSuccess: (updatedReport) => {
-      // Optimistically update in cache immediately
+      // Optimistically update in cache immediately with enhanced duplicate prevention
       queryClient.setQueryData<MaintenanceReport[]>(vehicleKeys.maintenanceReports(), (oldData) => {
         if (!oldData) return [updatedReport];
+        
         const updated = oldData.map(report => 
           report.id === updatedReport.id ? updatedReport : report
         );
+        
+        console.log('✅ Updated vehicle maintenance report in cache:', updatedReport.id);
         return deduplicateMaintenanceReports(updated);
       });
       toast.success('Maintenance report updated successfully!');
@@ -916,10 +942,11 @@ export function useSupabaseRealtime() {
                 // Check if report already exists in cache
                 const existingReport = oldData.find(report => report.id === reportData.id);
                 if (existingReport) {
-                  console.log('🔄 Maintenance report already exists in cache, skipping insert');
+                  console.log('🔄 Vehicle maintenance report already exists in cache, skipping realtime insert:', reportData.id);
                   return oldData; // Don't add duplicate
                 }
                 
+                console.log('📡 Adding vehicle maintenance report from realtime:', reportData.id);
                 return deduplicateMaintenanceReports([reportData, ...oldData]);
               });
               // No toast here - mutation handles user-initiated creates
@@ -933,10 +960,11 @@ export function useSupabaseRealtime() {
                 
                 const existingIndex = oldData.findIndex(report => report.id === reportData.id);
                 if (existingIndex === -1) {
-                  console.log('🔄 Maintenance report not found in cache for update, skipping');
+                  console.log('🔄 Vehicle maintenance report not found in cache for realtime update, skipping:', reportData.id);
                   return oldData;
                 }
                 
+                console.log('📡 Updating vehicle maintenance report from realtime:', reportData.id);
                 const updated = oldData.map(report => 
                   report.id === reportData.id ? reportData : report
                 );
@@ -956,10 +984,11 @@ export function useSupabaseRealtime() {
                   
                   const existingReport = oldData.find(report => report.id === deletedReport.id);
                   if (!existingReport) {
-                    console.log('🗑️ Maintenance report not found in cache for deletion, skipping');
+                    console.log('🗑️ Vehicle maintenance report not found in cache for realtime deletion, skipping:', deletedReport.id);
                     return oldData;
                   }
                   
+                  console.log('📡 Removing vehicle maintenance report from realtime:', deletedReport.id);
                   const filtered = oldData.filter(report => report.id !== deletedReport.id);
                   return deduplicateMaintenanceReports(filtered);
                 });

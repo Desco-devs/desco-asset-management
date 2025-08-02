@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,10 +41,33 @@ export default function VehicleMaintenanceReportsEnhanced({
   } = useVehiclesStore();
 
 
-  // Filter reports for this specific vehicle
-  const vehicleReports = Array.isArray(maintenanceReports)
-    ? maintenanceReports.filter((report) => report.vehicle_id === vehicleId)
-    : [];
+  // Helper function to deduplicate maintenance reports in component
+  const deduplicateReports = (reports: MaintenanceReport[]) => {
+    const seen = new Set<string>();
+    return reports.filter(report => {
+      if (seen.has(report.id)) {
+        console.warn('🚨 Duplicate vehicle maintenance report found and removed in component:', report.id);
+        return false;
+      }
+      seen.add(report.id);
+      return true;
+    });
+  };
+
+  // Filter reports for this specific vehicle with deduplication
+  const vehicleReports = useMemo(() => {
+    if (!Array.isArray(maintenanceReports)) return [];
+    
+    const filtered = maintenanceReports.filter((report) => report.vehicle_id === vehicleId);
+    const deduplicated = deduplicateReports(filtered);
+    
+    // Log if duplicates were found after filtering
+    if (filtered.length !== deduplicated.length) {
+      console.warn(`🔍 Found ${filtered.length - deduplicated.length} duplicate maintenance reports for vehicle ${vehicleId}`);
+    }
+    
+    return deduplicated;
+  }, [maintenanceReports, vehicleId]);
 
   const getStatusColor = (status?: string) => {
     switch (status) {

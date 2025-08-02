@@ -25,7 +25,7 @@ import {
 } from "@/hooks/useEquipmentQuery";
 import { useProjects } from "@/hooks/api/use-projects";
 import { useEquipmentStore, selectActiveModal } from "@/stores/equipmentStore";
-import { Plus, Trash2, Settings, Clock, MapPin, Wrench, FileText, Camera, Upload, X, Package, ClipboardCheck, ImageIcon, Loader2 } from "lucide-react";
+import { Plus, Trash2, Settings, Clock, MapPin, Wrench, FileText, Camera, Upload, X, Package, ClipboardCheck, ImageIcon, Loader2, LinkIcon } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectionSimple";
@@ -170,10 +170,31 @@ export default function EditEquipmentMaintenanceReportModal() {
     }));
   }, []);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
 
-    if (!selectedReport) return;
+    console.log('🔧 handleSubmit called');
+    console.log('📋 selectedReport:', selectedReport);
+    console.log('🔑 selectedReport keys:', selectedReport ? Object.keys(selectedReport) : 'null');
+    
+    if (!selectedReport) {
+      console.error('❌ No selectedReport found');
+      toast.error("No report selected");
+      return;
+    }
+
+    // Try to extract the ID from different possible locations
+    const reportId = selectedReport.id || selectedReport.uid || selectedReport._id;
+    console.log('🆔 selectedReport.id:', selectedReport.id);
+    console.log('🔍 typeof selectedReport.id:', typeof selectedReport.id);
+    console.log('🎯 Extracted reportId:', reportId);
+    console.log('📊 Full selectedReport object:', JSON.stringify(selectedReport, null, 2));
+
+    if (!reportId) {
+      console.error('❌ No valid report ID found in selectedReport');
+      toast.error("Invalid report data - missing ID");
+      return;
+    }
 
     if (!formData.issue_description.trim()) {
       toast.error("Issue description is required");
@@ -184,24 +205,29 @@ export default function EditEquipmentMaintenanceReportModal() {
     const filteredPartsReplaced = formData.parts_replaced.filter(
       (part) => part.trim() !== ""
     );
+    
+    // Filter out deleted attachments and empty URLs
     const filteredAttachmentUrls = formData.attachment_urls.filter(
-      (url) => url.trim() !== ""
+      (url) => url.trim() !== "" && !deletedAttachments.includes(url)
     );
 
     try {
       // Create FormData for file uploads and data
       const formDataToSend = new FormData();
       
+      // Add the report ID for the mutation
+      formDataToSend.append('reportId', reportId);
+      
       // Add basic form fields
       formDataToSend.append('equipment_id', selectedReport.equipment_id);
-      formDataToSend.append('location_id', formData.location_id);
+      formDataToSend.append('location_id', formData.location_id || '');
       formDataToSend.append('issue_description', formData.issue_description);
-      formDataToSend.append('remarks', formData.remarks);
-      formDataToSend.append('inspection_details', formData.inspection_details);
-      formDataToSend.append('action_taken', formData.action_taken);
+      formDataToSend.append('remarks', formData.remarks || '');
+      formDataToSend.append('inspection_details', formData.inspection_details || '');
+      formDataToSend.append('action_taken', formData.action_taken || '');
       formDataToSend.append('priority', formData.priority);
       formDataToSend.append('status', formData.status);
-      formDataToSend.append('downtime_hours', formData.downtime_hours);
+      formDataToSend.append('downtime_hours', formData.downtime_hours || '');
       formDataToSend.append('reported_by', selectedReport.reported_by || '');
       formDataToSend.append('repaired_by', selectedReport.repaired_by || '');
       
@@ -229,25 +255,14 @@ export default function EditEquipmentMaintenanceReportModal() {
         }
       });
 
-      // Make direct API call with FormData
-      const response = await fetch(`/api/equipments/maintenance-reports/${selectedReport.id}`, {
-        method: 'PUT',
-        body: formDataToSend,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update maintenance report');
-      }
-
-      const updatedReport = await response.json();
+      console.log('Sending update request for report:', reportId);
+      
+      // Use TanStack Query mutation for consistent data management
+      const updatedReport = await updateMaintenanceReportMutation.mutateAsync(formDataToSend);
+      console.log('Update successful:', updatedReport);
       
       toast.success("Equipment maintenance report updated successfully");
       handleClose();
-      
-      // Trigger data refetch by calling the mutation with the result
-      // This ensures the UI updates with the latest data
-      updateMaintenanceReportMutation.mutate(updatedReport);
     } catch (error) {
       console.error('Submit error:', error);
       toast.error(error instanceof Error ? error.message : "Failed to update maintenance report");
@@ -539,33 +554,130 @@ export default function EditEquipmentMaintenanceReportModal() {
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="border rounded-lg">
-                      <div className="flex items-center gap-2 p-3 px-4 py-3">
-                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">
-                          Upload Attachments
-                          {localAttachmentFiles[0] && ` - ${localAttachmentFiles[0].name.slice(0, 30)}${localAttachmentFiles[0].name.length > 30 ? '...' : ''}`}
-                        </span>
-                      </div>
-                      <div className="space-y-3 border-t p-4">
-                        <FileUploadSectionSimple
-                          label="Attachment"
-                          accept="image/*,application/pdf,.doc,.docx"
-                          onFileChange={(file) => {
-                            const newFiles = [...localAttachmentFiles];
+                    {/* Existing Attachments */}
+                    {formData.attachment_urls.map((attachmentUrl, index) => {
+                      if (!attachmentUrl || deletedAttachments.includes(attachmentUrl)) return null;
+                      
+                      const fileName = attachmentUrl.split('/').pop() || `Attachment ${index + 1}`;
+                      
+                      return (
+                        <div key={`existing-attachment-${attachmentUrl}-${index}`} className="border rounded-lg">
+                          <div className="flex items-center justify-between p-3 px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">
+                                {fileName.slice(0, 30)}{fileName.length > 30 ? '...' : ''}
+                              </span>
+                              <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                existing
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setDeletedAttachments(prev => [...prev, attachmentUrl]);
+                              }}
+                              className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="space-y-3 border-t p-4">
+                            <FileUploadSectionSimple
+                              label={fileName}
+                              accept="image/*,application/pdf,.doc,.docx"
+                              onFileChange={() => {}}
+                              onKeepExistingChange={() => {}}
+                              selectedFile={null}
+                              currentFileUrl={attachmentUrl}
+                              required={false}
+                              readOnly={true}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* New Attachment Files */}
+                    {localAttachmentFiles.map((file, index) => {
+                      return (
+                        <div key={`new-attachment-${file.name}-${index}-${Date.now()}`} className="border rounded-lg">
+                          <div className="flex items-center justify-between p-3 px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">
+                                {file.name.slice(0, 30)}{file.name.length > 30 ? '...' : ''}
+                              </span>
+                              <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                                new
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setLocalAttachmentFiles(prev => {
+                                  const newFiles = [...prev];
+                                  newFiles.splice(index, 1);
+                                  return newFiles;
+                                });
+                              }}
+                              className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="space-y-3 border-t p-4">
+                            <FileUploadSectionSimple
+                              label={file.name}
+                              accept="image/*,application/pdf,.doc,.docx"
+                              onFileChange={(newFile) => {
+                                setLocalAttachmentFiles(prev => {
+                                  const newFiles = [...prev];
+                                  if (newFile) {
+                                    newFiles[index] = newFile;
+                                  } else {
+                                    newFiles.splice(index, 1);
+                                  }
+                                  return newFiles;
+                                });
+                              }}
+                              onKeepExistingChange={() => {}}
+                              selectedFile={file}
+                              currentFileUrl={null}
+                              required={false}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Add Another Attachment Button */}
+                    <div className="flex justify-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          // Create empty file input for new attachment
+                          const newFileInput = document.createElement('input');
+                          newFileInput.type = 'file';
+                          newFileInput.accept = 'image/*,application/pdf,.doc,.docx';
+                          newFileInput.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
                             if (file) {
-                              newFiles[0] = file;
-                            } else {
-                              newFiles.splice(0, 1);
+                              setLocalAttachmentFiles(prev => [...prev, file]);
                             }
-                            setLocalAttachmentFiles(newFiles);
-                          }}
-                          onKeepExistingChange={() => {}}
-                          selectedFile={localAttachmentFiles[0]}
-                          currentFileUrl={formData.attachment_urls[0] || null}
-                          required={false}
-                        />
-                      </div>
+                          };
+                          newFileInput.click();
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Another Attachment
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

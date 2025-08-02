@@ -116,7 +116,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
     pgpcInspection: null as File | null,
     originalReceipt: null as File | null,
     equipmentRegistration: null as File | null,
-    maintenanceAttachment: null as File | null,
+    maintenanceAttachments: [null] as (File | null)[],
   });
 
   // Parts structure state
@@ -131,8 +131,27 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
   };
   
   // Maintenance file handlers
-  const handleMaintenanceFileChange = (file: File | null) => {
-    setFiles(prev => ({ ...prev, maintenanceAttachment: file }));
+  const handleMaintenanceAttachmentChange = (index: number, file: File | null) => {
+    setFiles(prev => ({
+      ...prev,
+      maintenanceAttachments: prev.maintenanceAttachments.map((item, i) =>
+        i === index ? file : item
+      )
+    }));
+  };
+
+  const addMaintenanceAttachment = () => {
+    setFiles(prev => ({
+      ...prev,
+      maintenanceAttachments: [...prev.maintenanceAttachments, null]
+    }));
+  };
+
+  const removeMaintenanceAttachment = (index: number) => {
+    setFiles(prev => ({
+      ...prev,
+      maintenanceAttachments: prev.maintenanceAttachments.filter((_, i) => i !== index)
+    }));
   };
   
   // Parts management handlers
@@ -180,26 +199,20 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       return;
     }
     
-    // Add parts structure data - EXACT COPY FROM VEHICLES
-    console.log('📦 [Form] Parts structure:', partsStructure);
+    // Add parts structure data
     formDataFromForm.append('partsStructure', JSON.stringify(partsStructure));
     
-    // Add all parts files to formData with folder information - EXACT COPY FROM VEHICLES
-    console.log('📦 [Form] Processing root files:', partsStructure.rootFiles.length);
+    // Add all parts files to formData with folder information
     partsStructure.rootFiles.forEach((partFile, index) => {
       if (partFile.file) {
-        console.log(`📦 [Form] Adding root file ${index}:`, partFile.name);
         formDataFromForm.append(`partsFile_root_${index}`, partFile.file);
         formDataFromForm.append(`partsFile_root_${index}_name`, partFile.name);
       }
     });
 
-    console.log('📦 [Form] Processing folders:', partsStructure.folders.length);
     partsStructure.folders.forEach((folder, folderIndex) => {
-      console.log(`📦 [Form] Processing folder ${folderIndex} (${folder.name}):`, folder.files.length, 'files');
       folder.files.forEach((partFile, fileIndex) => {
         if (partFile.file) {
-          console.log(`📦 [Form] Adding folder file ${folderIndex}_${fileIndex}:`, partFile.name, 'to folder:', folder.name);
           formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}`, partFile.file);
           formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_name`, partFile.name);
           formDataFromForm.append(`partsFile_folder_${folderIndex}_${fileIndex}_folder`, folder.name);
@@ -209,9 +222,13 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
 
     // Add all the files to formData
     Object.entries(files).forEach(([key, file]) => {
-      if (key === 'maintenanceAttachment' && file) {
-        formDataFromForm.append('maintenanceAttachment', file);
-      } else if (file && key !== 'maintenanceAttachment') {
+      if (key === 'maintenanceAttachments' && Array.isArray(file)) {
+        file.forEach((attachment, index) => {
+          if (attachment) {
+            formDataFromForm.append(`maintenanceAttachment_${index}`, attachment);
+          }
+        });
+      } else if (file && key !== 'maintenanceAttachments' && !Array.isArray(file)) {
         formDataFromForm.append(key, file);
       }
     });
@@ -247,7 +264,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
       maintenanceData.downtimeHours.trim() !== '' ||
       dateRepaired ||
       maintenanceData.partsReplaced.some(part => part.trim() !== '') ||
-      files.maintenanceAttachment !== null
+      files.maintenanceAttachments.some(attachment => attachment !== null)
     );
     
     if (hasMaintenanceData) {
@@ -285,7 +302,7 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
             pgpcInspection: null,
             originalReceipt: null,
             equipmentRegistration: null,
-            maintenanceAttachment: null,
+            maintenanceAttachments: [null],
           });
           setMaintenanceData({
             issueDescription: '',
@@ -1307,30 +1324,60 @@ export default function CreateEquipmentForm({ projects, onSuccess, onCancel, isM
               </p>
             </CardHeader>
             <CardContent className={`space-y-4 ${isMobile ? 'px-4 pb-4' : ''}`}>
-              <div className={`border rounded-lg ${isMobile ? '' : ''}`}>
-                <div className={`flex items-center gap-2 p-3 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
-                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                  <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
-                    Upload Attachment
-                    {files.maintenanceAttachment && ` - ${files.maintenanceAttachment.name.slice(0, 30)}${files.maintenanceAttachment.name.length > 30 ? '...' : ''}`}
-                  </span>
-                </div>
-                <div className={`space-y-3 border-t ${isMobile ? 'p-3' : 'p-4'}`}>
-                  <EquipmentFormErrorBoundary fallback={
-                    <div className="p-2 border border-red-200 rounded bg-red-50">
-                      <p className="text-xs text-red-600">Attachment upload failed to load</p>
+              {files.maintenanceAttachments.map((attachment, index) => {
+                return (
+                  <div key={`attachment-input-${index}`} className={`border rounded-lg ${isMobile ? '' : ''}`}>
+                    <div className={`flex items-center justify-between p-3 ${isMobile ? 'px-3 py-2' : 'px-4 py-3'}`}>
+                      <div className="flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        <span className={`font-medium ${isMobile ? 'text-sm' : ''}`}>
+                          Attachment {index + 1}
+                          {attachment && ` - ${attachment.name.slice(0, 30)}${attachment.name.length > 30 ? '...' : ''}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {files.maintenanceAttachments.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeMaintenanceAttachment(index)}
+                            className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  }>
-                    <FileUploadSectionSimple
-                      label="Attachment"
-                      accept="image/*,application/pdf,.doc,.docx"
-                      onFileChange={handleMaintenanceFileChange}
-                      onKeepExistingChange={() => {}}
-                      selectedFile={files.maintenanceAttachment}
-                      required={false}
-                    />
-                  </EquipmentFormErrorBoundary>
-                </div>
+                    <div className={`space-y-3 border-t ${isMobile ? 'p-3' : 'p-4'}`}>
+                      <EquipmentFormErrorBoundary fallback={
+                        <div className="p-2 border border-red-200 rounded bg-red-50">
+                          <p className="text-xs text-red-600">Attachment upload failed to load</p>
+                        </div>
+                      }>
+                        <FileUploadSectionSimple
+                          label={`Attachment ${index + 1}`}
+                          accept="image/*,application/pdf,.doc,.docx"
+                          onFileChange={(file) => handleMaintenanceAttachmentChange(index, file)}
+                          onKeepExistingChange={() => {}}
+                          selectedFile={attachment}
+                          required={false}
+                        />
+                      </EquipmentFormErrorBoundary>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addMaintenanceAttachment}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Another Attachment
+                </Button>
               </div>
             </CardContent>
           </Card>

@@ -25,6 +25,8 @@ export function useEquipmentRealtime() {
           console.log('📡 Equipment realtime update received:', payload)
           
           // Enhanced cache invalidation strategy for parts updates
+          let isPartsUpdate = false
+          
           if (payload.eventType === 'UPDATE' && payload.new) {
             const updatedEquipment = payload.new as any
             
@@ -32,6 +34,7 @@ export function useEquipmentRealtime() {
             if (payload.old && 
                 JSON.stringify(payload.old.equipment_parts) !== JSON.stringify(updatedEquipment.equipment_parts)) {
               console.log('🔧 Parts update detected, performing immediate cache sync')
+              isPartsUpdate = true
               
               // Transform equipment_parts to match frontend format before updating cache
               const transformEquipmentParts = (rawParts: string[]) => {
@@ -103,19 +106,25 @@ export function useEquipmentRealtime() {
                   })
                 }
               )
+              
+              // CRITICAL FIX: Skip cache invalidation for parts updates to prevent deleted files from reappearing
+              console.log('⏭️ Skipping cache invalidation for parts update to prevent race condition')
+              return
             }
           }
           
-          // Debounced cache invalidation to prevent excessive refetches
-          if (invalidationTimeoutRef.current) {
-            clearTimeout(invalidationTimeoutRef.current)
+          // Only perform debounced cache invalidation for NON-parts updates
+          if (!isPartsUpdate) {
+            if (invalidationTimeoutRef.current) {
+              clearTimeout(invalidationTimeoutRef.current)
+            }
+            
+            invalidationTimeoutRef.current = setTimeout(() => {
+              console.log('🔄 Performing debounced cache invalidation after real-time update')
+              queryClient.invalidateQueries({ queryKey: equipmentKeys.list() })
+              queryClient.invalidateQueries({ queryKey: ['dashboard-data'] })
+            }, 300) // 300ms debounce to prevent rapid invalidations
           }
-          
-          invalidationTimeoutRef.current = setTimeout(() => {
-            console.log('🔄 Performing debounced cache invalidation after real-time update')
-            queryClient.invalidateQueries({ queryKey: equipmentKeys.list() })
-            queryClient.invalidateQueries({ queryKey: ['dashboard-data'] })
-          }, 300) // 300ms debounce to prevent rapid invalidations
         }
       )
       .subscribe()

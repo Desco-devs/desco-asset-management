@@ -7,6 +7,44 @@ import { status as EquipmentStatus, Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 const supabase = createServiceRoleClient();
 
+// Helper to get next available file indices from existing parts structure
+const getNextFileIndices = (existingPartsStructure: { rootFiles: any[], folders: any[] }) => {
+  // Find highest root file index
+  let maxRootIndex = -1;
+  existingPartsStructure.rootFiles.forEach((file) => {
+    if (file.id) {
+      const match = file.id.match(/^root_(\d+)_/);
+      if (match) {
+        const index = parseInt(match[1]);
+        if (index > maxRootIndex) {
+          maxRootIndex = index;
+        }
+      }
+    }
+  });
+  
+  // Find highest folder file index
+  let maxFolderIndex = -1;
+  existingPartsStructure.folders.forEach((folder) => {
+    folder.files.forEach((file: any) => {
+      if (file.id) {
+        const match = file.id.match(/^folder_(\d+)_/);
+        if (match) {
+          const index = parseInt(match[1]);
+          if (index > maxFolderIndex) {
+            maxFolderIndex = index;
+          }
+        }
+      }
+    });
+  });
+  
+  return {
+    nextRootIndex: maxRootIndex + 1,
+    nextFolderIndex: maxFolderIndex + 1
+  };
+};
+
 // Helper to extract storage path from a Supabase URL
 const extractFilePathFromUrl = (fileUrl: string): string | null => {
   try {
@@ -749,10 +787,12 @@ export const POST = withResourcePermission(
         updateData.equipment_parts = equipmentParts;
       }
 
-      // 4) CRITICAL FIX: Handle parts files upload (was missing!)
-      // Process root parts files
+      // 4) CRITICAL FIX: Handle parts files upload with consistent indexing
+      // For create mode, start from 0 (no existing files to conflict with)
       const partsUploadPromises: Promise<any>[] = [];
-      let rootFileIndex = 0;
+      let rootFileIndex = 0; // Both FormData index and actual index start at 0 for create
+      
+      console.log(`🔢 CREATE MODE - Starting file indices - Root: 0, Folder: 0`);
       
       while (formData.get(`partsFile_root_${rootFileIndex}`)) {
         const partFile = formData.get(`partsFile_root_${rootFileIndex}`) as File;
@@ -760,6 +800,7 @@ export const POST = withResourcePermission(
         
         if (partFile && partFile.size > 0) {
           const fileId = `root_${rootFileIndex}_${Date.now()}`;
+          console.log(`📁 Creating root file with ID: ${fileId} (CREATE MODE)`);
           partsUploadPromises.push(
             uploadEquipmentPart(
               partFile,
@@ -778,17 +819,18 @@ export const POST = withResourcePermission(
         rootFileIndex++;
       }
       
-      // Process folder parts files
-      let folderIndex = 0;
-      let fileIndex = 0;
+      // Process folder parts files with consistent indexing
+      let folderIndex = 0; // FormData folder index
+      let fileIndex = 0; // FormData file index within folder
+      let actualFolderFileIndex = 0; // Actual file ID index (starts at 0 for create mode)
       
       while (formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`)) {
         const partFile = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
-        const partName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string;
         const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
         
         if (partFile && partFile.size > 0 && folderName) {
-          const fileId = `folder_${folderIndex}_${fileIndex}_${Date.now()}`;
+          const fileId = `folder_${actualFolderFileIndex}_${Date.now()}`;
+          console.log(`📁 Creating folder file with ID: ${fileId} (CREATE MODE - FormData indices: ${folderIndex}/${fileIndex})`);
           partsUploadPromises.push(
             uploadEquipmentPart(
               partFile,
@@ -803,6 +845,7 @@ export const POST = withResourcePermission(
               type
             )
           );
+          actualFolderFileIndex++; // Increment the actual file ID index
         }
         
         fileIndex++;
@@ -1266,11 +1309,15 @@ export const PUT = withResourcePermission(
         }
       }
 
-      // Handle parts deletion requests first
+      // Handle parts deletion requests first and track deleted files
       const deletePartsData = formData.get('deleteParts') as string;
+      const deletedFileUrls = new Set<string>();
+      const deletedFileIds = new Set<string>();
+      
       if (deletePartsData) {
         try {
           const deleteRequests = JSON.parse(deletePartsData);
+          console.log('🗑️ Processing parts deletion requests:', deleteRequests);
           
           // Handle individual file deletions
           if (deleteRequests.files && Array.isArray(deleteRequests.files)) {
@@ -1279,12 +1326,19 @@ export const PUT = withResourcePermission(
               if (fileDelete.fileUrl) {
                 try {
                   await deleteFileFromSupabase(fileDelete.fileUrl, `part file ${fileDelete.fileName}`);
+                  deletedFileUrls.add(fileDelete.fileUrl);
+                  console.log(`✅ Deleted file from storage: ${fileDelete.fileName}`);
                 } catch (error) {
                   console.warn(`Failed to delete part file by URL: ${fileDelete.fileName}`, error);
                 }
               } else {
                 // No URL means it's a new file - delete by ID
                 await deletePartFile(equipmentId, fileDelete.fileId, fileDelete.folderPath || 'root');
+              }
+              
+              // Track deletion for filtering from parts structure
+              if (fileDelete.fileId) {
+                deletedFileIds.add(fileDelete.fileId);
               }
             }
           }
@@ -1301,17 +1355,40 @@ export const PUT = withResourcePermission(
         }
       }
 
-      // CRITICAL FIX: Handle parts files upload (was also missing in PUT!)
-      // Process root parts files
+      // CRITICAL FIX: Handle parts files upload with proper auto-increment tracking
+      // Get existing parts structure to determine next available indices
+      const currentEquipment = await prisma.equipment.findUnique({
+        where: { id: equipmentId },
+        select: { equipment_parts: true }
+      });
+      
+      let existingPartsStructure: { rootFiles: any[], folders: any[] } = { rootFiles: [], folders: [] };
+      if (currentEquipment?.equipment_parts && currentEquipment.equipment_parts.length > 0) {
+        try {
+          const firstPart = currentEquipment.equipment_parts[0];
+          if (typeof firstPart === 'string' && firstPart.startsWith('{')) {
+            existingPartsStructure = JSON.parse(firstPart);
+          }
+        } catch (error) {
+          console.warn('Could not parse existing parts structure for index calculation, starting from 0');
+        }
+      }
+      
+      // Get next available indices to prevent conflicts
+      const { nextRootIndex, nextFolderIndex } = getNextFileIndices(existingPartsStructure);
+      console.log(`🔢 Starting file indices - Root: ${nextRootIndex}, Folder: ${nextFolderIndex}`);
+      
+      // Process root parts files with proper auto-increment
       const partsUploadPromises: Promise<any>[] = [];
-      let rootFileIndex = 0;
+      let rootFileIndex = 0; // FormData index (always starts at 0)
+      let actualRootIndex = nextRootIndex; // Actual file ID index (continues from existing)
       
       while (formData.get(`partsFile_root_${rootFileIndex}`)) {
         const partFile = formData.get(`partsFile_root_${rootFileIndex}`) as File;
-        const partName = formData.get(`partsFile_root_${rootFileIndex}_name`) as string;
         
         if (partFile && partFile.size > 0) {
-          const fileId = `root_${rootFileIndex}_${Date.now()}`;
+          const fileId = `root_${actualRootIndex}_${Date.now()}`;
+          console.log(`📁 Creating root file with ID: ${fileId} (FormData index: ${rootFileIndex})`);
           partsUploadPromises.push(
             uploadEquipmentPart(
               partFile,
@@ -1321,21 +1398,23 @@ export const PUT = withResourcePermission(
               "" // empty folder path for root files - store directly in parts-management
             )
           );
+          actualRootIndex++; // Increment the actual file ID index
         }
-        rootFileIndex++;
+        rootFileIndex++; // Increment FormData index
       }
       
-      // Process folder parts files
-      let folderIndex = 0;
-      let fileIndex = 0;
+      // Process folder parts files with proper auto-increment
+      let folderIndex = 0; // FormData folder index
+      let fileIndex = 0; // FormData file index within folder
+      let actualFolderFileIndex = nextFolderIndex; // Actual file ID index (continues from existing)
       
       while (formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`)) {
         const partFile = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}`) as File;
-        const partName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_name`) as string;
         const folderName = formData.get(`partsFile_folder_${folderIndex}_${fileIndex}_folder`) as string;
         
         if (partFile && partFile.size > 0 && folderName) {
-          const fileId = `folder_${folderIndex}_${fileIndex}_${Date.now()}`;
+          const fileId = `folder_${actualFolderFileIndex}_${Date.now()}`;
+          console.log(`📁 Creating folder file with ID: ${fileId} (FormData indices: ${folderIndex}/${fileIndex})`);
           partsUploadPromises.push(
             uploadEquipmentPart(
               partFile,
@@ -1345,6 +1424,7 @@ export const PUT = withResourcePermission(
               folderName // use actual folder name
             )
           );
+          actualFolderFileIndex++; // Increment the actual file ID index
         }
         
         fileIndex++;
@@ -1379,6 +1459,34 @@ export const PUT = withResourcePermission(
             } catch (error) {
               console.warn('Could not parse existing parts structure, starting fresh');
             }
+          }
+          
+          // CRITICAL FIX: Apply deletions to existing parts structure BEFORE adding new files
+          if (deletedFileUrls.size > 0 || deletedFileIds.size > 0) {
+            console.log('🗑️ Applying deletions to existing parts structure');
+            
+            // Filter deleted files from root files
+            existingPartsStructure.rootFiles = existingPartsStructure.rootFiles.filter((file: any) => {
+              const shouldDelete = deletedFileUrls.has(file.url || file.preview) || deletedFileIds.has(file.id);
+              if (shouldDelete) {
+                console.log(`🗑️ Removing from rootFiles: ${file.name}`);
+              }
+              return !shouldDelete;
+            });
+            
+            // Filter deleted files from folders
+            existingPartsStructure.folders = existingPartsStructure.folders.map((folder: any) => ({
+              ...folder,
+              files: folder.files.filter((file: any) => {
+                const shouldDelete = deletedFileUrls.has(file.url || file.preview) || deletedFileIds.has(file.id);
+                if (shouldDelete) {
+                  console.log(`🗑️ Removing from folder "${folder.name}": ${file.name}`);
+                }
+                return !shouldDelete;
+              })
+            }));
+            
+            console.log(`🗑️ Applied deletions. Remaining files: ${existingPartsStructure.rootFiles.length} root, ${existingPartsStructure.folders.reduce((sum: number, f: any) => sum + f.files.length, 0)} in folders`);
           }
           
           // Add new uploaded parts to the structure
@@ -1429,30 +1537,79 @@ export const PUT = withResourcePermission(
 
       // Handle equipment parts updates - only update if no new files were uploaded
       if (!newPartsUploaded) {
-        const equipmentPartsData = formData.get('equipmentParts') as string;
+        // Check for partsStructure data (modern format) first
+        const partsStructureData = formData.get('partsStructure') as string;
         
-        if (equipmentPartsData) {
+        if (partsStructureData) {
           try {
-            const partsArray = JSON.parse(equipmentPartsData);
-            if (Array.isArray(partsArray)) {
-              // Filter and validate parts as strings
-              const equipmentParts = partsArray
-                .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
-                .map(part => part.trim())
-                .slice(0, 50); // Reasonable limit
-              
-              updateData.equipment_parts = equipmentParts;
-            }
-          } catch (error) {
-            // If parsing fails, try to handle as comma-separated string
-            const equipmentParts = equipmentPartsData
-              .split(',')
-              .map(part => part.trim())
-              .filter(part => part.length > 0)
-              .slice(0, 50);
+            let partsStructure = JSON.parse(partsStructureData);
+            console.log('📝 Processing partsStructure data for update');
             
-            if (equipmentParts.length > 0) {
-              updateData.equipment_parts = equipmentParts;
+            // CRITICAL FIX: Apply deletions to the parts structure being submitted
+            if (deletedFileUrls.size > 0 || deletedFileIds.size > 0) {
+              console.log('🗑️ Applying deletions to submitted parts structure');
+              
+              // Filter deleted files from root files
+              if (partsStructure.rootFiles) {
+                partsStructure.rootFiles = partsStructure.rootFiles.filter((file: any) => {
+                  const shouldDelete = deletedFileUrls.has(file.url || file.preview) || deletedFileIds.has(file.id);
+                  if (shouldDelete) {
+                    console.log(`🗑️ Removing from submitted rootFiles: ${file.name}`);
+                  }
+                  return !shouldDelete;
+                });
+              }
+              
+              // Filter deleted files from folders
+              if (partsStructure.folders) {
+                partsStructure.folders = partsStructure.folders.map((folder: any) => ({
+                  ...folder,
+                  files: folder.files.filter((file: any) => {
+                    const shouldDelete = deletedFileUrls.has(file.url || file.preview) || deletedFileIds.has(file.id);
+                    if (shouldDelete) {
+                      console.log(`🗑️ Removing from submitted folder "${folder.name}": ${file.name}`);
+                    }
+                    return !shouldDelete;
+                  })
+                }));
+              }
+              
+              console.log(`🗑️ Applied deletions to submitted structure. Final count: ${(partsStructure.rootFiles || []).length} root, ${(partsStructure.folders || []).reduce((sum: number, f: any) => sum + (f.files?.length || 0), 0)} in folders`);
+            }
+            
+            // Store the processed parts structure
+            updateData.equipment_parts = [JSON.stringify(partsStructure)];
+            console.log('📝 Updated equipment_parts with processed structure');
+          } catch (error) {
+            console.warn('Failed to process partsStructure data:', error);
+          }
+        } else {
+          // Fall back to legacy equipmentParts format
+          const equipmentPartsData = formData.get('equipmentParts') as string;
+          
+          if (equipmentPartsData) {
+            try {
+              const partsArray = JSON.parse(equipmentPartsData);
+              if (Array.isArray(partsArray)) {
+                // Filter and validate parts as strings
+                const equipmentParts = partsArray
+                  .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+                  .map(part => part.trim())
+                  .slice(0, 50); // Reasonable limit
+                
+                updateData.equipment_parts = equipmentParts;
+              }
+            } catch (error) {
+              // If parsing fails, try to handle as comma-separated string
+              const equipmentParts = equipmentPartsData
+                .split(',')
+                .map(part => part.trim())
+                .filter(part => part.length > 0)
+                .slice(0, 50);
+              
+              if (equipmentParts.length > 0) {
+                updateData.equipment_parts = equipmentParts;
+              }
             }
           }
         }

@@ -36,8 +36,8 @@ import { useProjects } from "@/hooks/api/use-projects";
 import { useQueryClient } from "@tanstack/react-query";
 import { equipmentKeys } from "@/hooks/useEquipmentQuery";
 import { useEquipmentStore, selectIsMobile } from "@/stores/equipmentStore";
-import { Plus, Trash2, X, ClipboardCheck, Package, ImageIcon, Upload, MapPin, Calendar, Clock, Wrench, Loader2 } from "lucide-react";
-import { useState, useCallback, useEffect } from "react";
+import { Plus, Trash2, X, ClipboardCheck, Package, ImageIcon, Upload, MapPin, Calendar, Clock, Wrench, Loader2, LinkIcon } from "lucide-react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 
@@ -60,9 +60,12 @@ export default function EditEquipmentMaintenanceReportDrawer() {
   // Extract locations from projects for backward compatibility
   // Handle different return types from useProjects
   const projectsArray = Array.isArray(projects) ? projects : (projects?.data || []);
-  const locations = projectsArray
-    .map(p => p.client?.location)
-    .filter((location): location is NonNullable<typeof location> => Boolean(location));
+  const locations = useMemo(() => {
+    return projectsArray
+      .map(p => p.client?.location)
+      .filter((location): location is NonNullable<typeof location> => Boolean(location))
+      .filter((location, index, arr) => arr.findIndex(l => l.id === location.id) === index); // Remove duplicates
+  }, [projectsArray]);
   const updateMaintenanceReportMutation = useUpdateEquipmentMaintenanceReport();
   const queryClient = useQueryClient();
 
@@ -96,16 +99,12 @@ export default function EditEquipmentMaintenanceReportDrawer() {
     attachment_urls: [""] as string[],
   });
   const [localAttachmentFiles, setLocalAttachmentFiles] = useState<File[]>([]);
-  const [removedAttachments, setRemovedAttachments] = useState<number[]>([]);
+  const [deletedAttachments, setDeletedAttachments] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Populate form data when selectedReport changes
   useEffect(() => {
     if (selectedReport) {
-      
-      // Find the location to verify it exists
-      const selectedLocation = locations.find(loc => loc.id === selectedReport.location_id);
-      
       setFormData({
         issue_description: selectedReport.issue_description || "",
         remarks: selectedReport.remarks || "",
@@ -122,9 +121,8 @@ export default function EditEquipmentMaintenanceReportDrawer() {
           ? selectedReport.attachment_urls.slice(selectedReport.parts_replaced.length).filter((url: string) => url && url.trim() !== "")
           : [""], // Only attachment URLs after part images
       });
-      
     }
-  }, [selectedReport, locations]);
+  }, [selectedReport]); // Remove locations dependency to prevent infinite loop
 
   // Stable event handlers using useCallback
   const handleClose = useCallback(() => {
@@ -134,7 +132,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
     // Reset form state
     setActiveTab('details');
     setLocalAttachmentFiles([]);
-    setRemovedAttachments([]);
+    setDeletedAttachments([]);
     setFormData({
       issue_description: "",
       remarks: "",
@@ -177,7 +175,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       // Reset form state
       setActiveTab('details');
       setLocalAttachmentFiles([]);
-      setRemovedAttachments([]);
+      setDeletedAttachments([]);
       setFormData({
         issue_description: "",
         remarks: "",
@@ -240,67 +238,11 @@ export default function EditEquipmentMaintenanceReportDrawer() {
     }));
     // Also remove corresponding files
     setLocalAttachmentFiles((prev) => prev.filter((_, i) => i !== index));
-    setRemovedAttachments((prev) => prev.filter(i => i !== index).map(i => i > index ? i - 1 : i));
+    // Note: For new file removal, we don't need to track deletions since they were never uploaded
   }, []);
 
 
 
-  // File upload helper function  
-  const uploadFileToSupabase = useCallback(async (file: File, prefix: string, isAttachment: boolean = false): Promise<string> => {
-    const supabase = createClient();
-    const timestamp = Date.now();
-    const ext = file.name.split('.').pop();
-    const filename = `${timestamp}_${selectedReport?.id || 'unknown'}_${file.name}`;
-    
-    // Match the create functionality path structure
-    const equipmentId = selectedReport?.equipment_id || 'unknown';
-    const reportId = selectedReport?.id || 'unknown';
-    const folder = isAttachment ? 'attachments' : 'parts';
-    const filepath = `equipment-${equipmentId}/maintenance-reports/${reportId}/${folder}/${filename}`;
-    
-    const buffer = await file.arrayBuffer();
-    const { data: uploadData, error: uploadErr } = await supabase.storage
-      .from('equipments')
-      .upload(filepath, buffer, { cacheControl: '3600', upsert: false });
-
-    if (uploadErr || !uploadData) {
-      throw new Error(`Upload failed: ${uploadErr?.message}`);
-    }
-
-    const { data: urlData } = supabase.storage
-      .from('equipments')
-      .getPublicUrl(uploadData.path);
-
-    return urlData.publicUrl;
-  }, [selectedReport?.equipment_id, selectedReport?.id]);
-
-  // Function to delete old files from Supabase storage
-  const deleteFileFromSupabase = useCallback(async (fileUrl: string): Promise<void> => {
-    if (!fileUrl || !fileUrl.includes('supabase.co/storage/v1/object/public/equipments/')) {
-      return; // Not a Supabase storage URL, skip deletion
-    }
-    
-    const supabase = createClient();
-    
-    // Extract the file path from the URL
-    // URL format: https://domain.supabase.co/storage/v1/object/public/equipments/path/to/file
-    const urlParts = fileUrl.split('/storage/v1/object/public/equipments/');
-    if (urlParts.length !== 2) {
-      console.warn('Invalid storage URL format:', fileUrl);
-      return;
-    }
-    
-    const filePath = urlParts[1];
-    
-    const { error } = await supabase.storage
-      .from('equipments')
-      .remove([filePath]);
-      
-    if (error) {
-      console.warn('Failed to delete file from storage:', filePath, error);
-      // Don't throw error - continue with update even if file deletion fails
-    }
-  }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -326,52 +268,20 @@ export default function EditEquipmentMaintenanceReportDrawer() {
         (part) => part.trim() !== ""
       );
 
-      // Step 2: Delete removed attachment files from storage  
-      for (const removedIndex of removedAttachments) {
-        const existingUrl = selectedReport?.attachment_urls?.[removedIndex];
-        if (existingUrl) {
-          await deleteFileFromSupabase(existingUrl);
-        }
-      }
+      // Step 2: Handle file deletions (will be processed by backend)
+      // No need to manually delete files here - backend will handle it
 
-      // Step 3: Process attachment files
-      const attachmentUrls: string[] = [];
-      
-      for (let i = 0; i < formData.attachment_urls.length; i++) {
-        // Skip removed attachments
-        if (removedAttachments.includes(i)) {
-          continue;
-        }
-        
-        const file = localAttachmentFiles[i];
-        if (file) {
-          // Delete old attachment file if replacing
-          const existingUrl = selectedReport?.attachment_urls?.[attachmentUrls.length];
-          if (existingUrl) {
-            await deleteFileFromSupabase(existingUrl);
-          }
-          
-          // Upload new attachment file
-          try {
-            const uploadedUrl = await uploadFileToSupabase(file, `attachment_${attachmentUrls.length}`, true);
-            attachmentUrls.push(uploadedUrl);
-          } catch (uploadError) {
-            toast.error(`Failed to upload attachment ${attachmentUrls.length + 1}`);
-            setIsSubmitting(false);
-            return;
-          }
-        } else if (formData.attachment_urls[i] && formData.attachment_urls[i].trim()) {
-          // Keep manual URL if provided
-          attachmentUrls.push(formData.attachment_urls[i]);
-        }
-      }
+      // Step 3: Filter out deleted attachment URLs
+      const filteredAttachmentUrls = formData.attachment_urls.filter(
+        (url) => url.trim() !== "" && !deletedAttachments.includes(url)
+      );
 
       // Step 4: Update the maintenance report with new data
       // Create FormData for the update
       const formDataToSend = new FormData();
       
       // Add basic form fields
-      formDataToSend.append('id', selectedReport.id);
+      formDataToSend.append('reportId', selectedReport.id);
       formDataToSend.append('equipment_id', selectedReport.equipment_id);
       formDataToSend.append('issue_description', formData.issue_description);
       if (formData.remarks) formDataToSend.append('remarks', formData.remarks);
@@ -386,7 +296,19 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       
       // Add arrays as JSON strings
       formDataToSend.append('parts_replaced', JSON.stringify(filteredPartsReplaced));
-      formDataToSend.append('attachment_urls', JSON.stringify(attachmentUrls));
+      formDataToSend.append('attachment_urls', JSON.stringify(filteredAttachmentUrls));
+      
+      // Add files to delete
+      if (deletedAttachments.length > 0) {
+        formDataToSend.append('filesToDelete', JSON.stringify(deletedAttachments));
+      }
+      
+      // Add new attachment files
+      localAttachmentFiles.forEach((file, index) => {
+        if (file) {
+          formDataToSend.append(`attachment_${index}`, file);
+        }
+      });
       
       // Add repair date
       const repairDate = formData.status === "COMPLETED" && !selectedReport.date_repaired 
@@ -401,7 +323,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       setIsSubmitting(false);
       toast.error("Failed to update maintenance report");
     }
-  }, [formData, selectedReport, updateMaintenanceReportMutation, handleSaveAndViewDetails, localAttachmentFiles, uploadFileToSupabase, removedAttachments]);
+  }, [formData, selectedReport, updateMaintenanceReportMutation, handleSaveAndViewDetails, localAttachmentFiles, deletedAttachments]);
 
 
   // Stable tab button renderer
@@ -578,8 +500,8 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                             <SelectValue placeholder="Select location..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {locations.map((location) => (
-                              <SelectItem key={location.id} value={location.id}>
+                            {locations.map((location, index) => (
+                              <SelectItem key={`location-mobile-${location.id}-${location.address}-${index}`} value={location.id}>
                                 {location.address}
                               </SelectItem>
                             ))}
@@ -650,7 +572,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                   <CardContent className="space-y-4">
                     {formData.parts_replaced.map((part, index) => {
                       return (
-                        <div key={`part-input-${index}`} className="border rounded-lg">
+                        <div key={`part-mobile-${index}-${part.slice(0, 10)}`} className="border rounded-lg">
                           <div className="flex items-center justify-between p-3 px-3 py-2">
                             <div className="flex items-center gap-2">
                               <Package className="h-4 w-4 text-muted-foreground" />
@@ -720,33 +642,131 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="border rounded-lg">
-                      <div className="flex items-center gap-2 p-3 px-3 py-2">
-                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium text-sm">
-                          Upload Attachments
-                          {localAttachmentFiles[0] && ` - ${localAttachmentFiles[0].name.slice(0, 30)}${localAttachmentFiles[0].name.length > 30 ? '...' : ''}`}
-                        </span>
-                      </div>
-                      <div className="space-y-3 border-t p-3">
-                        <FileUploadSectionSimple
-                          label="Attachment"
-                          accept="image/*,application/pdf,.doc,.docx"
-                          onFileChange={(file) => {
-                            const newFiles = [...localAttachmentFiles];
+                    {/* Existing Attachments */}
+                    {formData.attachment_urls.map((attachmentUrl, index) => {
+                      if (!attachmentUrl || deletedAttachments.includes(attachmentUrl)) return null;
+                      
+                      const fileName = attachmentUrl.split('/').pop() || `Attachment ${index + 1}`;
+                      
+                      return (
+                        <div key={`existing-attachment-mobile-${index}-${fileName.slice(0, 10)}`} className="border rounded-lg">
+                          <div className="flex items-center justify-between p-3 px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium text-sm">
+                                {fileName.slice(0, 25)}{fileName.length > 25 ? '...' : ''}
+                              </span>
+                              <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                                existing
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setDeletedAttachments(prev => [...prev, attachmentUrl]);
+                              }}
+                              className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="space-y-3 border-t p-3">
+                            <FileUploadSectionSimple
+                              label={fileName}
+                              accept="image/*,application/pdf,.doc,.docx"
+                              onFileChange={() => {}}
+                              onKeepExistingChange={() => {}}
+                              selectedFile={null}
+                              currentFileUrl={attachmentUrl}
+                              required={false}
+                              readOnly={true}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* New Attachment Files */}
+                    {localAttachmentFiles.map((file, index) => {
+                      return (
+                        <div key={`new-attachment-mobile-${index}-${file.name.slice(0, 10)}-${file.lastModified || Date.now()}`} className="border rounded-lg">
+                          <div className="flex items-center justify-between p-3 px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium text-sm">
+                                {file.name.slice(0, 25)}{file.name.length > 25 ? '...' : ''}
+                              </span>
+                              <span className="text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                                new
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setLocalAttachmentFiles(prev => {
+                                  const newFiles = [...prev];
+                                  newFiles.splice(index, 1);
+                                  return newFiles;
+                                });
+                              }}
+                              className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="space-y-3 border-t p-3">
+                            <FileUploadSectionSimple
+                              label={file.name}
+                              accept="image/*,application/pdf,.doc,.docx"
+                              onFileChange={(newFile) => {
+                                setLocalAttachmentFiles(prev => {
+                                  const newFiles = [...prev];
+                                  if (newFile) {
+                                    newFiles[index] = newFile;
+                                  } else {
+                                    newFiles.splice(index, 1);
+                                  }
+                                  return newFiles;
+                                });
+                              }}
+                              onKeepExistingChange={() => {}}
+                              selectedFile={file}
+                              currentFileUrl={null}
+                              required={false}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Add Another Attachment Button */}
+                    <div className="flex justify-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          // Create empty file input for new attachment
+                          const newFileInput = document.createElement('input');
+                          newFileInput.type = 'file';
+                          newFileInput.accept = 'image/*,application/pdf,.doc,.docx';
+                          newFileInput.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
                             if (file) {
-                              newFiles[0] = file;
-                            } else {
-                              newFiles.splice(0, 1);
+                              setLocalAttachmentFiles(prev => [...prev, file]);
                             }
-                            setLocalAttachmentFiles(newFiles);
-                          }}
-                          onKeepExistingChange={() => {}}
-                          selectedFile={localAttachmentFiles[0]}
-                          currentFileUrl={formData.attachment_urls[0] || null}
-                          required={false}
-                        />
-                      </div>
+                          };
+                          newFileInput.click();
+                        }}
+                        className="flex items-center gap-2"
+                        size="sm"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Another Attachment
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -912,8 +932,8 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                         <SelectValue placeholder="Select location..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {locations.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
+                        {locations.map((location, index) => (
+                          <SelectItem key={`location-desktop-${location.id}-${location.address}-${index}`} value={location.id}>
                             {location.address}
                           </SelectItem>
                         ))}
@@ -972,7 +992,7 @@ export default function EditEquipmentMaintenanceReportDrawer() {
               </div>
               {formData.parts_replaced.map((part, index) => {
                 return (
-                  <div key={`part-input-${index}`} className="border rounded-lg">
+                  <div key={`part-desktop-${index}-${part.slice(0, 10)}`} className="border rounded-lg">
                     <div className="flex items-center justify-between p-3 px-3 py-2">
                       <div className="flex items-center gap-2">
                         <Package className="h-4 w-4 text-muted-foreground" />
@@ -1040,33 +1060,132 @@ export default function EditEquipmentMaintenanceReportDrawer() {
                   Update additional images, documents, or reference materials for this maintenance report
                 </p>
               </div>
-              <div className="border rounded-lg">
-                <div className="flex items-center gap-2 p-3 px-3 py-2">
-                  <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-sm">
-                    Upload Attachments
-                    {localAttachmentFiles[0] && ` - ${localAttachmentFiles[0].name.slice(0, 30)}${localAttachmentFiles[0].name.length > 30 ? '...' : ''}`}
-                  </span>
-                </div>
-                <div className="space-y-3 border-t p-3">
-                  <FileUploadSectionSimple
-                    label="Attachment"
-                    accept="image/*,application/pdf,.doc,.docx"
-                    onFileChange={(file) => {
-                      const newFiles = [...localAttachmentFiles];
+
+              {/* Existing Attachments */}
+              {formData.attachment_urls.map((attachmentUrl, index) => {
+                if (!attachmentUrl || deletedAttachments.includes(attachmentUrl)) return null;
+                
+                const fileName = attachmentUrl.split('/').pop() || `Attachment ${index + 1}`;
+                
+                return (
+                  <div key={`existing-attachment-desktop-${index}-${fileName.slice(0, 10)}`} className="border rounded-lg">
+                    <div className="flex items-center justify-between p-3 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-sm">
+                          {fileName.slice(0, 30)}{fileName.length > 30 ? '...' : ''}
+                        </span>
+                        <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                          existing
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setDeletedAttachments(prev => [...prev, attachmentUrl]);
+                        }}
+                        className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="space-y-3 border-t p-3">
+                      <FileUploadSectionSimple
+                        label={fileName}
+                        accept="image/*,application/pdf,.doc,.docx"
+                        onFileChange={() => {}}
+                        onKeepExistingChange={() => {}}
+                        selectedFile={null}
+                        currentFileUrl={attachmentUrl}
+                        required={false}
+                        readOnly={true}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* New Attachment Files */}
+              {localAttachmentFiles.map((file, index) => {
+                return (
+                  <div key={`new-attachment-desktop-${index}-${file.name.slice(0, 10)}-${file.lastModified || Date.now()}`} className="border rounded-lg">
+                    <div className="flex items-center justify-between p-3 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-sm">
+                          {file.name.slice(0, 30)}{file.name.length > 30 ? '...' : ''}
+                        </span>
+                        <span className="text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                          new
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setLocalAttachmentFiles(prev => {
+                            const newFiles = [...prev];
+                            newFiles.splice(index, 1);
+                            return newFiles;
+                          });
+                        }}
+                        className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="space-y-3 border-t p-3">
+                      <FileUploadSectionSimple
+                        label={file.name}
+                        accept="image/*,application/pdf,.doc,.docx"
+                        onFileChange={(newFile) => {
+                          setLocalAttachmentFiles(prev => {
+                            const newFiles = [...prev];
+                            if (newFile) {
+                              newFiles[index] = newFile;
+                            } else {
+                              newFiles.splice(index, 1);
+                            }
+                            return newFiles;
+                          });
+                        }}
+                        onKeepExistingChange={() => {}}
+                        selectedFile={file}
+                        currentFileUrl={null}
+                        required={false}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Add Another Attachment Button */}
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    // Create empty file input for new attachment
+                    const newFileInput = document.createElement('input');
+                    newFileInput.type = 'file';
+                    newFileInput.accept = 'image/*,application/pdf,.doc,.docx';
+                    newFileInput.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
                       if (file) {
-                        newFiles[0] = file;
-                      } else {
-                        newFiles.splice(0, 1);
+                        setLocalAttachmentFiles(prev => [...prev, file]);
                       }
-                      setLocalAttachmentFiles(newFiles);
-                    }}
-                    onKeepExistingChange={() => {}}
-                    selectedFile={localAttachmentFiles[0]}
-                    currentFileUrl={formData.attachment_urls[0] || null}
-                    required={false}
-                  />
-                </div>
+                    };
+                    newFileInput.click();
+                  }}
+                  className="flex items-center gap-2"
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Another Attachment
+                </Button>
               </div>
             </div>
           )}

@@ -58,6 +58,11 @@ export default function ViewEquipmentMaintenanceReportModal() {
 
   const handleEdit = () => {
     if (selectedReportForView) {
+      console.log('🔄 ViewModal: handleEdit called');
+      console.log('📝 selectedReportForView:', selectedReportForView);
+      console.log('🔑 selectedReportForView.id:', selectedReportForView.id);
+      console.log('📊 selectedReportForView keys:', Object.keys(selectedReportForView));
+      
       // Use unified modal coordination to switch to edit modal
       setActiveModal('maintenance-edit');
       // Close create modal if it's open
@@ -65,8 +70,13 @@ export default function ViewEquipmentMaintenanceReportModal() {
       // Close view modal
       setSelectedMaintenanceReportForDetail(null);
       setIsMaintenanceReportDetailOpen(false);
-      // Open edit modal
-      setSelectedEquipmentMaintenanceReport(selectedReportForView);
+      // Open edit modal with guaranteed id field
+      const reportForEdit = {
+        ...selectedReportForView,
+        id: selectedReportForView.id || selectedReportForView.uid || selectedReportForView._id
+      };
+      console.log('✅ Setting reportForEdit:', reportForEdit);
+      setSelectedEquipmentMaintenanceReport(reportForEdit);
     }
   };
 

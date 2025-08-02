@@ -38,14 +38,7 @@ export default function CreateEquipmentModalModern() {
   const { data: projectsData, isLoading: projectsLoading, error: projectsError } = useProjects();
   const projects = projectsData?.data || [];
 
-  // Add console logging for debugging
-  console.log('🚀 CreateEquipmentModalModern - Projects data:', {
-    projectsData,
-    projects,
-    projectsCount: projects.length,
-    isLoading: projectsLoading,
-    error: projectsError
-  });
+  // Projects data loaded
 
   const handleSuccess = () => {
     setIsCreateModalOpen(false);

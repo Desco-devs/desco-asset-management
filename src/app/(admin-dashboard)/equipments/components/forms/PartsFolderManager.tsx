@@ -299,7 +299,7 @@ export default function PartsFolderManager({
   };
 
   const removeFile = (fileId: string, folderId?: string) => {
-    console.log(`🗑️ Removing file ${fileId} from ${folderId ? `folder ${folderId}` : 'root'}`);
+    // Removing file from structure
     
     if (folderId) {
       // Remove from folder
@@ -308,11 +308,8 @@ export default function PartsFolderManager({
         const fileToRemove = folder.files.find(f => f.id === fileId);
         
         if (fileToRemove) {
-          console.log(`📁 Found file to remove: ${fileToRemove.name}, has URL: ${!!(fileToRemove.url || fileToRemove.preview)}, has file object: ${!!fileToRemove.file}`);
-          
           // Track deletion of existing files (those with URLs but no File object)
           if ((fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
-            console.log(`🔗 Tracking deletion of existing file: ${fileToRemove.name}`);
             onPartFileDelete(fileToRemove.id, fileToRemove.name, folder.name, fileToRemove.url || fileToRemove.preview);
           }
         }
@@ -327,17 +324,14 @@ export default function PartsFolderManager({
         ),
       };
       updatePartsStructure(newStructure);
-      console.log(`✅ Updated folder structure, remaining files in folder: ${newStructure.folders.find(f => f.id === folderId)?.files.length || 0}`);
+      // Updated folder structure
     } else {
       // Remove from root
       const fileToRemove = partsStructure.rootFiles.find(f => f.id === fileId);
       
       if (fileToRemove) {
-        console.log(`🗂️ Found root file to remove: ${fileToRemove.name}, has URL: ${!!(fileToRemove.url || fileToRemove.preview)}, has file object: ${!!fileToRemove.file}`);
-        
         // Track deletion of existing files (those with URLs but no File object)
         if ((fileToRemove.url || fileToRemove.preview) && !fileToRemove.file && onPartFileDelete) {
-          console.log(`🔗 Tracking deletion of existing root file: ${fileToRemove.name}`);
           onPartFileDelete(fileToRemove.id, fileToRemove.name, 'root', fileToRemove.url || fileToRemove.preview);
         }
       }
@@ -347,7 +341,7 @@ export default function PartsFolderManager({
         rootFiles: partsStructure.rootFiles.filter((f) => f.id !== fileId),
       };
       updatePartsStructure(newStructure);
-      console.log(`✅ Updated root structure, remaining root files: ${newStructure.rootFiles.length}`);
+      // Updated root structure
     }
   };
 

@@ -130,17 +130,17 @@ export default function EquipmentPartsViewer({
   // Parse equipment parts data into folder structure - enhanced with better error handling
   const parsePartsData = (parts: string[] | { rootFiles: any[]; folders: any[] } | string | undefined): ParsedPartData => {
     if (!parts) {
-      console.log('🔍 [EquipmentPartsViewer] No parts data provided');
+      // No parts data provided
       return { rootFiles: [], folders: [] };
     }
 
-    console.log('🔍 [EquipmentPartsViewer] Parsing parts data:', { type: typeof parts, isArray: Array.isArray(parts), data: parts });
+    // Parsing parts data
 
     // Handle database format: array with JSON string (most common)
     if (Array.isArray(parts) && parts.length > 0 && typeof parts[0] === 'string') {
       try {
         const parsed = JSON.parse(parts[0]);
-        console.log('✅ [EquipmentPartsViewer] Successfully parsed array[0] as JSON:', parsed);
+        // Successfully parsed array[0] as JSON
         if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
           // MIGRATION FIX: Check for legacy "Root" folder and merge with rootFiles
           let rootFiles = Array.isArray(parsed.rootFiles) ? parsed.rootFiles : [];
@@ -155,15 +155,15 @@ export default function EquipmentPartsViewer({
             const rootFolder = folders[rootFolderIndex];
             if (rootFolder.files && Array.isArray(rootFolder.files) && rootFolder.files.length > 0) {
               // Merge Root folder files into rootFiles
-              console.log(`🔄 [EquipmentPartsViewer] MIGRATION: Found legacy "${rootFolder.name}" folder with ${rootFolder.files.length} files, moving to Root Files section`);
+              // MIGRATION: Found legacy folder, moving to Root Files section
               rootFiles = [...rootFiles, ...rootFolder.files];
               // Remove the Root folder from folders array
               folders = folders.filter((_: any, index: number) => index !== rootFolderIndex);
-              console.log('✅ [EquipmentPartsViewer] Successfully migrated legacy Root folder to rootFiles');
+              // Successfully migrated legacy Root folder to rootFiles
             } else {
               // Empty root folder, just remove it
               folders = folders.filter((_: any, index: number) => index !== rootFolderIndex);
-              console.log('🗑️ [EquipmentPartsViewer] Removed empty legacy Root folder');
+              // Removed empty legacy Root folder
             }
           }
           
@@ -204,7 +204,7 @@ export default function EquipmentPartsViewer({
     if (typeof parts === 'string') {
       try {
         const parsed = JSON.parse(parts);
-        console.log('✅ [EquipmentPartsViewer] Successfully parsed string as JSON:', parsed);
+        // Successfully parsed string as JSON
         if (parsed && typeof parsed === 'object' && parsed.rootFiles && parsed.folders) {
           // MIGRATION FIX: Check for legacy "Root" folder and merge with rootFiles
           let rootFiles = Array.isArray(parsed.rootFiles) ? parsed.rootFiles : [];
@@ -219,15 +219,15 @@ export default function EquipmentPartsViewer({
             const rootFolder = folders[rootFolderIndex];
             if (rootFolder.files && Array.isArray(rootFolder.files) && rootFolder.files.length > 0) {
               // Merge Root folder files into rootFiles
-              console.log(`🔄 [EquipmentPartsViewer] MIGRATION: Found legacy "${rootFolder.name}" folder with ${rootFolder.files.length} files, moving to Root Files section`);
+              // MIGRATION: Found legacy folder, moving to Root Files section
               rootFiles = [...rootFiles, ...rootFolder.files];
               // Remove the Root folder from folders array
               folders = folders.filter((_: any, index: number) => index !== rootFolderIndex);
-              console.log('✅ [EquipmentPartsViewer] Successfully migrated legacy Root folder to rootFiles');
+              // Successfully migrated legacy Root folder to rootFiles
             } else {
               // Empty root folder, just remove it
               folders = folders.filter((_: any, index: number) => index !== rootFolderIndex);
-              console.log('🗑️ [EquipmentPartsViewer] Removed empty legacy Root folder');
+              // Removed empty legacy Root folder
             }
           }
           
@@ -280,7 +280,7 @@ export default function EquipmentPartsViewer({
 
     // Handle object format (already parsed)
     if (typeof parts === 'object' && !Array.isArray(parts)) {
-      console.log('✅ [EquipmentPartsViewer] Parts data is already an object');
+      // Parts data is already an object
       if (parts.rootFiles && parts.folders) {
         // MIGRATION FIX: Check for legacy "Root" folder and merge with rootFiles
         let rootFiles = Array.isArray(parts.rootFiles) ? parts.rootFiles : [];
@@ -298,7 +298,7 @@ export default function EquipmentPartsViewer({
             rootFiles = [...rootFiles, ...rootFolder.files];
             // Remove the Root folder from folders array
             folders = folders.filter((_: any, index: number) => index !== rootFolderIndex);
-            console.log('🔄 [EquipmentPartsViewer] Migrated legacy "Root" folder to rootFiles');
+            // Migrated legacy Root folder to rootFiles
           }
         }
         
@@ -334,11 +334,11 @@ export default function EquipmentPartsViewer({
     // Handle array format (legacy - URLs only)
     if (Array.isArray(parts)) {
       if (parts.length === 0) {
-        console.log('ℹ️ [EquipmentPartsViewer] Empty parts array');
+        // Empty parts array
         return { rootFiles: [], folders: [] };
       }
 
-      console.log('🔄 [EquipmentPartsViewer] Converting legacy URL array to new format');
+      // Converting legacy URL array to new format
       // Convert legacy URL array to new format
       const rootFiles: ParsedFile[] = parts.map((url, index) => {
         const fileName = url.split('/').pop() || `Part ${index + 1}`;
@@ -615,7 +615,7 @@ export default function EquipmentPartsViewer({
     };
     
     const handleImageLoad = () => {
-      console.log('Image loaded successfully:', fileUrl);
+      // Image loaded successfully
       setImageLoadError(false);
       setImageLoading(false);
       setImageLoaded(true);

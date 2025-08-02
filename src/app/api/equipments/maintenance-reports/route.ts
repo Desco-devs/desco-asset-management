@@ -60,7 +60,26 @@ export async function GET() {
 // POST - Create new equipment maintenance report
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Handle FormData from frontend
+    const formData = await request.formData();
+    
+    // Extract and convert FormData to JSON object
+    const body: any = {};
+    for (const [key, value] of formData.entries()) {
+      if (key === 'parts_replaced' || key === 'attachment_urls') {
+        // Parse JSON strings back to arrays
+        try {
+          body[key] = JSON.parse(value as string);
+        } catch {
+          body[key] = [];
+        }
+      } else if (key === 'downtime_hours') {
+        // Keep downtime_hours as string (matches Prisma schema)
+        body[key] = value || null;
+      } else {
+        body[key] = value;
+      }
+    }
     
     // Sanitize parts_replaced and attachment_urls before validation
     const sanitizedBody = {
@@ -68,6 +87,16 @@ export async function POST(request: NextRequest) {
       parts_replaced: sanitizePartsArray(body.parts_replaced),
       attachment_urls: sanitizeAttachmentUrls(body.attachment_urls),
     };
+
+    // Enhanced debug logging
+    console.log('=== MAINTENANCE REPORT DEBUG ===');
+    console.log('Received FormData entries:');
+    for (const [key, value] of formData.entries()) {
+      console.log(`  ${key}:`, value);
+    }
+    console.log('Processed body object:', JSON.stringify(body, null, 2));
+    console.log('Sanitized body object:', JSON.stringify(sanitizedBody, null, 2));
+    console.log('=== END DEBUG ===');
 
     // Validate the entire request body with Zod
     const validationResult = createEquipmentMaintenanceReportSchema.safeParse(sanitizedBody);
@@ -138,8 +167,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(report, { status: 201 });
   } catch (error) {
+    console.error('Error creating equipment maintenance report:', error);
     return NextResponse.json(
-      { error: 'Failed to create equipment maintenance report' },
+      { 
+        error: 'Failed to create equipment maintenance report',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

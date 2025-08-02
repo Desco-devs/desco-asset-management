@@ -133,8 +133,8 @@ async function createEquipmentMaintenanceReport(formData: FormData): Promise<Equ
   return response.json();
 }
 
-async function updateEquipmentMaintenanceReport(formData: FormData): Promise<EquipmentMaintenanceReport> {
-  const response = await fetch('/api/equipments/maintenance-reports', {
+async function updateEquipmentMaintenanceReport(id: string, formData: FormData): Promise<EquipmentMaintenanceReport> {
+  const response = await fetch(`/api/equipments/maintenance-reports/${id}`, {
     method: 'PUT',
     body: formData, // FormData for file uploads
   });
@@ -160,15 +160,37 @@ async function deleteEquipmentMaintenanceReport(id: string): Promise<void> {
 
 // Helper function to deduplicate maintenance reports
 function deduplicateEquipmentMaintenanceReports(reports: EquipmentMaintenanceReport[]): EquipmentMaintenanceReport[] {
-  const seen = new Set();
-  return reports.filter(report => {
+  if (!Array.isArray(reports)) {
+    console.warn('🚨 Non-array maintenance reports data received, returning empty array');
+    return [];
+  }
+  
+  const seen = new Set<string>();
+  const duplicateIds = new Set<string>();
+  
+  const deduplicated = reports.filter(report => {
+    // Validate report structure
+    if (!report || typeof report !== 'object' || !report.id) {
+      console.warn('🚨 Invalid maintenance report structure found:', report);
+      return false;
+    }
+    
     if (seen.has(report.id)) {
+      duplicateIds.add(report.id);
       console.warn('🚨 Duplicate equipment maintenance report found and removed:', report.id);
       return false;
     }
     seen.add(report.id);
     return true;
   });
+  
+  // Log summary if duplicates were found
+  if (duplicateIds.size > 0) {
+    console.warn(`🔥 Equipment maintenance reports deduplication summary: ${duplicateIds.size} duplicate IDs removed from ${reports.length} total reports`);
+    console.warn('🔍 Duplicate IDs:', Array.from(duplicateIds));
+  }
+  
+  return deduplicated;
 }
 
 // TanStack Query Hooks
@@ -513,7 +535,7 @@ export function useCreateEquipmentMaintenanceReport() {
       toast.error(`Failed to create maintenance report: ${error.message}`);
     },
     onSuccess: (newReport) => {
-      // Add to cache optimistically
+      // Add to cache optimistically with enhanced duplicate prevention
       queryClient.setQueryData<EquipmentMaintenanceReport[]>(
         equipmentKeys.maintenanceReports(),
         (oldData) => {
@@ -522,12 +544,13 @@ export function useCreateEquipmentMaintenanceReport() {
           // Check if report already exists to prevent duplicates
           const existingReport = oldData.find(report => report.id === newReport.id);
           if (existingReport) {
-            console.log('🔄 Maintenance report already exists in cache during create, skipping duplicate');
+            console.log('🔄 Equipment maintenance report already exists in cache during create, skipping duplicate:', newReport.id);
             return oldData;
           }
           
-          console.log('✅ Adding new maintenance report to cache:', newReport.id);
-          return deduplicateEquipmentMaintenanceReports([newReport, ...oldData]);
+          console.log('✅ Adding new equipment maintenance report to cache:', newReport.id);
+          const updatedData = [newReport, ...oldData];
+          return deduplicateEquipmentMaintenanceReports(updatedData);
         }
       );
       toast.success('Maintenance report created successfully!');
@@ -542,7 +565,13 @@ export function useUpdateEquipmentMaintenanceReport() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: updateEquipmentMaintenanceReport,
+    mutationFn: (formData: FormData) => {
+      const reportId = formData.get('reportId') as string;
+      if (!reportId) {
+        throw new Error('Report ID is required for update');
+      }
+      return updateEquipmentMaintenanceReport(reportId, formData);
+    },
     onMutate: async (formData) => {
       const reportId = formData.get('reportId') as string;
       
@@ -562,14 +591,17 @@ export function useUpdateEquipmentMaintenanceReport() {
       toast.error(`Failed to update maintenance report: ${error.message}`);
     },
     onSuccess: (updatedReport) => {
-      // Update in cache
+      // Update in cache with enhanced duplicate prevention
       queryClient.setQueryData<EquipmentMaintenanceReport[]>(
         equipmentKeys.maintenanceReports(),
         (oldData) => {
           if (!oldData) return [updatedReport];
+          
           const updated = oldData.map((report) => 
             report.id === updatedReport.id ? updatedReport : report
           );
+          
+          console.log('✅ Updated equipment maintenance report in cache:', updatedReport.id);
           return deduplicateEquipmentMaintenanceReports(updated);
         }
       );
