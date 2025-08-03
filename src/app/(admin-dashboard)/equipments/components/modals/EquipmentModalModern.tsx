@@ -114,7 +114,9 @@ export default function EquipmentModalModern() {
   const activeModal = useEquipmentStore(selectActiveModal);
 
   // Add maintenance report detail state for mutual exclusion
-  const isMaintenanceReportDetailOpen = useEquipmentStore((state) => state.isMaintenanceReportDetailOpen);
+  const selectedMaintenanceReport = useEquipmentStore((state) => state.selectedMaintenanceReport);
+  const maintenanceReportMode = useEquipmentStore((state) => state.maintenanceReportMode);
+  const isMaintenanceReportDetailOpen = Boolean(selectedMaintenanceReport && maintenanceReportMode);
 
   // Custom tab state - EXACTLY like CreateEquipmentForm with Images and Documents tabs
   const [activeTab, setActiveTab] = useState<'details' | 'images' | 'documents' | 'parts' | 'maintenance'>('details');
@@ -646,9 +648,9 @@ export default function EquipmentModalModern() {
     setActiveModal,
   } = useEquipmentStore();
   const { 
-    setSelectedMaintenanceReportForDetail,
-    setSelectedEquipmentMaintenanceReport,
-    setIsMaintenanceReportDetailOpen 
+    setSelectedMaintenanceReport,
+    setMaintenanceReportMode,
+    closeMaintenanceReport
   } = useEquipmentStore();
 
   // Mutations
@@ -773,9 +775,7 @@ export default function EquipmentModalModern() {
     setActiveModal(null);
     // Close any maintenance report modals
     setIsMaintenanceModalOpen(false);
-    setIsMaintenanceReportDetailOpen(false);
-    setSelectedMaintenanceReportForDetail(null);
-    setSelectedEquipmentMaintenanceReport(null);
+    closeMaintenanceReport();
     // Reset global edit state
     setIsGlobalEditMode(false);
     // Reset upload state using safety function

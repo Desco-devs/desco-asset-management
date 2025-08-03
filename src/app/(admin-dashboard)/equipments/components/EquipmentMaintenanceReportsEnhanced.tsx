@@ -33,11 +33,13 @@ export default function EquipmentMaintenanceReportsEnhanced({
   const deleteMaintenanceReportMutation = useDeleteEquipmentMaintenanceReport();
   const isMaintenanceModalOpen = useEquipmentStore(state => state.isMaintenanceModalOpen);
   const activeModal = useEquipmentStore(selectActiveModal);
-  const { setIsMaintenanceModalOpen, setActiveModal } = useEquipmentStore();
   const { 
-    setSelectedEquipmentMaintenanceReport,
-    setSelectedMaintenanceReportForDetail,
-    setIsMaintenanceReportDetailOpen
+    setIsMaintenanceModalOpen, 
+    setActiveModal, 
+    openMaintenanceReportView, 
+    openMaintenanceReportEdit,
+    setSelectedMaintenanceReport,
+    setMaintenanceReportMode
   } = useEquipmentStore();
 
   // Helper function to deduplicate maintenance reports in component
@@ -95,23 +97,20 @@ export default function EquipmentMaintenanceReportsEnhanced({
 
   // Simple CRUD functions with unified modal coordination
   const handleViewReport = (report: EquipmentMaintenanceReport) => {
-    // Use unified modal coordination - this will close all other modals
-    setActiveModal('maintenance-view');
-    // Set the report data
-    setSelectedMaintenanceReportForDetail(report);
-    setIsMaintenanceReportDetailOpen(true);
-    // Clear any edit state
-    setSelectedEquipmentMaintenanceReport(null);
+    console.log('🔍 handleViewReport called with report:', report);
+    console.log('🔍 report.id:', report.id);
+    console.log('🔍 Current activeModal before:', activeModal);
+    
+    // Use the optimized unified function from the store
+    console.log('✅ Using unified function');
+    openMaintenanceReportView(report);
+    
+    console.log('✅ handleViewReport completed - modal should open');
   };
 
   const handleEditReport = (report: EquipmentMaintenanceReport) => {
-    // Use unified modal coordination - this will close all other modals
-    setActiveModal('maintenance-edit');
-    // Set the report data for editing
-    setSelectedEquipmentMaintenanceReport(report);
-    // Clear view state
-    setIsMaintenanceReportDetailOpen(false);
-    setSelectedMaintenanceReportForDetail(null);
+    // Use the optimized unified function from the store
+    openMaintenanceReportEdit(report);
   };
 
   const handleDeleteReport = async (report: EquipmentMaintenanceReport) => {
@@ -155,9 +154,8 @@ export default function EquipmentMaintenanceReportsEnhanced({
             // Use unified modal coordination - this will close all other modals
             setActiveModal('maintenance-create');
             // Clear any existing report state
-            setIsMaintenanceReportDetailOpen(false);
-            setSelectedMaintenanceReportForDetail(null);
-            setSelectedEquipmentMaintenanceReport(null);
+            setSelectedMaintenanceReport(null);
+            setMaintenanceReportMode(null);
             // Open create modal
             setIsMaintenanceModalOpen(true);
           }}
@@ -188,9 +186,8 @@ export default function EquipmentMaintenanceReportsEnhanced({
               // Use unified modal coordination - this will close all other modals
               setActiveModal('maintenance-create');
               // Clear any existing report state
-              setIsMaintenanceReportDetailOpen(false);
-              setSelectedMaintenanceReportForDetail(null);
-              setSelectedEquipmentMaintenanceReport(null);
+              setSelectedMaintenanceReport(null);
+              setMaintenanceReportMode(null);
               // Open create modal
               setIsMaintenanceModalOpen(true);
             }}
@@ -211,7 +208,12 @@ export default function EquipmentMaintenanceReportsEnhanced({
             <Card key={report.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow">
               <CardHeader 
                 className="pb-3"
-                onClick={() => handleViewReport(report)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('🖱️ CardHeader clicked!');
+                  handleViewReport(report);
+                }}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">

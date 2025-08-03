@@ -41,13 +41,12 @@ import Image from "next/image";
 export default function MaintenanceReportDetailDrawer() {
   // State from Zustand
   const isMobile = useEquipmentStore(selectIsMobile);
-  const selectedReport = useEquipmentStore((state) => state.selectedMaintenanceReportForDetail);
-  const isOpen = useEquipmentStore((state) => state.isMaintenanceReportDetailOpen);
+  const selectedReport = useEquipmentStore((state) => state.selectedMaintenanceReport);
+  const maintenanceReportMode = useEquipmentStore((state) => state.maintenanceReportMode);
+  const isOpen = Boolean(selectedReport && maintenanceReportMode === 'view');
   const { 
-    setIsMaintenanceReportDetailOpen, 
-    setSelectedMaintenanceReportForDetail,
-    setSelectedMaintenanceReportForEdit,
-    setIsEditMaintenanceReportDrawerOpen,
+    closeMaintenanceReport,
+    openMaintenanceReportEdit,
     setIsModalOpen 
   } = useEquipmentStore();
 
@@ -72,23 +71,18 @@ export default function MaintenanceReportDetailDrawer() {
   }, []);
 
   const handleClose = useCallback(() => {
-    setIsMaintenanceReportDetailOpen(false);
-    setSelectedMaintenanceReportForDetail(null);
+    closeMaintenanceReport();
     // Reopen equipment modal after closing detail drawer
     setIsModalOpen(true);
-  }, [setIsMaintenanceReportDetailOpen, setSelectedMaintenanceReportForDetail, setIsModalOpen]);
+  }, [closeMaintenanceReport, setIsModalOpen]);
 
   const handleEdit = useCallback(() => {
     if (!selectedReport) return;
-    // Set report for edit drawer
-    setSelectedMaintenanceReportForEdit(selectedReport);
-    setIsEditMaintenanceReportDrawerOpen(true);
-    // Close this drawer
-    setIsMaintenanceReportDetailOpen(false);
-    setSelectedMaintenanceReportForDetail(null);
+    // Use unified function to open edit mode
+    openMaintenanceReportEdit(selectedReport);
     // Close equipment modal to prevent navigation conflicts (same as opening detail from main modal)
     setIsModalOpen(false);
-  }, [selectedReport, setSelectedMaintenanceReportForEdit, setIsEditMaintenanceReportDrawerOpen, setIsMaintenanceReportDetailOpen, setSelectedMaintenanceReportForDetail, setIsModalOpen]);
+  }, [selectedReport, openMaintenanceReportEdit, setIsModalOpen]);
 
   const handleDeleteClick = useCallback(() => {
     setShowDeleteConfirmation(true);
@@ -101,12 +95,11 @@ export default function MaintenanceReportDetailDrawer() {
       await deleteMaintenanceReportMutation.mutateAsync(selectedReport.id);
       setShowDeleteConfirmation(false);
       // Close this drawer and reopen equipment modal
-      setIsMaintenanceReportDetailOpen(false);
-      setSelectedMaintenanceReportForDetail(null);
+      closeMaintenanceReport();
       setIsModalOpen(true);
     } catch (error) {
     }
-  }, [selectedReport, deleteMaintenanceReportMutation, setIsMaintenanceReportDetailOpen, setSelectedMaintenanceReportForDetail, setIsModalOpen]);
+  }, [selectedReport, deleteMaintenanceReportMutation, closeMaintenanceReport, setIsModalOpen]);
 
   const handleDeleteCancel = useCallback(() => {
     setShowDeleteConfirmation(false);
@@ -179,8 +172,22 @@ export default function MaintenanceReportDetailDrawer() {
 
   const getAttachmentsCount = () => {
     if (!selectedReport?.attachment_urls) return 0;
-    // FIXED: All attachments are standalone - no part-specific attachments in current implementation
-    return selectedReport.attachment_urls.filter((url: string) => url && url.trim() !== "").length;
+    
+    // Handle attachment_urls being either string or array
+    let urls: string[] = [];
+    if (Array.isArray(selectedReport.attachment_urls)) {
+      urls = selectedReport.attachment_urls;
+    } else if (typeof selectedReport.attachment_urls === 'string') {
+      // Try to parse as JSON, fallback to single URL
+      try {
+        const parsed = JSON.parse(selectedReport.attachment_urls);
+        urls = Array.isArray(parsed) ? parsed : [selectedReport.attachment_urls];
+      } catch {
+        urls = [selectedReport.attachment_urls];
+      }
+    }
+    
+    return urls.filter((url: string) => url && url.trim() !== "").length;
   };
 
   // Image Viewer Component - EXACTLY like equipment modal
@@ -289,10 +296,10 @@ export default function MaintenanceReportDetailDrawer() {
           <div>
             <h2 className="text-xl font-bold mb-3">{selectedReport.issue_description}</h2>
             <div className="flex flex-wrap gap-2 mb-4">
-              <Badge className={getStatusColor(selectedReport.status)}>
+              <Badge className={getStatusColor(selectedReport.status ?? undefined)}>
                 {selectedReport.status || "REPORTED"}
               </Badge>
-              <Badge className={getPriorityColor(selectedReport.priority)}>
+              <Badge className={getPriorityColor(selectedReport.priority ?? undefined)}>
                 {selectedReport.priority || "MEDIUM"} Priority
               </Badge>
             </div>
@@ -325,19 +332,19 @@ export default function MaintenanceReportDetailDrawer() {
             </div>
 
             <div className="space-y-3">
-              {selectedReport.reported_user && (
+              {selectedReport.reported_by && (
                 <div className="flex items-center gap-2 text-sm">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">Reported by:</span>
-                  <span>{selectedReport.reported_user.full_name}</span>
+                  <span>{selectedReport.reported_by}</span>
                 </div>
               )}
 
-              {selectedReport.repaired_user && (
+              {selectedReport.repaired_by && (
                 <div className="flex items-center gap-2 text-sm">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">Repaired by:</span>
-                  <span>{selectedReport.repaired_user.full_name}</span>
+                  <span>{selectedReport.repaired_by}</span>
                 </div>
               )}
 
@@ -447,7 +454,19 @@ export default function MaintenanceReportDetailDrawer() {
             if (!selectedReport.attachment_urls) return null;
             
             // FIXED: Show all attachments since none are part-specific in current implementation
-            const allAttachments = selectedReport.attachment_urls.filter((url: string) => url && url.trim() !== "");
+            // Handle attachment_urls being either string or array
+            let allAttachments: string[] = [];
+            if (Array.isArray(selectedReport.attachment_urls)) {
+              allAttachments = selectedReport.attachment_urls.filter((url: string) => url && url.trim() !== "");
+            } else if (typeof selectedReport.attachment_urls === 'string') {
+              // Try to parse as JSON, fallback to single URL
+              try {
+                const parsed = JSON.parse(selectedReport.attachment_urls);
+                allAttachments = Array.isArray(parsed) ? parsed.filter((url: string) => url && url.trim() !== "") : [selectedReport.attachment_urls].filter(url => url.trim() !== "");
+              } catch {
+                allAttachments = [selectedReport.attachment_urls].filter(url => url.trim() !== "");
+              }
+            }
             
             return allAttachments.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -545,10 +564,10 @@ export default function MaintenanceReportDetailDrawer() {
                     {selectedReport.issue_description}
                   </p>
                   <div className="flex flex-wrap gap-1">
-                    <Badge className={getStatusColor(selectedReport.status)} variant="outline">
+                    <Badge className={getStatusColor(selectedReport.status ?? undefined)} variant="outline">
                       {selectedReport.status || "REPORTED"}
                     </Badge>
-                    <Badge className={getPriorityColor(selectedReport.priority)} variant="outline">
+                    <Badge className={getPriorityColor(selectedReport.priority ?? undefined)} variant="outline">
                       {selectedReport.priority || "MEDIUM"} Priority
                     </Badge>
                   </div>

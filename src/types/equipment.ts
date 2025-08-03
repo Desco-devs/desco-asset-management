@@ -65,11 +65,16 @@ export interface MaintenanceReport {
   downtime_hours: string | null;
   date_reported: string;
   date_repaired: string | null;
-  attachment_urls: string[];
+  attachment_urls: string[] | string;
   reported_by: string | null;
   repaired_by: string | null;
   created_at: string;
   updated_at: string;
+  // Optional fallback properties for compatibility
+  uid?: string;
+  _id?: string;
+  // Optional populated relations
+  location?: Location;
 }
 
 // API Response Types

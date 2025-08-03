@@ -32,10 +32,9 @@ import { FileUploadSectionSimple } from "@/components/equipment/FileUploadSectio
 import { toast } from "sonner";
 
 export default function EditEquipmentMaintenanceReportModal() {
-  const selectedReport = useEquipmentStore((state) => state.selectedEquipmentMaintenanceReport);
+  const selectedReport = useEquipmentStore((state) => state.selectedMaintenanceReport);
   const activeModal = useEquipmentStore(selectActiveModal);
-  const { setSelectedEquipmentMaintenanceReport } = useEquipmentStore();
-  const { setActiveModal } = useEquipmentStore();
+  const { setSelectedMaintenanceReport, setActiveModal, closeMaintenanceReport } = useEquipmentStore();
   // Server state from TanStack Query (standardized approach)
   const { data: equipments = [] } = useEquipments();
   const { data: projects = [] } = useProjects();
@@ -58,7 +57,7 @@ export default function EditEquipmentMaintenanceReportModal() {
     downtime_hours: "",
     location_id: "",
     parts_replaced: [""] as string[],
-    attachment_urls: [""] as string[],
+    attachment_urls: [] as string[],
   });
   const [localAttachmentFiles, setLocalAttachmentFiles] = useState<File[]>([]);
   const [deletedAttachments, setDeletedAttachments] = useState<string[]>([]);
@@ -66,15 +65,55 @@ export default function EditEquipmentMaintenanceReportModal() {
 
   // Populate form when selectedReport changes
   useEffect(() => {
+    console.log('🔄 EditModal: useEffect triggered');
+    console.log('📝 selectedReport:', selectedReport);
+    console.log('🔑 selectedReport?.id:', selectedReport?.id);
+    
     if (selectedReport) {
+      // Validate that we have a valid report with required data
+      if (!selectedReport.id && !selectedReport.uid && !selectedReport._id) {
+        console.error('❌ EditModal: selectedReport missing valid ID');
+        toast.error('Cannot edit report: invalid data');
+        return;
+      }
+      
+      console.log('✅ EditModal: Processing selectedReport data');
+      
       const partsReplaced = selectedReport.parts_replaced?.length > 0 
         ? selectedReport.parts_replaced.filter((part: string) => part.trim() !== "") 
         : [];
-      const attachmentUrls = selectedReport.attachment_urls?.length > 0 
-        ? selectedReport.attachment_urls.filter((url: string) => url.trim() !== "") 
-        : [];
+      
+      // ROBUST ATTACHMENT URL PROCESSING
+      let attachmentUrls: string[] = [];
+      
+      try {
+        // Handle multiple possible data formats
+        if (selectedReport.attachment_urls) {
+          if (Array.isArray(selectedReport.attachment_urls)) {
+            // Already an array - filter out empty strings
+            attachmentUrls = selectedReport.attachment_urls.filter((url: string) => url && url.trim() !== "");
+          } else if (typeof selectedReport.attachment_urls === 'string') {
+            // Might be JSON string - try to parse
+            try {
+              const parsed = JSON.parse(selectedReport.attachment_urls);
+              if (Array.isArray(parsed)) {
+                attachmentUrls = parsed.filter((url: string) => url && url.trim() !== "");
+              } else {
+                // Single URL as string
+                attachmentUrls = selectedReport.attachment_urls.trim() ? [selectedReport.attachment_urls.trim()] : [];
+              }
+            } catch {
+              // Not JSON - treat as single URL
+              attachmentUrls = selectedReport.attachment_urls.trim() ? [selectedReport.attachment_urls.trim()] : [];
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error processing attachment_urls:', error);
+        attachmentUrls = [];
+      }
 
-      setFormData({
+      const newFormData = {
         issue_description: selectedReport.issue_description || "",
         remarks: selectedReport.remarks || "",
         inspection_details: selectedReport.inspection_details || "",
@@ -84,13 +123,38 @@ export default function EditEquipmentMaintenanceReportModal() {
         downtime_hours: selectedReport.downtime_hours || "",
         location_id: selectedReport.location_id || "",
         parts_replaced: partsReplaced.length > 0 ? partsReplaced : [""],
-        attachment_urls: attachmentUrls.length > 0 ? attachmentUrls : [""],
+        attachment_urls: attachmentUrls,
+      };
+      
+      console.log('✅ EditModal: Setting form data:', newFormData);
+      console.log('✅ EditModal: Attachment URLs count:', attachmentUrls.length);
+      
+      setFormData(newFormData);
+      
+      // Reset other state when switching to a new report
+      setLocalAttachmentFiles([]);
+      setDeletedAttachments([]);
+      setActiveTab('details');
+    } else {
+      console.log('⚠️ EditModal: No selectedReport, clearing form');
+      // Clear form when no report is selected
+      setFormData({
+        issue_description: "",
+        remarks: "",
+        inspection_details: "",
+        action_taken: "",
+        priority: "MEDIUM",
+        status: "REPORTED",
+        downtime_hours: "",
+        location_id: "",
+        parts_replaced: [""],
+        attachment_urls: [],
       });
     }
   }, [selectedReport]);
 
   const handleClose = useCallback(() => {
-    setSelectedEquipmentMaintenanceReport(null);
+    setSelectedMaintenanceReport(null);
     // Clear active modal coordination
     setActiveModal(null);
     // Reset form
@@ -104,12 +168,12 @@ export default function EditEquipmentMaintenanceReportModal() {
       downtime_hours: "",
       location_id: "",
       parts_replaced: [""],
-      attachment_urls: [""],
+      attachment_urls: [],
     });
     setLocalAttachmentFiles([]);
     setDeletedAttachments([]);
     setActiveTab('details');
-  }, [setSelectedEquipmentMaintenanceReport, setActiveModal]);
+  }, [setSelectedMaintenanceReport, setActiveModal]);
 
   const handleInputChange = useCallback((field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -200,6 +264,13 @@ export default function EditEquipmentMaintenanceReportModal() {
       toast.error("Issue description is required");
       return;
     }
+    
+    // Additional validation to ensure equipment_id exists
+    if (!selectedReport.equipment_id) {
+      console.error('❌ No equipment_id found in selectedReport');
+      toast.error("Invalid report data - missing equipment ID");
+      return;
+    }
 
     // Filter out empty values from arrays
     const filteredPartsReplaced = formData.parts_replaced.filter(
@@ -272,10 +343,13 @@ export default function EditEquipmentMaintenanceReportModal() {
   // Only render when this is the active modal and we have a report to edit
   const shouldShow = activeModal === 'maintenance-edit' && !!selectedReport;
   
-  if (!selectedReport || !shouldShow) return null;
+  // Show loading state if modal should be open but no data yet
+  const isLoading = activeModal === 'maintenance-edit' && !selectedReport;
+  
+  if (!shouldShow && !isLoading) return null;
 
   return (
-    <Dialog open={shouldShow} onOpenChange={handleClose}>
+    <Dialog open={shouldShow || isLoading} onOpenChange={handleClose}>
       <DialogContent 
         className="!max-w-none !w-[70vw] max-h-[95dvh] overflow-hidden flex flex-col p-6"
         style={{ maxWidth: '70vw', width: '70vw' }}
@@ -288,6 +362,18 @@ export default function EditEquipmentMaintenanceReportModal() {
           </DialogDescription>
         </DialogHeader>
         
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex-1 overflow-y-auto min-h-0 flex items-center justify-center py-8">
+            <div className="text-center space-y-3">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Loading maintenance report data...</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Main Content - Only show when data is loaded */}
+        {!isLoading && (
         <div className="flex-1 overflow-y-auto min-h-0">
           <div className="space-y-4">
             {/* Tab Navigation - Always Horizontal */}
@@ -554,9 +640,15 @@ export default function EditEquipmentMaintenanceReportModal() {
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    
                     {/* Existing Attachments */}
-                    {formData.attachment_urls.map((attachmentUrl, index) => {
-                      if (!attachmentUrl || deletedAttachments.includes(attachmentUrl)) return null;
+                    {formData.attachment_urls && formData.attachment_urls.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-3">Existing Attachments ({formData.attachment_urls.length})</h4>
+                        {formData.attachment_urls.map((attachmentUrl, index) => {
+                      if (!attachmentUrl || attachmentUrl.trim() === "" || deletedAttachments.includes(attachmentUrl)) {
+                        return null;
+                      }
                       
                       const fileName = attachmentUrl.split('/').pop() || `Attachment ${index + 1}`;
                       
@@ -599,6 +691,8 @@ export default function EditEquipmentMaintenanceReportModal() {
                         </div>
                       );
                     })}
+                      </div>
+                    )}
 
                     {/* New Attachment Files */}
                     {localAttachmentFiles.map((file, index) => {
@@ -685,23 +779,29 @@ export default function EditEquipmentMaintenanceReportModal() {
             )}
           </div>
         </div>
+        )}
         
         {/* Desktop Action Buttons in Footer */}
         <DialogFooter className="pt-4 border-t bg-background">
           <div className="flex gap-2 w-full justify-end">
-            <Button type="button" variant="outline" onClick={handleClose} size="lg">
+            <Button type="button" variant="outline" onClick={handleClose} size="lg" disabled={isLoading}>
               Cancel
             </Button>
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={updateMaintenanceReportMutation.isPending}
+              disabled={updateMaintenanceReportMutation.isPending || isLoading}
               size="lg"
             >
               {updateMaintenanceReportMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Updating Report...
+                </>
+              ) : isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading...
                 </>
               ) : (
                 "Update Report"

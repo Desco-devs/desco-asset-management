@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Equipment } from '@/types/equipment';
+import type { Equipment, MaintenanceReport } from '@/types/equipment';
 
 /**
  * Equipment UI Store - Following REALTIME_PATTERN.md
@@ -44,12 +44,10 @@ interface EquipmentUIState {
   // Active modal state for maintenance reports
   activeModal: string | null;
 
-  // Maintenance report specific state (temporary bridge to old functionality)
-  selectedEquipmentMaintenanceReport: any | null;
-  selectedMaintenanceReportForDetail: any | null;
-  isMaintenanceReportDetailOpen: boolean;
-  selectedMaintenanceReportForEdit: any | null;
-  isEditMaintenanceReportDrawerOpen: boolean;
+  // Unified maintenance report state - optimized for modal workflow
+  selectedMaintenanceReport: MaintenanceReport | null;
+  maintenanceReportMode: 'view' | 'edit' | null;
+  
 
   // Filters (not persisted - start fresh each session)
   searchQuery: string;
@@ -79,12 +77,13 @@ interface EquipmentUIState {
   setDeleteConfirmation: (state: { isOpen: boolean; equipment: Equipment | null }) => void;
   setActiveModal: (modal: string | null) => void;
   
-  // Maintenance report actions (temporary bridge)
-  setSelectedEquipmentMaintenanceReport: (report: any | null) => void;
-  setSelectedMaintenanceReportForDetail: (report: any | null) => void;
-  setIsMaintenanceReportDetailOpen: (open: boolean) => void;
-  setSelectedMaintenanceReportForEdit: (report: any | null) => void;
-  setIsEditMaintenanceReportDrawerOpen: (open: boolean) => void;
+  // Unified maintenance report actions
+  setSelectedMaintenanceReport: (report: MaintenanceReport | null) => void;
+  setMaintenanceReportMode: (mode: 'view' | 'edit' | null) => void;
+  openMaintenanceReportView: (report: MaintenanceReport) => void;
+  openMaintenanceReportEdit: (report: MaintenanceReport) => void;
+  closeMaintenanceReport: () => void;
+  
   
   setSearchQuery: (query: string) => void;
   setFilterStatus: (status: 'all' | 'OPERATIONAL' | 'NON_OPERATIONAL') => void;
@@ -137,12 +136,10 @@ export const useEquipmentStore = create<EquipmentUIState>()(
       // Active modal state
       activeModal: null,
 
-      // Maintenance report state (temporary bridge)
-      selectedEquipmentMaintenanceReport: null,
-      selectedMaintenanceReportForDetail: null,
-      isMaintenanceReportDetailOpen: false,
-      selectedMaintenanceReportForEdit: null,
-      isEditMaintenanceReportDrawerOpen: false,
+      // Unified maintenance report state
+      selectedMaintenanceReport: null,
+      maintenanceReportMode: null,
+      
 
       // Filters (not persisted)
       searchQuery: '',
@@ -172,12 +169,36 @@ export const useEquipmentStore = create<EquipmentUIState>()(
       setDeleteConfirmation: (state) => set({ deleteConfirmation: state }),
       setActiveModal: (modal) => set({ activeModal: modal }),
       
-      // Maintenance report actions (temporary bridge)
-      setSelectedEquipmentMaintenanceReport: (report) => set({ selectedEquipmentMaintenanceReport: report }),
-      setSelectedMaintenanceReportForDetail: (report) => set({ selectedMaintenanceReportForDetail: report }),
-      setIsMaintenanceReportDetailOpen: (open) => set({ isMaintenanceReportDetailOpen: open }),
-      setSelectedMaintenanceReportForEdit: (report) => set({ selectedMaintenanceReportForEdit: report }),
-      setIsEditMaintenanceReportDrawerOpen: (open) => set({ isEditMaintenanceReportDrawerOpen: open }),
+      // Unified maintenance report actions
+      setSelectedMaintenanceReport: (report) => set({ selectedMaintenanceReport: report }),
+      setMaintenanceReportMode: (mode) => set({ maintenanceReportMode: mode }),
+      
+      openMaintenanceReportView: (report) => {
+        set({
+          selectedMaintenanceReport: report,
+          maintenanceReportMode: 'view',
+          activeModal: 'maintenance-view',
+          // Ensure equipment modal is closed
+          isModalOpen: false,
+          selectedEquipment: null,
+        });
+      },
+      
+      openMaintenanceReportEdit: (report) => set({
+        selectedMaintenanceReport: report,
+        maintenanceReportMode: 'edit',
+        activeModal: 'maintenance-edit',
+        // Ensure other modals are closed
+        isModalOpen: false,
+        isMaintenanceModalOpen: false,
+      }),
+      
+      closeMaintenanceReport: () => set({
+        selectedMaintenanceReport: null,
+        maintenanceReportMode: null,
+        activeModal: null,
+      }),
+      
       
       setSearchQuery: (query) => set({ searchQuery: query, currentPage: 1 }),
       setFilterStatus: (status) => set({ filterStatus: status, currentPage: 1 }),
@@ -324,7 +345,7 @@ export const useEquipmentStore = create<EquipmentUIState>()(
         currentPage: 1,
       }),
 
-      // Close all modals
+      // Close all modals with proper cleanup
       closeAllModals: () => set({
         isModalOpen: false,
         isCreateModalOpen: false,
@@ -338,6 +359,9 @@ export const useEquipmentStore = create<EquipmentUIState>()(
           isOpen: false,
           equipment: null,
         },
+        // Clean up maintenance report state
+        selectedMaintenanceReport: null,
+        maintenanceReportMode: null,
       }),
     }),
     {
@@ -361,6 +385,17 @@ export const selectIsMobile = (state: EquipmentUIState) => state.isMobile;
 export const selectViewerImage = (state: EquipmentUIState) => state.viewerImage;
 export const selectDeleteConfirmation = (state: EquipmentUIState) => state.deleteConfirmation;
 export const selectActiveModal = (state: EquipmentUIState) => state.activeModal;
+
+// Maintenance Report Selectors - Optimized for performance
+export const selectSelectedMaintenanceReport = (state: EquipmentUIState) => state.selectedMaintenanceReport;
+export const selectMaintenanceReportMode = (state: EquipmentUIState) => state.maintenanceReportMode;
+export const selectIsMaintenanceReportViewOpen = (state: EquipmentUIState) => 
+  state.maintenanceReportMode === 'view' && state.activeModal === 'maintenance-view';
+export const selectIsMaintenanceReportEditOpen = (state: EquipmentUIState) => 
+  state.maintenanceReportMode === 'edit' && state.activeModal === 'maintenance-edit';
+
+
+// Filter and Pagination Selectors
 export const selectSearchQuery = (state: EquipmentUIState) => state.searchQuery;
 export const selectFilterStatus = (state: EquipmentUIState) => state.filterStatus;
 export const selectFilterType = (state: EquipmentUIState) => state.filterType;

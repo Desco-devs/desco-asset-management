@@ -35,22 +35,19 @@ import {
 import { useProjects } from "@/hooks/api/use-projects";
 import { useQueryClient } from "@tanstack/react-query";
 import { equipmentKeys } from "@/hooks/useEquipmentQuery";
-import { useEquipmentStore, selectIsMobile } from "@/stores/equipmentStore";
+import { useEquipmentStore, selectIsMobile, selectIsMaintenanceReportEditOpen, selectSelectedMaintenanceReport } from "@/stores/equipmentStore";
 import { Plus, Trash2, X, ClipboardCheck, Package, ImageIcon, Upload, MapPin, Calendar, Clock, Wrench, Loader2, LinkIcon } from "lucide-react";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 
 export default function EditEquipmentMaintenanceReportDrawer() {
-  // State from Zustand
-  const isOpen = useEquipmentStore((state) => state.isEditMaintenanceReportDrawerOpen);
+  // State from Zustand - using optimized selectors
+  const isOpen = useEquipmentStore(selectIsMaintenanceReportEditOpen);
   const isMobile = useEquipmentStore(selectIsMobile);
-  const selectedReport = useEquipmentStore((state) => state.selectedMaintenanceReportForEdit);
+  const selectedReport = useEquipmentStore(selectSelectedMaintenanceReport);
   const { 
-    setIsEditMaintenanceReportDrawerOpen, 
-    setSelectedMaintenanceReportForEdit,
-    setIsMaintenanceReportDetailOpen,
-    setSelectedMaintenanceReportForDetail,
+    closeMaintenanceReport,
     setIsModalOpen
   } = useEquipmentStore();
 
@@ -117,18 +114,38 @@ export default function EditEquipmentMaintenanceReportDrawer() {
         parts_replaced: selectedReport.parts_replaced && selectedReport.parts_replaced.length > 0 
           ? selectedReport.parts_replaced.filter((part: string) => part && part.trim() !== "")
           : [""], // Always have at least one empty part
-        attachment_urls: selectedReport.attachment_urls && selectedReport.attachment_urls.length > 0 && selectedReport.parts_replaced
-          ? selectedReport.attachment_urls.slice(selectedReport.parts_replaced.length).filter((url: string) => url && url.trim() !== "")
-          : [""], // Only attachment URLs after part images
+        attachment_urls: (() => {
+          // Handle attachment_urls being either string or array
+          let urls: string[] = [];
+          if (selectedReport.attachment_urls) {
+            if (Array.isArray(selectedReport.attachment_urls)) {
+              urls = selectedReport.attachment_urls;
+            } else if (typeof selectedReport.attachment_urls === 'string') {
+              // Try to parse as JSON, fallback to single URL
+              try {
+                const parsed = JSON.parse(selectedReport.attachment_urls);
+                urls = Array.isArray(parsed) ? parsed : [selectedReport.attachment_urls];
+              } catch {
+                urls = [selectedReport.attachment_urls];
+              }
+            }
+          }
+          
+          // Filter out empty URLs and slice if needed
+          if (urls.length > 0 && selectedReport.parts_replaced) {
+            return urls.slice(selectedReport.parts_replaced.length).filter((url: string) => url && url.trim() !== "");
+          }
+          return [""];
+        })()
       });
     }
   }, [selectedReport]); // Remove locations dependency to prevent infinite loop
 
   // Stable event handlers using useCallback
   const handleClose = useCallback(() => {
-    setIsEditMaintenanceReportDrawerOpen(false);
-    const reportToReturn = selectedReport; // Store before clearing
-    setSelectedMaintenanceReportForEdit(null);
+    // Close using unified state management
+    closeMaintenanceReport();
+    
     // Reset form state
     setActiveTab('details');
     setLocalAttachmentFiles([]);
@@ -145,33 +162,26 @@ export default function EditEquipmentMaintenanceReportDrawer() {
       parts_replaced: [""],
       attachment_urls: [""],
     });
-    // Reopen maintenance report detail drawer (user came from there)
-    if (reportToReturn) {
-      setSelectedMaintenanceReportForDetail(reportToReturn);
-      setIsMaintenanceReportDetailOpen(true);
-    } else {
-      // Fallback to equipment modal if no report
+    
+    // Fallback to equipment modal if no report
+    if (!selectedReport) {
       setIsModalOpen(true);
     }
-  }, [setIsEditMaintenanceReportDrawerOpen, selectedReport, setSelectedMaintenanceReportForDetail, setIsMaintenanceReportDetailOpen, setIsModalOpen]);
+  }, [closeMaintenanceReport, selectedReport, setIsModalOpen]);
 
   const handleSaveAndViewDetails = useCallback((updatedReport?: any) => {
     // Use the updated report if provided, otherwise use selected report
     const reportToShow = updatedReport || selectedReport;
     if (reportToShow) {
-      // Set the updated report for detail view - ensure it's a fresh object
-      setSelectedMaintenanceReportForDetail({...reportToShow});
-      setIsMaintenanceReportDetailOpen(true);
-      
       // Invalidate queries to ensure fresh data everywhere
       if (selectedReport?.equipment_id) {
         queryClient.invalidateQueries({ queryKey: equipmentKeys.equipmentMaintenanceReports(selectedReport.equipment_id) });
       }
       queryClient.invalidateQueries({ queryKey: equipmentKeys.list() });
       
-      // Close edit drawer (this will also close equipment modal via handleClose)
-      setIsEditMaintenanceReportDrawerOpen(false);
-      setSelectedMaintenanceReportForEdit(null);
+      // Close edit and transition to view using unified state management
+      closeMaintenanceReport();
+      
       // Reset form state
       setActiveTab('details');
       setLocalAttachmentFiles([]);
@@ -188,10 +198,11 @@ export default function EditEquipmentMaintenanceReportDrawer() {
         parts_replaced: [""],
         attachment_urls: [""],
       });
-      // Equipment modal stays closed since we're opening detail drawer
-      // (Detail drawer will handle reopening equipment modal when it closes)
+      
+      // Note: Transition to view mode should be handled by the calling component
+      // since this drawer component shouldn't directly control view mode
     }
-  }, [selectedReport, setSelectedMaintenanceReportForDetail, setIsMaintenanceReportDetailOpen, setIsEditMaintenanceReportDrawerOpen, setSelectedMaintenanceReportForEdit, setLocalAttachmentFiles, setFormData, setActiveTab, queryClient]);
+  }, [selectedReport, closeMaintenanceReport, setLocalAttachmentFiles, setFormData, setActiveTab, queryClient]);
 
   const handleInputChange = useCallback((field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
