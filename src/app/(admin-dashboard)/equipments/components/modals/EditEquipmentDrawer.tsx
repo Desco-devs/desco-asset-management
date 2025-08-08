@@ -116,14 +116,7 @@ function EditEquipmentDrawer() {
   // Form reference for resetting
   const formRef = useRef<HTMLFormElement>(null);
   
-  // Focus preservation refs
-  const brandInputRef = useRef<HTMLInputElement>(null);
-  const modelInputRef = useRef<HTMLInputElement>(null);
-  const plateNumberInputRef = useRef<HTMLInputElement>(null);
-  const ownerInputRef = useRef<HTMLInputElement>(null);
-  const beforeInputRef = useRef<HTMLInputElement>(null);
-  const remarksInputRef = useRef<HTMLTextAreaElement>(null);
-  const lastFocusedInput = useRef<string | null>(null);
+  // Focus preservation refs - REMOVED: Causing autofocus issues in edit mode
   
   // Tab state - EXACTLY like CreateEquipmentForm and EquipmentModalModern
   const [activeTab, setActiveTab] = useState<'details' | 'images' | 'documents' | 'parts'>('details');
@@ -333,27 +326,7 @@ function EditEquipmentDrawer() {
     }
   }, [selectedEquipment]); // CRITICAL FIX: Depend on full object to catch data changes
 
-  // Focus restoration effect - restore focus after re-renders
-  useEffect(() => {
-    if (lastFocusedInput.current) {
-      const inputRefs = {
-        brand: brandInputRef,
-        model: modelInputRef,
-        plateNumber: plateNumberInputRef,
-        owner: ownerInputRef,
-        before: beforeInputRef,
-        remarks: remarksInputRef
-      };
-      
-      const targetRef = inputRefs[lastFocusedInput.current as keyof typeof inputRefs];
-      if (targetRef?.current) {
-        // Use setTimeout to ensure the input is rendered
-        setTimeout(() => {
-          targetRef.current?.focus();
-        }, 0);
-      }
-    }
-  }, [formData]); // Run after form data changes
+  // REMOVED: Focus restoration effect that was causing autofocus issues in edit mode
 
   // REMOVED: Problematic cache sync useEffect that was causing focus issues
   // We'll rely on the onSuccess callback in the mutation to update the store
@@ -379,24 +352,20 @@ function EditEquipmentDrawer() {
     setFiles(prev => ({ ...prev, equipmentRegistration: file }));
   }, []);
 
-  // Create stable onChange handlers using useCallback to prevent focus loss
+  // Create stable onChange handlers using useCallback
   const handleBrandChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    lastFocusedInput.current = 'brand';
     setFormData(prev => ({ ...prev, brand: e.target.value }));
   }, []);
   
   const handleModelChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    lastFocusedInput.current = 'model';
     setFormData(prev => ({ ...prev, model: e.target.value }));
   }, []);
   
   const handlePlateNumberChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    lastFocusedInput.current = 'plateNumber';
     setFormData(prev => ({ ...prev, plateNumber: e.target.value }));
   }, []);
   
   const handleOwnerChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    lastFocusedInput.current = 'owner';
     setFormData(prev => ({ ...prev, owner: e.target.value }));
   }, []);
   
@@ -413,12 +382,10 @@ function EditEquipmentDrawer() {
   }, []);
   
   const handleBeforeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    lastFocusedInput.current = 'before';
     setFormData(prev => ({ ...prev, before: e.target.value }));
   }, []);
   
   const handleRemarksChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    lastFocusedInput.current = 'remarks';
     setFormData(prev => ({ ...prev, remarks: e.target.value }));
   }, []);
   
