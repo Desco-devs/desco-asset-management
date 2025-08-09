@@ -713,9 +713,10 @@ function EditEquipmentDrawer() {
     });
   };
 
-  // Tab content components - EXACTLY like CreateEquipmentForm  
-  const renderTabButton = (tab: 'details' | 'images' | 'documents' | 'parts', label: string, icon: React.ReactNode, count?: number) => (
+  // CRITICAL FIX: Memoize renderTabButton to prevent component re-creation
+  const renderTabButton = useCallback((tab: 'details' | 'images' | 'documents' | 'parts', label: string, icon: React.ReactNode, count?: number) => (
     <Button
+      key={tab} // Add key to help React identify the component
       type="button"
       variant={activeTab === tab ? 'default' : 'ghost'}
       size="sm"
@@ -732,7 +733,7 @@ function EditEquipmentDrawer() {
       </div>
       <span className="hidden sm:inline">{label}</span>
     </Button>
-  );
+  ), [activeTab]); // Only depend on activeTab
 
   const ModalContent = useMemo(() => (
     <div className="flex flex-col h-full">
@@ -845,6 +846,7 @@ function EditEquipmentDrawer() {
                       Brand *
                     </Label>
                     <Input
+                      key="brand-input" // Add stable key
                       id="brand"
                       name="brand"
                       value={formData.brand}
@@ -860,6 +862,7 @@ function EditEquipmentDrawer() {
                       Model *
                     </Label>
                     <Input
+                      key="model-input" // Add stable key
                       id="model"
                       name="model"
                       value={formData.model}
@@ -901,6 +904,7 @@ function EditEquipmentDrawer() {
                       Plate/Serial Number
                     </Label>
                     <Input
+                      key="plateNumber-input"
                       id="plateNumber"
                       name="plateNumber"
                       value={formData.plateNumber}
@@ -920,6 +924,7 @@ function EditEquipmentDrawer() {
                       Owner *
                     </Label>
                     <Input
+                      key="owner-input"
                       id="owner"
                       name="owner"
                       value={formData.owner}
@@ -1073,6 +1078,7 @@ function EditEquipmentDrawer() {
               <div className="space-y-2">
                 <Label htmlFor="remarks">Additional Notes</Label>
                 <Textarea
+                  key="remarks-textarea"
                   id="remarks"
                   name="remarks"
                   value={formData.remarks}
