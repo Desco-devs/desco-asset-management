@@ -1319,7 +1319,10 @@ function EditEquipmentDrawer() {
   if (isMobile) {
     return (
       <Drawer open={true} onOpenChange={handleCancel}>
-        <DrawerContent className="!max-h-[95dvh] flex flex-col">
+        <DrawerContent 
+          className="!max-h-[95dvh] flex flex-col"
+          onOpenAutoFocus={(e) => e.preventDefault()} // CRITICAL FIX: Prevent focus trap from stealing focus
+        >
           <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
             {/* Mobile Header - Exact copy from CreateEquipmentModalModern */}
             <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
@@ -1378,6 +1381,7 @@ function EditEquipmentDrawer() {
       <DialogContent 
         className="!max-w-none !w-[55vw] max-h-[95dvh] overflow-hidden flex flex-col p-6"
         style={{ maxWidth: '55vw', width: '55vw' }}
+        onOpenAutoFocus={(e) => e.preventDefault()} // CRITICAL FIX: Prevent focus trap from stealing focus
       >
         <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col h-full max-h-full">
           <DialogHeader className="flex-shrink-0 pb-4">
