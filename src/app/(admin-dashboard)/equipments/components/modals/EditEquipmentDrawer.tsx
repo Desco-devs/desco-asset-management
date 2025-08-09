@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useMemo, memo, useCallback } from "react";
 import { format } from "date-fns";
 import { useUpdateEquipment } from "@/hooks/useEquipmentQuery";
 import { useProjects } from "@/hooks/api/use-projects";
-import * as FocusScopeRadix from "@radix-ui/react-focus-scope";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -847,11 +846,10 @@ function EditEquipmentDrawer() {
                       Brand *
                     </Label>
                     <Input
-                      key="brand-input" // Add stable key
                       id="brand"
                       name="brand"
                       value={formData.brand}
-                      onChange={handleBrandChange}
+                      onChange={(e) => setFormData(prev => ({ ...prev, brand: e.target.value }))}
                       placeholder="Enter equipment brand"
                       required
                     />
@@ -863,11 +861,10 @@ function EditEquipmentDrawer() {
                       Model *
                     </Label>
                     <Input
-                      key="model-input" // Add stable key
                       id="model"
                       name="model"
                       value={formData.model}
-                      onChange={handleModelChange}
+                      onChange={(e) => setFormData(prev => ({ ...prev, model: e.target.value }))}
                       placeholder="Enter equipment model"
                       required
                     />
@@ -877,7 +874,7 @@ function EditEquipmentDrawer() {
                     <Label htmlFor="type">Equipment Type *</Label>
                     <Select 
                       value={formData.type} 
-                      onValueChange={handleTypeChange}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}
                       required
                     >
                       <SelectTrigger className="w-full">
@@ -905,11 +902,10 @@ function EditEquipmentDrawer() {
                       Plate/Serial Number
                     </Label>
                     <Input
-                      key="plateNumber-input"
                       id="plateNumber"
                       name="plateNumber"
                       value={formData.plateNumber}
-                      onChange={handlePlateNumberChange}
+                      onChange={(e) => setFormData(prev => ({ ...prev, plateNumber: e.target.value }))}
                       placeholder="Enter plate or serial number"
                     />
                   </div>
@@ -925,11 +921,10 @@ function EditEquipmentDrawer() {
                       Owner *
                     </Label>
                     <Input
-                      key="owner-input"
                       id="owner"
                       name="owner"
                       value={formData.owner}
-                      onChange={handleOwnerChange}
+                      onChange={(e) => setFormData(prev => ({ ...prev, owner: e.target.value }))}
                       placeholder="Enter equipment owner"
                       required
                     />
@@ -939,7 +934,7 @@ function EditEquipmentDrawer() {
                     <Label htmlFor="projectId">Assigned Project *</Label>
                     <Select 
                       value={formData.projectId} 
-                      onValueChange={handleProjectChange}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, projectId: value }))}
                       required
                     >
                       <SelectTrigger className="w-full">
@@ -967,7 +962,7 @@ function EditEquipmentDrawer() {
                     </Label>
                     <Select 
                       value={formData.status} 
-                      onValueChange={handleStatusChange}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as 'OPERATIONAL' | 'NON_OPERATIONAL' }))}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue />
@@ -988,7 +983,7 @@ function EditEquipmentDrawer() {
                       min="1"
                       max="12"
                       value={formData.before}
-                      onChange={handleBeforeChange}
+                      onChange={(e) => setFormData(prev => ({ ...prev, before: e.target.value }))}
                       placeholder="6"
                     />
                   </div>
@@ -1020,7 +1015,10 @@ function EditEquipmentDrawer() {
                         <Calendar
                           mode="single"
                           selected={formData.inspectionDate}
-                          onSelect={handleInspectionDateChange}
+                          onSelect={(date) => {
+                            setFormData(prev => ({ ...prev, inspectionDate: date || new Date() }));
+                            setInspectionDateOpen(false);
+                          }}
                           initialFocus
                           captionLayout="dropdown-buttons"
                           fromYear={1990}
@@ -1057,7 +1055,10 @@ function EditEquipmentDrawer() {
                         <Calendar
                           mode="single"
                           selected={formData.insuranceExpirationDate}
-                          onSelect={handleInsuranceDateChange}
+                          onSelect={(date) => {
+                            setFormData(prev => ({ ...prev, insuranceExpirationDate: date }));
+                            setInsuranceDateOpen(false);
+                          }}
                           initialFocus
                           captionLayout="dropdown-buttons"
                           fromYear={1990}
@@ -1079,11 +1080,10 @@ function EditEquipmentDrawer() {
               <div className="space-y-2">
                 <Label htmlFor="remarks">Additional Notes</Label>
                 <Textarea
-                  key="remarks-textarea"
                   id="remarks"
                   name="remarks"
                   value={formData.remarks}
-                  onChange={handleRemarksChange}
+                  onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
                   placeholder="Enter any additional notes or remarks about this equipment"
                   rows={3}
                 />
@@ -1320,14 +1320,7 @@ function EditEquipmentDrawer() {
   if (isMobile) {
     return (
       <Drawer open={true} onOpenChange={handleCancel}>
-        <FocusScopeRadix.FocusScope trapped={false} asChild>
-          <DrawerContent 
-            className="!max-h-[95dvh] flex flex-col"
-            onOpenAutoFocus={(e) => e.preventDefault()} // CRITICAL FIX: Prevent focus trap from stealing focus
-            onPointerDownOutside={(e) => e.preventDefault()}
-            onInteractOutside={(e) => e.preventDefault()}
-            onCloseAutoFocus={(e) => e.preventDefault()}
-          >
+        <DrawerContent className="!max-h-[95dvh] flex flex-col">
           <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
             {/* Mobile Header - Exact copy from CreateEquipmentModalModern */}
             <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
@@ -1375,8 +1368,7 @@ function EditEquipmentDrawer() {
               </div>
             </DrawerFooter>
           </form>
-          </DrawerContent>
-        </FocusScopeRadix.FocusScope>
+        </DrawerContent>
       </Drawer>
     );
   }
@@ -1384,15 +1376,10 @@ function EditEquipmentDrawer() {
   // Desktop dialog implementation - Exact copy from CreateEquipmentModalModern
   return (
     <Dialog open={true} onOpenChange={handleCancel}>
-      <FocusScopeRadix.FocusScope trapped={false} asChild>
-        <DialogContent 
-          className="!max-w-none !w-[55vw] max-h-[95dvh] overflow-hidden flex flex-col p-6"
-          style={{ maxWidth: '55vw', width: '55vw' }}
-          onOpenAutoFocus={(e) => e.preventDefault()} // CRITICAL FIX: Prevent focus trap from stealing focus
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => e.preventDefault()}
-        >
+      <DialogContent 
+        className="!max-w-none !w-[55vw] max-h-[95dvh] overflow-hidden flex flex-col p-6"
+        style={{ maxWidth: '55vw', width: '55vw' }}
+      >
         <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col h-full max-h-full">
           <DialogHeader className="flex-shrink-0 pb-4">
             <DialogTitle className="text-xl">Edit Equipment: {selectedEquipment?.brand} {selectedEquipment?.model}</DialogTitle>
@@ -1424,8 +1411,7 @@ function EditEquipmentDrawer() {
             </div>
           </DialogFooter>
         </form>
-        </DialogContent>
-      </FocusScopeRadix.FocusScope>
+      </DialogContent>
     </Dialog>
   );
 }
