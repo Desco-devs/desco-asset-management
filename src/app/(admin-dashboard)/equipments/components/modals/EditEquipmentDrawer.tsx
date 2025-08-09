@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo, memo, useCallback } from "react";
 import { format } from "date-fns";
 import { useUpdateEquipment } from "@/hooks/useEquipmentQuery";
 import { useProjects } from "@/hooks/api/use-projects";
+import * as FocusScopeRadix from "@radix-ui/react-focus-scope";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -1319,10 +1320,14 @@ function EditEquipmentDrawer() {
   if (isMobile) {
     return (
       <Drawer open={true} onOpenChange={handleCancel}>
-        <DrawerContent 
-          className="!max-h-[95dvh] flex flex-col"
-          onOpenAutoFocus={(e) => e.preventDefault()} // CRITICAL FIX: Prevent focus trap from stealing focus
-        >
+        <FocusScopeRadix.FocusScope trapped={false} asChild>
+          <DrawerContent 
+            className="!max-h-[95dvh] flex flex-col"
+            onOpenAutoFocus={(e) => e.preventDefault()} // CRITICAL FIX: Prevent focus trap from stealing focus
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
           <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
             {/* Mobile Header - Exact copy from CreateEquipmentModalModern */}
             <DrawerHeader className="p-4 pb-4 flex-shrink-0 border-b relative">
@@ -1370,7 +1375,8 @@ function EditEquipmentDrawer() {
               </div>
             </DrawerFooter>
           </form>
-        </DrawerContent>
+          </DrawerContent>
+        </FocusScopeRadix.FocusScope>
       </Drawer>
     );
   }
@@ -1378,11 +1384,15 @@ function EditEquipmentDrawer() {
   // Desktop dialog implementation - Exact copy from CreateEquipmentModalModern
   return (
     <Dialog open={true} onOpenChange={handleCancel}>
-      <DialogContent 
-        className="!max-w-none !w-[55vw] max-h-[95dvh] overflow-hidden flex flex-col p-6"
-        style={{ maxWidth: '55vw', width: '55vw' }}
-        onOpenAutoFocus={(e) => e.preventDefault()} // CRITICAL FIX: Prevent focus trap from stealing focus
-      >
+      <FocusScopeRadix.FocusScope trapped={false} asChild>
+        <DialogContent 
+          className="!max-w-none !w-[55vw] max-h-[95dvh] overflow-hidden flex flex-col p-6"
+          style={{ maxWidth: '55vw', width: '55vw' }}
+          onOpenAutoFocus={(e) => e.preventDefault()} // CRITICAL FIX: Prevent focus trap from stealing focus
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
         <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col h-full max-h-full">
           <DialogHeader className="flex-shrink-0 pb-4">
             <DialogTitle className="text-xl">Edit Equipment: {selectedEquipment?.brand} {selectedEquipment?.model}</DialogTitle>
@@ -1414,7 +1424,8 @@ function EditEquipmentDrawer() {
             </div>
           </DialogFooter>
         </form>
-      </DialogContent>
+        </DialogContent>
+      </FocusScopeRadix.FocusScope>
     </Dialog>
   );
 }
