@@ -6,26 +6,10 @@ import { useProjects } from "@/hooks/api/use-projects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import {
-  selectIsMobile,
   selectSelectedEquipment,
   useEquipmentStore,
 } from "@/stores/equipmentStore";
@@ -33,7 +17,6 @@ import {
 export default function EditEquipmentDrawer() {
   // Store state
   const selectedEquipment = useEquipmentStore(selectSelectedEquipment);
-  const isMobile = useEquipmentStore(selectIsMobile);
   const { setIsEditMode, setIsModalOpen } = useEquipmentStore();
 
   // Server data
@@ -173,59 +156,63 @@ export default function EditEquipmentDrawer() {
         </div>
       </div>
 
-      {/* Selects */}
+      {/* Selects - Using simple HTML select to avoid focus issues */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="type">Equipment Type *</Label>
-          <Select value={type} onValueChange={setType} required>
-            <SelectTrigger>
-              <SelectValue placeholder="Select equipment type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Excavator">Excavator</SelectItem>
-              <SelectItem value="Bulldozer">Bulldozer</SelectItem>
-              <SelectItem value="Crane">Crane</SelectItem>
-              <SelectItem value="Loader">Loader</SelectItem>
-              <SelectItem value="Grader">Grader</SelectItem>
-              <SelectItem value="Compactor">Compactor</SelectItem>
-              <SelectItem value="Dump Truck">Dump Truck</SelectItem>
-              <SelectItem value="Mixer">Mixer</SelectItem>
-              <SelectItem value="Generator">Generator</SelectItem>
-              <SelectItem value="Pump">Pump</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
-            </SelectContent>
-          </Select>
+          <select 
+            id="type"
+            value={type} 
+            onChange={(e) => setType(e.target.value)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            required
+          >
+            <option value="">Select equipment type</option>
+            <option value="Excavator">Excavator</option>
+            <option value="Bulldozer">Bulldozer</option>
+            <option value="Crane">Crane</option>
+            <option value="Loader">Loader</option>
+            <option value="Grader">Grader</option>
+            <option value="Compactor">Compactor</option>
+            <option value="Dump Truck">Dump Truck</option>
+            <option value="Mixer">Mixer</option>
+            <option value="Generator">Generator</option>
+            <option value="Pump">Pump</option>
+            <option value="Other">Other</option>
+          </select>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="projectId">Assigned Project *</Label>
-          <Select value={projectId} onValueChange={setProjectId} required>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a project" />
-            </SelectTrigger>
-            <SelectContent>
-              {projectsArray.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <select 
+            id="projectId"
+            value={projectId} 
+            onChange={(e) => setProjectId(e.target.value)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            required
+          >
+            <option value="">Select a project</option>
+            {projectsArray.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="status">Operational Status</Label>
-          <Select value={status} onValueChange={(value: 'OPERATIONAL' | 'NON_OPERATIONAL') => setStatus(value)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="OPERATIONAL">Operational</SelectItem>
-              <SelectItem value="NON_OPERATIONAL">Non-Operational</SelectItem>
-            </SelectContent>
-          </Select>
+          <select 
+            id="status"
+            value={status} 
+            onChange={(e) => setStatus(e.target.value as 'OPERATIONAL' | 'NON_OPERATIONAL')}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
+            <option value="OPERATIONAL">Operational</option>
+            <option value="NON_OPERATIONAL">Non-Operational</option>
+          </select>
         </div>
       </div>
 
@@ -243,60 +230,31 @@ export default function EditEquipmentDrawer() {
     </div>
   );
 
-  // Mobile drawer
-  if (isMobile) {
-    return (
-      <Drawer open={true} onOpenChange={handleCancel}>
-        <DrawerContent className="max-h-[90vh]">
-          <form onSubmit={handleSubmit} className="flex flex-col h-full">
-            <DrawerHeader>
-              <DrawerTitle>Edit Equipment</DrawerTitle>
-            </DrawerHeader>
-            
-            <div className="flex-1 overflow-y-auto p-4">
-              <FormContent />
-            </div>
-            
-            <DrawerFooter>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={handleCancel} disabled={updateEquipmentMutation.isPending}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={updateEquipmentMutation.isPending}>
-                  {updateEquipmentMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Changes
-                    </>
-                  )}
-                </Button>
-              </div>
-            </DrawerFooter>
-          </form>
-        </DrawerContent>
-      </Drawer>
-    );
-  }
-
-  // Desktop dialog
+  // Simple overlay - no complex focus management
   return (
-    <Dialog open={true} onOpenChange={handleCancel}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
-          <DialogHeader>
-            <DialogTitle>Edit Equipment: {selectedEquipment?.brand} {selectedEquipment?.model}</DialogTitle>
-          </DialogHeader>
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b">
+            <h2 className="text-lg font-semibold">Edit Equipment: {selectedEquipment?.brand} {selectedEquipment?.model}</h2>
+            <button 
+              type="button" 
+              onClick={handleCancel} 
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+              disabled={updateEquipmentMutation.isPending}
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
           
-          <div className="flex-1 overflow-y-auto p-1">
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
             <FormContent />
           </div>
           
-          <DialogFooter>
+          {/* Footer */}
+          <div className="flex justify-end gap-3 p-6 border-t bg-gray-50">
             <Button type="button" variant="outline" onClick={handleCancel} disabled={updateEquipmentMutation.isPending}>
               Cancel
             </Button>
@@ -313,9 +271,9 @@ export default function EditEquipmentDrawer() {
                 </>
               )}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
