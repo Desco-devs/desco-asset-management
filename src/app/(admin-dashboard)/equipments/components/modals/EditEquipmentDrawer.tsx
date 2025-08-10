@@ -33,10 +33,17 @@ export default function EditEquipmentDrawer() {
   const [projectId, setProjectId] = useState('');
   const [status, setStatus] = useState<'OPERATIONAL' | 'NON_OPERATIONAL'>('OPERATIONAL');
   const [remarks, setRemarks] = useState('');
+  
+  // Track if user is actively editing to prevent form resets
+  const [isUserEditing, setIsUserEditing] = useState(false);
+  const [initializedEquipmentId, setInitializedEquipmentId] = useState<string | null>(null);
 
-  // Initialize form ONCE
+  // Initialize form ONCE - only when equipment changes and user is not actively editing
   useEffect(() => {
-    if (selectedEquipment) {
+    if (selectedEquipment && 
+        selectedEquipment.id !== initializedEquipmentId && 
+        !isUserEditing) {
+      console.log('🏗️ Initializing form for equipment:', selectedEquipment.id);
       setBrand(selectedEquipment.brand || '');
       setModel(selectedEquipment.model || '');
       setPlateNumber(selectedEquipment.plate_number || '');
@@ -45,12 +52,24 @@ export default function EditEquipmentDrawer() {
       setProjectId(selectedEquipment.project?.id || '');
       setStatus(selectedEquipment.status || 'OPERATIONAL');
       setRemarks(selectedEquipment.remarks || '');
+      setInitializedEquipmentId(selectedEquipment.id);
     }
-  }, [selectedEquipment?.id]); // Only when equipment ID changes
+  }, [selectedEquipment?.id, isUserEditing, initializedEquipmentId]);
+
+  // Start tracking user editing on first input focus
+  const handleInputFocus = () => {
+    if (!isUserEditing) {
+      console.log('👤 User started editing - preventing form resets');
+      setIsUserEditing(true);
+    }
+  };
 
   const handleCancel = () => {
     setIsEditMode(false);
     setIsModalOpen(true);
+    // Reset editing state
+    setIsUserEditing(false);
+    setInitializedEquipmentId(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,6 +118,9 @@ export default function EditEquipmentDrawer() {
         toast.success(`Equipment "${brand} ${model}" updated successfully!`);
         setIsEditMode(false);
         setIsModalOpen(true);
+        // Reset editing state after successful save
+        setIsUserEditing(false);
+        setInitializedEquipmentId(null);
       },
       onError: () => {
         // Error handled by mutation hook
@@ -118,6 +140,7 @@ export default function EditEquipmentDrawer() {
             id="brand"
             value={brand}
             onChange={(e) => setBrand(e.target.value)}
+            onFocus={handleInputFocus}
             placeholder="Enter equipment brand"
             required
           />
@@ -129,6 +152,7 @@ export default function EditEquipmentDrawer() {
             id="model"
             value={model}
             onChange={(e) => setModel(e.target.value)}
+            onFocus={handleInputFocus}
             placeholder="Enter equipment model"
             required
           />
@@ -140,6 +164,7 @@ export default function EditEquipmentDrawer() {
             id="plateNumber"
             value={plateNumber}
             onChange={(e) => setPlateNumber(e.target.value)}
+            onFocus={handleInputFocus}
             placeholder="Enter plate or serial number"
           />
         </div>
@@ -150,6 +175,7 @@ export default function EditEquipmentDrawer() {
             id="owner"
             value={owner}
             onChange={(e) => setOwner(e.target.value)}
+            onFocus={handleInputFocus}
             placeholder="Enter equipment owner"
             required
           />
@@ -164,6 +190,7 @@ export default function EditEquipmentDrawer() {
             id="type"
             value={type} 
             onChange={(e) => setType(e.target.value)}
+            onFocus={handleInputFocus}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             required
           >
@@ -188,6 +215,7 @@ export default function EditEquipmentDrawer() {
             id="projectId"
             value={projectId} 
             onChange={(e) => setProjectId(e.target.value)}
+            onFocus={handleInputFocus}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             required
           >
@@ -208,6 +236,7 @@ export default function EditEquipmentDrawer() {
             id="status"
             value={status} 
             onChange={(e) => setStatus(e.target.value as 'OPERATIONAL' | 'NON_OPERATIONAL')}
+            onFocus={handleInputFocus}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             <option value="OPERATIONAL">Operational</option>
@@ -223,6 +252,7 @@ export default function EditEquipmentDrawer() {
           id="remarks"
           value={remarks}
           onChange={(e) => setRemarks(e.target.value)}
+          onFocus={handleInputFocus}
           placeholder="Enter any additional notes or remarks about this equipment"
           rows={3}
         />
